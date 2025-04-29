@@ -1,0 +1,22 @@
+{
+    "name": "mirror-and-mountain/meros-framework",
+    "description": "Pending",
+    "type": "library",
+    "license": "MIT",
+    "version": "dev-main",
+    "authors": [
+        {
+            "name": "tmw-mm",
+            "email": "toby@mirrorandmountain.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "MM\\Meros\\Contracts\\": "src/Contracts",
+            "MM\\Meros\\Traits\\": "src/Traits",
+            "MM\\Meros\\Helpers\\": "src/Helpers"
+        }
+    },
+    "minimum-stability": "stable",
+    "require": {}
+}
