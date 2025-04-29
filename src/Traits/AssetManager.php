@@ -16,12 +16,10 @@ trait AssetManager
     ];
     
     protected string $assetsDir  = 'assets/build';
-    protected string $scriptsDir = 'scripts/build';
     protected array  $scripts    = [];
     protected array  $scriptDeps = [];
     protected bool   $putScriptsInFooter = false;
 
-    protected string $stylesDir = 'styles/build';
     protected array  $styles    = [];
     protected array  $styleDeps = [];
 
@@ -59,20 +57,25 @@ trait AssetManager
 
         $assets = File::glob( "{$path}/{$type}/*.{$extension}" );
 
+        if ($assets === []) {
+            return;
+        }
+
         foreach ( $assets as $asset ) {
 
             $pathInfo = pathinfo( $asset );
             $dependancyFile = trailingslashit( $pathInfo['dirname'] ) . $pathInfo['filename'] . 'asset.php';
+            $handle = $this->name . '_' . $type . '_' . $pathInfo['filename'] . '_' . strtolower( Str::random(4) );
 
             if ( $extension === 'js' ) {
 
                 $this->scriptDeps[ $type ] = file_exists( $dependancyFile ) ? include $dependancyFile : [];
-                $this->scripts[ $type ]    = Str::replace( $this->path, $this->uri, $asset );
+                $this->scripts[ $type ][ $handle ] = Str::replace( $this->path, $this->uri, $asset );
 
             } elseif ( $extension === 'css' ) {
 
                 $this->styleDeps[ $type ] = file_exists( $dependancyFile ) ? include $dependancyFile : [];
-                $this->styles[ $type ]    = Str::replace( $this->path, $this->uri, $asset );
+                $this->styles[ $type ][ $handle ] = Str::replace( $this->path, $this->uri, $asset );
                 
             }
 

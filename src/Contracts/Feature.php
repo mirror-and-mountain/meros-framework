@@ -65,6 +65,7 @@ abstract class Feature
         }
 
         if ($this->hasAssets) {
+            $this->loadAssets();
             $this->enqueueAssets();
         }
 
