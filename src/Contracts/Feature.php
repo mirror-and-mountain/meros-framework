@@ -56,9 +56,9 @@ abstract class Feature
 
     public function initialise(): void
     {
-        if (!$this->settings['enabled']) { 
-            return; 
-        }
+        // if (!$this->settings['enabled']) { 
+        //     return; 
+        // }
 
         if ($this->hasIncludes) {
             $this->include();
