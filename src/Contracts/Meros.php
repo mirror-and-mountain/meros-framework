@@ -3,6 +3,7 @@
 namespace MM\Meros\Contracts;
 
 use MM\Meros\Helpers\ClassInfo;
+use MM\Meros\Helpers\Features;
 use MM\Meros\Traits\ContextManager;
 use MM\Meros\Traits\AuthorManager;
 
@@ -10,7 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Arr;
 use Illuminate\Contracts\Foundation\Application;
 
-abstract class Meros implements FeatureManager 
+class Meros implements FeatureManager 
 {
     protected array $categories;
     protected array $features = [];
@@ -50,17 +51,18 @@ abstract class Meros implements FeatureManager
             $class = ClassInfo::get( $bootstrapper ); // Get the feature class
             if ( ! $class->isDescendantOf( Feature::class ) ) { return false; } // Return false if the feature isn't compliant
 
-            $classArgs = [
-                'name'     => $name,
-                'fullName' => $fullName,
-                'dotName'  => $dotName,
-                'category' => $category,
-                'path'     => $args['path'] ?? $class->path,
-                'uri'      => $args['uri'] ?? $class->uri
+            $featureArgs = [
+                'name'        => $name,
+                'fullName'    => $fullName,
+                'dotName'     => $dotName,
+                'category'    => $category,
+                'optionGroup' => $this->categories[ $category ],
+                'path'        => $args['path'] ?? $class->path,
+                'uri'         => $args['uri'] ?? $class->uri
             ];
 
             $pluginInfo = $class->extends( Plugin::class ) ? $args['pluginInfo'] : null;
-            $feature    = $this->instantiateFeature( $class, $classArgs, $pluginInfo ); // Instantiate the featured
+            $feature    = Features::instantiate( $this->app, $class, $featureArgs, $pluginInfo  );
 
             Arr::set( $this->features, $dotName, $feature ); // Add the feature
         }
@@ -68,28 +70,11 @@ abstract class Meros implements FeatureManager
         return true;
     }
 
-    protected function instantiateFeature( object $class, array $args, array|null $pluginInfo ): object
+    public function __addInstantiatedFeature( string $name, object $feature ): void
     {
-        $optionGroup = $this->categories[ $args['category'] ];
-        $this->app->singleton(
-            $args['dotName'],
-            fn() => new $class->name( 
-                $args['name'], 
-                $args['fullName'], 
-                $args['category'], 
-                $optionGroup, 
-                $args['path'], 
-                $args['uri'],
-            )
-        );
-
-        $instance = $this->app->make( $args['dotName'] );
-
-        if ( $pluginInfo ) {
-            $instance->setPluginInfo( $pluginInfo );
+        if ( !array_key_exists( $name, $this->features ) ) {
+            Arr::set( $this->features, $name, $feature );
         }
-
-        return $instance;
     }
 
     public function getFeatures(): array
@@ -116,5 +101,20 @@ abstract class Meros implements FeatureManager
         );
     }
 
-    public abstract function bootstrap();
+    public function bootstrap(): void
+    {
+        $features = Arr::dot( $this->features );
+
+        foreach ( $features as $feature ) {
+
+            if ( is_callable( $feature ) ) {
+                call_user_func( $feature );
+            } 
+
+            else {
+                $feature->initialise();
+            }
+
+        }
+    }
 }

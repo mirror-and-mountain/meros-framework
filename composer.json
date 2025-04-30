@@ -12,10 +12,13 @@
     ],
     "autoload": {
         "psr-4": {
+            "MM\\Meros\\Providers\\": "src/Providers",
+            "MM\\Meros\\CoreFeatures\\": "src/CoreFeatures",
             "MM\\Meros\\Contracts\\": "src/Contracts",
             "MM\\Meros\\Traits\\": "src/Traits",
             "MM\\Meros\\Helpers\\": "src/Helpers"
-        }
+        },
+        "files": ["src/bootstrap.php"]
     },
     "minimum-stability": "stable",
     "require": {}
