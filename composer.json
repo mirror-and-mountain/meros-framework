@@ -19,7 +19,8 @@
             "MM\\Meros\\Helpers\\": "src/Helpers"
         }
     },
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
+    "prefer-stable": true,
     "repositories": [
         {
             "type": "vcs",
