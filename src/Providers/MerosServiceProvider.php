@@ -13,7 +13,7 @@ use MM\Meros\Helpers\ClassInfo;
 use MM\Meros\Helpers\PluginInfo;
 use MM\Meros\Helpers\Features;
 
-use MM\Meros\CoreFeatures\DynamicPage;
+use MM\Meros\CoreFeatures\DynamicPage\Feature as DynamicPage;
 
 class MerosServiceProvider extends ServiceProvider
 {
@@ -36,6 +36,8 @@ class MerosServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->ensureAppKey();
+
         $meros = $this->app->make(Meros::class);
 
         $this->loadCoreFeatures( $meros );
@@ -60,10 +62,13 @@ class MerosServiceProvider extends ServiceProvider
 
             $featureArgs = array_merge($feature, $args);
 
-            $class = ClassInfo::get( $featureArgs['class'] );
-            if ( ! $class->isDescendantOf( Feature::class ) ) { continue; }
+            $classInfo = ClassInfo::get( $featureArgs['class'] );
+            if ( ! $classInfo->isDescendantOf( Feature::class ) ) { continue; }
 
-            $instance = Features::instantiate( $this->app, $class, $featureArgs );
+            $featureArgs['path'] = $classInfo->path;
+            $featureArgs['uri']  = $classInfo->uri;
+
+            $instance = Features::instantiate( $this->app, $featureArgs['class'], $featureArgs );
             $meros->__addInstantiatedFeature( $featureArgs['fullName'], $instance );
         }
     }
@@ -108,6 +113,26 @@ class MerosServiceProvider extends ServiceProvider
 
                 });
             }
+        }
+    }
+
+    protected function ensureAppKey(): void
+    {
+        $envPath = base_path('.env');
+        $key = 'base64:' . base64_encode(random_bytes(32));
+        $comment = "# An App Key is required for Livewire functionality";
+
+        if (!file_exists($envPath)) {
+            $envContent = "{$comment}\nAPP_KEY={$key}\n";
+            file_put_contents($envPath, $envContent);
+            return;
+        }
+
+        $envContent = file_get_contents($envPath);
+
+        if (!preg_match('/^APP_KEY=.*$/m', $envContent)) {
+            $envContent = rtrim($envContent) . "\n\n{$comment}\nAPP_KEY={$key}\n";
+            file_put_contents($envPath, $envContent);
         }
     }
 }

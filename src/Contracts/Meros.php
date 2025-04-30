@@ -48,8 +48,8 @@ class Meros implements FeatureManager
         if ( is_callable( $bootstrapper ) ) {
             Arr::set( $this->features, $dotName, $bootstrapper );
         } else {
-            $class = ClassInfo::get( $bootstrapper ); // Get the feature class
-            if ( ! $class->isDescendantOf( Feature::class ) ) { return false; } // Return false if the feature isn't compliant
+            $classInfo = ClassInfo::get( $bootstrapper ); // Get the feature class
+            if ( ! $classInfo->isDescendantOf( Feature::class ) ) { return false; } // Return false if the feature isn't compliant
 
             $featureArgs = [
                 'name'        => $name,
@@ -57,12 +57,12 @@ class Meros implements FeatureManager
                 'dotName'     => $dotName,
                 'category'    => $category,
                 'optionGroup' => $this->categories[ $category ],
-                'path'        => $args['path'] ?? $class->path,
-                'uri'         => $args['uri'] ?? $class->uri
+                'path'        => $args['path'] ?? $classInfo->path,
+                'uri'         => $args['uri'] ?? $classInfo->uri
             ];
 
-            $pluginInfo = $class->extends( Plugin::class ) ? $args['pluginInfo'] : null;
-            $feature    = Features::instantiate( $this->app, $class, $featureArgs, $pluginInfo  );
+            $pluginInfo = $classInfo->extends( Plugin::class ) ? $args['pluginInfo'] : null;
+            $feature    = Features::instantiate( $this->app, $bootstrapper, $featureArgs, $pluginInfo  );
 
             Arr::set( $this->features, $dotName, $feature ); // Add the feature
         }
