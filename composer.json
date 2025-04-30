@@ -21,5 +21,9 @@
         "files": ["src/bootstrap.php"]
     },
     "minimum-stability": "stable",
-    "require": {}
+    "require": {
+        "roots/acorn": "^5.0",
+        "livewire/livewire": "^3.6",
+        "joserick/laravel-livewire-discover": "^1.3"
+    }
 }
