@@ -17,8 +17,7 @@
             "MM\\Meros\\Contracts\\": "src/Contracts",
             "MM\\Meros\\Traits\\": "src/Traits",
             "MM\\Meros\\Helpers\\": "src/Helpers"
-        },
-        "files": ["src/bootstrap.php"]
+        }
     },
     "minimum-stability": "stable",
     "require": {
