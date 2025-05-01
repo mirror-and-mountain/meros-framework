@@ -1,6 +1,6 @@
 <?php
 
-namespace MM\Meros\App\Features;
+namespace App\Features;
 
 use MM\Meros\Contracts\Plugin;
 
