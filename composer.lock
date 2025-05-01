@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b2a929743e88d5ea4deac8fc3f403d31",
+    "content-hash": "61605a97dd87c265cee1d78465dcbfed",
     "packages": [
         {
             "name": "brick/math",
@@ -2896,19 +2896,18 @@
         },
         {
             "name": "mirror-and-mountain/meros-dynamic-page",
-            "version": "dev-main",
+            "version": "v0.0.2",
             "source": {
                 "type": "git",
                 "url": "git@github.com:mirror-and-mountain/meros-dynamic-page.git",
-                "reference": "2294107fe95fcffe8d603d44d5f9e159914747ac"
+                "reference": "5b1b027b9166d7f1cfbb5493c7108c2dceca136b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mirror-and-mountain/meros-dynamic-page/zipball/2294107fe95fcffe8d603d44d5f9e159914747ac",
-                "reference": "2294107fe95fcffe8d603d44d5f9e159914747ac",
+                "url": "https://api.github.com/repos/mirror-and-mountain/meros-dynamic-page/zipball/5b1b027b9166d7f1cfbb5493c7108c2dceca136b",
+                "reference": "5b1b027b9166d7f1cfbb5493c7108c2dceca136b",
                 "shasum": ""
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -2926,10 +2925,10 @@
             ],
             "description": "Pending",
             "support": {
-                "source": "https://github.com/mirror-and-mountain/meros-dynamic-page/tree/main",
+                "source": "https://github.com/mirror-and-mountain/meros-dynamic-page/tree/v0.0.2",
                 "issues": "https://github.com/mirror-and-mountain/meros-dynamic-page/issues"
             },
-            "time": "2025-05-01T11:01:19+00:00"
+            "time": "2025-05-01T11:47:17+00:00"
         },
         {
             "name": "monolog/monolog",
@@ -6301,9 +6300,7 @@
     "packages-dev": [],
     "aliases": [],
     "minimum-stability": "dev",
-    "stability-flags": {
-        "mirror-and-mountain/meros-dynamic-page": 20
-    },
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {},
