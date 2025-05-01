@@ -13,7 +13,7 @@ use MM\Meros\Helpers\ClassInfo;
 use MM\Meros\Helpers\PluginInfo;
 use MM\Meros\Helpers\Features;
 
-use MM\Meros\CoreFeatures\DynamicPage\Feature as DynamicPage;
+use MM\Meros\DynamicPage\Feature as DynamicPage;
 
 class MerosServiceProvider extends ServiceProvider
 {

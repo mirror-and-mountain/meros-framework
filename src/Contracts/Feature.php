@@ -69,6 +69,11 @@ abstract class Feature
             $this->enqueueAssets();
         }
 
+        if ($this->hasComponents) {
+            $this->loadComponents();
+            $this->loadViews();
+        }
+
         if ($this->hasBlocks) {
             $this->registerBlocks();
         }

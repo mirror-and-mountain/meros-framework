@@ -20,7 +20,7 @@ trait ComponentManager
     protected array  $components    = [];
     protected array  $views         = [];
 
-    protected bool   $useFullNameForComponents = true;
+    protected bool   $useFullNameForComponents = false;
 
     final protected function loadComponents(): void
     {
@@ -78,7 +78,7 @@ trait ComponentManager
         foreach ( $candidates as $view ) {
 
             $pathInfo = pathinfo( $view );
-            $name     = $naming . '_' . Str::replace( '.blade', '', Str::slug( $pathInfo['filename'] ) );
+            $name     = $naming . '_' . Str::replace( 'blade', '', Str::slug( $pathInfo['filename'] ) );
 
             $this->views[ $name ] = $path;
 
