@@ -20,7 +20,6 @@ abstract class ThemeManager implements ThemeInterface
     protected array $features   = [];
 
     protected bool  $disableThemeSettings = false;
-    protected bool  $alwaysInjectLivewire = false;
     public bool     $useSinglePageLoading = false;
 
     use ContextManager, AuthorManager;
@@ -42,22 +41,6 @@ abstract class ThemeManager implements ThemeInterface
 
         if ( !$this->disableThemeSettings ) {
             add_action( 'admin_menu', [$this, 'initialiseAdminPages'] );
-        }
-
-        if ( $this->alwaysInjectLivewire || $this->useSinglePageLoading ) {
-
-            add_action('wp_enqueue_scripts', function() {
-                $themePath = '/vendor/mirror-and-mountain/meros-framework/src/assets/build/meros-livewire.js';
-                $src       = trailingslashit( $this->contextUri ) . $themePath;
-                $path      = wp_normalize_path( dirname(__DIR__) . '/assets/build/meros-livewire.js' );
-                wp_enqueue_script(
-                    'meros-livewire',
-                    $src,
-                    [],
-                    filemtime($path),
-                    true
-                );
-            });
         }
     }
 
