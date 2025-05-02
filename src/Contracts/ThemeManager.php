@@ -44,15 +44,21 @@ abstract class ThemeManager implements ThemeInterface
             add_action( 'admin_menu', [$this, 'initialiseAdminPages'] );
         }
 
-        add_action('wp_enqueue_scripts', function () {
-            wp_enqueue_script( 
-                'livewire', 
-                get_theme_file_uri('vendor/livewire/livewire/dist/livewire.js'),
-                [],
-                null,
-                true
-            );
-        });
+        if ( $this->alwaysInjectLivewire || $this->useSinglePageLoading ) {
+
+            add_action('wp_enqueue_scripts', function() {
+                $themePath = '/vendor/mirror-and-mountain/meros-framework/src/assets/build/meros-livewire.js';
+                $src       = trailingslashit( $this->contextUri ) . $themePath;
+                $path      = wp_normalize_path( dirname(__DIR__) . '/assets/build/meros-livewire.js' );
+                wp_enqueue_script(
+                    'meros-livewire',
+                    $src,
+                    [],
+                    filemtime($path),
+                    true
+                );
+            });
+        }
     }
 
     final public static function bootstrap( string $themeName, array $providers = [] ): void
