@@ -1,0 +1,10 @@
+{
+    "name": "meros-framework",
+    "private": true,
+    "scripts": {
+        "build": "wp-scripts build --config webpack.config.js"
+    },
+    "devDependencies": {
+        "@wordpress/scripts": "^30.13.0"
+    }
+}

@@ -1,0 +1,14 @@
+# Exclude development source folders
+src/assets/src/ export-ignore
+
+# Exclude config and metadata files not needed in production
+.gitattributes export-ignore
+.gitignore export-ignore
+
+# Exclude documentation and meta files
+README.md export-ignore
+
+# Exclude package managers' config
+package.json export-ignore
+package-lock.json export-ignore
+webpack.config.js export-ignore

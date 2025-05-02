@@ -43,6 +43,16 @@ abstract class ThemeManager implements ThemeInterface
         if ( !$this->disableThemeSettings ) {
             add_action( 'admin_menu', [$this, 'initialiseAdminPages'] );
         }
+
+        add_action('wp_enqueue_scripts', function () {
+            wp_enqueue_script( 
+                'livewire', 
+                get_theme_file_uri('vendor/livewire/livewire/dist/livewire.js'),
+                [],
+                null,
+                true
+            );
+        });
     }
 
     final public static function bootstrap( string $themeName, array $providers = [] ): void
