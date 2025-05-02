@@ -12,6 +12,7 @@ use MM\Meros\Traits\AuthorManager;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Contracts\Foundation\Application;
 
 abstract class ThemeManager implements ThemeInterface
@@ -19,8 +20,9 @@ abstract class ThemeManager implements ThemeInterface
     protected array $categories = [];
     protected array $features   = [];
 
-    protected bool  $disableThemeSettings = false;
-    public bool     $useSinglePageLoading = false;
+    protected bool  $alwaysInjectLivewireAssets = false;
+    protected bool  $disableThemeSettings       = false;
+    public bool     $useSinglePageLoading       = false;
 
     use ContextManager, AuthorManager;
 
@@ -41,6 +43,10 @@ abstract class ThemeManager implements ThemeInterface
 
         if ( !$this->disableThemeSettings ) {
             add_action( 'admin_menu', [$this, 'initialiseAdminPages'] );
+        }
+
+        if ( $this->alwaysInjectLivewireAssets || $this->useSinglePageLoading ) {
+            $this->injectLivewireAssets();
         }
     }
 
@@ -75,6 +81,19 @@ abstract class ThemeManager implements ThemeInterface
     }
 
     protected abstract function configure(): void;
+
+    final protected function injectLivewireAssets(): void
+    {
+        // Add Livewire styles to the head
+        add_action('wp_head', function () {
+            echo Blade::render('@livewireStyles');
+        });
+
+        // Add Livewire scripts to the footer
+        add_action('wp_footer', function () {
+            echo Blade::render('@livewireScripts');
+        });
+    }
 
     final public function addFeature( 
         string $name, 

@@ -61,12 +61,13 @@ trait AssetManager
             return;
         }
 
+        $i = 0;
         foreach ( $assets as $asset ) {
 
             $pathInfo = pathinfo( $asset );
             $dependancyFile = trailingslashit( $pathInfo['dirname'] ) . $pathInfo['filename'] . 'asset.php';
             $name = $this->useFullNameForAssets ? $this->fullName : $this->name;
-            $handle = $name . '_' . $type . '_' . $pathInfo['filename'] . '_' . strtolower( Str::random(4) );
+            $handle = $name . '_' . $type . '_' . $pathInfo['filename'] . '_' . $i;
 
             if ( $extension === 'js' ) {
 
@@ -79,6 +80,8 @@ trait AssetManager
                 $this->styles[ $type ][ $handle ] = Str::replace( $this->path, $this->uri, $asset );
                 
             }
+
+            $i++;
         }
     }
 
@@ -86,10 +89,10 @@ trait AssetManager
     {
         add_action('init', function () {
             foreach ( $this->assetTypes as $type => $_ ) {
+                $i = 0;
                 foreach ( $this->scripts[ $type ] ?? [] as $handle => $src ) {
                     if ( !is_string( $handle ) ) {
-                        $id     = strtolower( Str::random(4) );
-                        $handle = "{$this->name}_{$type}_script_{$id}";
+                        $handle = "{$this->name}_{$type}_script_{$i}";
                     }
 
                     $registered = wp_register_script(
@@ -103,12 +106,13 @@ trait AssetManager
                     if ( $registered !== false ) {
                         $this->registeredScripts[ $type ][ $handle ] = $src; 
                     }
+                    $i++;
                 }
 
+                $i = 0;
                 foreach ( $this->styles[ $type ] ?? [] as $handle => $src ) {
                     if ( !is_string( $handle ) ) {
-                        $id     = strtolower( Str::random(4) );
-                        $handle = "{$this->name}_{$type}_style_{$id}";
+                        $handle = "{$this->name}_{$type}_style_{$i}";
                     }
 
                     $registered = wp_register_style(
@@ -121,6 +125,7 @@ trait AssetManager
                     if ( $registered !== false ) {
                         $this->registeredStyles[ $type ][ $handle ] = $src; 
                     }
+                    $i++;
                 }
             }
         });
