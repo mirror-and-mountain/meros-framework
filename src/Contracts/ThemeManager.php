@@ -16,8 +16,8 @@ use Illuminate\Contracts\Foundation\Application;
 
 abstract class ThemeManager implements ThemeInterface
 {
-    protected array $categories;
-    protected array $features = [];
+    protected array $categories = [];
+    protected array $features   = [];
 
     protected bool  $disableThemeSettings = false;
     protected bool  $alwaysInjectLivewire = false;
@@ -45,7 +45,7 @@ abstract class ThemeManager implements ThemeInterface
         }
     }
 
-    final protected static function bootstrap( string $themeName, array $providers = [] ): void
+    final public static function bootstrap( string $themeName, array $providers = [] ): void
     {
         defined('MEROS_BOOT')     || define('MEROS_BOOT', true);
         defined('MEROS_BASEPATH') || define('MEROS_BASEPATH', get_theme_file_path());
@@ -141,12 +141,12 @@ abstract class ThemeManager implements ThemeInterface
     {
         // Theme Settings
         add_theme_page(
-            "{$this->contextName} Settings",
+            "{$this->context} Settings",
             'Settings',
             'manage_options',
             'meros_theme_settings',
             function () {
-                echo "<div class=\"wrap\"><h1>" . esc_html( $this->contextName ) . " Settings</h1><p>I am an options page.</p></div>";
+                echo "<div class=\"wrap\"><h1>" . esc_html( $this->context ) . " Settings</h1><p>I am an options page.</p></div>";
             }            
         );
     }
