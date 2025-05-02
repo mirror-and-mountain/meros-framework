@@ -34,16 +34,16 @@ class Composer
                 $io->write("<info>Main plugin file detected: {$pluginFile}</info>");
                 $io->write("Generating plugin feature class</info>");
 
-                $featureClass = str_replace(' ', '', ucwords(str_replace('-', ' ', basename($installPath))));
-                $featureFile  = dirname($installPath, 2) . '/app/Features/' . $featureClass . '.php';
-                $stubPath     = dirname(__DIR__) . '/stubs/Feature.stub';
+                $pluginClass = str_replace(' ', '', ucwords(str_replace('-', ' ', basename($installPath))));
+                $pluginFile  = dirname($installPath, 2) . '/app/Plugins/' . $pluginClass . '.php';
+                $stubPath    = dirname(__DIR__) . '/stubs/Plugin.stub';
 
-                if (file_exists( $stubPath ) && !file_exists( $featureFile )) {
+                if (file_exists( $stubPath ) && !file_exists( $pluginFile )) {
                     $stub     = file_get_contents( $stubPath );
-                    $rendered = str_replace('{{class}}', $featureClass, $stub);
+                    $rendered = str_replace('{{class}}', $pluginClass, $stub);
 
-                    file_put_contents($featureFile, $rendered);
-                    $io->write("<info>Generated: {$featureFile}</info>");
+                    file_put_contents($pluginFile, $rendered);
+                    $io->write("<info>Generated: {$pluginFile}</info>");
                 }
             }
         }

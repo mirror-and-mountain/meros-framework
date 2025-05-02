@@ -2,6 +2,9 @@
 
 namespace MM\Meros\Contracts;
 
+use Roots\Acorn\Application as RootsApplication;
+use MM\Meros\Providers\MerosServiceProvider;
+
 use MM\Meros\Helpers\ClassInfo;
 use MM\Meros\Helpers\Features;
 use MM\Meros\Traits\ContextManager;
@@ -11,29 +14,76 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Arr;
 use Illuminate\Contracts\Foundation\Application;
 
-class Meros implements FeatureManager 
+abstract class ThemeManager implements ThemeInterface
 {
     protected array $categories;
     protected array $features = [];
 
+    protected bool  $disableThemeSettings = false;
+    protected bool  $alwaysInjectLivewire = false;
+    public bool     $useSinglePageLoading = false;
+
     use ContextManager, AuthorManager;
 
-    public function __construct( protected Application $app )
+    final public function __construct( protected Application $app )
     {
         $theme = wp_get_theme();
-        $this->context = 'theme';
-        $this->contextName = $theme->get('Name');
+        $this->context     = $theme->get('Name');
         $this->contextUri  = get_theme_file_uri();
 
-        $this->categories = [
-            'blocks'        => 'meros_theme_settings',
-            'miscellaneous' => 'meros_theme_settings'
-        ];
+        $this->configure();
 
-        add_action( 'admin_menu', [$this, 'initialiseAdminPages'] );
+        if ( $this->categories === [] ) {
+            $this->categories = [
+                'blocks'        => 'meros_theme_settings',
+                'miscellaneous' => 'meros_theme_settings'
+            ];
+        }
+
+        if ( !$this->disableThemeSettings ) {
+            add_action( 'admin_menu', [$this, 'initialiseAdminPages'] );
+        }
     }
 
-    public function addFeature( string $name, string $category, string|callable $bootstrapper, string|array $author, array $args = [] ): bool
+    final protected static function bootstrap( string $themeName, array $providers = [] ): void
+    {
+        defined('MEROS_BOOT')     || define('MEROS_BOOT', true);
+        defined('MEROS_BASEPATH') || define('MEROS_BASEPATH', get_theme_file_path());
+        defined('MEROS_BASEURI')  || define('MEROS_BASEURI', get_theme_file_uri());
+
+        if ( MEROS_BOOT !== false && class_exists( RootsApplication::class ) ) {
+
+            add_action( 'after_setup_theme', function() use ( $providers ) {
+
+                $providers = array_merge([MerosServiceProvider::class], $providers);
+
+                RootsApplication::configure( MEROS_BASEPATH )
+                    ->withProviders( $providers )
+                    ->withRouting( wordpress: true )
+                    ->boot();
+
+            }, 0);
+        }
+
+        // Enqueue theme stylesheet
+        add_action('wp_enqueue_scripts', function () use ( $themeName ) {
+            $handle = Str::slug( $themeName, '-' . '-styles' );
+            wp_enqueue_style(
+                $handle, 
+                get_stylesheet_uri()
+            );
+        });
+    }
+
+    protected abstract function configure(): void;
+
+    final public function addFeature( 
+        string $name, 
+        string $category, 
+        string|callable $bootstrapper, 
+        string|array $author, 
+        array $args = [] 
+    ): bool
     {   
         if ( !in_array( $category, array_keys( $this->categories ) ) ) { return false; } // Return false if the category isn't valid
         $author = $this->addAuthor( $author ); // Sanitize and add the author. Returns formatted name on success
@@ -70,24 +120,24 @@ class Meros implements FeatureManager
         return true;
     }
 
-    public function __addInstantiatedFeature( string $name, object $feature ): void
+    final public function __addInstantiatedFeature( string $name, object $feature ): void
     {
         if ( !array_key_exists( $name, $this->features ) ) {
             Arr::set( $this->features, $name, $feature );
         }
     }
 
-    public function getFeatures(): array
+    final public function getFeatures(): array
     {
         return $this->features;
     }
 
-    public function getFeature( string $name ): string|object|null
+    final public function getFeature( string $name ): string|object|null
     {
         return Arr::get( $this->features, $name ) ?? null;
     }
 
-    public function initialiseAdminPages(): void
+    final public function initialiseAdminPages(): void
     {
         // Theme Settings
         add_theme_page(
@@ -101,7 +151,7 @@ class Meros implements FeatureManager
         );
     }
 
-    public function bootstrap(): void
+    final public function initialise(): void
     {
         $features = Arr::dot( $this->features );
 
