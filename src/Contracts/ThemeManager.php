@@ -9,6 +9,7 @@ use MM\Meros\Helpers\ClassInfo;
 use MM\Meros\Helpers\Features;
 use MM\Meros\Traits\ContextManager;
 use MM\Meros\Traits\AuthorManager;
+use MM\Meros\Traits\AdminManager;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Arr;
@@ -17,93 +18,75 @@ use Illuminate\Contracts\Foundation\Application;
 
 abstract class ThemeManager implements ThemeInterface
 {
-    protected array $categories = [];
-    protected array $features   = [];
+    protected array $featureCategories = [];
+    private array   $features          = [];
 
-    protected bool  $alwaysInjectLivewireAssets = false;
-    protected bool  $disableThemeSettings       = false;
-    public bool     $useSinglePageLoading       = false;
+    protected bool  $enable_smooth_scrolling       = false;
+    protected bool  $always_inject_livewire_assets = false;
+    public bool     $use_single_page_loading       = false;
 
-    use ContextManager, AuthorManager;
+    use ContextManager, AuthorManager, AdminManager;
 
     final public function __construct( protected Application $app )
     {
-        $theme = wp_get_theme();
-        $this->context     = $theme->get('Name');
-        $this->contextUri  = get_theme_file_uri();
-
+        $this->setContext();
         $this->configure();
+        $this->enqueueThemeStyle();
 
-        if ( $this->categories === [] ) {
-            $this->categories = [
+        if ( $this->featureCategories === [] ) {
+            $this->featureCategories = [
                 'blocks'        => 'meros_theme_settings',
                 'miscellaneous' => 'meros_theme_settings'
             ];
         }
-
-        if ( !$this->disableThemeSettings ) {
-            add_action( 'admin_menu', [$this, 'initialiseAdminPages'] );
-        }
-
-        if ( $this->alwaysInjectLivewireAssets || $this->useSinglePageLoading ) {
-            $this->injectLivewireAssets();
-        }
     }
 
-    final public static function bootstrap( string $themeName, array $providers = [] ): void
+    final public static function bootstrap( array $providers = [] ): void
     {
-        defined('MEROS_BOOT')     || define('MEROS_BOOT', true);
-        defined('MEROS_BASEPATH') || define('MEROS_BASEPATH', get_theme_file_path());
-        defined('MEROS_BASEURI')  || define('MEROS_BASEURI', get_theme_file_uri());
-
-        if ( MEROS_BOOT !== false && class_exists( RootsApplication::class ) ) {
+        if ( class_exists( RootsApplication::class ) ) {
 
             add_action( 'after_setup_theme', function() use ( $providers ) {
 
                 $providers = array_merge([MerosServiceProvider::class], $providers);
-
-                RootsApplication::configure( MEROS_BASEPATH )
+                $root      = get_stylesheet_directory();
+                RootsApplication::configure( $root )
                     ->withProviders( $providers )
                     ->withRouting( wordpress: true )
                     ->boot();
 
             }, 0);
         }
-
-        // Enqueue theme stylesheet
-        add_action('wp_enqueue_scripts', function () use ( $themeName ) {
-            $handle = Str::slug( $themeName, '-' . '-styles' );
-            wp_enqueue_style(
-                $handle, 
-                get_stylesheet_uri()
-            );
-        });
     }
 
     protected abstract function configure(): void;
 
-    final protected function injectLivewireAssets(): void
+    private function enqueueThemeStyle(): void
     {
-        // Add Livewire styles to the head
-        add_action('wp_head', function () {
-            echo Blade::render('@livewireStyles');
-        });
+        $themeName = $this->themeName;
+        add_action('wp_enqueue_scripts', function () use ( $themeName ) {
+            $handle = Str::slug( $themeName, '-' . '-styles' );
+            wp_enqueue_style(
+                $handle, 
+                get_stylesheet_uri(),
+                [],
+                filemtime(trailingslashit(get_stylesheet_directory()) . 'style.css')
+            );
 
-        // Add Livewire scripts to the footer
-        add_action('wp_footer', function () {
-            echo Blade::render('@livewireScripts');
+            if ( $this->enable_smooth_scrolling ) {
+                $scrollingCSS = "
+                    html {
+                        scroll-behavior: smooth;
+                    }
+                ";
+
+                wp_add_inline_style( $handle, $scrollingCSS );
+            }
         });
     }
 
-    final public function addFeature( 
-        string $name, 
-        string $category, 
-        string|callable $bootstrapper, 
-        string|array $author, 
-        array $args = [] 
-    ): bool
+    final public function addFeature( string $name, string $category, string|callable $bootstrapper, string|array $author, array $args = [] ): bool
     {   
-        if ( !in_array( $category, array_keys( $this->categories ) ) ) { return false; } // Return false if the category isn't valid
+        if ( !in_array( $category, array_keys( $this->featureCategories ) ) ) { return false; } // Return false if the category isn't valid
         $author = $this->addAuthor( $author ); // Sanitize and add the author. Returns formatted name on success
         if ( !$author ) { return false; } // Return false if the author isn't valid
 
@@ -124,7 +107,7 @@ abstract class ThemeManager implements ThemeInterface
                 'fullName'    => $fullName,
                 'dotName'     => $dotName,
                 'category'    => $category,
-                'optionGroup' => $this->categories[ $category ],
+                'optionGroup' => $this->featureCategories[ $category ],
                 'path'        => $args['path'] ?? $classInfo->path,
                 'uri'         => $args['uri'] ?? $classInfo->uri
             ];
@@ -138,10 +121,15 @@ abstract class ThemeManager implements ThemeInterface
         return true;
     }
 
-    final public function __addInstantiatedFeature( string $name, object $feature ): void
+    final public function __addInstantiatedFeature( string $name, object $feature, string|array $author ): void
     {
-        if ( !array_key_exists( $name, $this->features ) ) {
-            Arr::set( $this->features, $name, $feature );
+        $author = $this->addAuthor( $author );
+        if ( !$author ) { return; }
+        
+        $dotName = $author . '.' . $name;
+
+        if ( !array_key_exists( $dotName, $this->features ) ) {
+            Arr::set( $this->features, $dotName, $feature );
         }
     }
 
@@ -155,22 +143,16 @@ abstract class ThemeManager implements ThemeInterface
         return Arr::get( $this->features, $name ) ?? null;
     }
 
-    final public function initialiseAdminPages(): void
-    {
-        // Theme Settings
-        add_theme_page(
-            "{$this->context} Settings",
-            'Settings',
-            'manage_options',
-            'meros_theme_settings',
-            function () {
-                echo "<div class=\"wrap\"><h1>" . esc_html( $this->context ) . " Settings</h1><p>I am an options page.</p></div>";
-            }            
-        );
-    }
-
     final public function initialise(): void
     {
+        if ( $this->always_inject_livewire_assets || $this->use_single_page_loading ) {
+            $this->injectLivewireAssets();
+        }
+
+        if ( $this->use_unified_settings_pages ) {
+            $this->initialiseAdminPages();
+        }
+
         $features = Arr::dot( $this->features );
 
         foreach ( $features as $feature ) {
@@ -184,5 +166,18 @@ abstract class ThemeManager implements ThemeInterface
             }
 
         }
+    }
+
+    private function injectLivewireAssets(): void
+    {
+        // Add Livewire styles to the head
+        add_action('wp_head', function () {
+            echo Blade::render('@livewireStyles');
+        });
+
+        // Add Livewire scripts to the footer
+        add_action('wp_footer', function () {
+            echo Blade::render('@livewireScripts');
+        });
     }
 }

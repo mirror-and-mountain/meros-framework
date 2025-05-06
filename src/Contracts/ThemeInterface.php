@@ -13,5 +13,6 @@ interface ThemeInterface
     public function getAuthor(string $name): ?array;
     public function getAuthorFeatures(string $author): ?array;
 
-    public function initialise();
+    public static function bootstrap(array $providers = []): void;
+    public function initialise(): void;
 }
