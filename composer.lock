@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b2d8bfa5c1e84a55d78a49d7a7db35f4",
+    "content-hash": "6ec4317544a44b16c8b1ccb3ea86168a",
     "packages": [
         {
             "name": "brick/math",
@@ -2896,16 +2896,16 @@
         },
         {
             "name": "mirror-and-mountain/meros-dynamic-page",
-            "version": "v0.0.16",
+            "version": "v0.0.17",
             "source": {
                 "type": "git",
                 "url": "git@github.com:mirror-and-mountain/meros-dynamic-page.git",
-                "reference": "de2ae183a953f06f3a8d75e32851687a7d08a3a7"
+                "reference": "4d0280001f8f388bd77a2480d24945d94ab578c5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mirror-and-mountain/meros-dynamic-page/zipball/de2ae183a953f06f3a8d75e32851687a7d08a3a7",
-                "reference": "de2ae183a953f06f3a8d75e32851687a7d08a3a7",
+                "url": "https://api.github.com/repos/mirror-and-mountain/meros-dynamic-page/zipball/4d0280001f8f388bd77a2480d24945d94ab578c5",
+                "reference": "4d0280001f8f388bd77a2480d24945d94ab578c5",
                 "shasum": ""
             },
             "type": "library",
@@ -2925,10 +2925,10 @@
             ],
             "description": "Pending",
             "support": {
-                "source": "https://github.com/mirror-and-mountain/meros-dynamic-page/tree/v0.0.16",
+                "source": "https://github.com/mirror-and-mountain/meros-dynamic-page/tree/v0.0.17",
                 "issues": "https://github.com/mirror-and-mountain/meros-dynamic-page/issues"
             },
-            "time": "2025-05-06T15:45:34+00:00"
+            "time": "2025-05-06T22:07:17+00:00"
         },
         {
             "name": "monolog/monolog",
@@ -3927,16 +3927,16 @@
         },
         {
             "name": "roots/acorn",
-            "version": "v5.0.2",
+            "version": "v5.0.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/roots/acorn.git",
-                "reference": "e2a20295478915822702877a2b3118db4be2d471"
+                "reference": "95254dbef7f1c6c26ec2b4b14c0c3372763b89bd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/roots/acorn/zipball/e2a20295478915822702877a2b3118db4be2d471",
-                "reference": "e2a20295478915822702877a2b3118db4be2d471",
+                "url": "https://api.github.com/repos/roots/acorn/zipball/95254dbef7f1c6c26ec2b4b14c0c3372763b89bd",
+                "reference": "95254dbef7f1c6c26ec2b4b14c0c3372763b89bd",
                 "shasum": ""
             },
             "require": {
@@ -4028,7 +4028,7 @@
             "support": {
                 "forum": "https://discourse.roots.io/",
                 "issues": "https://github.com/roots/acorn/issues",
-                "source": "https://github.com/roots/acorn/tree/v5.0.2"
+                "source": "https://github.com/roots/acorn/tree/v5.0.3"
             },
             "funding": [
                 {
@@ -4036,7 +4036,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-03-27T00:24:56+00:00"
+            "time": "2025-05-06T18:30:43+00:00"
         },
         {
             "name": "roots/support",
