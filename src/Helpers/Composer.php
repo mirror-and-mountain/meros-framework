@@ -20,7 +20,7 @@ class Composer
             $io          = $event->getIO();
 
             if ($packageType === 'wordpress-plugin') {
-                $io->write("Handling plugin package: {$packageName} at {$installPath}");
+                $io->write("<info>Handling plugin package: {$packageName} at {$installPath}</info>");
 
                 $pluginInfo = PluginInfo::get( $installPath );
 
@@ -46,18 +46,21 @@ class Composer
                     $io->write("<info>Generated: {$pluginFile}</info>");
                 }
             }
-            else if ($packageName === 'mirror-and-mountain/meros-dynamic-page') {
-                $io->write(json_encode($extra));
-                $io->write("Handling extension package: {$packageName} at {$installPath}");
+            else if (isset($extra['meros'], $extra['meros']['name'])) {
+                $io->write("<info>Handling extension package: {$packageName} at {$installPath}</info>");
+                $extensionName = $extra['meros']['name'];
 
-                $overrideFile = dirname($installPath, 3) . '/app/Extensions/MerosDynamicPage.php';
-                $stubPath     = $installPath . '/src/Override.stub';
+                if ($extra['meros']['allowOverrides'] ?? true) {
 
-                if (file_exists( $stubPath ) && !file_exists($overrideFile)) {
-                    $content = file_get_contents( $stubPath );
-                    file_put_contents($overrideFile, $content);
+                    $overrideFile = dirname($installPath, 3) . "/app/Extensions/{$extensionName}.php";
+                    $stubPath     = $installPath . '/src/Override.stub';
 
-                    $io->write("<info>Generated: {$overrideFile}</info>");
+                    if (file_exists($stubPath) && !file_exists($overrideFile)) {
+                        $content = file_get_contents( $stubPath );
+                        file_put_contents($overrideFile, $content);
+
+                        $io->write("<info>Generated: {$overrideFile}</info>");
+                    }
                 }
             }
         }
