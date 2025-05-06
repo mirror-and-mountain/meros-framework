@@ -16,9 +16,9 @@ class Composer
             $packageType = $package->getType();
             $packageName = $package->getName();
             $installPath = $installationManager->getInstallPath($package);
+            $io          = $event->getIO();
 
             if ($packageType === 'wordpress-plugin') {
-                $io = $event->getIO();
                 $io->write("Handling plugin package: {$packageName} at {$installPath}");
 
                 $pluginInfo = PluginInfo::get( $installPath );
@@ -45,9 +45,11 @@ class Composer
                     $io->write("<info>Generated: {$pluginFile}</info>");
                 }
             }
-            else if ($packageName === 'meros-dynamic-page') {
+            else if ($packageName === 'mirror-and-mountain/meros-dynamic-page') {
+                $io->write("Handling extension package: {$packageName} at {$installPath}");
+
                 $overrideFile = dirname($installPath, 3) . '/app/Extensions/MerosDynamicPage.php';
-                $stubPath     = dirname($installPath . '/src/Override.stub');
+                $stubPath     = $installPath . '/src/Override.stub';
 
                 if (file_exists( $stubPath ) && !file_exists($overrideFile)) {
                     $content = file_get_contents( $stubPath );
