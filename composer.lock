@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6ec4317544a44b16c8b1ccb3ea86168a",
+    "content-hash": "3d8e3fd1900456ad2f433e5c421b560d",
     "packages": [
         {
             "name": "brick/math",
@@ -2896,19 +2896,25 @@
         },
         {
             "name": "mirror-and-mountain/meros-dynamic-page",
-            "version": "v0.0.17",
+            "version": "v0.0.18",
             "source": {
                 "type": "git",
                 "url": "git@github.com:mirror-and-mountain/meros-dynamic-page.git",
-                "reference": "4d0280001f8f388bd77a2480d24945d94ab578c5"
+                "reference": "3f846ff5199a2f47e0d1cb29dd0598e34fa5a03f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mirror-and-mountain/meros-dynamic-page/zipball/4d0280001f8f388bd77a2480d24945d94ab578c5",
-                "reference": "4d0280001f8f388bd77a2480d24945d94ab578c5",
+                "url": "https://api.github.com/repos/mirror-and-mountain/meros-dynamic-page/zipball/3f846ff5199a2f47e0d1cb29dd0598e34fa5a03f",
+                "reference": "3f846ff5199a2f47e0d1cb29dd0598e34fa5a03f",
                 "shasum": ""
             },
             "type": "library",
+            "extra": {
+                "meros": {
+                    "name": "MerosDynamicPage",
+                    "allowOverrides": true
+                }
+            },
             "autoload": {
                 "psr-4": {
                     "MM\\Meros\\DynamicPage\\": "src/"
@@ -2925,10 +2931,10 @@
             ],
             "description": "Pending",
             "support": {
-                "source": "https://github.com/mirror-and-mountain/meros-dynamic-page/tree/v0.0.17",
+                "source": "https://github.com/mirror-and-mountain/meros-dynamic-page/tree/v0.0.18",
                 "issues": "https://github.com/mirror-and-mountain/meros-dynamic-page/issues"
             },
-            "time": "2025-05-06T22:07:17+00:00"
+            "time": "2025-05-06T22:30:20+00:00"
         },
         {
             "name": "monolog/monolog",

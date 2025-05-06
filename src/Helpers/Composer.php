@@ -15,6 +15,7 @@ class Composer
         foreach ($composer->getRepositoryManager()->getLocalRepository()->getPackages() as $package) {
             $packageType = $package->getType();
             $packageName = $package->getName();
+            $extra       = $package->getExtra();
             $installPath = $installationManager->getInstallPath($package);
             $io          = $event->getIO();
 
@@ -46,6 +47,7 @@ class Composer
                 }
             }
             else if ($packageName === 'mirror-and-mountain/meros-dynamic-page') {
+                $io->write(json_encode($extra));
                 $io->write("Handling extension package: {$packageName} at {$installPath}");
 
                 $overrideFile = dirname($installPath, 3) . '/app/Extensions/MerosDynamicPage.php';
