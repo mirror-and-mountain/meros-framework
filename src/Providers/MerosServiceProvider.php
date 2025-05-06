@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\ServiceProvider;
 
 use MM\Meros\Contracts\Feature;
+use MM\Meros\Contracts\Extension;
 use MM\Meros\Contracts\Plugin;
 use MM\Meros\Contracts\ThemeManager;
 
@@ -50,9 +51,9 @@ class MerosServiceProvider extends ServiceProvider
         }
     }
 
-    private function loadCoreFeatures( object $site ): void
+    private function loadCoreFeatures( object $theme ): void
     {
-        $this->enableSPA( $site );
+        $this->enableSPA( $theme );
     }
 
     private function loadPlugins(): void
@@ -120,10 +121,14 @@ class MerosServiceProvider extends ServiceProvider
 
     protected function enableSPA( object $theme ): void
     {
-        $spa = $theme->use_single_page_loading;
+        $class     = DynamicPage::class;
+        $overrider = app_path('Extensions/MerosDynamicPage.php');
 
-        if ( !$spa ) {
-            return;
+        if ( File::exists($overrider) ) { 
+            $overriderInfo = ClassInfo::getFromPath($overrider);
+            if ( $overriderInfo->extends( DynamicPage::class ) ) {
+                $class = $overriderInfo->name;
+            } 
         }
 
         $spaName = 'meros_dynamic_page';
@@ -132,15 +137,13 @@ class MerosServiceProvider extends ServiceProvider
             'fullName'    => 'mirror_and_mountain_' . $spaName,
             'dotName'     => 'mirror_and_mountain.' . $spaName,
             'category'    => 'miscellaneous',
-            'optionGroup' => 'meros_theme_settings',
-            'class'       => DynamicPage::class
+            'optionGroup' => 'meros_theme_settings'
         ];
 
-        $classInfo = ClassInfo::get( $spaArgs['class'] );
-        if ( ! $classInfo->isDescendantOf( Feature::class ) ) { return; }
-        $spaArgs['path'] = $classInfo->path;
-        $spaArgs['uri']  = $classInfo->uri;
-        $spaInstance     = Features::instantiate( $this->app, $spaArgs['class'], $spaArgs );
+        $classInfo       = ClassInfo::get( DynamicPage::class );
+        $spaArgs['path'] = $classInfo->path; // Always use the base class path
+        $spaArgs['uri']  = $classInfo->uri; // Always use the base class uri
+        $spaInstance     = Features::instantiate( $this->app, $class, $spaArgs );
         $author          = 'MIRROR AND MOUNTAIN';
         
         $theme->__addInstantiatedFeature( $spaArgs['name'], $spaInstance, $author );

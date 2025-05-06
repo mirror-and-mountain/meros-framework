@@ -10,11 +10,13 @@ use MM\Meros\Traits\SettingsManager;
 
 abstract class Feature
 {
+    public    bool   $enabled = true;
     protected string $name;
     protected string $fullName;
     protected string $path;
     protected string $uri;
     protected string $category;
+    protected bool   $isExtension = false;
     protected bool   $isPlugin = false;
     protected array  $log = [];
     public    bool   $initialised = false;
@@ -49,6 +51,12 @@ abstract class Feature
         }
 
         $this->configure();
+
+        if ( $this instanceof Extension ) {
+            $this->isExtension = true;
+            $this->override();
+        }
+
         $this->sanitizeOptions();
     }
 
@@ -56,9 +64,9 @@ abstract class Feature
 
     public function initialise(): void
     {
-        // if (!$this->settings['enabled']) { 
-        //     return; 
-        // }
+        if ( $this->enabled === false ) {
+            return;
+        }
 
         if ($this->hasIncludes) {
             $this->include();

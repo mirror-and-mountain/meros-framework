@@ -14,11 +14,10 @@ class Composer
         // Example if you want to loop installed packages:
         foreach ($composer->getRepositoryManager()->getLocalRepository()->getPackages() as $package) {
             $packageType = $package->getType();
+            $packageName = $package->getName();
+            $installPath = $installationManager->getInstallPath($package);
 
             if ($packageType === 'wordpress-plugin') {
-                $packageName = $package->getName();
-                $installPath = $installationManager->getInstallPath($package);
-
                 $io = $event->getIO();
                 $io->write("Handling plugin package: {$packageName} at {$installPath}");
 
@@ -44,6 +43,17 @@ class Composer
 
                     file_put_contents($pluginFile, $rendered);
                     $io->write("<info>Generated: {$pluginFile}</info>");
+                }
+            }
+            else if ($packageName === 'meros-dynamic-page') {
+                $overrideFile = dirname($installPath, 3) . '/app/Extensions/MerosDynamicPage.php';
+                $stubPath     = dirname($installPath . '/src/Override.stub');
+
+                if (file_exists( $stubPath ) && !file_exists($overrideFile)) {
+                    $content = file_get_contents( $stubPath );
+                    file_put_contents($overrideFile, $content);
+
+                    $io->write("<info>Generated: {$overrideFile}</info>");
                 }
             }
         }
