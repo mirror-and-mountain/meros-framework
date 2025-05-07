@@ -104,7 +104,7 @@ trait SettingsManager
     protected function sanitizeOptions(): void
     {
         if ( $this->userSwitchable && !isset( $this->options['enabled'] ) ) {
-            $enabledDescription = 'Enables or disables ' . Str::title( Str::replace('_', ' ', $this->name )) . '.';
+            $enabledDescription = 'Enable or disable ' . Str::title( Str::replace('_', ' ', $this->name )) . '.';
             $this->options['enabled'] = [
                 'label'       => 'Enabled',
                 'type'        => 'boolean',
