@@ -2,6 +2,7 @@
 
 namespace MM\Meros\Traits;
 
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\View;
 
@@ -19,7 +20,6 @@ trait ComponentManager
     protected array  $components    = [];
     protected array  $views         = [];
 
-    protected string $componentsNamespace = '';
     protected bool   $useFullNameForComponents = false;
 
     final protected function loadComponents(): void
@@ -31,8 +31,10 @@ trait ComponentManager
         $this->hasComponents = $this->components !== [];
 
         if ( $this->hasComponents ) {
-            $handle = $this->useFullNameForComponents ? $this->fullName : $this->name;
-            Livewire::discover( $handle, $this->componentsNamespace );
+            
+            foreach ( $this->components as $handle => $class ) {
+                Livewire::component( $handle, $class );
+            }
         }
     }
 
@@ -63,12 +65,9 @@ trait ComponentManager
             $class = ClassInfo::getFromPath( $component );
             
             if ( $class->extends( Component::class ) ) {
-                
-                $this->components[] = $class->name;
-
-                if ( $this->componentsNamespace === '' ) {
-                    $this->componentsNamespace = $class->namespace;
-                }
+                $handle  = $this->useFullNameForComponents ? $this->fullName : $this->name;
+                $handle .= '.' . Str::lower( Str::replace( '.php', '', basename( $component )));
+                $this->components[ $handle ] = $class->name;
             }
         }
     }
