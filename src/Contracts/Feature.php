@@ -44,10 +44,7 @@ abstract class Feature
         $this->optionGroup = $optionGroup;
 
         $this->setUp();
-
-        if ( is_admin() ) {
-            $this->initialiseSettings();
-        }
+        $this->initialiseSettings();
     }
 
     private function setUp(): void
@@ -57,6 +54,7 @@ abstract class Feature
             property_exists( $this, 'pluginFile' ) 
         ) {
             $this->isPlugin = true;
+            $this->userSwitchable = false;
         }
 
         $this->configure();
@@ -70,6 +68,7 @@ abstract class Feature
     private function initialiseSettings(): void
     {
         $this->sanitizeOptions();
+        $this->setRegisteredSettings();
         $this->registerSettings();
     }
 
@@ -77,11 +76,14 @@ abstract class Feature
 
     public function initialise(): void
     {
-        if ( 
-            $this->enabled === false ||
-            $this->userSwitchable === true &&
-            $this->settings['enabled'] ?? false === false
+        if ( $this->enabled === false ) {
+            return;
+        }
+
+        if ( $this->userSwitchable === true &&
+             $this->settings['enabled'] === '0' 
         ) {
+            $this->enabled = false;
             return;
         }
 

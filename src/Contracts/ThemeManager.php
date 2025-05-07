@@ -159,7 +159,7 @@ abstract class ThemeManager implements ThemeInterface
     {
         if ( 
             $this->always_inject_livewire_assets && 
-            is_admin() 
+            !is_admin() 
         ) 
         {
             Livewire::injectAssets();

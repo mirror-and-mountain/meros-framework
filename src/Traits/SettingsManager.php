@@ -12,47 +12,45 @@ trait SettingsManager
     protected array  $settings            = [];
     protected string $settingsCapability  = 'manage_options';
 
-    protected function registerSettings(): void
+    protected function setRegisteredSettings(): void
     {
-        if ( $this->userSwitchable && !isset( $this->options['enabled'] ) ) {
-            $enabledDescription = 'Enables or disables ' . Str::title( $this->name ) . '.';
-            $this->options['enabled'] = [
-                'label'       => 'Enabled',
-                'type'        => 'boolean',
-                'description' => $enabledDescription,
-                'hasField'    => true,
-                'fieldType'   => 'checkbox',
-                'default'     => true
-            ];
+        if ( $this->options === [] ) {
+            return;
         }
 
-        if ( $this->options === [] ) {
+        foreach ( $this->options as $option => $schema ) {
+            $this->settings[ $option ] = get_option( $option, $schema['default'] ?? null );
+        }
+    }
+
+    protected function registerSettings(): void
+    {
+        if ( $this->options === [] || !is_admin() ) {
             return;
         }
 
         add_action( 'admin_init', function() {
 
-            $settingsSectionTitle = Str::title( $this->name ) . ' Options';
+            $settingsSectionTitle = Str::title( Str::replace('_', ' ', $this->name )) . ' Options';
             $settingsSectionId    = $this->name . '_options';
 
             add_settings_section(
                 $settingsSectionId,
                 $settingsSectionTitle,
                 function () {
-                    echo 'I am a settings section';
+                    echo '';
                 },
                 $this->optionGroup,
                 []
             );
 
             foreach ( $this->options as $option => $schema ) {
-
                 $type             = $schema['type'];
                 $default          = $schema['default'] ?? null;
                 $description      = $schema['description'] ?? '';
                 $hasField         = $schema['hasField'];
                 $fieldType        = $schema['fieldType'] ?? null;
-                $name             = $schema['name'] ?? $option;
+                $id               = $schema['name'] ?? $this->name . '_' .$option;
                 $required         = $schema['required'] ?? false;
                 $sanitizeCallback = $schema['sanitize_callback'] ?? false;
 
@@ -67,7 +65,7 @@ trait SettingsManager
                         'description'       => $description,
                         'sanitize_callback' => function( mixed $value ) use( $option, $sanitizeCallback ): mixed {
                             if ( $sanitizeCallback !== false ) {
-                                return call_user_func( $sanitizeCallback );
+                                return call_user_func( $sanitizeCallback, $value );
                             } else {
                                 $schema = $this->options[ $option ];
                                 return $this->sanitizeSetting( $value, $schema );
@@ -84,13 +82,13 @@ trait SettingsManager
                     add_settings_field(
                         "{$this->name}_{$option}",
                         Str::title( $option ),
-                        function() use ( $option, $type, $description, $name, $default, $fieldType, $required ) {
+                        function() use ( $option, $type, $description, $id, $default, $fieldType, $required ) {
                             if ( is_callable( $fieldType ) ) {
                                 call_user_func( $fieldType );
                             }
                             else {
                                 echo Fields::make( 
-                                    $option, $type, $description, $name, $default, $fieldType, $required 
+                                    $option, $type, $description, $id, $default, $fieldType, $required 
                                 );
                             }
                         },
@@ -99,14 +97,24 @@ trait SettingsManager
                         [ 'label_for' => $option ]
                     );
                 }
-
-                $this->settings[ $option ] = get_option( $option, $default );
             }
         });
     }
 
     protected function sanitizeOptions(): void
     {
+        if ( $this->userSwitchable && !isset( $this->options['enabled'] ) ) {
+            $enabledDescription = 'Enables or disables ' . Str::title( Str::replace('_', ' ', $this->name )) . '.';
+            $this->options['enabled'] = [
+                'label'       => 'Enabled',
+                'type'        => 'boolean',
+                'description' => $enabledDescription,
+                'hasField'    => true,
+                'fieldType'   => 'checkbox',
+                'default'     => '1'
+            ];
+        }
+
         if ( $this->options === [] ) {
             return;
         }
@@ -314,7 +322,7 @@ trait SettingsManager
 
                 case 'bool':
                 case 'boolean':
-                    $value = (bool) $value;
+                    $value = $value === '1' ? '1' : '0';
                     break;
 
             }
@@ -362,11 +370,6 @@ trait SettingsManager
 
     protected function getSettings(): array
     {
-        return [];
-    }
-
-    protected function updateSettings( array $settings ): void
-    {
-        // TBC
+        return $this->settings;
     }
 }

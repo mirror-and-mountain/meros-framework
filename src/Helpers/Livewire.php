@@ -2,14 +2,14 @@
 
 namespace MM\Meros\Helpers;
 
-use MM\Meros\Facades\Theme;
 use Illuminate\Support\Facades\Blade;
 
 class Livewire
 {
     public static function injectAssets(): void
     {
-        $initialised = Theme::$livewireInitialised;
+        $theme       = app()->make('meros.theme_manager');
+        $initialised = $theme->livewireInitialised;
 
         if ( $initialised ) {
             return;
@@ -25,6 +25,6 @@ class Livewire
             echo Blade::render('@livewireScripts');
         });
 
-        Theme::$livewireInitialised = true;
+        $theme->livewireInitialised = true;
     }
 }

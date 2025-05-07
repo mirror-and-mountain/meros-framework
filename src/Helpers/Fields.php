@@ -8,8 +8,8 @@ class Fields
         string $option, 
         string $valueType, 
         string $description, 
-        string $name, 
-        ?mixed $default, 
+        string $id, 
+        mixed $default, 
         ?string $fieldType,
         bool $required = false
     ): string
@@ -67,20 +67,18 @@ class Fields
         }
 
         switch ( $fieldType ) {
+            
+            case 'checkbox':
+                $checked = checked( $value, '1', false );
+                $html .= '<input type="hidden" name="' . esc_attr( $option ) . '" value="0" />';
+                $html .= '<input type="checkbox" id="' . esc_attr( $id ) . '" name="' . esc_attr( $option ) . '" value="1" ' . $checked . ' />';
+                break;                
 
             case 'text':
-            case 'checkbox':
             case 'number':
             case 'email':
             case 'url':
-                $html .= '<input id="' . esc_attr( $name ) . '" 
-                name="' . esc_attr( $name ) . '" 
-                type="' . $fieldType . '" 
-                value="' . esc_attr( $value ) . '"';
-
-                if ( $fieldType === 'checkbox' && $value === '1' ) {
-                    $html .= ' checked';
-                }
+                $html .= '<input type="' . $fieldType . '" id="' . esc_attr( $id ) . '" name="' . esc_attr( $option ) . '" value="' . esc_attr( $value ) . '"';
 
                 if ( $required ) {
                     $html .= ' required';

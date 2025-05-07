@@ -26,7 +26,13 @@ trait AdminManager
                 'manage_options',
                 'meros_theme_settings',
                 function () {
-                    echo "<div class=\"wrap\"><h1>" . esc_html( $this->themeName ) . " Settings</h1><p>I am an options page.</p></div>";
+                    echo "<div class=\"wrap\">";
+                    echo "<h1>" . esc_html($this->themeName) . " Settings</h1>";
+                    echo "<form method='post' action='options.php'>";
+                    settings_fields('meros_theme_settings');
+                    do_settings_sections('meros_theme_settings');
+                    submit_button();
+                    echo "</form></div>";
                 }            
             );
         });
