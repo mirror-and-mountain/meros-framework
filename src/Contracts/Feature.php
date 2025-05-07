@@ -10,16 +10,16 @@ use MM\Meros\Traits\SettingsManager;
 
 abstract class Feature
 {
-    public    bool   $enabled = true;
+    public    bool   $enabled        = true;
+    public    bool   $userSwitchable = true;
+    public    bool   $initialised    = false;
     protected string $name;
     protected string $fullName;
     protected string $path;
     protected string $uri;
     protected string $category;
     protected bool   $isExtension = false;
-    protected bool   $isPlugin = false;
-    protected array  $log = [];
-    public    bool   $initialised = false;
+    protected bool   $isPlugin    = false;
 
     use AssetManager, 
         BlockManager, 
@@ -43,6 +43,15 @@ abstract class Feature
         $this->uri         = trailingslashit( $uri );
         $this->optionGroup = $optionGroup;
 
+        $this->setUp();
+
+        if ( is_admin() ) {
+            $this->initialiseSettings();
+        }
+    }
+
+    private function setUp(): void
+    {
         if ( 
             property_exists( $this, 'pluginInfo' ) &&
             property_exists( $this, 'pluginFile' ) 
@@ -56,15 +65,23 @@ abstract class Feature
             $this->isExtension = true;
             $this->override();
         }
+    }
 
+    private function initialiseSettings(): void
+    {
         $this->sanitizeOptions();
+        $this->registerSettings();
     }
 
     abstract protected function configure(): void;
 
     public function initialise(): void
     {
-        if ( $this->enabled === false ) {
+        if ( 
+            $this->enabled === false ||
+            $this->userSwitchable === true &&
+            $this->settings['enabled'] ?? false === false
+        ) {
             return;
         }
 

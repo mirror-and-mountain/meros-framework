@@ -6,6 +6,17 @@ trait AdminManager
 {
     protected bool $use_unified_settings_pages = false;
 
+    private function initialiseAdmin(): void
+    {
+        if ( !is_admin() ) {
+            return;
+        }
+        
+        if ( $this->use_unified_settings_pages ) {
+            $this->initialiseAdminPages();
+        }
+    }
+
     private function initialiseAdminPages(): void
     {
         add_action('admin_menu', function () {

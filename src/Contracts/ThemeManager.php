@@ -7,23 +7,24 @@ use MM\Meros\Providers\MerosServiceProvider;
 
 use MM\Meros\Helpers\ClassInfo;
 use MM\Meros\Helpers\Features;
+use MM\Meros\Helpers\Livewire;
 use MM\Meros\Traits\ContextManager;
 use MM\Meros\Traits\AuthorManager;
 use MM\Meros\Traits\AdminManager;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Contracts\Foundation\Application;
 
 abstract class ThemeManager implements ThemeInterface
 {
     protected array $featureCategories = [];
-    private array   $features          = [];
+    private   array $features          = [];
 
     protected bool  $enable_smooth_scrolling       = false;
-    protected bool  $always_inject_livewire_assets = false;
-    public bool     $use_single_page_loading       = false;
+    public    bool  $always_inject_livewire_assets = false;
+
+    public    bool  $livewireInitialised = false;
 
     use ContextManager, AuthorManager, AdminManager;
 
@@ -32,13 +33,7 @@ abstract class ThemeManager implements ThemeInterface
         $this->setContext();
         $this->configure();
         $this->enqueueThemeStyle();
-
-        if ( $this->featureCategories === [] ) {
-            $this->featureCategories = [
-                'blocks'        => 'meros_theme_settings',
-                'miscellaneous' => 'meros_theme_settings'
-            ];
-        }
+        $this->setFeatureCategories();
     }
 
     final public static function bootstrap( array $providers = [] ): void
@@ -55,6 +50,16 @@ abstract class ThemeManager implements ThemeInterface
                     ->boot();
 
             }, 0);
+        }
+    }
+
+    private function setFeatureCategories(): void
+    {
+        if ( $this->featureCategories === [] ) {
+            $this->featureCategories = [
+                'blocks'        => 'meros_theme_settings',
+                'miscellaneous' => 'meros_theme_settings'
+            ];
         }
     }
 
@@ -145,14 +150,24 @@ abstract class ThemeManager implements ThemeInterface
 
     final public function initialise(): void
     {
-        if ( $this->always_inject_livewire_assets || $this->use_single_page_loading ) {
-            $this->injectLivewireAssets();
-        }
+        $this->initialiseAdmin();
+        $this->initialiseAssets();
+        $this->initialiseFeatures();
+    }
 
-        if ( $this->use_unified_settings_pages ) {
-            $this->initialiseAdminPages();
+    private function initialiseAssets(): void
+    {
+        if ( 
+            $this->always_inject_livewire_assets && 
+            is_admin() 
+        ) 
+        {
+            Livewire::injectAssets();
         }
+    }
 
+    private function initialiseFeatures():void
+    {
         $features = Arr::dot( $this->features );
 
         foreach ( $features as $feature ) {
@@ -166,18 +181,5 @@ abstract class ThemeManager implements ThemeInterface
             }
 
         }
-    }
-
-    private function injectLivewireAssets(): void
-    {
-        // Add Livewire styles to the head
-        add_action('wp_head', function () {
-            echo Blade::render('@livewireStyles');
-        });
-
-        // Add Livewire scripts to the footer
-        add_action('wp_footer', function () {
-            echo Blade::render('@livewireScripts');
-        });
     }
 }

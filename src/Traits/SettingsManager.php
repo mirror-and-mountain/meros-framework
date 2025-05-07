@@ -2,6 +2,7 @@
 
 namespace MM\Meros\Traits;
 
+use MM\Meros\Helpers\Fields;
 use Illuminate\Support\Str;
 
 trait SettingsManager
@@ -13,6 +14,18 @@ trait SettingsManager
 
     protected function registerSettings(): void
     {
+        if ( $this->userSwitchable && !isset( $this->options['enabled'] ) ) {
+            $enabledDescription = 'Enables or disables ' . Str::title( $this->name ) . '.';
+            $this->options['enabled'] = [
+                'label'       => 'Enabled',
+                'type'        => 'boolean',
+                'description' => $enabledDescription,
+                'hasField'    => true,
+                'fieldType'   => 'checkbox',
+                'default'     => true
+            ];
+        }
+
         if ( $this->options === [] ) {
             return;
         }
@@ -34,9 +47,14 @@ trait SettingsManager
 
             foreach ( $this->options as $option => $schema ) {
 
-                $type     = $schema['type'];
-                $default  = $schema['default'] ?? null;
-                $hasField = $schema['hasField'];
+                $type             = $schema['type'];
+                $default          = $schema['default'] ?? null;
+                $description      = $schema['description'] ?? '';
+                $hasField         = $schema['hasField'];
+                $fieldType        = $schema['fieldType'] ?? null;
+                $name             = $schema['name'] ?? $option;
+                $required         = $schema['required'] ?? false;
+                $sanitizeCallback = $schema['sanitize_callback'] ?? false;
 
                 if ( $type === 'text' || $type === 'textarea' ) {
                     $type = 'string';
@@ -46,26 +64,43 @@ trait SettingsManager
                     $this->optionGroup, $option, [
                         'type'              => $type,
                         'default'           => $default,
-                        'sanitize_callback' => function( mixed $value ) use( $option ): mixed {
-                            $schema = $this->options[ $option ];
-                            return $this->sanitizeSetting( $value, $schema );
-
+                        'description'       => $description,
+                        'sanitize_callback' => function( mixed $value ) use( $option, $sanitizeCallback ): mixed {
+                            if ( $sanitizeCallback !== false ) {
+                                return call_user_func( $sanitizeCallback );
+                            } else {
+                                $schema = $this->options[ $option ];
+                                return $this->sanitizeSetting( $value, $schema );
+                            }
                         }
                     ]
                 );
 
                 if ( $hasField ) {
+                    if ( $type === 'array' ) {
+                        $fieldType = 'repeater';
+                    }
+
                     add_settings_field(
                         "{$this->name}_{$option}",
                         Str::title( $option ),
-                        function() {
-                            echo 'I am a settings field';
+                        function() use ( $option, $type, $description, $name, $default, $fieldType, $required ) {
+                            if ( is_callable( $fieldType ) ) {
+                                call_user_func( $fieldType );
+                            }
+                            else {
+                                echo Fields::make( 
+                                    $option, $type, $description, $name, $default, $fieldType, $required 
+                                );
+                            }
                         },
                         $this->optionGroup,
                         $settingsSectionId,
-                        []
+                        [ 'label_for' => $option ]
                     );
                 }
+
+                $this->settings[ $option ] = get_option( $option, $default );
             }
         });
     }
@@ -123,11 +158,25 @@ trait SettingsManager
             'type',
             'description',
             'hasField',
+            'fieldType',
+            'name',
             'required',
             'default',
             'schema',
             'options',
-            'multi'
+            'multi',
+            'sanitize_callback'
+        ];
+
+        $validFieldTypes = [
+            'text',
+            'textarea',
+            'checkbox',
+            'select',
+            'toggle',
+            'radio',
+            'color',
+            'repeater'
         ];
     
         $sanitizedSchema = [];
@@ -161,16 +210,29 @@ trait SettingsManager
                     break;
 
                 case 'description':
-                    $sanitizedSchema['description'] = is_string($value) ? strip_tags($value) : '';
+                case 'name':
+                    $sanitizedSchema[ $key ] = is_string($value) ? strip_tags($value) : '';
                     break;
 
                 case 'hasField':
                     $sanitizedSchema['hasField'] = is_bool($value) ? $value : true;
                     break;
 
+                case 'fieldType':
+                    if ( in_array( $value, $validFieldTypes ) ) {
+                        $sanitizedSchema['fieldType'] = $value;
+                    } 
+                    else if ( is_callable( $value ) ) {
+                        $sanitizedSchema['fieldType'] = $value;
+                    }
+                    else {
+                        $sanitizedSchema['fieldType'] = null;
+                    }
+                    break;
+
                 case 'required':
                 case 'multi':
-                    $sanitizedSchema[$key] = is_bool($value) ? $value : false;
+                    $sanitizedSchema[ $key ] = is_bool($value) ? $value : false;
                     break;
     
                 case 'options':
@@ -201,6 +263,10 @@ trait SettingsManager
     
                 case 'default':
                     $sanitizedSchema['default'] = $value;
+                    break;
+
+                case 'sanitize_callback':
+                    $sanitizedSchema['sanitize_callback'] = is_callable($value) ? $value : null;
                     break;
             }
         }
