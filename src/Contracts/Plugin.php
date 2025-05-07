@@ -18,6 +18,17 @@ abstract class Plugin extends Feature
 
     public function initialise(): void
     {
+        if ( $this->enabled === false ) {
+            return;
+        }
+
+        if ( $this->userSwitchable === true &&
+             $this->settings['enabled'] === '0' 
+        ) {
+            $this->enabled = false;
+            return;
+        }
+        
         if ( 
             $this->usePluginConfig && 
             File::exists( $this->pluginFile ) 

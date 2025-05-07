@@ -32,13 +32,15 @@ trait SettingsManager
         add_action( 'admin_init', function() {
 
             $settingsSectionTitle = Str::title( Str::replace('_', ' ', $this->name )) . ' Options';
+            $settingsSectionTitle = apply_filters( 'meros_' . $this->name . '_settings_section_title', $settingsSectionTitle );
             $settingsSectionId    = $this->name . '_options';
 
             add_settings_section(
                 $settingsSectionId,
                 $settingsSectionTitle,
                 function () {
-                    echo '';
+                    $content = apply_filters( 'meros_' . $this->name . '_settings_section_content', '' );
+                    echo $content;
                 },
                 $this->optionGroup,
                 []
@@ -105,6 +107,7 @@ trait SettingsManager
     {
         if ( $this->userSwitchable && !isset( $this->options['enabled'] ) ) {
             $enabledDescription = 'Enable or disable ' . Str::title( Str::replace('_', ' ', $this->name )) . '.';
+            $enabledDescription = apply_filters( 'meros_' . $this->name . '_user_switch_label', $enabledDescription );
             $this->options['enabled'] = [
                 'label'       => 'Enabled',
                 'type'        => 'boolean',
@@ -181,7 +184,6 @@ trait SettingsManager
             'textarea',
             'checkbox',
             'select',
-            'toggle',
             'radio',
             'color',
             'repeater'
