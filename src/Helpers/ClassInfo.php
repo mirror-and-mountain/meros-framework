@@ -53,11 +53,10 @@ class ClassInfo
         $instance->path       = dirname( $reflection->getFileName() );
         $instance->parent     = $reflection->getParentClass()->getName();
 
-        $instance->uri = Str::replace( 
-            $_SERVER['DOCUMENT_ROOT'], 
-            get_site_url(), 
-            $instance->path 
-        );
+        $themePath = get_theme_file_path();
+        $themeUri  = get_template_directory_uri();
+
+        $instance->uri = Str::replaceFirst( $themePath, $themeUri, $instance->path );
     }
 
     public function extends( string $baseClass ): bool

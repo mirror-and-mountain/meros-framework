@@ -39,9 +39,7 @@ abstract class ThemeManager implements ThemeInterface
     final public static function bootstrap( array $providers = [] ): void
     {
         if ( class_exists( RootsApplication::class ) ) {
-
             add_action( 'after_setup_theme', function() use ( $providers ) {
-
                 $providers = array_merge([MerosServiceProvider::class], $providers);
                 $root      = get_stylesheet_directory();
                 RootsApplication::configure( $root )
@@ -51,6 +49,22 @@ abstract class ThemeManager implements ThemeInterface
 
             }, 0);
         }
+
+        add_action('after_switch_theme', function () {
+            $sessionDir = get_theme_file_path('storage/framework/sessions');
+        
+            if ( !is_dir( $sessionDir ) ) {
+                return;
+            }
+        
+            $files = glob( $sessionDir . '/*' );
+        
+            foreach ( $files as $file ) {
+                if ( is_file( $file ) ) {
+                    unlink( $file );
+                }
+            }
+        });
     }
 
     private function setFeatureCategories(): void

@@ -6,8 +6,6 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\ServiceProvider;
 
-use MM\Meros\Contracts\Feature;
-use MM\Meros\Contracts\Extension;
 use MM\Meros\Contracts\Plugin;
 use MM\Meros\Contracts\ThemeManager;
 
@@ -33,7 +31,7 @@ class MerosServiceProvider extends ServiceProvider
             $this->registered = true;
         }
 
-        define('MEROS', true);
+        defined('MEROS') || define('MEROS', true);
     }
 
     public function boot(): void
