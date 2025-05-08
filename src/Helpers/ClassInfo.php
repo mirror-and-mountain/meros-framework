@@ -37,7 +37,11 @@ class ClassInfo
         if ( preg_match('/class\s+(\w+)\s+extends/', $contents, $matches) ) {
             $class = $namespace ? "{$namespace}\\{$matches[1]}" : null;
 
-            if ( $class && class_exists( $class ) ) {
+            if ( $class ) {
+                require_once $path;
+            }
+
+            if ( class_exists( $class ) ) {
                 $instance->setProps( $instance, $class );
             }
         }
