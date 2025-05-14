@@ -17,19 +17,22 @@ use Illuminate\Contracts\Foundation\Application;
 
 class ExtensionLoader
 {
-    public array $extensions;
-    public array $features;
-    public array $plugins;
+    public array   $extensions;
+    public array   $features;
+    public array   $plugins;
+    
     private object $theme;
+    private string $themeNamespace;
 
-    private function __construct( private Application $app, object $theme )
+    private function __construct( private Application $app, object $theme, string $themeNamespace )
     {
-        $this->theme = $theme;
+        $this->theme          = $theme;
+        $this->themeNamespace = $themeNamespace;
     }
 
-    public static function init( Application $app, object $theme ): self
+    public static function init( Application $app, object $theme, string $themeNamespace ): self
     {
-        $instance    = new self( $app, $theme );
+        $instance    = new self( $app, $theme, $themeNamespace );
         $themeConfig = base_path('config/theme.php');
 
         if ( File::exists( $themeConfig ) ) {
@@ -74,7 +77,8 @@ class ExtensionLoader
         }
 
         foreach ( $extenstionDefs as $class => $files ) {
-            $this->loadExtension( $extensionPath, $class, $files, $baseClass );
+            $fqClass = $this->themeNamespace . '\\' . $class;
+            $this->loadExtension( $extensionPath, $fqClass, $files, $baseClass );
         }
     }
 

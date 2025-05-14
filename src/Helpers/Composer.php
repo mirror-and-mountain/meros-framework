@@ -62,8 +62,8 @@ class Composer
                     if (file_exists($stubPath) && !file_exists($overrideFile)) {
                         $stub         = file_get_contents($stubPath);
                         $replacements = [
-                            'extension' => $extra['meros']['class'],
-                            'class'     => $extensionName
+                            '{{extension}}' => $extra['meros']['class'],
+                            '{{class}}'     => $extensionName
                         ];
                         $rendered = str_replace(array_keys($replacements), array_values($replacements), $stub);
                         
