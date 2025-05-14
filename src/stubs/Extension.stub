@@ -1,0 +1,13 @@
+<?php
+
+namespace App\Extensions;
+
+use {{extension}} as Feature;
+
+class {{class}} extends Feature
+{
+    protected function override(): void
+    {
+        $this->enabled = true;
+    }
+}

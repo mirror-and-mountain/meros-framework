@@ -12,6 +12,20 @@ trait SettingsManager
     protected array  $settings            = [];
     protected string $settingsCapability  = 'manage_options';
 
+    private function setOptionGroup(): void
+    {
+        $groups = [
+            'blocks'        => 'meros_theme_settings',
+            'miscellaneous' => 'meros_theme_settings'
+        ];
+
+        $category = $this->category;
+
+        $this->optionGroup = array_key_exists( $category, $groups ) 
+                             ? $groups[ $category ] 
+                             : 'meros_theme_settings';
+    }
+
     protected function setRegisteredSettings(): void
     {
         if ( $this->options === [] ) {

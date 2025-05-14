@@ -8,10 +8,9 @@ class Composer
 {
     public static function afterPluginInstall( $event ): void
     {
-        $composer = $event->getComposer();
+        $composer            = $event->getComposer();
         $installationManager = $composer->getInstallationManager();
 
-        // Example if you want to loop installed packages:
         foreach ($composer->getRepositoryManager()->getLocalRepository()->getPackages() as $package) {
             $packageType = $package->getType();
             $packageName = $package->getName();
@@ -35,34 +34,95 @@ class Composer
                 $io->write("Generating plugin feature class</info>");
 
                 $pluginClass = str_replace(' ', '', ucwords(str_replace('-', ' ', basename($installPath))));
-                $pluginFile  = dirname($installPath, 2) . '/app/Plugins/' . $pluginClass . '.php';
+                $configFile  = dirname($installPath, 2) . '/app/Plugins/' . $pluginClass . '.php';
                 $stubPath    = dirname(__DIR__) . '/stubs/Plugin.stub';
 
-                if (file_exists( $stubPath ) && !file_exists( $pluginFile )) {
+                if (file_exists( $stubPath ) && !file_exists( $configFile )) {
                     $stub     = file_get_contents( $stubPath );
                     $rendered = str_replace('{{class}}', $pluginClass, $stub);
 
-                    file_put_contents($pluginFile, $rendered);
-                    $io->write("<info>Generated: {$pluginFile}</info>");
+                    file_put_contents($configFile, $rendered);
+                    $io->write("<info>Generated: {$configFile}</info>");
+                    $io->write("<info>Updating Theme Config</info>");
+
+                    self::updateThemeConfig( 
+                        'plugins', $pluginClass, ['config' => basename($configFile), 'src' => $pluginFile ] 
+                    );
                 }
             }
-            else if (isset($extra['meros'], $extra['meros']['name'])) {
+            else if (isset($extra['meros'], $extra['meros']['class'], $extra['meros']['name'])) {
                 $io->write("<info>Handling extension package: {$packageName} at {$installPath}</info>");
                 $extensionName = $extra['meros']['name'];
 
                 if ($extra['meros']['allowOverrides'] ?? true) {
 
                     $overrideFile = dirname($installPath, 3) . "/app/Extensions/{$extensionName}.php";
-                    $stubPath     = $installPath . '/src/Override.stub';
+                    $stubPath     = dirname(__DIR__) . '/stubs/Extension.stub';
 
                     if (file_exists($stubPath) && !file_exists($overrideFile)) {
-                        $content = file_get_contents( $stubPath );
-                        file_put_contents($overrideFile, $content);
-
+                        $stub         = file_get_contents($stubPath);
+                        $replacements = [
+                            'extension' => $extra['meros']['class'],
+                            'class'     => $extensionName
+                        ];
+                        $rendered = str_replace(array_keys($replacements), array_values($replacements), $stub);
+                        
+                        file_put_contents($overrideFile, $rendered);
                         $io->write("<info>Generated: {$overrideFile}</info>");
+                        $io->write("<info>Updating Theme Config</info>");
+
+                        self::updateThemeConfig( 
+                            'extensions', $extensionName, $overrideFile
+                        );
                     }
                 }
             }
         }
+    }
+    private static function updateThemeConfig( string $type, string $class, string|array $files ): void
+    {
+        $themeConfigPath = dirname(__DIR__,5) . '/config/theme.php';
+
+        if (!file_exists($themeConfigPath) || !is_file($themeConfigPath)) {
+            return;
+        }
+
+        $config = include $themeConfigPath;
+        
+        if (!isset($config[ $type ]) || isset($config[ $type ][ $class ])) {
+            return;
+        }
+
+        $config[ $type ][ $class ] = $files;
+
+        $exported = self::exportFormattedConfig($config);
+        $output   = "<?php\n\nreturn " . $exported . ";\n";
+
+        file_put_contents($themeConfigPath, $output);
+
+    }
+    private static function exportFormattedConfig(array $array, int $indentLevel = 0): string 
+    {
+        $indent = str_repeat('    ', $indentLevel);
+        $nextIndent = str_repeat('    ', $indentLevel + 1);
+        $lines = [];
+
+        $lines[] = '[';
+
+        foreach ($array as $key => $value) {
+            $formattedKey = is_int($key) ? $key : var_export($key, true);
+            
+            if (is_array($value)) {
+                $formattedValue = self::exportFormattedConfig($value, $indentLevel + 1);
+            } else {
+                $formattedValue = var_export($value, true);
+            }
+
+            $lines[] = "{$nextIndent}{$formattedKey} => {$formattedValue},";
+        }
+
+        $lines[] = "{$indent}]";
+
+        return implode("\n", $lines);
     }
 }

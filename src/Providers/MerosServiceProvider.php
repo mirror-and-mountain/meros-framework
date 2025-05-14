@@ -2,18 +2,12 @@
 
 namespace MM\Meros\Providers;
 
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\ServiceProvider;
 
-use MM\Meros\Contracts\Plugin;
 use MM\Meros\Contracts\ThemeManager;
 
+use MM\Meros\Helpers\ExtensionLoader;
 use MM\Meros\Helpers\ClassInfo;
-use MM\Meros\Helpers\PluginInfo;
-use MM\Meros\Helpers\Features;
-
-use MM\Meros\DynamicPage\Feature as DynamicPage;
 
 class MerosServiceProvider extends ServiceProvider
 {
@@ -21,12 +15,12 @@ class MerosServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        $themeClass     = apply_filters('meros_site_class', 'App\\Theme');
-        $themeClassInfo = ClassInfo::get($themeClass);
+        $themeClass     = apply_filters( 'meros_site_class', 'App\\Theme' );
+        $themeClassInfo = ClassInfo::get( $themeClass );
 
         if ( $themeClassInfo->extends(ThemeManager::class) ) {
             $this->app->singleton(
-                'meros.theme_manager', fn($app) => new $themeClass($app)
+                'meros.theme_manager', fn($app) => new $themeClass( $app )
             );
             $this->registered = true;
         }
@@ -39,9 +33,12 @@ class MerosServiceProvider extends ServiceProvider
         $this->ensureAppKey();
 
         if ( $this->registered ) {
-            $theme = $this->app->make('meros.theme_manager');
-            $this->loadCoreFeatures( $theme );
-            $this->loadPlugins();
+            $theme  = $this->app->make('meros.theme_manager');
+            $loader = ExtensionLoader::init( $this->app, $theme );
+
+            $loader->loadExtensions('extensions');
+            $loader->loadExtensions('plugins');
+            $loader->loadExtensions('features');
 
             do_action('meros_theme_add_features', $theme);
 
@@ -49,55 +46,7 @@ class MerosServiceProvider extends ServiceProvider
         }
     }
 
-    private function loadCoreFeatures( object $theme ): void
-    {
-        $this->enableSPA( $theme );
-    }
-
-    private function loadPlugins(): void
-    {
-        $pluginConfigDir = app_path('Plugins');
-        $pluginsDir      = base_path('plugins');
-        $pluginPaths     = File::glob( $pluginsDir . '/*', GLOB_ONLYDIR );
-
-        foreach ( $pluginPaths as $pluginPath ) {
-            $pluginInfo = PluginInfo::get( $pluginPath );
-
-            if (
-                !$pluginInfo ||
-                !isset($pluginInfo['Plugin Name']) ||
-                !isset($pluginInfo['Author']) ||
-                !isset($pluginInfo['File'])
-            ) {
-                continue;
-            }
-
-            $className = Str::studly( basename($pluginPath) );
-            $classPath = "{$pluginConfigDir}/{$className}.php";
-            $class     = ClassInfo::getFromPath( $classPath );
-
-            if ( $class->extends( Plugin::class ) ) {
-
-                add_action('meros_theme_add_features', function ( $theme ) use ( $pluginInfo, $class ) {
-                    $name     = $pluginInfo['Plugin Name'];
-                    $category = $pluginInfo['MEROS Category'] ?? 'miscellaneous';
-                    $author   = $pluginInfo['Author'];
-                    $path     = base_path( $pluginInfo['File'] );
-
-                    $args     = [
-                        'path'       => $path,
-                        'uri'        => Str::replace( get_theme_file_path(), get_theme_file_uri(), $path ),
-                        'pluginInfo' => $pluginInfo
-                    ];
-        
-                    $theme->addFeature( $name, $category, $class->name, $author, $args );
-
-                });
-            }
-        }
-    }
-
-    protected function ensureAppKey(): void
+    private function ensureAppKey(): void
     {
         $envPath = base_path('.env');
         $key = 'base64:' . base64_encode(random_bytes(32));
@@ -115,35 +64,5 @@ class MerosServiceProvider extends ServiceProvider
             $envContent = rtrim($envContent) . "\n\n{$comment}\nAPP_KEY={$key}\n";
             file_put_contents($envPath, $envContent);
         }
-    }
-
-    protected function enableSPA( object $theme ): void
-    {
-        $class     = DynamicPage::class;
-        $overrider = app_path('Extensions/MerosDynamicPage.php');
-
-        if ( File::exists($overrider) ) { 
-            $overriderInfo = ClassInfo::getFromPath($overrider);
-            if ( $overriderInfo->extends( DynamicPage::class ) ) {
-                $class = $overriderInfo->name;
-            } 
-        }
-
-        $spaName = 'meros_dynamic_page';
-        $spaArgs = [
-            'name'        => $spaName,
-            'fullName'    => 'mirror_and_mountain_' . $spaName,
-            'dotName'     => 'mirror_and_mountain.' . $spaName,
-            'category'    => 'miscellaneous',
-            'optionGroup' => 'meros_theme_settings'
-        ];
-
-        $classInfo       = ClassInfo::get( DynamicPage::class );
-        $spaArgs['path'] = $classInfo->path; // Always use the base class path
-        $spaArgs['uri']  = $classInfo->uri; // Always use the base class uri
-        $spaInstance     = Features::instantiate( $this->app, $class, $spaArgs );
-        $author          = 'MIRROR AND MOUNTAIN';
-        
-        $theme->__addInstantiatedFeature( $spaArgs['name'], $spaInstance, $author );
     }
 }

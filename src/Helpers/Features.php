@@ -8,24 +8,18 @@ class Features
 {
     public static function instantiate ( 
         Application $app, 
-        string $class, 
-        array $args, 
+        string $class,
+        string $path,
+        string $uri,
         array|null $pluginInfo = null 
     ): object
     {
         $app->singleton(
-            $args['dotName'],
-            fn() => new $class( 
-                $args['name'], 
-                $args['fullName'], 
-                $args['category'], 
-                $args['optionGroup'], 
-                $args['path'], 
-                $args['uri'],
-            )
+            $class,
+            fn() => new $class( $path, $uri )
         );
 
-        $instance = $app->make( $args['dotName'] );
+        $instance = $app->make( $class );
 
         if ( $pluginInfo ) {
             $instance->setPluginInfo( $pluginInfo );

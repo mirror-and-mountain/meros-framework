@@ -2,6 +2,9 @@
 
 namespace MM\Meros\Contracts;
 
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\File;
+
 use MM\Meros\Traits\AssetManager;
 use MM\Meros\Traits\BlockManager;
 use MM\Meros\Traits\IncludeManager;
@@ -10,16 +13,17 @@ use MM\Meros\Traits\SettingsManager;
 
 abstract class Feature
 {
+    public    string $type           = 'feature';
     public    bool   $enabled        = true;
     public    bool   $userSwitchable = true;
     public    bool   $initialised    = false;
-    protected string $name;
-    protected string $fullName;
+    private   string $name;
+    private   string $fullName;
     protected string $path;
     protected string $uri;
-    protected string $category;
-    protected bool   $isExtension = false;
-    protected bool   $isPlugin    = false;
+    protected string $category = 'miscellaneous';
+
+    protected string|array $author = 'unknown';
 
     use AssetManager, 
         BlockManager, 
@@ -27,21 +31,14 @@ abstract class Feature
         ComponentManager, 
         SettingsManager;
 
-    public function __construct( 
-        string $name, 
-        string $fullName, 
-        string $category, 
-        string $optionGroup,
-        string $path, 
-        string $uri 
-    )
+    public function __construct( string $path, string $uri )
     {
-        $this->name        = $name;
-        $this->fullName    = $fullName;
-        $this->category    = $category;
-        $this->path        = trailingslashit( $path );
-        $this->uri         = trailingslashit( $uri );
-        $this->optionGroup = $optionGroup;
+        $class = Str::afterLast( __CLASS__, '\\' );
+        $class = Str::lower( Str::headline( $class ) );
+        
+        $this->name = Str::slug( $class, '_' );
+        $this->path = trailingslashit( $path );
+        $this->uri  = trailingslashit( $uri );
 
         $this->setUp();
         $this->initialiseSettings();
@@ -49,19 +46,49 @@ abstract class Feature
 
     private function setUp(): void
     {
-        if ( 
-            property_exists( $this, 'pluginInfo' ) &&
-            property_exists( $this, 'pluginFile' ) 
-        ) {
-            $this->isPlugin = true;
-            $this->userSwitchable = false;
+        if ( $this instanceof Plugin ) {
+            $this->type = 'plugin';
+            
+            $this->author = [
+                'name'        => isset( $this->pluginInfo['Author'] ) ? $this->pluginInfo['Author'] : 'unknown',
+                'description' => '',
+                'support'     => '',
+                'link'        => isset( $this->pluginInfo['Author URI'] ) ? $this->pluginInfo['Author URI'] : '',
+            ];
         }
 
         $this->configure();
 
         if ( $this instanceof Extension ) {
-            $this->isExtension = true;
+            $this->type = 'extension';
             $this->override();
+        }
+
+        $this->sanitizeAuthor();
+
+        $this->fullName = Str::slug( $this->author['name'], '_' ) . '_' . $this->name;
+
+        return;
+    }
+
+    private function sanitizeAuthor(): void
+    {
+        if ( is_string( $this->author ) ) {
+            $this->author = [
+                'name'        => $this->author,
+                'description' => '',
+                'support'     => '',
+                'link'        => ''
+            ];
+        } else if ( is_array( $this->author ) ) {
+            $author = [
+                'name'        => $this->author['name'] ?? 'unknown',
+                'description' => $this->author['description'] ?? '',
+                'support'     => $this->author['support'] ?? '',
+                'link'        => $this->author['link'] ?? ''
+            ];
+            
+            $this->author = $author;
         }
     }
 
@@ -87,6 +114,15 @@ abstract class Feature
             return;
         }
 
+        if (
+            $this instanceof Plugin &&
+            File::exists( $this->pluginInfo['File'] ) 
+        ) {
+            include_once $this->pluginInfo['File'];
+            $this->initialised = true;
+            return;
+        }
+
         if ($this->hasIncludes) {
             $this->include();
         }
@@ -106,5 +142,15 @@ abstract class Feature
         }
 
         $this->initialised = true;
+    }
+
+    final public function getAuthor(): array
+    {
+        return $this->author;
+    }
+
+    final public function getName( bool $full = false ): string
+    {
+        return $full === false ? $this->name : $this->fullName;
     }
 }

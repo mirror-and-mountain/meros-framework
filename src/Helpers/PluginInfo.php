@@ -16,8 +16,7 @@ class PluginInfo
         'License'           => 'License',
         'Licence URI'       => 'License URI',
         'Text Domain'       => 'Text Domain',
-        'Domain Path'       => 'Domain Path',
-        'MEROS Category'    => 'MEROS Category'
+        'Domain Path'       => 'Domain Path'
     ];
 
     public static function get( string $directory ): ?array
