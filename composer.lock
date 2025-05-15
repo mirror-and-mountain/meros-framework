@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7febf8a52d3e9f3a3da57e6b73e2bd6f",
+    "content-hash": "b4b53fb1a7a055b8094810683d709224",
     "packages": [
         {
             "name": "brick/math",
@@ -2839,16 +2839,16 @@
         },
         {
             "name": "mirror-and-mountain/meros-dynamic-page",
-            "version": "v0.0.22",
+            "version": "v0.0.23",
             "source": {
                 "type": "git",
                 "url": "git@github.com:mirror-and-mountain/meros-dynamic-page.git",
-                "reference": "6ea0795cd9ca21e5bd5370602c3ec3a44e4e5536"
+                "reference": "8d9577b96d59fddc10c0a4e4270f804c7a9c4c3c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mirror-and-mountain/meros-dynamic-page/zipball/6ea0795cd9ca21e5bd5370602c3ec3a44e4e5536",
-                "reference": "6ea0795cd9ca21e5bd5370602c3ec3a44e4e5536",
+                "url": "https://api.github.com/repos/mirror-and-mountain/meros-dynamic-page/zipball/8d9577b96d59fddc10c0a4e4270f804c7a9c4c3c",
+                "reference": "8d9577b96d59fddc10c0a4e4270f804c7a9c4c3c",
                 "shasum": ""
             },
             "type": "library",
@@ -2875,10 +2875,10 @@
             ],
             "description": "Pending",
             "support": {
-                "source": "https://github.com/mirror-and-mountain/meros-dynamic-page/tree/v0.0.22",
+                "source": "https://github.com/mirror-and-mountain/meros-dynamic-page/tree/v0.0.23",
                 "issues": "https://github.com/mirror-and-mountain/meros-dynamic-page/issues"
             },
-            "time": "2025-05-14T15:58:16+00:00"
+            "time": "2025-05-15T11:43:22+00:00"
         },
         {
             "name": "monolog/monolog",

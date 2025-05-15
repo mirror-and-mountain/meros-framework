@@ -57,18 +57,18 @@ class ExtensionLoader
 
         switch ( $type ) {
             case 'extensions':
-                $extenstionDefs = $this->extensions ?? [];
-                $baseClass      = Extension::class;
+                $extensionDefs = $this->extensions;
+                $baseClass     = Extension::class;
                 break;
 
             case 'plugins': 
-                $extenstionDefs = $this->plugins ?? [];
-                $baseClass      = Plugin::class;
+                $extensionDefs = $this->plugins ?? [];
+                $baseClass     = Plugin::class;
                 break;
             
             case 'features':
-                $extenstionDefs = $this->features ?? [];
-                $baseClass      = Feature::class;
+                $extensionDefs = $this->features ?? [];
+                $baseClass     = Feature::class;
                 break;
         }
 
@@ -76,8 +76,8 @@ class ExtensionLoader
             return;
         }
 
-        foreach ( $extenstionDefs as $class => $files ) {
-            $fqClass = $this->themeNamespace . '\\' . $class;
+        foreach ( $extensionDefs as $class => $files ) {
+            $fqClass = $this->themeNamespace . '\\' . ucfirst($type) . '\\' . $class;
             $this->loadExtension( $extensionPath, $fqClass, $files, $baseClass );
         }
     }
@@ -92,7 +92,7 @@ class ExtensionLoader
             return;
         }
 
-        require_once( $path );
+        require_once $path;
 
         $classInfo = ClassInfo::get( $class );
         $feature   = false;
@@ -120,7 +120,7 @@ class ExtensionLoader
             case Plugin::class:
                 $featurePath = $classInfo->path;
                 $featureUri  = $classInfo->uri;
-                $pluginDir   = dirname( $files['src'] );
+                $pluginDir   = base_path( dirname( $files['src'] ) );
 
                 if ( !File::isDirectory( $pluginDir ) ) {
                     return;

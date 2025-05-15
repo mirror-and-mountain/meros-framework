@@ -11,20 +11,14 @@ class Features
         string $class,
         string $path,
         string $uri,
-        array|null $pluginInfo = null 
+        array  $pluginInfo = []
     ): object
     {
         $app->singleton(
             $class,
-            fn() => new $class( $path, $uri )
+            fn() => new $class( $path, $uri, $pluginInfo )
         );
 
-        $instance = $app->make( $class );
-
-        if ( $pluginInfo ) {
-            $instance->setPluginInfo( $pluginInfo );
-        }
-
-        return $instance;
+        return $app->make( $class );
     }
 }

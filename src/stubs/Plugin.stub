@@ -8,6 +8,6 @@ class {{class}} extends Plugin
 {
     protected function configure(): void
     {
-        $this->usePluginConfig = true;
+        $this->enabled = true;
     }
 }

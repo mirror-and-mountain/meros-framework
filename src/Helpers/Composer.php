@@ -6,7 +6,7 @@ use MM\Meros\Helpers\PluginInfo;
 
 class Composer
 {
-    public static function afterPluginInstall( $event ): void
+    public static function handleMerosExtensions( $event ): void
     {
         $composer            = $event->getComposer();
         $installationManager = $composer->getInstallationManager();
@@ -72,7 +72,7 @@ class Composer
                         $io->write("<info>Updating Theme Config</info>");
 
                         self::updateThemeConfig( 
-                            'extensions', $extensionName, $overrideFile
+                            'extensions', $extensionName, basename($overrideFile)
                         );
                     }
                 }

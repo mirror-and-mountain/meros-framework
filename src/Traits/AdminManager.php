@@ -26,13 +26,34 @@ trait AdminManager
                 'manage_options',
                 'meros_theme_settings',
                 function () {
-                    echo "<div class=\"wrap\">";
-                    echo "<h1>" . esc_html($this->themeName) . " Settings</h1>";
-                    echo "<form method='post' action='options.php'>";
-                    settings_fields('meros_theme_settings');
-                    do_settings_sections('meros_theme_settings');
-                    submit_button();
-                    echo "</form></div>";
+                    ?>
+                    <div class="wrap">
+                        <h1><?php echo esc_html($this->themeName)?> Settings</h1>
+                        <?php
+                            $tabs = [
+                                'blocks'        => 'Blocks',
+                                'miscellaneous' => 'Miscellaneous'
+                            ];
+                            $current_tab = isset( $_GET['tab'], $tabs[ $_GET['tab'] ] ) ? $_GET['tab'] : array_key_first( $tabs );
+                        ?>
+                        <form method='post' action='options.php'>
+                            <nav class="nav-tab-wrapper">
+                                <?php
+                                    foreach ( $tabs as $tab => $name ) {
+                                        $current = $tab === $current_tab ? ' nav-tab-active' : '';
+                                        $url     = add_query_arg( array( 'page' => 'meros_theme_settings', 'tab' => $tab ), '' );
+                                        echo "<a class=\"nav-tab{$current}\" href=\"{$url}\">{$name}</a>";
+                                    }
+                                ?>
+                            </nav>
+                        <?php
+                            settings_fields("meros_theme_settings_{$current_tab}");
+                            do_settings_sections("meros_theme_settings_{$current_tab}");
+                            submit_button();
+                        ?>
+                        </form>
+                    </div>
+                    <?php
                 }            
             );
         });

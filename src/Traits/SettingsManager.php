@@ -22,8 +22,8 @@ trait SettingsManager
         $category = $this->category;
 
         $this->optionGroup = array_key_exists( $category, $groups ) 
-                             ? $groups[ $category ] 
-                             : 'meros_theme_settings';
+                             ? $groups[ $category ] . '_' . $category
+                             : 'meros_theme_settings_miscellaneous';
     }
 
     protected function setRegisteredSettings(): void
@@ -33,7 +33,8 @@ trait SettingsManager
         }
 
         foreach ( $this->options as $option => $schema ) {
-            $this->settings[ $option ] = get_option( $option, $schema['default'] ?? null );
+            $name = $this->name . '_' . $option;
+            $this->settings[ $option ] = get_option( $name, $schema['default'] ?? null );
         }
     }
 
@@ -61,6 +62,7 @@ trait SettingsManager
             );
 
             foreach ( $this->options as $option => $schema ) {
+                $name             = $this->name . '_' . $option;
                 $type             = $schema['type'];
                 $default          = $schema['default'] ?? null;
                 $description      = $schema['description'] ?? '';
@@ -75,7 +77,7 @@ trait SettingsManager
                 }
 
                 register_setting(
-                    $this->optionGroup, $option, [
+                    $this->optionGroup, $name, [
                         'type'              => $type,
                         'default'           => $default,
                         'description'       => $description,
@@ -96,21 +98,21 @@ trait SettingsManager
                     }
 
                     add_settings_field(
-                        "{$this->name}_{$option}",
+                        $name,
                         Str::title( $option ),
-                        function() use ( $option, $type, $description, $id, $default, $fieldType, $required ) {
+                        function() use ( $name, $type, $description, $id, $default, $fieldType, $required ) {
                             if ( is_callable( $fieldType ) ) {
                                 call_user_func( $fieldType );
                             }
                             else {
                                 echo Fields::make( 
-                                    $option, $type, $description, $id, $default, $fieldType, $required 
+                                    $name, $type, $description, $id, $default, $fieldType, $required 
                                 );
                             }
                         },
                         $this->optionGroup,
                         $settingsSectionId,
-                        [ 'label_for' => $option ]
+                        [ 'label_for' => $name ]
                     );
                 }
             }

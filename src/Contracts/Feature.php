@@ -17,8 +17,8 @@ abstract class Feature
     public    bool   $enabled        = true;
     public    bool   $userSwitchable = true;
     public    bool   $initialised    = false;
-    private   string $name;
-    private   string $fullName;
+    protected string $name;
+    protected string $fullName;
     protected string $path;
     protected string $uri;
     protected string $category = 'miscellaneous';
@@ -31,14 +31,18 @@ abstract class Feature
         ComponentManager, 
         SettingsManager;
 
-    public function __construct( string $path, string $uri )
+    public function __construct( string $path, string $uri, array $pluginInfo = [] )
     {
-        $class = Str::afterLast( __CLASS__, '\\' );
+        $class = Str::afterLast( get_class($this), '\\' );
         $class = Str::lower( Str::headline( $class ) );
         
         $this->name = Str::slug( $class, '_' );
         $this->path = trailingslashit( $path );
         $this->uri  = trailingslashit( $uri );
+
+        if ( $this instanceof Plugin ) {
+            $this->pluginInfo = $pluginInfo;
+        }
 
         $this->setUp();
         $this->initialiseSettings();
@@ -94,6 +98,7 @@ abstract class Feature
 
     private function initialiseSettings(): void
     {
+        $this->setOptionGroup();
         $this->sanitizeOptions();
         $this->setRegisteredSettings();
         $this->registerSettings();
@@ -116,14 +121,15 @@ abstract class Feature
 
         if (
             $this instanceof Plugin &&
-            File::exists( $this->pluginInfo['File'] ) 
+            File::exists( base_path( $this->pluginInfo['File'] ) ) 
         ) {
-            include_once $this->pluginInfo['File'];
+            include_once base_path( $this->pluginInfo['File'] );
             $this->initialised = true;
             return;
         }
 
         if ($this->hasIncludes) {
+            $this->loadIncludes();
             $this->include();
         }
 
@@ -138,6 +144,7 @@ abstract class Feature
         }
 
         if ($this->hasBlocks) {
+            $this->loadBlocks();
             $this->registerBlocks();
         }
 

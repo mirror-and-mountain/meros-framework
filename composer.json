@@ -19,7 +19,7 @@
     "require": {
         "roots/acorn": "^5.0.2",
         "livewire/livewire": "^3.6.3",
-        "mirror-and-mountain/meros-dynamic-page": "^0.0.22"
+        "mirror-and-mountain/meros-dynamic-page": "^0.0.23"
     },
     "autoload": {
         "psr-4": {
