@@ -2,25 +2,24 @@
 
 namespace MM\Meros\Providers;
 
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 
 use MM\Meros\Contracts\ThemeManager;
 
-use MM\Meros\Helpers\ExtensionLoader;
 use MM\Meros\Helpers\ClassInfo;
+use MM\Meros\Helpers\ExtensionLoader;
 
 class MerosServiceProvider extends ServiceProvider
 {
     private bool    $registered = false;
-    private ?string $themeNamespace;
 
     public function register(): void
     {
-        $themeClass           = apply_filters( 'meros_site_class', 'App\\Theme' );
-        $themeClassInfo       = ClassInfo::get( $themeClass );
-        $this->themeNamespace = $themeClassInfo->namespace;
+        $themeClass = Config::get('theme.theme_class');
+        $themeClass = ClassInfo::get( $themeClass );
 
-        if ( $themeClassInfo->extends(ThemeManager::class) ) {
+        if ( $themeClass->extends(ThemeManager::class) ) {
             $this->app->singleton(
                 'meros.theme_manager', fn($app) => new $themeClass( $app )
             );
@@ -36,7 +35,7 @@ class MerosServiceProvider extends ServiceProvider
 
         if ( $this->registered ) {
             $theme  = $this->app->make('meros.theme_manager');
-            $loader = ExtensionLoader::init( $this->app, $theme, $this->themeNamespace );
+            $loader = ExtensionLoader::init( $theme );
 
             $loader->loadExtensions('extensions');
             $loader->loadExtensions('plugins');

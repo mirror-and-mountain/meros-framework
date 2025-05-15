@@ -2,10 +2,6 @@
 
 namespace MM\Meros\Helpers;
 
-use MM\Meros\Helpers\Features;
-use MM\Meros\Helpers\ClassInfo;
-use MM\Meros\Helpers\PluginInfo;
-
 use MM\Meros\Contracts\Extension;
 use MM\Meros\Contracts\Feature;
 use MM\Meros\Contracts\Plugin;
@@ -13,26 +9,21 @@ use MM\Meros\Contracts\Plugin;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Contracts\Foundation\Application;
 
 class ExtensionLoader
 {
-    public array   $extensions;
-    public array   $features;
-    public array   $plugins;
-    
-    private object $theme;
-    private string $themeNamespace;
+    public array $extensions;
+    public array $features;
+    public array $plugins;
 
-    private function __construct( private Application $app, object $theme, string $themeNamespace )
+    private function __construct( private object $theme )
     {
-        $this->theme          = $theme;
-        $this->themeNamespace = $themeNamespace;
+        // Do nothing
     }
 
-    public static function init( Application $app, object $theme, string $themeNamespace ): self
+    public static function init( object $theme ): self
     {
-        $instance    = new self( $app, $theme, $themeNamespace );
+        $instance    = new self( $theme );
         $themeConfig = base_path('config/theme.php');
 
         if ( File::exists( $themeConfig ) ) {
@@ -46,9 +37,9 @@ class ExtensionLoader
 
     public function loadExtensions( string $type ): void
     {
-        $extensionPath = app_path( ucfirst( $type ) );
+        $extPath = app_path( ucfirst( $type ) );
 
-        if ( !File::exists( $extensionPath ) ) {
+        if ( !File::exists( $extPath ) ) {
             return;
         }
 
@@ -77,56 +68,65 @@ class ExtensionLoader
         }
 
         foreach ( $extensionDefs as $class => $files ) {
-            $fqClass = $this->themeNamespace . '\\' . ucfirst($type) . '\\' . $class;
-            $this->loadExtension( $extensionPath, $fqClass, $files, $baseClass );
+            $this->loadExtension( $extPath, $class, $files, $baseClass );
         }
     }
 
-    private function loadExtension( string $extPath, string $class, string|array $files, string $baseClass ): void
+    private function loadExtension( 
+        string $extPath, 
+        string $class, 
+        string|array $files, 
+        string $baseClass 
+    ): void
     {
-        if ( is_string ( $files ) ) {
-            if ( $baseClass === Feature::class ) {
-                $path = trailingslashit( $extPath ) . trailingslashit( File::name( $files ) ) . $files;
-            } else {
-                $path = trailingslashit( $extPath ) . $files;
+        if ( is_string( $files ) ) {
+            switch ( $baseClass ) {
+                case Feature::class:
+                    $path = trailingslashit( $extPath ) . trailingslashit( File::name( $files ) ) . $files;
+                    break;
+                
+                default:
+                    $path = trailingslashit( $extPath ) . $files;
             }
-        } else if ( is_array( $files ) && array_key_exists( 'config', $files ) ) {
+        } 
+        
+        else if ( is_array( $files ) && array_key_exists( 'config', $files ) ) {
             $path = trailingslashit( $extPath ) . $files['config'];
         } 
 
-        if ( !File::exists( $path ) || !File::isFile( $path ) ) {
-            return;
-        }
+        if ( !File::exists( $path ) || !File::isFile( $path ) ) { return; }
 
         require_once $path;
 
-        $classInfo = ClassInfo::get( $class );
-        $feature   = false;
+        $class   = ClassInfo::get( $class );
+        $feature = false;
 
         if ( 
-            !class_exists( $classInfo->name ) ||
-            !$classInfo->isDescendantOf( $baseClass )
+            !$class ||
+            !$class->isDescendantOf( $baseClass )
         ) {
             return;
         }
 
         switch ( $baseClass ) {
             case Extension::class:
-                $parent      = $classInfo->parent;
-                $parentInfo  = ClassInfo::get( $parent );
-                $featurePath = $parentInfo->path;
-                $featureUri  = $parentInfo->uri;
+                $parent      = ClassInfo::get( $class->parent );
+                $featurePath = $parent->path;
+                $featureUri  = $parent->uri;
 
                 $feature = Features::instantiate( 
-                    $this->app, $classInfo->name, $featurePath, $featureUri 
+                    $class->name, $featurePath, $featureUri 
                 );
 
                 break;
             
             case Plugin::class:
-                $featurePath = $classInfo->path;
-                $featureUri  = $classInfo->uri;
-                $pluginDir   = base_path( dirname( $files['src'] ) );
+                $featurePath = $class->path;
+                $featureUri  = $class->uri;
+
+                if ( !isset( $files['src'] ) ) { return; }
+                
+                $pluginDir = base_path( dirname( $files['src'] ) );
 
                 if ( !File::isDirectory( $pluginDir ) ) {
                     return;
@@ -134,22 +134,20 @@ class ExtensionLoader
 
                 $pluginInfo = PluginInfo::get( $pluginDir ) ?? false;
 
-                if ( !$pluginInfo ) {
-                    return;
-                }
+                if ( !$pluginInfo ) { return; }
 
                 $feature = Features::instantiate(
-                    $this->app, $classInfo->name, $featurePath, $featureUri, $pluginInfo
+                    $class->name, $featurePath, $featureUri, $pluginInfo
                 );
 
                 break;
             
             case Feature::class: 
-                $featurePath = $classInfo->path;
-                $featureUri  = $classInfo->uri;
+                $featurePath = $class->path;
+                $featureUri  = $class->uri;
 
                 $feature = Features::instantiate( 
-                    $this->app, $classInfo->name, $featurePath, $featureUri 
+                    $class->name, $featurePath, $featureUri 
                 );
 
                 break;

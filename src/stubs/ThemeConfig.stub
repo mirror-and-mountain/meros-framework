@@ -1,0 +1,12 @@
+<?php
+
+return [
+    'theme_class'          => {{theme_class}},
+    'features_namespace'   => {{features_namespace}},
+    'extensions_namespace' => {{extensions_namespace}},
+    'plugins_namespace'    => {{plugins_namespace}},
+
+    'features'   => {{features}},
+    'extensions' => {{extensions}},
+    'plugins'    => {{plugins}}
+];
