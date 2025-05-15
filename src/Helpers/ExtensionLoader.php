@@ -84,9 +84,15 @@ class ExtensionLoader
 
     private function loadExtension( string $extPath, string $class, string|array $files, string $baseClass ): void
     {
-        $path = is_string( $files ) 
-                ? trailingslashit( $extPath ) . $files
-                : trailingslashit( $extPath ) . $files['config'] ?? '';
+        if ( is_string ( $files ) ) {
+            if ( $baseClass === Feature::class ) {
+                $path = trailingslashit( $extPath ) . trailingslashit( File::name( $files ) ) . $files;
+            } else {
+                $path = trailingslashit( $extPath ) . $files;
+            }
+        } else if ( is_array( $files ) && array_key_exists( 'config', $files ) ) {
+            $path = trailingslashit( $extPath ) . $files['config'];
+        } 
 
         if ( !File::exists( $path ) || !File::isFile( $path ) ) {
             return;

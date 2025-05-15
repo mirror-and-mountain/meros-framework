@@ -79,7 +79,7 @@ class Composer
             }
         }
     }
-    private static function updateThemeConfig( string $type, string $class, string|array $files ): void
+    public static function updateThemeConfig( string $type, string $class, string|array $files ): void
     {
         $themeConfigPath = dirname(__DIR__,5) . '/config/theme.php';
 
