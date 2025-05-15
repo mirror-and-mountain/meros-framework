@@ -6,7 +6,12 @@ return [
     'features_namespace'   => 'App\\Features',
     'plugins_namespace'    => 'App\\Plugins',
 
-    'features'   => [],
+    // Installed features
+    'features' => [],
+
+    // Installed extensions
     'extensions' => [],
-    'plugins'    => []
+
+    // Installed plugins
+    'plugins' => []
 ];

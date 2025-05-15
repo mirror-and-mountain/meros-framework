@@ -146,11 +146,11 @@ class Composer
                     '{{plugins}}'
                 ],
                 [
-                    self::$themeConfig['theme_class'] ?? 'App\\Theme',
-                    self::$themeConfig['features_namespace'] ?? 'App\\Features',
-                    self::$themeConfig['extensions_namespace'] ?? 'App\\Extensions',
-                    self::$themeConfig['plugins_namespace'] ?? 'App\\Plugins',
-                    self::$themeConfig['features'] ?? '[]',
+                    var_export(self::$themeConfig['theme_class'] ?? 'App\\Theme', true),
+                    var_export(self::$themeConfig['features_namespace'] ?? 'App\\Features', true),
+                    var_export(self::$themeConfig['extensions_namespace'] ?? 'App\\Extensions', true),
+                    var_export(self::$themeConfig['plugins_namespace'] ?? 'App\\Plugins', true),
+                    self::formatArray(self::$themeConfig['features'] ?? [], 2, 'features'),
                     self::formatArray(self::$extensions, 2, 'extensions'),
                     self::formatArray(self::$plugins, 2, 'plugins')
                 ],

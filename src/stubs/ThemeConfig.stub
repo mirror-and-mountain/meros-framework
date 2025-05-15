@@ -6,7 +6,12 @@ return [
     'extensions_namespace' => {{extensions_namespace}},
     'plugins_namespace'    => {{plugins_namespace}},
 
-    'features'   => {{features}},
+    // Installed features
+    'features' => {{features}},
+
+    // Installed extensions
     'extensions' => {{extensions}},
-    'plugins'    => {{plugins}}
+
+    // Installed plugins
+    'plugins' => {{plugins}}
 ];
