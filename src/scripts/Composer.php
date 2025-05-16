@@ -1,42 +1,23 @@
 <?php
 
-namespace MM\Meros\Helpers;
+namespace MM\Meros\Scripts;
 
 use MM\Meros\Helpers\PluginInfo;
 
 class Composer
 {
     private static array $themeConfig = [];
+    private static array $features    = [];
     private static array $extensions  = [];
     private static array $plugins     = [];
 
-    public static function handleMerosExtensions( $event ): void
+    public static function handleExtensions( $event ): void
     {
         $composer            = $event->getComposer();
         $installationManager = $composer->getInstallationManager();
         $io                  = $event->getIO();
-        $themeConfig         = dirname(__DIR__, 5) . '/config/theme.php';
-        $themeConfigTemplate = dirname(__DIR__) . '/config/theme.template.php';
-        
-        if (!file_exists($themeConfig)) {
-            $io->write("<info>Setting up theme config file</info>");
-            
-            if (!file_exists($themeConfigTemplate)) {
-                $io->write("<error>Unable to locate theme config template. Aborting</error>");
-                return;
-            }
 
-            $newThemeConfig = copy($themeConfigTemplate, $themeConfig);
-
-            if (!$newThemeConfig) {
-                $io->write("<error>Unable to create theme config. Aborting</error>");
-                return;
-            }
-
-            $io->write("<info>Generated theme config file</info>");
-        }
-
-        self::$themeConfig = require $themeConfig;
+        self::checkThemeConfig( $io );
 
         foreach ($composer->getRepositoryManager()->getLocalRepository()->getPackages() as $package) {
             $packageType = $package->getType();
@@ -129,7 +110,73 @@ class Composer
         self::regenerateThemeConfig();
     }
 
-    public static function regenerateThemeConfig(): void
+    public static function makeCreateScriptExecutable(): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            chmod(__DIR__ . '/create-feature.sh', 0755);
+        }
+    }
+
+    public static function createFeature(): void
+    {
+        // Prompt user for feature name in PHP
+        echo "Enter feature name: ";
+        $featureName = trim(fgets(STDIN));
+
+        if ($featureName === '') {
+            echo "Feature name cannot be empty.\n";
+            exit(1);
+        }
+
+        // Build command to call shell or batch script with feature name argument
+        $script = PHP_OS_FAMILY === 'Windows'
+            ? 'cmd /c ' . escapeshellarg(__DIR__ . '\\create-feature.bat') . ' ' . escapeshellarg($featureName)
+            : 'sh ' . escapeshellarg(__DIR__ . '/create-feature.sh') . ' ' . escapeshellarg($featureName);
+
+        echo "Running script: $script\n";
+        passthru($script);
+
+        //Update theme config
+        self::$features[ $featureName ] = $featureName . '.php';
+        self::checkThemeConfig();
+        self::regenerateThemeConfig();
+    }
+
+    private static function checkThemeConfig( mixed $io = false ): void
+    {
+        $themeConfig         = dirname(__DIR__, 5) . '/config/theme.php';
+        $themeConfigTemplate = dirname(__DIR__) . '/config/theme.template.php';
+        
+        if (!file_exists($themeConfig)) {
+            if ($io !== false) {
+                $io->write("<info>Setting up theme config file</info>");
+            }
+            
+            if (!file_exists($themeConfigTemplate)) {
+                if ($io !== false) {
+                    $io->write("<error>Unable to locate theme config template. Aborting</error>");
+                }
+                return;
+            }
+
+            $newThemeConfig = copy($themeConfigTemplate, $themeConfig);
+
+            if (!$newThemeConfig) {
+                if ($io !== false) {
+                    $io->write("<error>Unable to create theme config. Aborting</error>");
+                }
+                return;
+            }
+
+            if ($io !== false) {
+                $io->write("<info>Generated theme config file</info>");
+            }
+        }
+
+        self::$themeConfig = require $themeConfig;
+    }
+
+    private static function regenerateThemeConfig(): void
     {
         $stubPath = dirname(__DIR__) . '/stubs/ThemeConfig.stub';
 
@@ -150,7 +197,7 @@ class Composer
                     var_export(self::$themeConfig['features_namespace'] ?? 'App\\Features', true),
                     var_export(self::$themeConfig['extensions_namespace'] ?? 'App\\Extensions', true),
                     var_export(self::$themeConfig['plugins_namespace'] ?? 'App\\Plugins', true),
-                    self::formatArray(self::$themeConfig['features'] ?? [], 2, 'features'),
+                    self::formatArray(self::$features, 2, 'features'),
                     self::formatArray(self::$extensions, 2, 'extensions'),
                     self::formatArray(self::$plugins, 2, 'plugins')
                 ],

@@ -30,6 +30,11 @@
             "MM\\Meros\\Helpers\\": "src/Helpers"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "MM\\Meros\\Scripts\\": "src/scripts"
+        }
+    },
     "minimum-stability": "stable",
     "prefer-stable": true
 }
