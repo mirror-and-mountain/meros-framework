@@ -200,9 +200,9 @@ class Composer
                     var_export(self::$themeConfig['features_namespace'] ?? 'App\\Features', true),
                     var_export(self::$themeConfig['extensions_namespace'] ?? 'App\\Extensions', true),
                     var_export(self::$themeConfig['plugins_namespace'] ?? 'App\\Plugins', true),
-                    self::formatArray(self::$features, 2, 'features'),
-                    self::formatArray(self::$extensions, 2, 'extensions'),
-                    self::formatArray(self::$plugins, 2, 'plugins')
+                    self::formatArray(self::$features, 'features', 2),
+                    self::formatArray(self::$extensions, 'extensions', 2),
+                    self::formatArray(self::$plugins, 'plugins', 2)
                 ],
                 $stub
             );
@@ -211,7 +211,7 @@ class Composer
         }
     }
 
-    private static function formatArray( array $array, int $indentLevel = 2, ?string $type ): string
+    private static function formatArray( array $array, ?string $type, int $indentLevel = 2  ): string
     {
         $indent = str_repeat('    ', $indentLevel);
         $lines  = ['['];
@@ -223,7 +223,7 @@ class Composer
         foreach ( $array as $key => $value ) {
             $formattedKey   = var_export($key, true);
             $formattedValue = is_array($value)
-                ? self::formatArray($value, $indentLevel + 1, null)
+                ? self::formatArray($value, null, $indentLevel + 1)
                 : var_export($value, true);
 
             $lines[] = "{$indent}{$formattedKey} => {$formattedValue},";
