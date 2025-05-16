@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Plugins;
+namespace {{namespace}};
 
 use MM\Meros\Contracts\Plugin;
 

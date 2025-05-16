@@ -37,9 +37,9 @@ class Composer
                 }
 
                 $pluginFile       = $pluginInfo['File'] ?? '';
-                $pluginsNamespace = self::$themeConfig['plugins_namespace'] ?? '';
+                $pluginsNamespace = self::$themeConfig['plugins_namespace'] ?? 'App\\Plugins';
 
-                if ($pluginFile === '' || $pluginsNamespace === '') {
+                if ($pluginFile === '') {
                     $io->write("<error>Cannot determine theme plugin configuration. Skipping {$packageName}</error>");
                     continue;
                 }
@@ -53,8 +53,13 @@ class Composer
                 $stubPath    = dirname(__DIR__) . '/stubs/Plugin.stub';
 
                 if (file_exists($stubPath) && !file_exists($configFile)) {
-                    $stub     = file_get_contents( $stubPath );
-                    $rendered = str_replace('{{class}}', $pluginClass, $stub);
+                    $stub         = file_get_contents( $stubPath );
+                    $replacements = [
+                        '{{namespace}}' => $pluginsNamespace, 
+                        '{{class}}'     => $pluginClass
+                    ];
+                    
+                    $rendered = str_replace(array_keys($replacements), array_values($replacements), $stub);
 
                     file_put_contents($configFile, $rendered);
                     $io->write("<info>Generated: {$configFile}</info>");
@@ -72,12 +77,7 @@ class Composer
             else if (isset($extra['meros'], $extra['meros']['class'], $extra['meros']['name'])) {
                 $io->write("<info>Handling extension package: {$packageName} at {$installPath}</info>");
                 
-                $extensionsNamespace = self::$themeConfig['extensions_namespace'] ?? '';
-
-                if ($extensionsNamespace === '') {
-                    $io->write("<error>Cannot determine theme extension namespace. Skipping {$packageName}</error>");
-                    continue;
-                }
+                $extensionsNamespace = self::$themeConfig['extensions_namespace'] ?? 'App\\Extensions;';
 
                 $overrideClass = $extra['meros']['name'];
 
@@ -89,6 +89,7 @@ class Composer
                     if (file_exists($stubPath) && !file_exists($overrideFile)) {
                         $stub         = file_get_contents($stubPath);
                         $replacements = [
+                            '{{namespace}}' => $extensionsNamespace,
                             '{{extension}}' => $extra['meros']['class'],
                             '{{class}}'     => $overrideClass
                         ];
@@ -119,7 +120,8 @@ class Composer
 
     public static function createFeature(): void
     {
-        // Prompt user for feature name in PHP
+        self::checkThemeConfig();
+        
         echo "Enter feature name: ";
         $featureName = trim(fgets(STDIN));
 
@@ -128,19 +130,20 @@ class Composer
             exit(1);
         }
 
-        // Build command to call shell or batch script with feature name argument
+        $namespace = self::$themeConfig['features_namespace'] ?? 'App\\Features';
+
+        // Pass both arguments
         $script = PHP_OS_FAMILY === 'Windows'
-            ? 'cmd /c ' . escapeshellarg(__DIR__ . '\\create-feature.bat') . ' ' . escapeshellarg($featureName)
-            : 'sh ' . escapeshellarg(__DIR__ . '/create-feature.sh') . ' ' . escapeshellarg($featureName);
+            ? 'cmd /c ' . escapeshellarg(__DIR__ . '\\create-feature.bat') . ' ' . escapeshellarg($featureName) . ' ' . escapeshellarg($namespace)
+            : 'sh ' . escapeshellarg(__DIR__ . '/create-feature.sh') . ' ' . escapeshellarg($featureName) . ' ' . escapeshellarg($namespace);
 
         echo "Running script: $script\n";
         passthru($script);
 
-        //Update theme config
-        self::$features[ $featureName ] = $featureName . '.php';
-        self::checkThemeConfig();
+        self::$features[$namespace . '\\' . $featureName] = $featureName . '.php';
         self::regenerateThemeConfig();
     }
+
 
     private static function checkThemeConfig( mixed $io = false ): void
     {
