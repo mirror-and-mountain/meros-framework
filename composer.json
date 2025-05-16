@@ -23,16 +23,11 @@
     },
     "autoload": {
         "psr-4": {
-            "MM\\Meros\\Providers\\": "src/Providers",
-            "MM\\Meros\\Facades\\": "src/Facades",
             "MM\\Meros\\Contracts\\": "src/Contracts",
-            "MM\\Meros\\Traits\\": "src/Traits",
-            "MM\\Meros\\Helpers\\": "src/Helpers"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "MM\\Meros\\Scripts\\": "src/scripts"
+            "MM\\Meros\\Helpers\\": "src/Helpers",
+            "MM\\Meros\\Providers\\": "src/Providers",
+            "MM\\Meros\\Scripts\\": "src/Scripts",
+            "MM\\Meros\\Traits\\": "src/Traits"
         }
     },
     "minimum-stability": "stable",
