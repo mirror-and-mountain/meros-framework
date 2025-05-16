@@ -28,7 +28,7 @@ trait AssetManager
 
     protected bool  $useFullNameForAssets = true;
 
-    final protected function loadAssets(): void
+    private function loadAssets(): void
     {   
         $assetsPath = $this->path . $this->assetsDir;
 
@@ -49,7 +49,7 @@ trait AssetManager
         $this->hasAssets = $this->registeredScripts !== [] || $this->registeredStyles !== [];
     }
 
-    final protected function setAssets( string $path, string $type, string $extension ): void
+    private function setAssets( string $path, string $type, string $extension ): void
     {
         if ( !File::exists( $path ) ) {
             return;
@@ -85,7 +85,7 @@ trait AssetManager
         }
     }
 
-    final protected function registerAssets(): void
+    private function registerAssets(): void
     {
         add_action('init', function () {
             foreach ( $this->assetTypes as $type => $_ ) {
@@ -131,7 +131,7 @@ trait AssetManager
         });
     }
 
-    final protected function enqueueAssets(): void
+    private function enqueueAssets(): void
     {
         foreach ( $this->assetTypes as $type => $hook ) {
             add_action( $hook, function () use ( $type ) {

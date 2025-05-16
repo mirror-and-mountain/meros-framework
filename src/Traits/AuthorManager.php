@@ -6,7 +6,7 @@ use Illuminate\Support\Arr;
 
 trait AuthorManager
 {
-    public function getAuthorFeatures( string $author ): ?array
+    final public function getAuthorFeatures( string $author ): ?array
     {
         $features = Arr::undot( $this->features );
 

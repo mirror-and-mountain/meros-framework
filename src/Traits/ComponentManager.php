@@ -22,7 +22,7 @@ trait ComponentManager
 
     protected bool   $useFullNameForComponents = false;
 
-    final protected function loadComponents(): void
+    private function loadComponents(): void
     {
         $componentsPath = $this->path . $this->componentsDir;
 
@@ -38,7 +38,7 @@ trait ComponentManager
         }
     }
 
-    final protected function loadViews(): void
+    private function loadViews(): void
     {
         $viewsPath = $this->path . $this->viewsDir;
 
@@ -52,7 +52,7 @@ trait ComponentManager
         }
     }
 
-    final protected function setComponents( string $path ): void
+    private function setComponents( string $path ): void
     {
         if ( !File::exists( $path ) ) {
             return;
@@ -72,7 +72,7 @@ trait ComponentManager
         }
     }
 
-    final protected function setViews( string $path ): void
+    private function setViews( string $path ): void
     {
         if ( !File::exists( $path ) ) {
             return;

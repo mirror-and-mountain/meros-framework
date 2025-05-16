@@ -107,7 +107,7 @@ abstract class Feature
 
     abstract protected function configure(): void;
 
-    public function initialise(): void
+    final public function initialise(): void
     {
         if ( $this->enabled === false ) {
             return;

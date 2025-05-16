@@ -13,7 +13,7 @@ trait IncludeManager
     protected bool   $searchSubDirs     = false;
     protected array  $includes          = [];
 
-    final protected function loadIncludes(): void
+    private function loadIncludes(): void
     {
         $includesPath = $this->path . $this->includesDir;
 
@@ -32,7 +32,7 @@ trait IncludeManager
         $this->hasIncludes = $this->includes !== [];
     }
 
-    final protected function setIncludes( string $path, array $fileNames ): void
+    private function setIncludes( string $path, array $fileNames ): void
     {
         if ( !File::exists( $path ) ) {
             return;
@@ -65,7 +65,7 @@ trait IncludeManager
         }
     }
 
-    final protected function include(): void
+    private function include(): void
     {
         foreach ($this->includes as $file) {
             include $file;

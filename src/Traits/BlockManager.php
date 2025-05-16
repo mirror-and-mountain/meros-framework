@@ -11,7 +11,7 @@ trait BlockManager
     protected string $blocksDir = 'blocks/build';
     protected array  $blocks    = [];
 
-    final protected function loadBlocks(): void
+    private function loadBlocks(): void
     {
         $blocksPath = $this->path . $this->blocksDir;
         
@@ -24,7 +24,7 @@ trait BlockManager
         $this->hasBlocks = $this->blocks !== [];
     }
 
-    final protected function setBlocks( string $path ): void
+    private function setBlocks( string $path ): void
     {
         if ( !File::exists( $path ) ) {
             return;
@@ -47,7 +47,7 @@ trait BlockManager
         }
     }
 
-    final protected function registerBlocks(): void
+    private function registerBlocks(): void
     {   
         add_action('init', function () {
 

@@ -23,7 +23,7 @@ trait SettingsManager
                 : $theme->getThemeSlug() . '_settings_miscellaneous';
     }
 
-    protected function setRegisteredSettings(): void
+    private function setRegisteredSettings(): void
     {
         if ( $this->options === [] ) {
             return;
@@ -35,7 +35,7 @@ trait SettingsManager
         }
     }
 
-    protected function registerSettings(): void
+    private function registerSettings(): void
     {
         if ( $this->options === [] || !is_admin() ) {
             return;
@@ -119,7 +119,7 @@ trait SettingsManager
         });
     }
 
-    protected function sanitizeOptions(): void
+    private function sanitizeOptions(): void
     {
         if ( $this->userSwitchable && !isset( $this->options['enabled'] ) ) {
             $enabledDescription = 'Enable or disable ' . Str::title( Str::replace('_', ' ', $this->name )) . '.';
@@ -164,7 +164,7 @@ trait SettingsManager
         $this->options = $sanitizedOptions;
     }
 
-    protected function sanitizeOptionSchema( string $option, array $schema ): array
+    private function sanitizeOptionSchema( string $option, array $schema ): array
     {
         $allowedTypes = [
             'string',
@@ -300,7 +300,7 @@ trait SettingsManager
         return $sanitizedSchema;
     }    
 
-    protected function sanitizeSetting( mixed $value, array $schema ): mixed
+    private function sanitizeSetting( mixed $value, array $schema ): mixed
     {
         $requiredType     = $schema['type'];
         $required         = $schema['required'] ?? false;
@@ -364,7 +364,7 @@ trait SettingsManager
         return $value;
     }
 
-    protected function sanitizeTextValue( mixed $value, string $type, string $requiredType ): string
+    private function sanitizeTextValue( mixed $value, string $type, string $requiredType ): string
     {
         if ( $type === 'string' ) {
 
@@ -387,7 +387,7 @@ trait SettingsManager
         return $value;
     }
 
-    protected function getSettings(): array
+    final public function getSettings(): array
     {
         return $this->settings;
     }

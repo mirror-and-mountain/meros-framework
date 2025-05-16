@@ -53,6 +53,10 @@ trait AdminManager
                     <div class="wrap">
                         <h1><?php echo esc_html($this->themeName)?> Settings</h1>
                         <?php
+                            $settingsIntro     = esc_html( apply_filters("{$this->themeSlug}_settings_intro", '') );
+                            $settingsIntroHtml = $settingsIntro !== '' ? "<p>{$settingsIntro}</p>" : '';
+                            
+                            echo $settingsIntroHtml;
                             $current_tab = isset( $_GET['tab'], $tabs[ $_GET['tab'] ] ) ? $_GET['tab'] : array_key_first( $tabs );
                         ?>
                         <form method='post' action='options.php'>
