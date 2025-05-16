@@ -12,7 +12,7 @@ use MM\Meros\Helpers\ExtensionLoader;
 
 class MerosServiceProvider extends ServiceProvider
 {
-    private bool    $registered = false;
+    private bool $registered = false;
 
     public function register(): void
     {
@@ -21,7 +21,7 @@ class MerosServiceProvider extends ServiceProvider
 
         if ( $themeClass->extends(ThemeManager::class) ) {
             $this->app->singleton(
-                'meros.theme_manager', fn($app) => new $themeClass( $app )
+                'meros.theme_manager', fn($app) => new $themeClass->name( $app )
             );
             $this->registered = true;
         }
@@ -41,7 +41,8 @@ class MerosServiceProvider extends ServiceProvider
             $loader->loadExtensions('plugins');
             $loader->loadExtensions('features');
 
-            do_action('meros_theme_add_features', $theme);
+            $themeSlug = $theme->getThemeSlug();
+            do_action("{$themeSlug}_add_features", $theme);
 
             $theme->initialise();
         }
@@ -50,7 +51,7 @@ class MerosServiceProvider extends ServiceProvider
     private function ensureAppKey(): void
     {
         $envPath = base_path('.env');
-        $key = 'base64:' . base64_encode(random_bytes(32));
+        $key     = 'base64:' . base64_encode(random_bytes(32));
         $comment = "# An App Key is required for Livewire functionality";
 
         if (!file_exists($envPath)) {

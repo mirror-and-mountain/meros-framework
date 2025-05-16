@@ -10,25 +10,24 @@ use MM\Meros\Traits\ContextManager;
 use MM\Meros\Traits\AuthorManager;
 use MM\Meros\Traits\AdminManager;
 
-use Illuminate\Support\Str;
 use Illuminate\Support\Arr;
 use Illuminate\Contracts\Foundation\Application;
 
-abstract class ThemeManager implements ThemeInterface
+abstract class ThemeManager
 {
-    private array $features = [];
+    private array $features    = [];
 
-    public bool  $always_inject_livewire_assets = false;
-    public bool  $enable_smooth_scrolling = false;
-    public bool  $livewireInitialised = false;
+    public bool $always_inject_livewire_assets = false;
+    public bool $livewireInitialised = false;
 
     use ContextManager, AuthorManager, AdminManager;
 
     final public function __construct( protected Application $app )
     {
         $this->setContext();
+        $this->setOptionsMap();
         $this->configure();
-        $this->enqueueThemeStyle();
+        $this->sanitizeOptionsMap();
     }
 
     final public static function bootstrap( array $providers = [] ): void
@@ -64,45 +63,11 @@ abstract class ThemeManager implements ThemeInterface
 
     protected abstract function configure(): void;
 
-    private function enqueueThemeStyle(): void
-    {
-        $themeName = $this->themeName;
-        add_action('wp_enqueue_scripts', function () use ( $themeName ) {
-            $handle = Str::slug( $themeName, '-' . '-styles' );
-            wp_enqueue_style(
-                $handle, 
-                get_stylesheet_uri(),
-                [],
-                filemtime(trailingslashit(get_stylesheet_directory()) . 'style.css')
-            );
-
-            if ( $this->enable_smooth_scrolling ) {
-                $scrollingCSS = "
-                    html {
-                        scroll-behavior: smooth;
-                    }
-                ";
-
-                wp_add_inline_style( $handle, $scrollingCSS );
-            }
-        });
-    }
-
     final public function addFeature( string $name, object $feature ): void
     {
         if ( !array_key_exists( $name, $this->features ) ) {
             Arr::set( $this->features, $name, $feature );
         }
-    }
-
-    final public function getFeatures(): array
-    {
-        return $this->features;
-    }
-
-    final public function getFeature( string $name ): object|null
-    {
-        return Arr::get( $this->features, $name ) ?? null;
     }
 
     final public function initialise(): void
@@ -114,13 +79,24 @@ abstract class ThemeManager implements ThemeInterface
 
     private function initialiseAssets(): void
     {
-        if ( 
-            $this->always_inject_livewire_assets && 
-            !is_admin() 
-        ) 
-        {
+        if ( $this->always_inject_livewire_assets && !is_admin() ) {
             Livewire::injectAssets();
         }
+
+        $this->enqueueThemeStyle();
+    }
+
+    private function enqueueThemeStyle(): void
+    {
+        add_action('wp_enqueue_scripts', function () {
+            $handle = $this->themeSlug . '_style';
+            wp_enqueue_style(
+                $handle, 
+                get_stylesheet_uri(),
+                [],
+                filemtime(trailingslashit(get_stylesheet_directory()) . 'style.css')
+            );
+        });
     }
 
     private function initialiseFeatures():void
@@ -128,15 +104,17 @@ abstract class ThemeManager implements ThemeInterface
         $features = Arr::dot( $this->features );
 
         foreach ( $features as $feature ) {
-
-            if ( is_callable( $feature ) ) {
-                call_user_func( $feature );
-            } 
-
-            else {
-                $feature->initialise();
-            }
-
+            $feature->initialise();
         }
+    }
+
+    final public function getFeatures(): array
+    {
+        return $this->features;
+    }
+
+    final public function getFeature( string $name ): object|null
+    {
+        return Arr::get( $this->features, $name ) ?? null;
     }
 }

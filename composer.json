@@ -10,16 +10,9 @@
             "email": "toby@mirrorandmountain.com"
         }
     ],
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/mirror-and-mountain/meros-dynamic-page"
-        }
-    ],
     "require": {
         "roots/acorn": "^5.0.2",
-        "livewire/livewire": "^3.6.3",
-        "mirror-and-mountain/meros-dynamic-page": "^0.0.23"
+        "livewire/livewire": "^3.6.3"
     },
     "autoload": {
         "psr-4": {

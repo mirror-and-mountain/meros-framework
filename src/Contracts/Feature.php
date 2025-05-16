@@ -13,10 +13,11 @@ use MM\Meros\Traits\SettingsManager;
 
 abstract class Feature
 {
-    public    string $type           = 'feature';
-    public    bool   $enabled        = true;
-    public    bool   $userSwitchable = true;
-    public    bool   $initialised    = false;
+    public string $type           = 'feature';
+    public bool   $enabled        = true;
+    public bool   $userSwitchable = true;
+    public bool   $initialised    = false;
+
     protected string $name;
     protected string $fullName;
     protected string $path;

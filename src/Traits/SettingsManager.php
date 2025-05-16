@@ -14,16 +14,13 @@ trait SettingsManager
 
     private function setOptionGroup(): void
     {
-        $groups = [
-            'blocks'        => 'meros_theme_settings',
-            'miscellaneous' => 'meros_theme_settings'
-        ];
+        $theme      = app()->make('meros.theme_manager');
+        $optionsMap = $theme->getOptionsMap();
+        $category   = $this->category;
 
-        $category = $this->category;
-
-        $this->optionGroup = array_key_exists( $category, $groups ) 
-                             ? $groups[ $category ] . '_' . $category
-                             : 'meros_theme_settings_miscellaneous';
+        $this->optionGroup = array_key_exists( $category, $optionsMap ) 
+                ? $optionsMap[ $category ] . '_' . $category
+                : $theme->getThemeSlug() . '_settings_miscellaneous';
     }
 
     protected function setRegisteredSettings(): void
@@ -47,14 +44,17 @@ trait SettingsManager
         add_action( 'admin_init', function() {
 
             $settingsSectionTitle = Str::title( Str::replace('_', ' ', $this->name )) . ' Options';
-            $settingsSectionTitle = apply_filters( 'meros_' . $this->name . '_settings_section_title', $settingsSectionTitle );
+            $settingsSectionTitle = apply_filters( $this->name . '_settings_section_title', $settingsSectionTitle );
             $settingsSectionId    = $this->name . '_options';
 
             add_settings_section(
                 $settingsSectionId,
                 $settingsSectionTitle,
                 function () {
-                    $content = apply_filters( 'meros_' . $this->name . '_settings_section_content', '' );
+                    $content  = $this->author['name']    !== 'unknown' ? "Provided by {$this->author['name']}" : '';
+                    $content .= $this->author['link']    !== '' ? " | <a href=\"{$this->author['link']}\" target=\"_blank\">URL</a>" : '';
+                    $content .= $this->author['support'] !== '' ? " | <a href=\"{$this->author['support']}\" target=\"_blank\">Support</a>" : '';
+                    $content  = apply_filters( $this->name . '_settings_section_content', $content );
                     echo $content;
                 },
                 $this->optionGroup,
@@ -123,7 +123,7 @@ trait SettingsManager
     {
         if ( $this->userSwitchable && !isset( $this->options['enabled'] ) ) {
             $enabledDescription = 'Enable or disable ' . Str::title( Str::replace('_', ' ', $this->name )) . '.';
-            $enabledDescription = apply_filters( 'meros_' . $this->name . '_user_switch_label', $enabledDescription );
+            $enabledDescription = apply_filters( $this->name . '_user_switch_label', $enabledDescription );
             $this->options['enabled'] = [
                 'label'       => 'Enabled',
                 'type'        => 'boolean',
@@ -177,7 +177,7 @@ trait SettingsManager
             'boolean',
             'integer',
             'number',
-            'array'
+            // 'array' Not currently supported
         ];
 
         $validKeys = [
@@ -202,7 +202,7 @@ trait SettingsManager
             'select',
             'radio',
             'color',
-            'repeater'
+            // 'repeater' Not currently supported
         ];
     
         $sanitizedSchema = [];
@@ -346,6 +346,7 @@ trait SettingsManager
             }
         }
 
+        // Not currently supported
         else if ( $type === 'array' && $requiredType === 'array' ) {
 
             if ( is_array( $schema['schema'] ?? null ) ) {
