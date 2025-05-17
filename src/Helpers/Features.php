@@ -4,6 +4,16 @@ namespace MM\Meros\Helpers;
 
 class Features
 {
+    /**
+     * A helper to instantiate theme features before they are
+     * bound to the theme manager.
+     *
+     * @param  string $class
+     * @param  string $path
+     * @param  string $uri
+     * @param  array  $pluginInfo
+     * @return object
+     */
     public static function instantiate ( 
         string $class,
         string $path,

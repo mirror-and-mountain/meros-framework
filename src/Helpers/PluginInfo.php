@@ -2,6 +2,10 @@
 
 namespace MM\Meros\Helpers;
 
+/**
+ * A utility to get and parses plugin data from plugins' main file.
+ * Similar approach to the way Wordpress does this.
+ */
 class PluginInfo
 {
     protected static array $validHeaders = [
@@ -19,6 +23,15 @@ class PluginInfo
         'Domain Path'       => 'Domain Path'
     ];
 
+    /**
+     * Attempts to locate a 'main' plugin file in the given
+     * plugin directory. If found, this method will parse the
+     * file's comments and compare them to the keys provided in
+     * the validHeaders property.
+     *
+     * @param  string     $directory
+     * @return array|null
+     */
     public static function get( string $directory ): ?array
     {
         $candidateFiles = glob( $directory . '/*.php' );
@@ -38,10 +51,12 @@ class PluginInfo
 
             foreach ( self::$validHeaders as $field => $regex ) {
 
-                if ( preg_match('/^[ \t\/*#@]*' . preg_quote($regex, '/') . ':(.*)$/mi', $fileData, $match) && $match[1] ) {
-
+                if ( preg_match('/^[ \t\/*#@]*' . 
+                     preg_quote($regex, '/') . 
+                     ':(.*)$/mi', $fileData, $match) && 
+                     $match[1] 
+                ) {
                     $headers[ $field ] = trim($match[1]);
-
                 }
             }
 
@@ -49,6 +64,7 @@ class PluginInfo
                 $pluginsDir      = 'plugins';
                 $pluginDir       = baseName($directory);
                 $pluginFile      = baseName($candidate);
+                // Add a key/value for the file's relative path for inclusion later on
                 $headers['File'] = "{$pluginsDir}/{$pluginDir}/{$pluginFile}";
                 return $headers;
             }

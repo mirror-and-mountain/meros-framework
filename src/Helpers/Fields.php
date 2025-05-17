@@ -2,8 +2,24 @@
 
 namespace MM\Meros\Helpers;
 
+/**
+ * A utility to generate fields of varying types for use
+ * in Wordpress settings pages.
+ */
 class Fields
 {
+    /**
+     * Makes a field based on the given option.
+     *
+     * @param  string      $option
+     * @param  string      $valueType
+     * @param  string      $description
+     * @param  string      $id
+     * @param  mixed       $default
+     * @param  string|null $fieldType
+     * @param  bool        $required
+     * @return string
+     */
     public static function make( 
         string $option, 
         string $valueType, 
@@ -17,55 +33,19 @@ class Fields
         $html  = '';
         $value = get_option( $option, $default );
 
+        /**
+         * If a field type isn't given, try and determine a type based on
+         * the option's data type.
+         */
         if ( !isset( $fieldType ) ) {
-
-            switch ( $valueType ) {
-                
-                case 'string':
-                case 'text':
-                    $fieldType = 'text';
-                    break;
-                
-                case 'textarea':
-                    $fieldType = 'textarea';
-                    break;
-                
-                case 'select':
-                    $fieldType = 'select';
-                    break;
-                
-                case 'url':
-                    $fieldType = 'url';
-                    break;
-                
-                case 'email':
-                    $fieldType = 'email';
-                    break;
-                
-                case 'hex':
-                    $fieldType = 'color';
-                    break;
-                
-                case 'boolean':
-                    $fieldType = 'checkbox';
-                    break;
-                
-                case 'integer':
-                case 'number':
-                    $fieldType = 'number';
-                    break;
-
-                default:
-                    $fieldType = false;
-                    break;
-            }
-
+            $fieldType = self::getFieldType( $valueType );
         }
 
         if ( !$fieldType ) {
             return $html;
         }
 
+        // Set html for the given field type
         switch ( $fieldType ) {
             
             case 'checkbox':
@@ -94,5 +74,53 @@ class Fields
 
         return $html;
     }
-    
+
+    /**
+     * Attempts to determine which field type should be used
+     * based on an option's value[data] type.
+     *
+     * @param  string      $valueType
+     * @return string|bool
+     */
+    private static function getFieldType( string $valueType ): string|bool
+    {
+        $fieldType = false;
+        switch ( $valueType ) {
+            case 'string':
+            case 'text':
+                $fieldType = 'text';
+                break;
+            
+            case 'textarea':
+                $fieldType = 'textarea';
+                break;
+            
+            case 'select':
+                $fieldType = 'select';
+                break;
+            
+            case 'url':
+                $fieldType = 'url';
+                break;
+            
+            case 'email':
+                $fieldType = 'email';
+                break;
+            
+            case 'hex':
+                $fieldType = 'color';
+                break;
+            
+            case 'boolean':
+                $fieldType = 'checkbox';
+                break;
+            
+            case 'integer':
+            case 'number':
+                $fieldType = 'number';
+                break;
+        }
+
+        return $fieldType;
+    }
 }

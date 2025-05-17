@@ -6,6 +6,12 @@ use Illuminate\Support\Facades\Blade;
 
 class Livewire
 {
+    /**
+     * Checks whether Livewire assets have already been injected
+     * and injects them if they haven't.
+     *
+     * @return void
+     */
     public static function injectAssets(): void
     {
         $theme       = app()->make('meros.theme_manager');

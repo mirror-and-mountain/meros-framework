@@ -5,14 +5,55 @@ namespace MM\Meros\Helpers;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
+/**
+ * Provides utilities to inspect classes for
+ * validation purposes.
+ */
 class ClassInfo
 {
-    public ?string $name      = null;
-    public ?string $namespace = null;
-    public ?string $path      = null;
-    public ?string $uri       = null;
-    public ?string $parent    = null;
+    /**
+     * The fully qualified name of the class.
+     *
+     * @var string|null
+     */
+    public ?string $name = null;
 
+    /**
+     * The class's namespace
+     *
+     * @var string|null
+     */
+    public ?string $namespace = null;
+
+    /**
+     * The full path to the file defining the class.
+     *
+     * @var string|null
+     */
+    public ?string $path = null;
+
+    /**
+     * The URI to the file defining the class.
+     *
+     * @var string|null
+     */
+    public ?string $uri = null;
+
+    /**
+     * The classes parent if available.
+     *
+     * @var string|null
+     */
+    public ?string $parent = null;
+
+    /**
+     * Returns instance of this class if the given class 
+     * exists. False otherwise. Sets properties for further 
+     * inspection by the caller.
+     *
+     * @param  string    $class
+     * @return self|bool
+     */
     public static function get( string $class ): self|bool
     {
         if ( class_exists( $class ) ) {
@@ -24,7 +65,16 @@ class ClassInfo
         return false;
     }
 
-    public static function getFromPath( string $path ): self 
+    /**
+     * Attempts to locate a class based on the given file path
+     * and returns an instance of this class if successful.
+     * False otherwise. Sets properties for further inspection
+     * by the caller.
+     *
+     * @param  string $path
+     * @return self
+     */
+    public static function getFromPath( string $path ): self|bool
     {
         $instance  = new self();
         $contents  = File::get( $path );
@@ -43,12 +93,20 @@ class ClassInfo
 
             if ( class_exists( $class ) ) {
                 $instance->setProps( $instance, $class );
+                return $instance;
             }
         }
 
-        return $instance;
+        return false;
     }
 
+    /**
+     * Uses a Reflection class to set this class's properties.
+     *
+     * @param  object $instance
+     * @param  string $class
+     * @return void
+     */
     private function setProps( object $instance, string $class ): void
     {
         $reflection           = new \ReflectionClass( $class );
@@ -63,13 +121,27 @@ class ClassInfo
         $instance->uri = Str::replaceFirst( $themePath, $themeUri, $instance->path );
     }
 
+    /**
+     * Determines whether the given class extends the given
+     * base class.
+     *
+     * @param  string $baseClass
+     * @return bool
+     */
     public function extends( string $baseClass ): bool
     {
         return $this->name && 
                is_subclass_of($this->name, $baseClass);
     }
 
-    public function isDescendantOf( $baseClass ): bool
+    /**
+     * Determines whether the given class is descended from the given
+     * base class. It will check up to two levels.
+     *
+     * @param  [type] $baseClass
+     * @return bool
+     */
+    public function isDescendantOf( string $baseClass ): bool
     {
         return $this->name &&
                is_subclass_of( $this->name, $baseClass ) ||

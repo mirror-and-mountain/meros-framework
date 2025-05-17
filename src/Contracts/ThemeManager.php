@@ -13,11 +13,33 @@ use MM\Meros\Traits\AdminManager;
 use Illuminate\Support\Arr;
 use Illuminate\Contracts\Foundation\Application;
 
+/**
+ * The theme's main class should extend this and define
+ * the configure() method.
+ */
 abstract class ThemeManager
 {
-    private array $features    = [];
+    /**
+     * The theme's features.
+     *
+     * @var array
+     */
+    private array $features = [];
 
+    /**
+     * Determines whether Livewire scripts and styles
+     * are always injected into WP's header & footer.
+     *
+     * @var bool
+     */
     public bool $always_inject_livewire_assets = false;
+
+    /**
+     * Used by the Livewire helper to determine whether
+     * Livewire assets have already been injected.
+     *
+     * @var bool
+     */
     public bool $livewireInitialised = false;
 
     use ContextManager, AuthorManager, AdminManager;
@@ -30,6 +52,16 @@ abstract class ThemeManager
         $this->sanitizeOptionsMap();
     }
 
+    /**
+     * Bootstraps the theme's Laravel App using Acorn's Application class. 
+     * Additional providers can be passed. 
+     * 
+     * This method should be called from the theme's functions.php file.
+     *
+     * @param  array $providers
+     *
+     * @return void
+     */
     final public static function bootstrap( array $providers = [] ): void
     {
         if ( class_exists( RootsApplication::class ) ) {
@@ -44,6 +76,7 @@ abstract class ThemeManager
             }, 0);
         }
 
+        // Clear out any existing session files when the theme is activated.
         add_action('after_switch_theme', function () {
             $sessionDir = get_theme_file_path('storage/framework/sessions');
         
@@ -61,6 +94,15 @@ abstract class ThemeManager
         });
     }
 
+    /**
+     * This method should be defined in the theme's main class
+     * found at app/Theme.php by default.
+     * 
+     * Can be used to change the values of various properties
+     * before they are used.
+     *
+     * @return void
+     */
     protected abstract function configure(): void;
 
     final public function addFeature( string $name, object $feature ): void
@@ -70,6 +112,14 @@ abstract class ThemeManager
         }
     }
 
+    /**
+     * This is called after theme's features have been instantiated 
+     * and added to the features property in the boot method of the 
+     * Meros Service Provider.
+     * 
+     * @see ../Providers/MerosServiceProvider
+     * @return void
+     */
     final public function initialise(): void
     {
         $this->initialiseAdmin();
@@ -77,6 +127,12 @@ abstract class ThemeManager
         $this->initialiseFeatures();
     }
 
+    /**
+     * Injects Livewire Assets via the Livewire helper if required.
+     * Additionally, the theme's stylesheet is enqueued here.
+     *
+     * @return void
+     */
     private function initialiseAssets(): void
     {
         if ( $this->always_inject_livewire_assets && !is_admin() ) {
@@ -84,12 +140,22 @@ abstract class ThemeManager
         }
 
         $this->enqueueThemeStyle();
+
+        /**
+         * Additional assets preparation can be done here in the future.
+         * E.g. Vite injection.
+         */
     }
 
+    /**
+     * Enqueues the theme's stylesheet.
+     *
+     * @return void
+     */
     private function enqueueThemeStyle(): void
     {
         add_action('wp_enqueue_scripts', function () {
-            $handle = $this->themeSlug . '_style';
+            $handle = $this->themeSlug . '_style'; // e.g. meros_style.
             wp_enqueue_style(
                 $handle, 
                 get_stylesheet_uri(),
@@ -99,6 +165,12 @@ abstract class ThemeManager
         });
     }
 
+    /**
+     * Calls the initialise method on each of the theme's features.
+     * This ultimately hooks any registered features into Wordpress.
+     *
+     * @return void
+     */
     private function initialiseFeatures():void
     {
         $features = Arr::dot( $this->features );
@@ -108,11 +180,22 @@ abstract class ThemeManager
         }
     }
 
+    /**
+     * Returns the features array.
+     *
+     * @return array
+     */
     final public function getFeatures(): array
     {
         return $this->features;
     }
 
+    /**
+     * Returns a particular feature from the features array.
+     *
+     * @param  string      $name
+     * @return object|null
+     */
     final public function getFeature( string $name ): object|null
     {
         return Arr::get( $this->features, $name ) ?? null;

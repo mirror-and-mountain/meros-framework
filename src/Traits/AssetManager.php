@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\File;
 
 trait AssetManager
 {
-    
     protected bool  $hasAssets  = false;
     protected array $assetTypes = [
         'admin'  => 'admin_enqueue_scripts', 

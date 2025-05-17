@@ -10,22 +10,41 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Config;
 
-class ExtensionLoader
+/**
+ * Provides utilities for loading the theme's
+ * features, extensions and plugins.
+ */
+class Loader
 {
-    public array $extensions;
-    public array $features;
-    public array $plugins;
+    // Properties set by the init() method
+    public array  $extensions;
+    public array  $features;
+    public array  $plugins;
 
-    private function __construct( private object $theme )
-    {
-        // Do nothing
-    }
+    /**
+     * The instantiated theme manager. Used to bind
+     * valid features to the object.
+     *
+     * @var object
+     */
+    public object $theme;
 
+    /**
+     * Collects and sets feature parameters from the theme
+     * config file located in config/theme.php. Returns an
+     * instance of the Loader for further inspection and usage
+     * by the caller.
+     *
+     * @param  object $theme
+     * @return self
+     */
     public static function init( object $theme ): self
     {
-        $instance    = new self( $theme );
-        $themeConfig = base_path('config/theme.php');
+        $instance        = new self();
+        $instance->theme = $theme;
+        $themeConfig     = base_path('config/theme.php');
 
+        // Check the theme config file exists
         if ( File::exists( $themeConfig ) ) {
             $instance->extensions = Config::get('theme.extensions') ?? [];
             $instance->features   = Config::get('theme.features') ?? [];
@@ -35,8 +54,17 @@ class ExtensionLoader
         return $instance;
     }
 
-    public function loadExtensions( string $type ): void
+    /**
+     * Loads features of the given type. This includes validating then
+     * instantiating each feature's class and adding them to the theme's 
+     * feature array.
+     *
+     * @param  string $type
+     * @return void
+     */
+    public function load( string $type ): void
     {
+        // Check the path to the feature's configuation class
         $extPath = app_path( ucfirst( $type ) );
 
         if ( !File::exists( $extPath ) ) {
@@ -67,12 +95,23 @@ class ExtensionLoader
             return;
         }
 
+        // Validate and load each feature of the given type
         foreach ( $extensionDefs as $class => $files ) {
-            $this->loadExtension( $extPath, $class, $files, $baseClass );
+            $this->loadItem( $extPath, $class, $files, $baseClass );
         }
     }
 
-    private function loadExtension( 
+    /**
+     * Validates and loads individual features, binding them to 
+     * the theme's main class.
+     *
+     * @param  string       $extPath
+     * @param  string       $class
+     * @param  string|array $files
+     * @param  string       $baseClass
+     * @return void
+     */
+    private function loadItem( 
         string $extPath, 
         string $class, 
         string|array $files, 
@@ -81,19 +120,23 @@ class ExtensionLoader
     {
         if ( is_string( $files ) ) {
             switch ( $baseClass ) {
+                // Features live in their own directory under app/Features by default
                 case Feature::class:
                     $path = trailingslashit( $extPath ) . trailingslashit( File::name( $files ) ) . $files;
                     break;
                 
+                // Approach used for extensions
                 default:
                     $path = trailingslashit( $extPath ) . $files;
             }
         } 
         
+        // This approach is used exclusively for plugins
         else if ( is_array( $files ) && array_key_exists( 'config', $files ) ) {
             $path = trailingslashit( $extPath ) . $files['config'];
         } 
 
+        // Check the main feature class file exists
         if ( !File::exists( $path ) || !File::isFile( $path ) ) { return; }
 
         require_once $path;
@@ -101,6 +144,7 @@ class ExtensionLoader
         $class   = ClassInfo::get( $class );
         $feature = false;
 
+        // Check the main feature class exists/is loadable
         if ( 
             !$class ||
             !$class->isDescendantOf( $baseClass )
@@ -110,10 +154,15 @@ class ExtensionLoader
 
         switch ( $baseClass ) {
             case Extension::class:
+                /**
+                 * Extensions should always use their path and uri
+                 * (not those of the override class in the theme).
+                 */
                 $parent      = ClassInfo::get( $class->parent );
                 $featurePath = $parent->path;
                 $featureUri  = $parent->uri;
 
+                // Instantiate the extension feature
                 $feature = Features::instantiate( 
                     $class->name, $featurePath, $featureUri 
                 );
@@ -124,6 +173,7 @@ class ExtensionLoader
                 $featurePath = $class->path;
                 $featureUri  = $class->uri;
 
+                // Check that the plugin's main file exists
                 if ( !isset( $files['src'] ) ) { return; }
                 
                 $pluginDir = base_path( dirname( $files['src'] ) );
@@ -132,10 +182,13 @@ class ExtensionLoader
                     return;
                 }
 
+                // Get and parse plugin info from the plugin's main file
                 $pluginInfo = PluginInfo::get( $pluginDir ) ?? false;
 
+                // Check that plugin info exists
                 if ( !$pluginInfo ) { return; }
 
+                // Instantiate the plugin feature
                 $feature = Features::instantiate(
                     $class->name, $featurePath, $featureUri, $pluginInfo
                 );
@@ -146,6 +199,7 @@ class ExtensionLoader
                 $featurePath = $class->path;
                 $featureUri  = $class->uri;
 
+                // Instantiate the feature
                 $feature = Features::instantiate( 
                     $class->name, $featurePath, $featureUri 
                 );
@@ -153,6 +207,7 @@ class ExtensionLoader
                 break;
         }
 
+        // Check that the feature has been instantiated
         if ( $feature === false ) {
             return;
         }
@@ -163,6 +218,7 @@ class ExtensionLoader
 
         $featureName = $author . '.' . $name;
 
+        // Bind the feature to the theme manager class
         $this->theme->addFeature( $featureName, $feature );
     }
 }

@@ -2,11 +2,35 @@
 
 namespace MM\Meros\Traits;
 
+/**
+ * Used by the theme manager to initialise settings
+ * pages in the Wordpress dashboard.
+ */
 trait AdminManager
 {
+    /**
+     * Provides feature categories mapped to the applicable
+     * options page in the Wordpress dashboard.
+     *
+     * @var array
+     */
     protected array $options_map;
-    protected bool  $use_unified_settings_pages = false;
 
+    /**
+     * Can be enabled via the theme manager's configure() method.
+     * Determines whether the framework adds a theme settings page
+     * in the Wordpress dashboard.
+     *
+     * @var bool
+     */
+    protected bool $use_unified_settings_pages = false;
+
+    /**
+     * Uses the theme manager's theme slug to determine option
+     * page's slugs for registration.
+     *
+     * @return void
+     */
     private function setOptionsMap(): void
     {
         $themeSettingsPageID = $this->themeSlug . '_settings';
@@ -17,6 +41,13 @@ trait AdminManager
         ];
     }
 
+    /**
+     * Sanitizes/validates the options map. Specifically,
+     * we need to make sure a 'miscellaneous' category exists 
+     * to use a fallback.
+     *
+     * @return void
+     */
     private function sanitizeOptionsMap(): void
     {
         if ( !isset( $this->options_map['miscellaneous'] ) ) {
@@ -25,6 +56,11 @@ trait AdminManager
         }
     }
 
+    /**
+     * Initialises option pages if enabled.
+     *
+     * @return void
+     */
     private function initialiseAdmin(): void
     {
         if ( !is_admin() ) {
@@ -36,6 +72,13 @@ trait AdminManager
         }
     }
 
+    /**
+     * Hooks into Wordpress to add the necessary options pages.
+     * At the moment, we're only using one utilising the
+     * add_theme_page hook.
+     *
+     * @return void
+     */
     private function initialiseAdminPages(): void
     {
         add_action('admin_menu', function () {
@@ -82,6 +125,12 @@ trait AdminManager
         });
     }
 
+    /**
+     * Used by features to map a feature's category to the relevant
+     * options page.
+     *
+     * @return array
+     */
     final public function getOptionsMap(): array
     {
         return $this->options_map ?? [];

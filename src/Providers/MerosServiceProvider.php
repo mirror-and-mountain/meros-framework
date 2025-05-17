@@ -7,8 +7,8 @@ use Illuminate\Support\ServiceProvider;
 
 use MM\Meros\Contracts\ThemeManager;
 
+use MM\Meros\Helpers\Loader;
 use MM\Meros\Helpers\ClassInfo;
-use MM\Meros\Helpers\ExtensionLoader;
 
 class MerosServiceProvider extends ServiceProvider
 {
@@ -35,11 +35,11 @@ class MerosServiceProvider extends ServiceProvider
 
         if ( $this->registered ) {
             $theme  = $this->app->make('meros.theme_manager');
-            $loader = ExtensionLoader::init( $theme );
+            $loader = Loader::init( $theme );
 
-            $loader->loadExtensions('extensions');
-            $loader->loadExtensions('plugins');
-            $loader->loadExtensions('features');
+            $loader->load('extensions');
+            $loader->load('plugins');
+            $loader->load('features');
 
             $themeSlug = $theme->getThemeSlug();
             do_action("{$themeSlug}_add_features", $theme);

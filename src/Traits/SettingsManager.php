@@ -12,6 +12,14 @@ trait SettingsManager
     protected array  $settings            = [];
     protected string $settingsCapability  = 'manage_options';
 
+    private function initialiseSettings(): void
+    {
+        $this->setOptionGroup();
+        $this->sanitizeOptions();
+        $this->setRegisteredSettings();
+        $this->registerSettings();
+    }
+
     private function setOptionGroup(): void
     {
         $theme      = app()->make('meros.theme_manager');
