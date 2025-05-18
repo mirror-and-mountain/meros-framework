@@ -1,7 +1,7 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
     "name": "mirror-and-mountain/meros-framework",
-    "description": "Pending",
+    "description": "A developer-friendly package for creating advanced Wordpress themes.",
     "type": "library",
     "license": "MIT",
     "authors": [
