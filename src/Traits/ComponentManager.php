@@ -13,15 +13,66 @@ use MM\Meros\Helpers\ClassInfo;
 
 trait ComponentManager
 {
-    protected bool   $hasComponents = false;
-    protected bool   $hasViews      = false;
+    /**
+     * Indicates whether the feature has components.
+     * Note: by component we mean a Livewire component.
+     *
+     * @var bool
+     */
+    protected bool $hasComponents = false;
+
+    /**
+     * Indicates whether the feature has views.
+     *
+     * @var bool
+     */
+    protected bool $hasViews = false;
+
+    /**
+     * The components directory relative to the feature
+     * directory.
+     *
+     * @var string
+     */
     protected string $componentsDir = 'components';
-    protected string $viewsDir      = 'views';
-    protected array  $components    = [];
-    protected array  $views         = [];
 
-    protected bool   $useFullNameForComponents = false;
+    /**
+     * The views directory relative to the feature
+     * directory.
+     *
+     * @var string
+     */
+    protected string $viewsDir = 'views';
 
+    /**
+     * Discovered components.
+     *
+     * @var array
+     */
+    protected array $components = [];
+
+    /**
+     * Discovered views.
+     *
+     * @var array
+     */
+    protected array $views = [];
+
+    /**
+     * Determines whether component handles should use
+     * the feature's fullName. This can be useful if 
+     * the feature has a common name and we need to
+     * avoid conflicts.
+     *
+     * @var bool
+     */
+    protected bool $useFullNameForComponents = false;
+
+    /**
+     * Sets absolute path and calls setComponents.
+     *
+     * @return void
+     */
     private function loadComponents(): void
     {
         $componentsPath = $this->path . $this->componentsDir;
@@ -38,6 +89,11 @@ trait ComponentManager
         }
     }
 
+    /**
+     * Sets absolute path and calls setViews.
+     *
+     * @return void
+     */
     private function loadViews(): void
     {
         $viewsPath = $this->path . $this->viewsDir;
@@ -52,6 +108,14 @@ trait ComponentManager
         }
     }
 
+    /**
+     * Uses glob to search the given path for valid components.
+     * Components will be indentified as a php file that contains
+     * a class extending Livewire\\Component.
+     *
+     * @param  string $path
+     * @return void
+     */
     private function setComponents( string $path ): void
     {
         if ( !File::exists( $path ) ) {
@@ -72,6 +136,13 @@ trait ComponentManager
         }
     }
 
+    /**
+     * Uses glob to search the given path for valid views.
+     * Views will be identified as files with a blade.php extension.
+     *
+     * @param  string $path
+     * @return void
+     */
     private function setViews( string $path ): void
     {
         if ( !File::exists( $path ) ) {

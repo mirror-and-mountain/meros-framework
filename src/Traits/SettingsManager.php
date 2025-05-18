@@ -7,11 +7,44 @@ use Illuminate\Support\Str;
 
 trait SettingsManager
 {
+    /**
+     * The option group for this feature. Determines
+     * which settings page in the WP dashboard settings
+     * for the feature will appear in.
+     *
+     * @var string
+     */
     protected string $optionGroup;
-    protected array  $options             = [];
-    protected array  $settings            = [];
-    protected string $settingsCapability  = 'manage_options';
 
+    /**
+     * The given options for the feature. These are translated
+     * into settings registered with register_setting.
+     *
+     * @var array
+     */
+    protected array $options = [];
+
+    /**
+     * Existing settings and their current values 
+     * loaded via get_option.
+     *
+     * @var array
+     */
+    protected array $settings = [];
+
+    /**
+     * The capability required to edit this feature's settings
+     * in the WP dashboard.
+     *
+     * @var string
+     */
+    protected string $settingsCapability = 'manage_options';
+
+    /**
+     * Initialises the feature's settings.
+     *
+     * @return void
+     */
     private function initialiseSettings(): void
     {
         $this->setOptionGroup();
@@ -20,6 +53,12 @@ trait SettingsManager
         $this->registerSettings();
     }
 
+    /**
+     * Sets the feature's options group with its given
+     * category.
+     *
+     * @return void
+     */
     private function setOptionGroup(): void
     {
         $theme      = app()->make('meros.theme_manager');
@@ -31,6 +70,11 @@ trait SettingsManager
                 : $theme->getThemeSlug() . '_settings_miscellaneous';
     }
 
+    /**
+     * Retrieves saved settings values for the feature.
+     *
+     * @return void
+     */
     private function setRegisteredSettings(): void
     {
         if ( $this->options === [] ) {
@@ -43,6 +87,11 @@ trait SettingsManager
         }
     }
 
+    /**
+     * Registers the feature's settings using the options array.
+     *
+     * @return void
+     */
     private function registerSettings(): void
     {
         if ( $this->options === [] || !is_admin() ) {
@@ -55,6 +104,7 @@ trait SettingsManager
             $settingsSectionTitle = apply_filters( $this->name . '_settings_section_title', $settingsSectionTitle );
             $settingsSectionId    = $this->name . '_options';
 
+            // Add the settings section.
             add_settings_section(
                 $settingsSectionId,
                 $settingsSectionTitle,
@@ -69,6 +119,7 @@ trait SettingsManager
                 []
             );
 
+            // Register each option
             foreach ( $this->options as $option => $schema ) {
                 $name             = $this->name . '_' . $option;
                 $type             = $schema['type'];
@@ -105,13 +156,16 @@ trait SettingsManager
                         $fieldType = 'repeater';
                     }
 
+                    // Add a settings field if specified
                     add_settings_field(
                         $name,
                         Str::title( $option ),
                         function() use ( $name, $type, $description, $id, $default, $fieldType, $required ) {
+                            // Devs may provide their own callback to render the field.
                             if ( is_callable( $fieldType ) ) {
                                 call_user_func( $fieldType );
                             }
+                            // Or use the built-in generator.
                             else {
                                 echo Fields::make( 
                                     $name, $type, $description, $id, $default, $fieldType, $required 
@@ -127,8 +181,14 @@ trait SettingsManager
         });
     }
 
+    /**
+     * Sanitizes the feature's given options.
+     *
+     * @return void
+     */
     private function sanitizeOptions(): void
     {
+        // Create a boolean 'enabled' option if userSwitchable is true
         if ( $this->userSwitchable && !isset( $this->options['enabled'] ) ) {
             $enabledDescription = 'Enable or disable ' . Str::title( Str::replace('_', ' ', $this->name )) . '.';
             $enabledDescription = apply_filters( $this->name . '_user_switch_label', $enabledDescription );
@@ -148,6 +208,7 @@ trait SettingsManager
 
         $sanitizedOptions = [];
 
+        // Sanitize each option in the options array
         foreach ( $this->options as $option => $schema ) {
             
             if ( !is_array( $schema ) ) {
@@ -172,8 +233,16 @@ trait SettingsManager
         $this->options = $sanitizedOptions;
     }
 
+    /**
+     * Checks, validates and sanitizes a feature option using its schema.
+     *
+     * @param  string $option
+     * @param  array  $schema
+     * @return array
+     */
     private function sanitizeOptionSchema( string $option, array $schema ): array
     {
+        // Allowed data types for the option
         $allowedTypes = [
             'string',
             'text',
@@ -188,6 +257,7 @@ trait SettingsManager
             // 'array' Not currently supported
         ];
 
+        // Valid schema keys for the option
         $validKeys = [
             'label',
             'type',
@@ -203,6 +273,7 @@ trait SettingsManager
             'sanitize_callback'
         ];
 
+        // Valid field types for the fields generator
         $validFieldTypes = [
             'text',
             'textarea',
@@ -231,7 +302,7 @@ trait SettingsManager
             $sanitizedSchema['type'] = $schema['type'];
         }
     
-        // Now sanitize known keys
+        // Sanitize known schema keys
         foreach ( $schema as $key => $value ) {
     
             if ( !in_array( $key, $validKeys, true ) ) {
@@ -306,8 +377,15 @@ trait SettingsManager
         }
     
         return $sanitizedSchema;
-    }    
+    }
 
+    /**
+     * Callback to sanitize a setting when modified in the WP dashboard.
+     *
+     * @param  mixed $value
+     * @param  array $schema
+     * @return mixed
+     */
     private function sanitizeSetting( mixed $value, array $schema ): mixed
     {
         $requiredType     = $schema['type'];
@@ -372,6 +450,15 @@ trait SettingsManager
         return $value;
     }
 
+    /**
+     * Helper to sanitize text values. Called by the sanitizeSetting
+     * method.
+     *
+     * @param  mixed  $value
+     * @param  string $type
+     * @param  string $requiredType
+     * @return string
+     */
     private function sanitizeTextValue( mixed $value, string $type, string $requiredType ): string
     {
         if ( $type === 'string' ) {
@@ -395,6 +482,13 @@ trait SettingsManager
         return $value;
     }
 
+    /**
+     * Returns the feature's current settings as retrieved from the
+     * database. Will return an empty array if no settings have been
+     * defined.
+     *
+     * @return array
+     */
     final public function getSettings(): array
     {
         return $this->settings;

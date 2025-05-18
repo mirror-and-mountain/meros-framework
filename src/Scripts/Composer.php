@@ -4,14 +4,47 @@ namespace MM\Meros\Scripts;
 
 use MM\Meros\Helpers\PluginInfo;
 
+/**
+ * Helpers to install theme features, extensions and plugins.
+ */
 class Composer
 {
+    /**
+     * Configuration returned from config/theme.php.
+     *
+     * @var array
+     */
     private static array $themeConfig = [];
-    private static array $features    = [];
-    private static array $extensions  = [];
-    private static array $plugins     = [];
 
-    public static function handleExtensions( $event ): void
+    /**
+     * Features defined in the theme's config.
+     *
+     * @var array
+     */
+    private static array $features = [];
+
+    /**
+     * Extensions defined in the theme's config.
+     *
+     * @var array
+     */
+    private static array $extensions = [];
+
+    /**
+     * Plugins defined in the theme's config.
+     *
+     * @var array
+     */
+    private static array $plugins = [];
+
+    /**
+     * Runs after composer dump-autoload. Will check installed packages and
+     * handle any relevant theme plugin or extension installations.
+     *
+     * @param  [type] $event
+     * @return void
+     */
+    public static function installPluginsAndExtensions( $event ): void
     {
         $composer            = $event->getComposer();
         $installationManager = $composer->getInstallationManager();
@@ -111,6 +144,11 @@ class Composer
         self::regenerateThemeConfig();
     }
 
+    /**
+     * Makes the create-feature.sh script executable.
+     *
+     * @return void
+     */
     public static function makeCreateScriptExecutable(): void
     {
         if (PHP_OS_FAMILY !== 'Windows') {
@@ -118,6 +156,12 @@ class Composer
         }
     }
 
+    /**
+     * Creates a new feature in app/Features using the Meros
+     * scaffold. 
+     *
+     * @return void
+     */
     public static function createFeature(): void
     {
         self::checkThemeConfig();
@@ -144,7 +188,12 @@ class Composer
         self::regenerateThemeConfig();
     }
 
-
+    /**
+     * Checks that a theme config exists and creates one if not.
+     *
+     * @param  mixed $io
+     * @return void
+     */
     private static function checkThemeConfig( mixed $io = false ): void
     {
         $themeConfig         = dirname(__DIR__, 5) . '/config/theme.php';
@@ -179,6 +228,12 @@ class Composer
         self::$themeConfig = require $themeConfig;
     }
 
+    /**
+     * Regenerates the theme config file after a feature, extension or
+     * plugin is installed.
+     *
+     * @return void
+     */
     private static function regenerateThemeConfig(): void
     {
         $stubPath = dirname(__DIR__) . '/stubs/ThemeConfig.stub';
@@ -211,6 +266,14 @@ class Composer
         }
     }
 
+    /**
+     * Formats arrays for the theme config file.
+     *
+     * @param  array       $array
+     * @param  string|null $type
+     * @param  int         $indentLevel
+     * @return string
+     */
     private static function formatArray( array $array, ?string $type, int $indentLevel = 2  ): string
     {
         $indent = str_repeat('    ', $indentLevel);
