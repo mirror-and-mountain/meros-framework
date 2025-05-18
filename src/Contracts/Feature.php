@@ -239,9 +239,6 @@ abstract class Feature
 
         if ($this->hasComponents) {
             $this->loadComponents();
-        }
-
-        if ($this->hasViews) {
             $this->loadViews();
         }
 
