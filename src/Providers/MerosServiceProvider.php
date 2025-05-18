@@ -10,10 +10,19 @@ use MM\Meros\Contracts\ThemeManager;
 use MM\Meros\Helpers\Loader;
 use MM\Meros\Helpers\ClassInfo;
 
+/**
+ * Binds Meros contracts to the Laravel application.
+ */
 class MerosServiceProvider extends ServiceProvider
 {
     private bool $registered = false;
 
+    /**
+     * Retrieved the theme manager class from theme config and binds
+     * it as a singleton.
+     *
+     * @return void
+     */
     public function register(): void
     {
         $themeClass = Config::get('theme.theme_class');
@@ -29,6 +38,12 @@ class MerosServiceProvider extends ServiceProvider
         defined('MEROS') || define('MEROS', true);
     }
 
+    /**
+     * Loads theme features, extensions and plugins before
+     * initialising them via the the theme manager class.
+     *
+     * @return void
+     */
     public function boot(): void
     {
         $this->ensureAppKey();
@@ -48,6 +63,12 @@ class MerosServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * Ensures that a .env file with an APP_KEY exists for Livewire
+     * functionality.
+     *
+     * @return void
+     */
     private function ensureAppKey(): void
     {
         $envPath = base_path('.env');
