@@ -2,6 +2,9 @@
 
 namespace MM\Meros\Scripts;
 
+use Composer\Script\Event;
+use Composer\Composer as ComposerInstance; // Alias to avoid conflict with class name
+use Composer\IO\IOInterface;
 use MM\Meros\Helpers\PluginInfo;
 
 /**
@@ -38,17 +41,81 @@ class Composer
     private static array $plugins = [];
 
     /**
+     * The root path of the Composer project (and assumed theme root).
+     *
+     * @var string
+     */
+    private static string $projectRoot;
+
+    /**
+     * The path to the 'vendor' directory.
+     *
+     * @var string
+     */
+    private static string $vendorDir;
+
+    /**
+     * The path to the 'plugins' directory for wordpress-plugin types.
+     *
+     * @var string
+     */
+    private static string $pluginsDir;
+
+    /**
+     * The path to the 'stubs' directory for Meros scripts.
+     *
+     * @var string
+     */
+    private static string $merosStubsDir;
+
+    /**
+     * Initializes static properties based on the Composer event.
+     * This should be called at the beginning of any public static method that
+     * needs path information.
+     *
+     * @param ComposerInstance $composer
+     * @param IOInterface $io
+     * @return void
+     */
+    private static function initializePaths(ComposerInstance $composer, IOInterface $io): void
+    {
+        // Get the vendor directory path from Composer's configuration
+        self::$vendorDir = realpath($composer->getConfig()->get('vendor-dir'));
+
+        if (self::$vendorDir === false) {
+            $io->write('<error>Vendor directory not found or inaccessible.</error>');
+            exit(1); 
+        }
+
+        // Project root is the parent of the vendor directory
+        self::$projectRoot = dirname(self::$vendorDir);
+
+        // Path to the custom 'plugins' directory at theme root
+        self::$pluginsDir = self::$projectRoot . DIRECTORY_SEPARATOR . 'plugins';
+
+        // Path to the Meros script stubs (relative to this class file)
+        self::$merosStubsDir = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'stubs');
+        if (self::$merosStubsDir === false) {
+            $io->write('<error>Meros stubs directory not found or inaccessible.</error>');
+            exit(1); 
+        }
+    }
+
+
+    /**
      * Runs after composer dump-autoload. Will check installed packages and
      * handle any relevant theme plugin or extension installations.
      *
-     * @param  [type] $event
+     * @param  Event $event
      * @return void
      */
-    public static function installPluginsAndExtensions( $event ): void
+    public static function installPluginsAndExtensions( Event $event ): void
     {
         $composer            = $event->getComposer();
         $installationManager = $composer->getInstallationManager();
         $io                  = $event->getIO();
+
+        self::initializePaths($composer, $io); // Initialize paths
 
         self::checkThemeConfig( $io );
 
@@ -56,16 +123,27 @@ class Composer
             $packageType = $package->getType();
             $packageName = $package->getName();
             $extra       = $package->getExtra();
+
+            // getInstallPath returns the path where the package is installed
+            // This path will be the symlink target for path repositories
             $installPath = $installationManager->getInstallPath($package);
+
+            // Resolve the real path, especially important for symlinked path repositories
+            $realInstallPath = realpath($installPath);
+
+            if ($realInstallPath === false) {
+                $io->write("<error>Could not determine real path for {$packageName} at {$installPath}. Skipping.</error>");
+                continue;
+            }
 
             // Handle Plugins
             if ($packageType === 'wordpress-plugin') {
-                $io->write("<info>Handling plugin package: {$packageName} at {$installPath}</info>");
+                $io->write("<info>Handling plugin package: {$packageName} at {$installPath} (realpath: {$realInstallPath})</info>");
 
-                $pluginInfo = PluginInfo::get($installPath);
+                $pluginInfo = PluginInfo::get($realInstallPath);
 
                 if (!$pluginInfo) {
-                    $io->write("<error>No main plugin file found in {$installPath}. Skipping {$packageName}</error>");
+                    $io->write("<error>No main plugin file found in {$realInstallPath}. Skipping {$packageName}</error>");
                     continue;
                 }
 
@@ -77,23 +155,28 @@ class Composer
                     continue;
                 }
 
-                
                 $io->write("<info>Main plugin file detected: {$pluginFile}</info>");
                 $io->write("Generating plugin class</info>");
 
-                $pluginClass = str_replace(' ', '', ucwords(str_replace('-', ' ', basename($installPath))));
-                $configFile  = dirname($installPath, 2) . '/app/Plugins/' . $pluginClass . '.php';
-                $stubPath    = dirname(__DIR__) . '/stubs/Plugin.stub';
+                // Plugin class name derived from the real installed directory name
+                $pluginClass = str_replace(' ', '', ucwords(str_replace('-', ' ', basename($realInstallPath))));
+
+                // Config file path is relative to the project root
+                $configFile  = self::$projectRoot . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Plugins' . DIRECTORY_SEPARATOR . $pluginClass . '.php';
+                $stubPath    = self::$merosStubsDir . DIRECTORY_SEPARATOR . 'Plugin.stub';
 
                 if (file_exists($stubPath) && !file_exists($configFile)) {
                     $stub         = file_get_contents( $stubPath );
                     $replacements = [
-                        '{{namespace}}' => $pluginsNamespace, 
+                        '{{namespace}}' => $pluginsNamespace,
                         '{{class}}'     => $pluginClass
                     ];
-                    
+
                     $rendered = str_replace(array_keys($replacements), array_values($replacements), $stub);
 
+                    if (!is_dir(dirname($configFile))) {
+                        mkdir(dirname($configFile), 0755, true);
+                    }
                     file_put_contents($configFile, $rendered);
                     $io->write("<info>Generated: {$configFile}</info>");
 
@@ -108,16 +191,16 @@ class Composer
 
             // Handle Extensions
             else if (isset($extra['meros'], $extra['meros']['class'], $extra['meros']['name'])) {
-                $io->write("<info>Handling extension package: {$packageName} at {$installPath}</info>");
-                
+                $io->write("<info>Handling extension package: {$packageName} at {$installPath} (realpath: {$realInstallPath})</info>");
+
                 $extensionsNamespace = self::$themeConfig['extensions_namespace'] ?? 'App\\Extensions;';
 
                 $overrideClass = $extra['meros']['name'];
 
                 if ($extra['meros']['allowOverrides'] ?? true) {
-
-                    $overrideFile = dirname($installPath, 3) . "/app/Extensions/{$overrideClass}.php";
-                    $stubPath     = dirname(__DIR__) . '/stubs/Extension.stub';
+                    // Override file path is relative to the project root
+                    $overrideFile = self::$projectRoot . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Extensions' . DIRECTORY_SEPARATOR . "{$overrideClass}.php";
+                    $stubPath     = self::$merosStubsDir . DIRECTORY_SEPARATOR . 'Extension.stub';
 
                     if (file_exists($stubPath) && !file_exists($overrideFile)) {
                         $stub         = file_get_contents($stubPath);
@@ -128,7 +211,10 @@ class Composer
                         ];
 
                         $rendered = str_replace(array_keys($replacements), array_values($replacements), $stub);
-                        
+
+                        if (!is_dir(dirname($overrideFile))) {
+                            mkdir(dirname($overrideFile), 0755, true);
+                        }
                         file_put_contents($overrideFile, $rendered);
 
                         $io->write("<info>Generated: {$overrideFile}</info>");
@@ -149,39 +235,71 @@ class Composer
      *
      * @return void
      */
-    public static function makeCreateScriptExecutable(): void
+    public static function makeCreateScriptExecutable( Event $event ): void
     {
+        $io = $event->getIO();
+        self::initializePaths($event->getComposer(), $io); // Initialize paths
+
+        // These scripts are assumed to be in the same directory as this Composer.php file
+        $scriptPathWindows = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'create-feature.bat');
+        $scriptPathUnix    = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'create-feature.sh');
+
         if (PHP_OS_FAMILY !== 'Windows') {
-            chmod(__DIR__ . '/create-feature.sh', 0755);
+            if ($scriptPathUnix && file_exists($scriptPathUnix)) {
+                chmod($scriptPathUnix, 0755);
+                $io->write("<info>Made {$scriptPathUnix} executable.</info>");
+            } else {
+                $io->write("<error>Unix create-feature script not found or inaccessible.</error>");
+            }
+        } else {
+            if (!$scriptPathWindows || !file_exists($scriptPathWindows)) {
+                $io->write("<error>Windows create-feature script not found or inaccessible.</error>");
+            }
         }
     }
 
     /**
      * Creates a new feature in app/Features using the Meros
-     * scaffold. 
+     * scaffold.
      *
+     * @param Event $event
      * @return void
      */
-    public static function createFeature(): void
+    public static function createFeature( Event $event ): void
     {
-        self::checkThemeConfig();
-        
-        echo "Enter feature name: ";
+        $io = $event->getIO();
+        self::initializePaths($event->getComposer(), $io); // Initialize paths
+
+        self::checkThemeConfig($io);
+
+        $io->write("Enter feature name: ");
         $featureName = trim(fgets(STDIN));
 
         if ($featureName === '') {
-            echo "Feature name cannot be empty.\n";
+            $io->write("<error>Feature name cannot be empty.</error>");
             exit(1);
         }
 
         $namespace = self::$themeConfig['features_namespace'] ?? 'App\\Features';
 
-        // Pass both arguments
-        $script = PHP_OS_FAMILY === 'Windows'
-            ? 'cmd /c ' . escapeshellarg(__DIR__ . '\\create-feature.bat') . ' ' . escapeshellarg($featureName) . ' ' . escapeshellarg($namespace)
-            : 'sh ' . escapeshellarg(__DIR__ . '/create-feature.sh') . ' ' . escapeshellarg($featureName) . ' ' . escapeshellarg($namespace);
+        // These scripts are assumed to be in the same directory as this Composer.php file
+        $scriptPathWindows = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'create-feature.bat');
+        $scriptPathUnix    = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'create-feature.sh');
 
-        echo "Running script: $script\n";
+        if (!$scriptPathWindows && PHP_OS_FAMILY === 'Windows') {
+            $io->write("<error>create-feature.bat not found.</error>");
+            exit(1);
+        }
+        if (!$scriptPathUnix && PHP_OS_FAMILY !== 'Windows') {
+            $io->write("<error>create-feature.sh not found.</error>");
+            exit(1);
+        }
+
+        $script = PHP_OS_FAMILY === 'Windows'
+            ? 'cmd /c ' . escapeshellarg($scriptPathWindows) . ' ' . escapeshellarg($featureName) . ' ' . escapeshellarg($namespace)
+            : 'sh ' . escapeshellarg($scriptPathUnix) . ' ' . escapeshellarg($featureName) . ' ' . escapeshellarg($namespace);
+
+        $io->write("<info>Running script: $script</info>");
         passthru($script);
 
         self::$features[$namespace . '\\' . $featureName] = $featureName . '.php';
@@ -191,41 +309,48 @@ class Composer
     /**
      * Checks that a theme config exists and creates one if not.
      *
-     * @param  mixed $io
+     * @param  IOInterface|null $io
      * @return void
      */
-    private static function checkThemeConfig( mixed $io = false ): void
+    private static function checkThemeConfig( ?IOInterface $io = null ): void
     {
-        $themeConfig         = dirname(__DIR__, 5) . '/config/theme.php';
-        $themeConfigTemplate = dirname(__DIR__) . '/config/theme.template.php';
-        
-        if (!file_exists($themeConfig)) {
-            if ($io !== false) {
+        // Theme config path is relative to the project root
+        $themeConfigPath     = self::$projectRoot . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'theme.php';
+        $themeConfigTemplate = self::$merosStubsDir . DIRECTORY_SEPARATOR . 'theme.template.php';
+
+        // Check if the actual theme config file exists
+        if (!file_exists($themeConfigPath)) {
+            if ($io !== null) {
                 $io->write("<info>Setting up theme config file</info>");
             }
-            
+
             if (!file_exists($themeConfigTemplate)) {
-                if ($io !== false) {
-                    $io->write("<error>Unable to locate theme config template. Aborting</error>");
+                if ($io !== null) {
+                    $io->write("<error>Unable to locate theme config template at {$themeConfigTemplate}. Aborting</error>");
                 }
                 return;
             }
 
-            $newThemeConfig = copy($themeConfigTemplate, $themeConfig);
+            // Ensure the config directory exists
+            if (!is_dir(dirname($themeConfigPath))) {
+                mkdir(dirname($themeConfigPath), 0755, true);
+            }
+
+            $newThemeConfig = copy($themeConfigTemplate, $themeConfigPath);
 
             if (!$newThemeConfig) {
-                if ($io !== false) {
-                    $io->write("<error>Unable to create theme config. Aborting</error>");
+                if ($io !== null) {
+                    $io->write("<error>Unable to create theme config at {$themeConfigPath}. Aborting</error>");
                 }
                 return;
             }
 
-            if ($io !== false) {
-                $io->write("<info>Generated theme config file</info>");
+            if ($io !== null) {
+                $io->write("<info>Generated theme config file at {$themeConfigPath}</info>");
             }
         }
 
-        self::$themeConfig = require $themeConfig;
+        self::$themeConfig = require $themeConfigPath;
     }
 
     /**
@@ -236,9 +361,9 @@ class Composer
      */
     private static function regenerateThemeConfig(): void
     {
-        $stubPath = dirname(__DIR__) . '/stubs/ThemeConfig.stub';
+        $stubPath = self::$merosStubsDir . DIRECTORY_SEPARATOR . 'ThemeConfig.stub';
 
-        if ( file_exists( $stubPath ) ) {
+        if (file_exists($stubPath)) {
             $stub     = file_get_contents( $stubPath );
             $rendered = str_replace(
                 [
@@ -247,7 +372,7 @@ class Composer
                     '{{extensions_namespace}}',
                     '{{plugins_namespace}}',
                     '{{features}}',
-                    '{{extensions}}', 
+                    '{{extensions}}',
                     '{{plugins}}'
                 ],
                 [
@@ -262,7 +387,15 @@ class Composer
                 $stub
             );
 
-            file_put_contents(dirname(__DIR__, 5) . '/config/theme.php', $rendered);
+            // Theme config file path relative to project root
+            $themeConfigFilePath = self::$projectRoot . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'theme.php';
+
+            // Ensure the directory exists before writing the file
+            if (!is_dir(dirname($themeConfigFilePath))) {
+                mkdir(dirname($themeConfigFilePath), 0755, true);
+            }
+
+            file_put_contents($themeConfigFilePath, $rendered);
         }
     }
 
