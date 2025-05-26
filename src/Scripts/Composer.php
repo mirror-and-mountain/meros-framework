@@ -429,4 +429,65 @@ class Composer
 
         return implode("\n", $lines);
     }
+
+    /**
+     * Publishes Livewire assets to the theme's assets directory.
+     *
+     * @return void
+     */
+    public static function publishLivewireAssets(): void
+    {
+        $themePath = '/var/www/html/wp/wp-content/themes/meros-blocks';
+        $command = "cd {$themePath} && wp acorn livewire:publish --assets";
+
+        exec($command, $output, $status);
+
+        if ($status !== 0) {
+            throw new \RuntimeException('Failed to publish Livewire assets. Output: ' . implode("\n", $output));
+        }
+
+        $source = "{$themePath}/public/vendor/livewire";
+        $destination = "{$themePath}/assets/livewire";
+
+        // Ensure the destination directory is clean
+        if (is_dir($destination)) {
+            self::deleteDirectory($destination);
+        }
+
+        // Move the directory
+        if (!rename($source, $destination)) {
+            throw new \RuntimeException("Failed to move Livewire assets from {$source} to {$destination}");
+        }
+
+        // Delete the vendor directory
+        $vendorDir = "{$themePath}/public/vendor";
+        if (is_dir($vendorDir)) {
+            self::deleteDirectory($vendorDir);
+        }
+    }
+
+    /**
+     * Deletes a directory and all its contents recursively.
+     *
+     * @param  string $dir The directory to delete.
+     * @return void
+     */
+    protected static function deleteDirectory(string $dir): void
+    {
+        if (!file_exists($dir)) {
+            return;
+        }
+
+        $items = scandir($dir);
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+
+            $path = $dir . DIRECTORY_SEPARATOR . $item;
+            is_dir($path) ? self::deleteDirectory($path) : unlink($path);
+        }
+
+        rmdir($dir);
+    }
 }

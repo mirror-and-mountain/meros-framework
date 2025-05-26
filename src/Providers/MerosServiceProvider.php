@@ -10,6 +10,9 @@ use MM\Meros\Contracts\ThemeManager;
 use MM\Meros\Helpers\Loader;
 use MM\Meros\Helpers\ClassInfo;
 
+use Livewire\Livewire;
+use Illuminate\Support\Facades\Route;
+
 /**
  * Binds Meros contracts to the Laravel application.
  */
@@ -46,8 +49,8 @@ class MerosServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $this->ensureAppKey();
-
+        $this->configureLivewire();
+        
         if ( $this->registered ) {
             $theme  = $this->app->make('meros.theme_manager');
             $loader = Loader::init( $theme );
@@ -61,6 +64,21 @@ class MerosServiceProvider extends ServiceProvider
 
             $theme->initialise();
         }
+    }
+
+    /**
+     * Configures Livewire settings for the theme.
+     *
+     * @return void
+     */
+    private function configureLivewire(): void
+    {
+        // Make sure an application key exists.
+        $this->ensureAppKey();
+        // Set the livewire script route to use theme assets dir.
+        Livewire::setScriptRoute(function ($handle) {
+            return Route::get(get_theme_file_uri('assets/livewire/livewire.min.js'), $handle);
+        });
     }
 
     /**
