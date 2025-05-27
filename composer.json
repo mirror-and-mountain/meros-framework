@@ -12,7 +12,8 @@
     ],
     "require": {
         "roots/acorn": "^5.0.2",
-        "livewire/livewire": "^3.6.3"
+        "livewire/livewire": "^3.6.3",
+        "htmlburger/carbon-fields": "^3.6"
     },
     "autoload": {
         "psr-4": {
