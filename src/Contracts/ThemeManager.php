@@ -113,6 +113,18 @@ abstract class ThemeManager
     }
 
     /**
+     * Adds a Wordpress theme support.
+     *
+     * @param string $support
+     * @param mixed ...$args
+     * @return void
+     */
+    protected function addThemeSupport( string $support, mixed ...$args ): void
+    {
+        add_theme_support( $support, $args );
+    }
+
+    /**
      * This is called after theme's features have been instantiated 
      * and added to the features property in the boot method of the 
      * Meros Service Provider.
