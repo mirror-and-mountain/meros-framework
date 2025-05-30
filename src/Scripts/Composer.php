@@ -297,7 +297,7 @@ class Composer
 
         $script = PHP_OS_FAMILY === 'Windows'
             ? 'cmd /c ' . escapeshellarg($scriptPathWindows) . ' ' . escapeshellarg($featureName) . ' ' . escapeshellarg($namespace)
-            : 'sh ' . escapeshellarg($scriptPathUnix) . ' ' . escapeshellarg($featureName) . ' ' . escapeshellarg($namespace);
+            : 'bash ' . escapeshellarg($scriptPathUnix) . ' ' . escapeshellarg($featureName) . ' ' . escapeshellarg($namespace);
 
         $io->write("<info>Running script: $script</info>");
         passthru($script);
