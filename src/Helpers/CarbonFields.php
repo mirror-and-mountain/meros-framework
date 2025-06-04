@@ -25,6 +25,5 @@ class CarbonFields
         Carbon_Fields::boot();
 
         $theme->carbonFieldsInitialised = true;
-        dd($theme);
     }
 }
