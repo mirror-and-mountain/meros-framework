@@ -36,12 +36,28 @@ abstract class ThemeManager
     public bool $always_inject_livewire_assets = false;
 
     /**
+     * Determines whether Livewire scripts and styles
+     * are always injected into WP's admin header & footer.
+     *
+     * @var bool
+     */
+    public bool $always_inject_livewire_assets_admin = false;
+
+    /**
      * Used by the Livewire helper to determine whether
      * Livewire assets have already been injected.
      *
      * @var bool
      */
     public bool $livewireInitialised = false;
+
+    /**
+     * Used by the Livewire helper to determine whether
+     * Livewire assets have already been injected in WP admin.
+     *
+     * @var bool
+     */
+    public bool $livewireInitialisedAdmin = false;
 
     /**
      * Determines whether Carbon Fields should always be booted.
@@ -179,6 +195,10 @@ abstract class ThemeManager
     {
         if ( $this->always_inject_livewire_assets && !is_admin() ) {
             Livewire::injectAssets();
+        }
+
+        if ( $this->always_inject_livewire_assets_admin && is_admin() ) {
+            Livewire::injectAssets( true );
         }
 
         $this->enqueueThemeStyle();
