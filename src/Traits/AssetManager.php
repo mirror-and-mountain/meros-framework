@@ -108,11 +108,11 @@ trait AssetManager
 
         foreach ( $this->assetTypes as $type => $_ ) {
     
-            if ( $this->scripts === [] ) {
+            if ( $this->scripts[ $type ] ?? [] === [] ) {
                 $this->setAssets( $assetsPath, $type, 'js' );
             }
             
-            if ( $this->styles === [] ) {
+            if ( $this->styles[ $type ] ?? [] === [] ) {
                 $this->setAssets( $assetsPath, $type, 'css' );
             }
 
