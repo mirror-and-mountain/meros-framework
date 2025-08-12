@@ -280,7 +280,7 @@ class Composer
             exit(1);
         }
 
-        $namespace = self::$themeConfig['features_namespace'] ?? 'App\\Features';
+        $namespace = self::$themeConfig['features_namespace'] ?? 'App\\Features\\' . $featureName;
 
         // These scripts are assumed to be in the same directory as this Composer.php file
         $scriptPathWindows = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'create-feature.bat');
@@ -302,7 +302,7 @@ class Composer
         $io->write("<info>Running script: $script</info>");
         passthru($script);
 
-        self::$features[$namespace . '\\' . $featureName] = $featureName . '.php';
+        self::$features[$namespace] = $featureName . '.php';
         self::regenerateThemeConfig();
     }
 
