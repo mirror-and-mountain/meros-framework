@@ -47,7 +47,6 @@ class Fields
 
         // Set html for the given field type
         switch ( $fieldType ) {
-            
             case 'checkbox':
                 $checked = checked( $value, '1', false );
                 $html .= '<input type="hidden" name="' . esc_attr( $option ) . '" value="0" />';
