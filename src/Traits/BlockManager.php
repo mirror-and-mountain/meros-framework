@@ -41,10 +41,6 @@ trait BlockManager
         
         $this->setBlocks( $blocksPath );
 
-        if ($this->blocks !== []) {
-            $this->defaultSettings['blocks'] = $this->blocks;
-        }
-
         // Resets the hasBlocks indicator depending on whether any blocks have been discovered.
         $this->hasBlocks = $this->blocks !== [];
     }
@@ -89,7 +85,7 @@ trait BlockManager
     {   
         add_action('init', function () {
 
-            foreach ( $this->currentSettings['blocks'] ?? [] as $block ) {
+            foreach ( $this->blocks ?? [] as $block ) {
                 if ( ! is_array($block) ) { continue; }
                 if ( ! $block['enabled'] ) { continue; }
                 register_block_type( $block['path'] );
