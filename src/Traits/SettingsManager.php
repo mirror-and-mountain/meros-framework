@@ -159,7 +159,7 @@ trait SettingsManager
                     // Add a settings field if specified
                     add_settings_field(
                         $name,
-                        Str::replace('_', '', Str::title( $option )),
+                        Str::replace('_', ' ', Str::title( $option )),
                         function() use ( $name, $type, $description, $id, $default, $fieldType, $required ) {
                             // Devs may provide their own callback to render the field.
                             if ( is_callable( $fieldType ) ) {
