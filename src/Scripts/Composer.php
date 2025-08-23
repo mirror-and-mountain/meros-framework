@@ -101,7 +101,6 @@ class Composer
         }
     }
 
-
     /**
      * Runs after composer dump-autoload. Will check installed packages and
      * handle any relevant theme plugin or extension installations.
@@ -115,7 +114,7 @@ class Composer
         $installationManager = $composer->getInstallationManager();
         $io                  = $event->getIO();
 
-        self::initialisePaths($composer, $io); // Initialize paths
+        self::initialisePaths($composer, $io); // Initialise paths
 
         self::checkThemeConfig( $io );
 
@@ -225,9 +224,49 @@ class Composer
                     }
                 }
             }
+
+            else if ($packageName === 'livewire/livewire') {
+                self::publishLivewireAssets();
+            }
         }
         $io->write("<info>Regenerating theme config</info>");
         self::regenerateThemeConfig();
+    }
+
+    /**
+     * Publishes Livewire assets to the theme's assets directory.
+     *
+     * @return void
+     */
+    public static function publishLivewireAssets(): void
+    {
+        $projectRoot = self::$projectRoot;
+        $command     = "cd {$projectRoot} && wp acorn livewire:publish --assets";
+
+        exec($command, $output, $status);
+
+        if ($status !== 0) {
+            throw new \RuntimeException('Failed to publish Livewire assets. Output: ' . implode("\n", $output));
+        }
+
+        $source = "{$projectRoot}/public/vendor/livewire";
+        $destination = "{$projectDir}/assets/livewire";
+
+        // Ensure the destination directory is clean
+        if (is_dir($destination)) {
+            self::deleteDirectory($destination);
+        }
+
+        // Move the directory
+        if (!rename($source, $destination)) {
+            throw new \RuntimeException("Failed to move Livewire assets from {$source} to {$destination}");
+        }
+
+        // Delete the vendor directory
+        $vendorDir = "{$themePath}/public/vendor";
+        if (is_dir($vendorDir)) {
+            self::deleteDirectory($vendorDir);
+        }
     }
 
     /**
@@ -421,42 +460,6 @@ class Composer
         $lines[] = str_repeat('    ', $indentLevel - 1) . ']';
 
         return implode("\n", $lines);
-    }
-
-    /**
-     * Publishes Livewire assets to the theme's assets directory.
-     *
-     * @return void
-     */
-    public static function publishLivewireAssets(): void
-    {
-        $themePath = '/var/www/html/wp/wp-content/themes/meros-blocks';
-        $command = "cd {$themePath} && wp acorn livewire:publish --assets";
-
-        exec($command, $output, $status);
-
-        if ($status !== 0) {
-            throw new \RuntimeException('Failed to publish Livewire assets. Output: ' . implode("\n", $output));
-        }
-
-        $source = "{$themePath}/public/vendor/livewire";
-        $destination = "{$themePath}/assets/livewire";
-
-        // Ensure the destination directory is clean
-        if (is_dir($destination)) {
-            self::deleteDirectory($destination);
-        }
-
-        // Move the directory
-        if (!rename($source, $destination)) {
-            throw new \RuntimeException("Failed to move Livewire assets from {$source} to {$destination}");
-        }
-
-        // Delete the vendor directory
-        $vendorDir = "{$themePath}/public/vendor";
-        if (is_dir($vendorDir)) {
-            self::deleteDirectory($vendorDir);
-        }
     }
 
     /**
