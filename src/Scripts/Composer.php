@@ -77,7 +77,7 @@ class Composer
      * @param IOInterface $io
      * @return void
      */
-    private static function initializePaths(ComposerInstance $composer, IOInterface $io): void
+    private static function initialisePaths(ComposerInstance $composer, IOInterface $io): void
     {
         // Get the vendor directory path from Composer's configuration
         self::$vendorDir = realpath($composer->getConfig()->get('vendor-dir'));
@@ -115,7 +115,7 @@ class Composer
         $installationManager = $composer->getInstallationManager();
         $io                  = $event->getIO();
 
-        self::initializePaths($composer, $io); // Initialize paths
+        self::initialisePaths($composer, $io); // Initialize paths
 
         self::checkThemeConfig( $io );
 
@@ -238,23 +238,15 @@ class Composer
     public static function makeCreateScriptExecutable( Event $event ): void
     {
         $io = $event->getIO();
-        self::initializePaths($event->getComposer(), $io); // Initialize paths
+        self::initialisePaths($event->getComposer(), $io); // Initialise paths
 
-        // These scripts are assumed to be in the same directory as this Composer.php file
-        $scriptPathWindows = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'create-feature.bat');
-        $scriptPathUnix    = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'create-feature.sh');
+        $scriptPath = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'create-feature.sh');
 
-        if (PHP_OS_FAMILY !== 'Windows') {
-            if ($scriptPathUnix && file_exists($scriptPathUnix)) {
-                chmod($scriptPathUnix, 0755);
-                $io->write("<info>Made {$scriptPathUnix} executable.</info>");
-            } else {
-                $io->write("<error>Unix create-feature script not found or inaccessible.</error>");
-            }
+        if ($scriptPath && file_exists($scriptPath)) {
+            chmod($scriptPath, 0755);
+            $io->write("<info>Made {$scriptPath} executable.</info>");
         } else {
-            if (!$scriptPathWindows || !file_exists($scriptPathWindows)) {
-                $io->write("<error>Windows create-feature script not found or inaccessible.</error>");
-            }
+            $io->write("<error>create-feature script not found or inaccessible.</error>");
         }
     }
 
@@ -268,7 +260,7 @@ class Composer
     public static function createFeature( Event $event ): void
     {
         $io = $event->getIO();
-        self::initializePaths($event->getComposer(), $io); // Initialize paths
+        self::initialisePaths($event->getComposer(), $io); // Initialize paths
 
         self::checkThemeConfig($io);
 
