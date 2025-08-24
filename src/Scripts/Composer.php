@@ -104,7 +104,7 @@ class Composer
      * @param  Event $event
      * @return void
      */
-    public static function installPluginsAndExtensions( Event $event ): void
+    public static function postAutoloadDump( Event $event ): void
     {
         $composer            = $event->getComposer();
         $installationManager = $composer->getInstallationManager();
@@ -232,6 +232,56 @@ class Composer
                         $overrideClass = $extensionsNamespace . '\\' . $overrideClass;
 
                         self::$extensions[ $overrideClass ] = basename($overrideFile);
+                    }
+                }
+            }
+
+            // Handle devcontainer
+            else if ($packageName === 'mirror-and-mountain/meros-theme-devcontainer') {
+                $io->write("<info>Updating Meros Theme Dev Container...</info>");
+
+                $devContainerDir        = self::$projectRoot . DIRECTORY_SEPARATOR . '.devcontainer';
+                $devPackageDir          = $devContainerDir . DIRECTORY_SEPARATOR . '_package';
+                $devPackageTemplatesDir = $devPackageDir . DIRECTORY_SEPARATOR . 'templates';
+
+                if (is_dir($devPackageDir)) {
+                    self::deleteDirectory($devPackageDir);
+                }
+
+                if (rename($realInstallPath, $devPackageDir)) {
+                    $io->write("<info>Successfully updated Meros Theme Dev Container package.</info>");
+                } else {
+                    $io->write("<error>Unable to update Meros Theme Dev Container package. Configuration files may be out of date.</error>");
+                }
+            
+                if (is_dir($devContainerDir) && is_dir($devPackageDir)) {
+                    $io->write("<info>Configuring Meros Theme .devcontainer.</info>");
+                    $configFiles = [
+                        'remotes' . DIRECTORY_SEPARATOR . 'remotes.json',
+                        '.env',
+                        'devcontainer.json',
+                        'Dockerfile',
+                        'docker-compose.yml'
+                    ];
+
+                    foreach ( $configFiles as $file ) {
+                        $userFile = $devContainerDir . DIRECTORY_SEPARATOR . $file;
+                        $template = $devPackageTemplatesDir . DIRECTORY_SEPARATOR . $file;
+                        $basename = basename($userFile);
+
+                        if (!file_exists($userFile)) {
+                            $io->write("<info>{$basename} file not found in .devcontainer directory. Attempting to copy from package template.</info>");
+                            if (file_exists($template)) {
+                                if (copy($template, $userFile)) {
+                                    $io->write("<info>Successfully copied {$basename} to .devcontainer directory.</info>");
+                                } else {
+                                    $io->write("<error>Failed to copy {$basename} to .devcontainer directory. Skipping.</error>");
+                                }
+                            }
+                        } else {
+                            $io->write("<info>{$basename} file already exists in .devcontainer directory. Skipping.</info>");
+                            continue;
+                        }
                     }
                 }
             }
