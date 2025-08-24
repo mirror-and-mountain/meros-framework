@@ -18,12 +18,13 @@ class Features
         string $class,
         string $path,
         string $uri,
-        array  $pluginInfo = []
+        array  $pluginInfo = [],
+        string|null $name = null,
     ): object
     {
         app()->singleton(
             $class,
-            fn() => new $class( $path, $uri, $pluginInfo )
+            fn() => new $class( $name, $path, $uri, $pluginInfo )
         );
 
         return app()->make( $class );

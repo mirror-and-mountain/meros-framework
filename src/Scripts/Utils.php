@@ -15,7 +15,7 @@ class Utils
         $projectRoot = '';
 
         if ( !isset($vendorDir) ) {
-            $vendorDir = realpath( dirname( __DIR__, 5 ) );
+            $vendorDir = realpath( dirname( __DIR__, 4 ) );
         }
 
         if ( is_dir($vendorDir) ) {

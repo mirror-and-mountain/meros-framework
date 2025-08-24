@@ -122,7 +122,8 @@ class Loader
             switch ( $baseClass ) {
                 // Features live in their own directory under app/Features by default
                 case Feature::class:
-                    $path = trailingslashit( $extPath ) . trailingslashit( File::name( $files ) ) . $files;
+                    $featureName = Str::afterLast( Str::beforeLast( $class, '\\' ), '\\' );
+                    $path = trailingslashit( $extPath ) . trailingslashit( $featureName ) . $files;
                     break;
                 
                 // Approach used for extensions
@@ -192,7 +193,6 @@ class Loader
                 $feature = Features::instantiate(
                     $class->name, $featurePath, $featureUri, $pluginInfo
                 );
-
                 break;
             
             case Feature::class: 
@@ -201,7 +201,7 @@ class Loader
 
                 // Instantiate the feature
                 $feature = Features::instantiate( 
-                    $class->name, $featurePath, $featureUri 
+                    $class->name, $featurePath, $featureUri, [], $featureName
                 );
 
                 break;

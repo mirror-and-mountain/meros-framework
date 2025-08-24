@@ -155,8 +155,25 @@ class Composer
                 $pluginClass = str_replace(' ', '', ucwords(str_replace('-', ' ', basename($realInstallPath))));
 
                 // Config file path is relative to the project root
-                $configFile  = self::$projectRoot . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Plugins' . DIRECTORY_SEPARATOR . $pluginClass . '.php';
-                $stubPath    = self::$stubDir . DIRECTORY_SEPARATOR . 'Plugin.stub';
+                $configFile = self::$projectRoot . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Plugins' . DIRECTORY_SEPARATOR . $pluginClass . '.php';
+                $stubPath   = '';
+
+                $merosBlockPlugins = [
+                    'meros-carousel',
+                    'meros-dynamic-header',
+                    'meros-text-animations'
+                ];
+
+                foreach ( $merosBlockPlugins as $merosBlockPlugin ) {
+                    if ( str_contains( $packageName, $merosBlockPlugin ) ) {
+                        $stubPath = self::$stubDir . DIRECTORY_SEPARATOR . 'MMBlock.stub';
+                        break;
+                    }
+                }
+
+                if ( $stubPath === '' ) {
+                    $stubPath = self::$stubDir . DIRECTORY_SEPARATOR . 'Plugin.stub';
+                }
 
                 if (file_exists($stubPath) && !file_exists($configFile)) {
                     $stub         = file_get_contents( $stubPath );
@@ -221,7 +238,7 @@ class Composer
 
             // Update livewire assets
             else if ($packageName === 'livewire/livewire') {
-                self::publishLivewireAssets();
+                self::publishLivewireAssets( $io );
             }
         }
         $io->write("<info>Regenerating theme config</info>");
@@ -242,15 +259,18 @@ class Composer
      *
      * @return void
      */
-    public static function publishLivewireAssets(): void
+    public static function publishLivewireAssets( $io ): void
     {
         $projectRoot = self::$projectRoot;
-        $command     = "cd {$projectRoot} && wp acorn livewire:publish --assets";
+
+        $io->write("<info>Attempting to republish Livewire Assets to {$projectRoot}/assets/livewire</info>");
+
+        $command = "cd {$projectRoot} && wp acorn livewire:publish --assets";
 
         exec($command, $output, $status);
 
         if ($status !== 0) {
-            throw new \RuntimeException('Failed to publish Livewire assets. Output: ' . implode("\n", $output));
+            throw new \RuntimeException('Failed to publish Livewire assets. Check that WP CLI is installed in the environment. Output: ' . implode("\n", $output));
         }
 
         $source = "{$projectRoot}/public/vendor/livewire";

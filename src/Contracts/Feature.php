@@ -100,17 +100,26 @@ abstract class Feature
         ComponentManager, 
         SettingsManager;
 
-    public function __construct( string $path, string $uri, array $pluginInfo = [] )
+    public function __construct( string|null $name, string $path, string $uri, array $pluginInfo = [] )
     {
-        $class = Str::afterLast( get_class($this), '\\' );
-        $class = Str::lower( Str::headline( $class ) );
-        
         // Set the feature's name
-        $this->name = Str::slug( $class, '_' );
+        if ( isset($name) ) {
+
+            $name = Str::lower( Str::headline( $name ) );
+            $this->name = Str::slug( $name, '_' );
+
+        } else {
+
+            $class = Str::afterLast( get_class($this), '\\' );
+            $class = Str::lower( Str::headline( $class ) );
+        
+            $this->name = Str::slug( $class, '_' );
+        }
+
         // Set the feature's path
         $this->path = trailingslashit( $path );
         // Set the feature's URI
-        $this->uri  = trailingslashit( $uri );
+        $this->uri = trailingslashit( $uri );
 
         // If the feature is a plugin, set the pluginInfo property
         if ( $this instanceof Plugin ) {

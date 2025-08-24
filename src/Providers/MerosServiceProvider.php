@@ -24,7 +24,7 @@ class MerosServiceProvider extends ServiceProvider
 
     /**
      * Retrieves the theme manager class from theme config and binds
-     * it as a singleton. Additionally WP CLI commands are registered.
+     * it as a singleton.
      *
      * @return void
      */
@@ -41,9 +41,6 @@ class MerosServiceProvider extends ServiceProvider
         }
 
         defined('MEROS') || define('MEROS', true);
-
-        $merosCli = new MerosCommands();
-        WP_CLI::add_command( 'meros', $merosCli );
     }
 
     /**
@@ -68,6 +65,14 @@ class MerosServiceProvider extends ServiceProvider
             do_action("{$themeSlug}_add_features", $theme);
 
             $theme->initialise();
+        }
+
+        // Enable wp meros cli if appropriate
+        if ( $this->app->runningInConsole() ) {
+            if ( defined( 'WP_CLI' ) && \WP_CLI ) {
+                $merosCli = new MerosCommands();
+                \WP_CLI::add_command( 'meros', $merosCli );
+            }
         }
     }
 

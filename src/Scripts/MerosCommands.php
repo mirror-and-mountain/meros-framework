@@ -59,8 +59,10 @@ class MerosCommands {
 
     /**
      * Sets up an instance of this class and sets required properties.
+     *
+     * @return void
      */
-    public function __construct() {
+    private function init(): bool {
         $directories = Utils::getDirectories( null );
 
         if ( $directories !== false ) {
@@ -72,16 +74,20 @@ class MerosCommands {
             $this->features   = $this->themeConfig['features'] ?? [];
             $this->extensions = $this->themeConfig['extensions'] ?? [];
             $this->plugins    = $this->themeConfig['plugins'] ?? [];
+        } else {
+            return false;
         }
 
-        // if (
-        //     $this->vendorDir === '' ||
-        //     $this->projectRoot === '' ||
-        //     $this->stubDir === '' ||
-        //     $this->themeConfig === []
-        // ) {
-        //     WP_CLI::error( "Can't configure meros command depenancies. Aborting." );
-        // }
+        if (
+            $this->vendorDir === '' ||
+            $this->projectRoot === '' ||
+            $this->stubDir === '' ||
+            $this->themeConfig === []
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -89,7 +95,7 @@ class MerosCommands {
      *
      * ## OPTIONS
      *
-     * [--name=<feature-name>]
+     * <name>
      * : The name of the feature to create. This will be converted to StudlyCase.
      *
      *
@@ -97,27 +103,18 @@ class MerosCommands {
      *
      * wp meros create-feature MyNewFeature
      * wp meros create-feature my-new-feature
-     * wp meros create-feature # will prompt for name
      *
      * @subcommand create-feature
      * @when after_wp_load
      *
-     * @param array $args       Positional arguments.
-     * @param array $assoc_args Associative arguments (e.g., --name=value).
+     * @param array $args Positional arguments.
      */
-    public function createFeature( $args, $assoc_args ) {
-        $featureName = WP_CLI\Utils\get_flag_value( $assoc_args, 'name' );
-
-        // If 'name' parameter is not provided, prompt the user for it.
-        if ( empty( $featureName ) ) {
-            $featureName = WP_CLI::prompt( 'Please enter the name of the feature to create' );
-
-            // Ensure a name was entered after prompting
-            if ( empty( $featureName ) ) {
-                WP_CLI::error( 'Feature name cannot be empty. Aborting.' );
-                return;
-            }
+    public function createFeature( $args ) {
+        if ( $this->init() === false ) {
+            \WP_CLI::error( 'Cannot extablish required meros properties. Aborting.' );
         }
+
+        list( $featureName ) = $args;
 
         $formattedName   = Str::studly( $featureName );
         $namespacePrefix = $this->themeConfig['features_namespace'] ?? 'App\\Features'; // Default namespace
@@ -132,13 +129,13 @@ class MerosCommands {
                 chmod( $scriptPath, 0755 );
             }
         } else {
-            WP_CLI::error( 'Cannot locate create-feature script. Expected at: ' . ( __DIR__ . DIRECTORY_SEPARATOR . 'create-feature.sh' ) . '. Aborting.' );
+            \WP_CLI::error( 'Cannot locate create-feature script. Expected at: ' . ( __DIR__ . DIRECTORY_SEPARATOR . 'create-feature.sh' ) . '. Aborting.' );
             return;
         }
 
-        WP_CLI::log( sprintf( 'Attempting to create feature: %s (formatted: %s)', $featureName, $formattedName ) );
-        WP_CLI::log( sprintf( 'Using namespace: %s', $namespace ) );
-        WP_CLI::log( sprintf( 'Executing script: bash %s %s %s', escapeshellarg( $scriptPath ), escapeshellarg( $formattedName ), escapeshellarg( $namespace ) ) );
+        \WP_CLI::log( sprintf( 'Attempting to create feature: %s (formatted: %s)', $featureName, $formattedName ) );
+        \WP_CLI::log( sprintf( 'Using namespace: %s', $namespace ) );
+        \WP_CLI::log( sprintf( 'Executing script: bash %s %s %s', escapeshellarg( $scriptPath ), escapeshellarg( $formattedName ), escapeshellarg( $namespace ) ) );
 
         // Construct the command to execute
         $command = 'bash ' . escapeshellarg( $scriptPath ) . ' ' . escapeshellarg( $formattedName ) . ' ' . escapeshellarg( $namespace );
@@ -151,8 +148,8 @@ class MerosCommands {
         exec( $command . ' 2>&1', $output, $return_var );
 
         if ( $return_var === 0 ) {
-            WP_CLI::success( sprintf( 'Feature "%s" created successfully!', $formattedName ) );
-            $this->features[ $namespace ] = $formattedName; // Add newly created feature to the list
+            \WP_CLI::success( sprintf( 'Feature "%s" created successfully!', $formattedName ) );
+            $this->features[ $namespace . '\\FeatureDefinition' ] = 'FeatureDefinition.php'; // Add newly created feature to the list
 
             // Regenerate the config file
             Utils::regenerateThemeConfig(
@@ -164,16 +161,155 @@ class MerosCommands {
                 $this->plugins
             );
         } else {
-            WP_CLI::error( sprintf( 'Failed to create feature "%s". Script exited with code %d.', $formattedName, $return_var ) );
+            \WP_CLI::error( sprintf( 'Failed to create feature "%s". Script exited with code %d.', $formattedName, $return_var ) );
         }
 
         // Output any messages from the bash script
         if ( ! empty( $output ) ) {
-            WP_CLI::log( '--- Script Output ---' );
+            \WP_CLI::log( '--- Script Output ---' );
             foreach ( $output as $line ) {
-                WP_CLI::log( $line );
+                \WP_CLI::log( $line );
             }
-            WP_CLI::log( '---------------------' );
+            \WP_CLI::log( '---------------------' );
+        }
+    }
+
+    /**
+     * Tests a connection to a remote environment via SSH.
+     *
+     * ## OPTIONS
+     *
+     * <environment>
+     * : The name of the environment to test a connection to as specified in this devcontainer's remotes.json file.
+     *
+     * ## EXAMPLES
+     *
+     * wp meros test-remote stage
+     * wp meros test-remote production
+     *
+     * @subcommand test-remote
+     * @when after_wp_load
+     *
+     * @param array $args Positional arguments.
+     */
+    public function testRemote( $args ) {
+        list( $environment ) = $args;
+        $scriptPath = '/usr/local/bin/test-remote.sh';
+
+        if (file_exists($scriptPath)) {
+            $command = 'bash ' . escapeshellarg( $scriptPath ) . ' ' . escapeshellarg( $environment );
+
+            $output     = [];
+            $return_var = 0;
+
+            exec( $command . ' 2>&1', $output, $return_var );
+
+            if ( $return_var === 0 ) {
+                \WP_CLI::success( sprintf( 'Test connection to remote environment "%s" ran successfully.', $environment ) );
+                \WP_CLI::log( implode("\n", $output) );
+            } else {
+                 \WP_CLI::error( sprintf( 'Failed test connection to remote environment "%s". Script exited with code %d. Output: %s', $environment, $return_var, implode("\n", $output) ) );
+            }
+        }
+    }
+
+    /**
+     * Synchronises this environment to another environment via SSH.
+     *
+     * ## OPTIONS
+     *
+     * <environment>
+     * : The name of the environment to sync to as specified in this devcontainer's remotes.json file.
+     *
+     * [--test=<test>]
+     * : Whether to run pre-sync tests.
+     * ---
+     * default: false
+     * options:
+     *   - true
+     *   - false
+     * ---
+     *
+     * ## EXAMPLES
+     *
+     * wp meros sync-to stage
+     * wp meros sync-to production --test=true
+     *
+     * @subcommand sync-to
+     * @when after_wp_load
+     *
+     * @param array $args Positional arguments.
+     * @param array $assoc_args Associative flags.
+     */
+    public function syncTo( $args, $assoc_args ) {
+        list( $environment ) = $args;
+        $runTests   = isset( $assoc_args['test'] ) && $assoc_args['test'] === 'true' ? 'true' : 'false';
+        $scriptPath = '/usr/local/bin/sync-to-remote.sh';
+
+        if (file_exists($scriptPath)) {
+            $command = 'bash ' . escapeshellarg( $scriptPath ) . ' ' . escapeshellarg( $environment ) . ' ' . escapeshellarg( $runTests );
+
+            $output     = [];
+            $return_var = 0;
+
+            exec( $command . ' 2>&1', $output, $return_var );
+
+            if ( $return_var === 0 ) {
+                \WP_CLI::success( sprintf( 'Sync to remote environment "%s" completed successfully.', $environment ) );
+                \WP_CLI::log( implode("\n", $output) );
+            } else {
+                 \WP_CLI::error( sprintf( 'Failed to sync to remote environment "%s". Script exited with code %d. Output: %s', $environment, $return_var, implode("\n", $output) ) );
+            }
+        }
+    }
+
+    /**
+     * Synchronises a remote environment to this environment via SSH.
+     *
+     * ## OPTIONS
+     *
+     * <environment>
+     * : The name of the environment to sync from as specified in this devcontainer's remotes.json file.
+     *
+     * [--test=<test>]
+     * : Whether to run pre-sync tests.
+     * ---
+     * default: false
+     * options:
+     *   - true
+     *   - false
+     * ---
+     *
+     * ## EXAMPLES
+     *
+     * wp meros sync-from stage
+     * wp meros sync-from production --test=true
+     *
+     * @subcommand sync-from
+     * @when after_wp_load
+     *
+     * @param array $args Positional arguments.
+     * @param array $assoc_args Associative flags.
+     */
+    public function syncFrom( $args, $assoc_args ) {
+        list( $environment ) = $args;
+        $runTests   = isset( $assoc_args['test'] ) && $assoc_args['test'] === 'true' ? 'true' : 'false';
+        $scriptPath = '/usr/local/bin/sync-from-remote.sh';
+
+        if (file_exists($scriptPath)) {
+            $command = 'bash ' . escapeshellarg( $scriptPath ) . ' ' . escapeshellarg( $environment ) . ' ' . escapeshellarg( $runTests );
+
+            $output     = [];
+            $return_var = 0;
+
+            exec( $command . ' 2>&1', $output, $return_var );
+
+            if ( $return_var === 0 ) {
+                \WP_CLI::success( sprintf( 'Sync from remote environment "%s" completed successfully.', $environment ) );
+                \WP_CLI::log( implode("\n", $output) );
+            } else {
+                 \WP_CLI::error( sprintf( 'Failed to sync from remote environment "%s". Script exited with code %d. Output: %s', $environment, $return_var, implode("\n", $output) ) );
+            }
         }
     }
 }
