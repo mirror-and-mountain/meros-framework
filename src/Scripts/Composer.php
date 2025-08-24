@@ -112,6 +112,8 @@ class Composer
 
         self::initialisePaths($composer, $io); // Initialise paths
 
+        $regenerateConfig = false;
+
         foreach ($composer->getRepositoryManager()->getLocalRepository()->getPackages() as $package) {
             $packageType = $package->getType();
             $packageName = $package->getName();
@@ -131,7 +133,7 @@ class Composer
 
             // Handle Plugins
             if ($packageType === 'wordpress-plugin') {
-                $io->write("<info>Handling plugin package: {$packageName} at {$installPath} (realpath: {$realInstallPath})</info>");
+                $io->write("Handling plugin package: {$packageName} at {$installPath} (realpath: {$realInstallPath})");
 
                 $pluginInfo = PluginInfo::get($realInstallPath);
 
@@ -148,8 +150,7 @@ class Composer
                     continue;
                 }
 
-                $io->write("<info>Main plugin file detected: {$pluginFile}</info>");
-                $io->write("Generating plugin class</info>");
+                $io->write("Main plugin file detected: {$pluginFile}");
 
                 // Plugin class name derived from the real installed directory name
                 $pluginClass = str_replace(' ', '', ucwords(str_replace('-', ' ', basename($realInstallPath))));
@@ -176,6 +177,7 @@ class Composer
                 }
 
                 if (file_exists($stubPath) && !file_exists($configFile)) {
+                    $io->write("Generating plugin config file.");
                     $stub         = file_get_contents( $stubPath );
                     $replacements = [
                         '{{namespace}}' => $pluginsNamespace,
@@ -196,12 +198,14 @@ class Composer
                         'config' => basename($configFile),
                         'src'    => $pluginFile
                     ];
+
+                    $regenerateConfig = true;
                 }
             }
 
             // Handle Extensions
             else if (isset($extra['meros'], $extra['meros']['class'], $extra['meros']['name'])) {
-                $io->write("<info>Handling extension package: {$packageName} at {$installPath} (realpath: {$realInstallPath})</info>");
+                $io->write("Handling extension package: {$packageName} at {$installPath} (realpath: {$realInstallPath})");
 
                 $extensionsNamespace = self::$themeConfig['extensions_namespace'] ?? 'App\\Extensions;';
 
@@ -232,56 +236,8 @@ class Composer
                         $overrideClass = $extensionsNamespace . '\\' . $overrideClass;
 
                         self::$extensions[ $overrideClass ] = basename($overrideFile);
-                    }
-                }
-            }
 
-            // Handle devcontainer
-            else if ($packageName === 'mirror-and-mountain/meros-theme-devcontainer') {
-                $io->write("<info>Updating Meros Theme Dev Container...</info>");
-
-                $devContainerDir        = self::$projectRoot . DIRECTORY_SEPARATOR . '.devcontainer';
-                $devPackageDir          = $devContainerDir . DIRECTORY_SEPARATOR . '_package';
-                $devPackageTemplatesDir = $devPackageDir . DIRECTORY_SEPARATOR . 'templates';
-
-                if (is_dir($devPackageDir)) {
-                    self::deleteDirectory($devPackageDir);
-                }
-
-                if (rename($realInstallPath, $devPackageDir)) {
-                    $io->write("<info>Successfully updated Meros Theme Dev Container package.</info>");
-                } else {
-                    $io->write("<error>Unable to update Meros Theme Dev Container package. Configuration files may be out of date.</error>");
-                }
-            
-                if (is_dir($devContainerDir) && is_dir($devPackageDir)) {
-                    $io->write("<info>Configuring Meros Theme .devcontainer.</info>");
-                    $configFiles = [
-                        'remotes.json',
-                        '.env',
-                        'devcontainer.json',
-                        'Dockerfile',
-                        'docker-compose.yml'
-                    ];
-
-                    foreach ( $configFiles as $file ) {
-                        $userFile = $devContainerDir . DIRECTORY_SEPARATOR . $file;
-                        $template = $devPackageTemplatesDir . DIRECTORY_SEPARATOR . $file;
-                        $basename = basename($userFile);
-
-                        if (!file_exists($userFile)) {
-                            $io->write("<info>{$basename} file not found in .devcontainer directory. Attempting to copy from package template.</info>");
-                            if (file_exists($template)) {
-                                if (copy($template, $userFile)) {
-                                    $io->write("<info>Successfully copied {$basename} to .devcontainer directory.</info>");
-                                } else {
-                                    $io->write("<error>Failed to copy {$basename} to .devcontainer directory. Skipping.</error>");
-                                }
-                            }
-                        } else {
-                            $io->write("<info>{$basename} file already exists in .devcontainer directory. Skipping.</info>");
-                            continue;
-                        }
+                        $regenerateConfig = true;
                     }
                 }
             }
@@ -292,17 +248,19 @@ class Composer
             }
         }
 
-        $io->write("<info>Regenerating theme config</info>");
+        if ($regenerateConfig) {
+            $io->write("<info>Regenerating theme config</info>");
 
-        // Regenerate theme config
-        Utils::regenerateThemeConfig(
-            self::$stubDir,
-            self::$projectRoot,
-            self::$themeConfig,
-            self::$features,
-            self::$extensions,
-            self::$plugins
-        );
+            // Regenerate theme config
+            Utils::regenerateThemeConfig(
+                self::$stubDir,
+                self::$projectRoot,
+                self::$themeConfig,
+                self::$features,
+                self::$extensions,
+                self::$plugins
+            );
+        }
     }
 
     /**
@@ -314,13 +272,13 @@ class Composer
     {
         $projectRoot = self::$projectRoot;
 
-        $io->write("<info>Attempting to republish Livewire Assets to {$projectRoot}/assets/livewire</info>");
+        $io->write("Attempting to republish Livewire Assets to {$projectRoot}/assets/livewire");
 
         $testCommand = "cd {$projectRoot} && wp acorn";
         exec($testCommand, $testOutput, $testStatus);
 
         if ($testStatus !== 0) {
-            $io->write("<info>Meros theme not currently activated or WP CLI unavailable. Skipping publish Livewire assets.</info>");
+            $io->write("<error>Meros theme not currently activated or WP CLI unavailable. Skipping publish Livewire assets.</error>");
             return;
         }
 
@@ -329,7 +287,7 @@ class Composer
         exec($command, $output, $status);
 
         if ($status !== 0) {
-            throw new \RuntimeException('Failed to publish Livewire assets. Check that WP CLI is installed in the environment. Output: ' . implode("\n", $output));
+            $io->write("<error>Failed to publish Livewire assets. Check that WP CLI is installed in the environment.</error>");
         }
 
         $source = "{$projectRoot}/public/vendor/livewire";
@@ -342,7 +300,9 @@ class Composer
 
         // Move the directory
         if (!rename($source, $destination)) {
-            throw new \RuntimeException("Failed to move Livewire assets from {$source} to {$destination}");
+            $io->write("<error>Failed to move Livewire assets from {$source} to {$destination}</error>");
+        } else {
+            $io->write("<info>Successfully published Livewire assets to {$destination}</info>");
         }
 
         // Delete the vendor directory
