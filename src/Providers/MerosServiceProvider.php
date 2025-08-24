@@ -10,6 +10,8 @@ use MM\Meros\Contracts\ThemeManager;
 use MM\Meros\Helpers\Loader;
 use MM\Meros\Helpers\ClassInfo;
 
+use MM\Meros\Scripts\MerosCommands;
+
 use Livewire\Livewire;
 use Illuminate\Support\Facades\Route;
 
@@ -21,8 +23,8 @@ class MerosServiceProvider extends ServiceProvider
     private bool $registered = false;
 
     /**
-     * Retrieved the theme manager class from theme config and binds
-     * it as a singleton.
+     * Retrieves the theme manager class from theme config and binds
+     * it as a singleton. Additionally WP CLI commands are registered.
      *
      * @return void
      */
@@ -39,6 +41,9 @@ class MerosServiceProvider extends ServiceProvider
         }
 
         defined('MEROS') || define('MEROS', true);
+
+        $merosCli = new MerosCommands();
+        WP_CLI::add_command( 'meros', $merosCli );
     }
 
     /**

@@ -74,14 +74,14 @@ class MerosCommands {
             $this->plugins    = $this->themeConfig['plugins'] ?? [];
         }
 
-        if (
-            $this->vendorDir === '' ||
-            $this->projectRoot === '' ||
-            $this->stubDir === '' ||
-            $this->themeConfig === []
-        ) {
-            WP_CLI::error( "Can't configure meros command depenancies. Aborting." );
-        }
+        // if (
+        //     $this->vendorDir === '' ||
+        //     $this->projectRoot === '' ||
+        //     $this->stubDir === '' ||
+        //     $this->themeConfig === []
+        // ) {
+        //     WP_CLI::error( "Can't configure meros command depenancies. Aborting." );
+        // }
     }
 
     /**
