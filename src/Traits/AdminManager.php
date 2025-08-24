@@ -37,6 +37,7 @@ trait AdminManager
 
         $this->options_map = [
             'blocks'        => $themeSettingsPageID,
+            'styles'        => $themeSettingsPageID,
             'miscellaneous' => $themeSettingsPageID
         ];
     }
