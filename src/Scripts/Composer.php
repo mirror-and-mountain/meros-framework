@@ -257,7 +257,7 @@ class Composer
                 if (is_dir($devContainerDir) && is_dir($devPackageDir)) {
                     $io->write("<info>Configuring Meros Theme .devcontainer.</info>");
                     $configFiles = [
-                        'remotes' . DIRECTORY_SEPARATOR . 'remotes.json',
+                        'remotes.json',
                         '.env',
                         'devcontainer.json',
                         'Dockerfile',
