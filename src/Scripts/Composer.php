@@ -241,6 +241,7 @@ class Composer
                 self::publishLivewireAssets( $io );
             }
         }
+
         $io->write("<info>Regenerating theme config</info>");
 
         // Regenerate theme config
@@ -264,6 +265,14 @@ class Composer
         $projectRoot = self::$projectRoot;
 
         $io->write("<info>Attempting to republish Livewire Assets to {$projectRoot}/assets/livewire</info>");
+
+        $testCommand = "cd {$projectRoot} && wp acorn";
+        exec($testCommand, $testOutput, $testStatus);
+
+        if ($testStatus !== 0) {
+            $io->write("<info>Meros theme not currently activated or WP CLI unavailable. Skipping publish Livewire assets.</info>");
+            return;
+        }
 
         $command = "cd {$projectRoot} && wp acorn livewire:publish --assets";
 
