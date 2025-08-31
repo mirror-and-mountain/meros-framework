@@ -139,13 +139,8 @@ class MerosCommands {
 
         // Construct the command to execute
         $command = 'bash ' . escapeshellarg( $scriptPath ) . ' ' . escapeshellarg( $formattedName ) . ' ' . escapeshellarg( $namespace );
-
-        $output     = [];
-        $return_var = 0;
-
-        // Execute the bash script and capture output/return code
-        // stderr is redirected to stdout to be captured in $output
-        exec( $command . ' 2>&1', $output, $return_var );
+        
+        passthru( $command, $return_var );
 
         if ( $return_var === 0 ) {
             \WP_CLI::success( sprintf( 'Feature "%s" created successfully!', $formattedName ) );
@@ -162,15 +157,6 @@ class MerosCommands {
             );
         } else {
             \WP_CLI::error( sprintf( 'Failed to create feature "%s". Script exited with code %d.', $formattedName, $return_var ) );
-        }
-
-        // Output any messages from the bash script
-        if ( ! empty( $output ) ) {
-            \WP_CLI::log( '--- Script Output ---' );
-            foreach ( $output as $line ) {
-                \WP_CLI::log( $line );
-            }
-            \WP_CLI::log( '---------------------' );
         }
     }
 
@@ -199,16 +185,12 @@ class MerosCommands {
         if (file_exists($scriptPath)) {
             $command = 'bash ' . escapeshellarg( $scriptPath ) . ' ' . escapeshellarg( $environment );
 
-            $output     = [];
-            $return_var = 0;
-
-            exec( $command . ' 2>&1', $output, $return_var );
+            passthru( $command, $return_var );
 
             if ( $return_var === 0 ) {
                 \WP_CLI::success( sprintf( 'Test connection to remote environment "%s" ran successfully.', $environment ) );
-                \WP_CLI::log( implode("\n", $output) );
             } else {
-                 \WP_CLI::error( sprintf( 'Failed test connection to remote environment "%s". Script exited with code %d. Output: %s', $environment, $return_var, implode("\n", $output) ) );
+                 \WP_CLI::error( sprintf( 'Failed test connection to remote environment "%s". Script exited with code %d. Output: %s', $environment, $return_var ) );
             }
         }
     }
@@ -249,16 +231,13 @@ class MerosCommands {
         if (file_exists($scriptPath)) {
             $command = 'bash ' . escapeshellarg( $scriptPath ) . ' ' . escapeshellarg( $environment ) . ' ' . escapeshellarg( $runTests );
 
-            $output     = [];
-            $return_var = 0;
-
-            exec( $command . ' 2>&1', $output, $return_var );
+            // Use passthru() to output the command's output in real-time
+            passthru( $command, $return_var );
 
             if ( $return_var === 0 ) {
                 \WP_CLI::success( sprintf( 'Sync to remote environment "%s" completed successfully.', $environment ) );
-                \WP_CLI::log( implode("\n", $output) );
             } else {
-                 \WP_CLI::error( sprintf( 'Failed to sync to remote environment "%s". Script exited with code %d. Output: %s', $environment, $return_var, implode("\n", $output) ) );
+                \WP_CLI::error( sprintf( 'Failed to sync to remote environment "%s". Script exited with code %d.', $environment, $return_var ) );
             }
         }
     }
@@ -299,16 +278,12 @@ class MerosCommands {
         if (file_exists($scriptPath)) {
             $command = 'bash ' . escapeshellarg( $scriptPath ) . ' ' . escapeshellarg( $environment ) . ' ' . escapeshellarg( $runTests );
 
-            $output     = [];
-            $return_var = 0;
-
-            exec( $command . ' 2>&1', $output, $return_var );
+            passthru( $command, $return_var );
 
             if ( $return_var === 0 ) {
                 \WP_CLI::success( sprintf( 'Sync from remote environment "%s" completed successfully.', $environment ) );
-                \WP_CLI::log( implode("\n", $output) );
             } else {
-                 \WP_CLI::error( sprintf( 'Failed to sync from remote environment "%s". Script exited with code %d. Output: %s', $environment, $return_var, implode("\n", $output) ) );
+                 \WP_CLI::error( sprintf( 'Failed to sync from remote environment "%s". Script exited with code %d. Output: %s', $environment, $return_var ) );
             }
         }
     }
