@@ -11,7 +11,7 @@ trait DatabaseManager
      *
      * @var bool
      */
-    protected bool $hasMigrations = false;
+    public bool $hasMigrations = false;
 
     /**
      * Whether to automatically run the feature's migrations
@@ -44,7 +44,7 @@ trait DatabaseManager
      * @return void
      */
     final public function runMigrations(): void {
-        $migrationPath = $this->getFeaturePath() . '/' . $this->migrationsDir;
+        $migrationPath = trailingslashit($this->path) . $this->migrationsDir;
 
         Artisan::call('migrate', [
             '--path'  => $migrationPath,

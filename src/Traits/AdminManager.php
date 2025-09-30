@@ -142,6 +142,7 @@ trait AdminManager
     private function initialiseMigrationsSettingsPage(): void
     {
         $features = Arr::flatten( $this->features );
+
         $features = Arr::where( $features, function($feature) {
             return property_exists( $feature, 'hasMigrations' ) && $feature->hasMigrations === true;
         });
@@ -162,18 +163,18 @@ trait AdminManager
                         <h1>Database Migrations</h1>
                         <?php 
                             foreach ($features as $feature) {
-                                $featureName = str_replace('_', ' ', $feature->name);
+                                $featureName = str_replace('_', ' ', $feature->getName());
                                 $featureName = ucwords($featureName);
                                 ?>
-                                <div style="margin-bottom: 2rem; padding: 1rem; border: 1px solid #ccc; border-radius: 8px;">
+                                <div style="margin-bottom: 2rem">
                                     <h2><?php echo esc_html($featureName); ?></h2>
                                     <form method="post" action="">
-                                        <?php wp_nonce_field( $feature->name . '_migrate_action', $feature->name . '_migrate_nonce' ); ?>
-                                        <input type="hidden" name="feature_name" value="<?php echo esc_attr($feature->name); ?>">
+                                        <?php wp_nonce_field( $feature->getName() . '_migrate_action', $feature->getName() . '_migrate_nonce' ); ?>
+                                        <input type="hidden" name="feature_name" value="<?php echo esc_attr($feature->getName()); ?>">
                                         <p>Run database migrations for the <?php echo esc_html($featureName); ?> feature.</p>
                                         <?php
-                                        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_migrations']) && isset($_POST['feature_name']) && $_POST['feature_name'] === $feature->name) {
-                                            if (isset($_POST[$feature->name . '_migrate_nonce']) && wp_verify_nonce($_POST[$feature->name . '_migrate_nonce'], $feature->name . '_migrate_action')) {
+                                        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_migrations']) && isset($_POST['feature_name']) && $_POST['feature_name'] === $feature->getName()) {
+                                            if (isset($_POST[$feature->getName() . '_migrate_nonce']) && wp_verify_nonce($_POST[$feature->getName() . '_migrate_nonce'], $feature->getName() . '_migrate_action')) {
                                                 if (method_exists($feature, 'runMigrations')) {
                                                     $feature->runMigrations();
                                                     echo '<div class="notice notice-success"><p>Migrations ran successfully for ' . esc_html($featureName) . '.</p></div>';
