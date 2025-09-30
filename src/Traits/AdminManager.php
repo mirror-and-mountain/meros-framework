@@ -32,7 +32,14 @@ trait AdminManager
      *
      * @var bool
      */
-    protected bool $register_migrations_page = false;
+    public bool $register_migrations_page = false;
+
+    /**
+     * Whether the migrations settings page has been registered.
+     *
+     * @var bool
+     */
+    private bool $migrations_page_registered = false;
 
     /**
      * Uses the theme manager's theme slug to determine option
@@ -87,9 +94,7 @@ trait AdminManager
     }
 
     /**
-     * Hooks into Wordpress to add the necessary options pages.
-     * At the moment, we're only using one utilising the
-     * add_theme_page hook.
+     * Adds a theme settings page to the WP dashboard.
      *
      * @return void
      */
@@ -139,8 +144,18 @@ trait AdminManager
         });
     }
 
+
+    /**
+     * Adds a database migrations page to the WP dashboard.
+     *
+     * @return void
+     */
     private function initialiseMigrationsSettingsPage(): void
     {
+        if ( $this->migrations_page_registered ) {
+            return;
+        }
+
         $features = Arr::flatten( $this->features );
 
         $features = Arr::where( $features, function($feature) {
@@ -197,6 +212,8 @@ trait AdminManager
                 }
             );
         });
+
+        $this->migrations_page_registered = true;
     }
 
     /**

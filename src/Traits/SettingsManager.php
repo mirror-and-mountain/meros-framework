@@ -47,10 +47,21 @@ trait SettingsManager
      */
     private function initialiseSettings(): void
     {
-        $this->setOptionGroup();
+        $theme      = app()->make('meros.theme_manager');
+        $themeSlug  = $theme->getThemeSlug();
+        $optionsMap = $theme->getOptionsMap();
+
+        $this->enableDataBaseSettings( $theme );
+        $this->setOptionGroup( $optionsMap, $themeSlug );
         $this->sanitizeOptions();
         $this->setRegisteredSettings();
         $this->registerSettings();
+    }
+
+    private function enableDataBaseSettings( object $theme ): void {
+        if ( $this->hasMigrations ) {
+            $theme->register_migrations_page = true;
+        }
     }
 
     /**
@@ -59,15 +70,13 @@ trait SettingsManager
      *
      * @return void
      */
-    private function setOptionGroup(): void
+    private function setOptionGroup( array $optionsMap, string $themeSlug ): void
     {
-        $theme      = app()->make('meros.theme_manager');
-        $optionsMap = $theme->getOptionsMap();
-        $category   = $this->category;
+        $category = $this->category;
 
         $this->optionGroup = array_key_exists( $category, $optionsMap ) 
                 ? $optionsMap[ $category ] . '_' . $category
-                : $theme->getThemeSlug() . '_settings_miscellaneous';
+                : $themeSlug . '_settings_miscellaneous';
     }
 
     /**
