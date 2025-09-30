@@ -2,6 +2,8 @@
 
 namespace MM\Meros\Traits;
 
+use Illuminate\Support\Arr;
+
 /**
  * Used by the theme manager to initialise settings
  * pages in the Wordpress dashboard.
@@ -24,6 +26,13 @@ trait AdminManager
      * @var bool
      */
     protected bool $use_unified_settings_pages = false;
+
+    /**
+     * Whether the migrations settings page should be added.
+     *
+     * @var bool
+     */
+    protected bool $register_migrations_page = false;
 
     /**
      * Uses the theme manager's theme slug to determine option
@@ -69,7 +78,11 @@ trait AdminManager
         }
         
         if ( $this->use_unified_settings_pages ) {
-            $this->initialiseAdminPages();
+            $this->initialiseThemeSettingsPage();
+        }
+
+        if ($this->register_migrations_page) {
+            $this->initialiseMigrationsSettingsPage();
         }
     }
 
@@ -80,7 +93,7 @@ trait AdminManager
      *
      * @return void
      */
-    private function initialiseAdminPages(): void
+    private function initialiseThemeSettingsPage(): void
     {
         add_action('admin_menu', function () {
             add_theme_page(
@@ -122,6 +135,65 @@ trait AdminManager
                     </div>
                     <?php
                 }            
+            );
+        });
+    }
+
+    private function initialiseMigrationsSettingsPage(): void
+    {
+        $features = Arr::flatten( $this->features );
+        $features = Arr::where( $features, function($feature) {
+            return property_exists( $feature, 'hasMigrations' ) && $feature->hasMigrations === true;
+        });
+
+        if ( count( $features ) === 0 ) {
+            return;
+        }
+
+        add_action('admin_menu', function() use ($features) {
+            add_options_page(
+                'Database',
+                'Database',
+                'manage_options',
+                $this->themeSlug . '_db_migrations',
+                function() use ($features) {
+                    ?>
+                    <div class="wrap">
+                        <h1>Database Migrations</h1>
+                        <?php 
+                            foreach ($features as $feature) {
+                                $featureName = str_replace('_', ' ', $feature->name);
+                                $featureName = ucwords($featureName);
+                                ?>
+                                <div style="margin-bottom: 2rem; padding: 1rem; border: 1px solid #ccc; border-radius: 8px;">
+                                    <h2><?php echo esc_html($featureName); ?></h2>
+                                    <form method="post" action="">
+                                        <?php wp_nonce_field( $feature->name . '_migrate_action', $feature->name . '_migrate_nonce' ); ?>
+                                        <input type="hidden" name="feature_name" value="<?php echo esc_attr($feature->name); ?>">
+                                        <p>Run database migrations for the <?php echo esc_html($featureName); ?> feature.</p>
+                                        <?php
+                                        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_migrations']) && isset($_POST['feature_name']) && $_POST['feature_name'] === $feature->name) {
+                                            if (isset($_POST[$feature->name . '_migrate_nonce']) && wp_verify_nonce($_POST[$feature->name . '_migrate_nonce'], $feature->name . '_migrate_action')) {
+                                                if (method_exists($feature, 'runMigrations')) {
+                                                    $feature->runMigrations();
+                                                    echo '<div class="notice notice-success"><p>Migrations ran successfully for ' . esc_html($featureName) . '.</p></div>';
+                                                } else {
+                                                    echo '<div class="notice notice-error"><p>runMigrations method not found on ' . esc_html($featureName) . '.</p></div>';
+                                                }
+                                            } else {
+                                                echo '<div class="notice notice-error"><p>Invalid nonce. Please try again.</p></div>';
+                                            }
+                                        }
+                                        ?>
+                                        <button type="submit" name="run_migrations" class="button button-primary">Run Migrations</button>
+                                    </form>
+                                </div>
+                                <?php
+                            }
+                        ?>
+                    </div>
+                    <?php
+                }
             );
         });
     }

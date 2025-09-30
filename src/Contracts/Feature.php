@@ -10,6 +10,7 @@ use MM\Meros\Traits\BlockManager;
 use MM\Meros\Traits\IncludeManager;
 use MM\Meros\Traits\ComponentManager;
 use MM\Meros\Traits\SettingsManager;
+use MM\Meros\Traits\DatabaseManager;
 
 /**
  * Features should extend this class and define
@@ -98,7 +99,8 @@ abstract class Feature
         BlockManager, 
         IncludeManager, 
         ComponentManager, 
-        SettingsManager;
+        SettingsManager,
+        DatabaseManager;
 
     public function __construct( string|null $name, string $path, string $uri, array $pluginInfo = [] )
     {

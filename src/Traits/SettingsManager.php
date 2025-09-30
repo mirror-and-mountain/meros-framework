@@ -190,16 +190,7 @@ trait SettingsManager
     {
         // Create a boolean 'enabled' option if userSwitchable is true
         if ( $this->userSwitchable && !isset( $this->options['enabled'] ) ) {
-            $enabledDescription = 'Enable or disable ' . Str::title( Str::replace('_', ' ', $this->name )) . '.';
-            $enabledDescription = apply_filters( $this->name . '_user_switch_label', $enabledDescription );
-            $this->options['enabled'] = [
-                'label'       => 'Enabled',
-                'type'        => 'boolean',
-                'description' => $enabledDescription,
-                'hasField'    => true,
-                'fieldType'   => 'checkbox',
-                'default'     => '1'
-            ];
+            $this->createEnableOption();
         }
 
         if ( $this->options === [] ) {
@@ -231,6 +222,25 @@ trait SettingsManager
         }
 
         $this->options = $sanitizedOptions;
+    }
+
+    /**
+     * Creates a boolean 'enabled' option in the options array
+     * if userSwitchable is true and no such option already exists.
+     *
+     * @return void
+     */
+    private function createEnableOption(): void {
+        $enabledDescription = 'Enable or disable ' . Str::title( Str::replace('_', ' ', $this->name )) . '.';
+        $enabledDescription = apply_filters( $this->name . '_user_switch_label', $enabledDescription );
+        $this->options['enabled'] = [
+            'label'       => 'Enabled',
+            'type'        => 'boolean',
+            'description' => $enabledDescription,
+            'hasField'    => true,
+            'fieldType'   => 'checkbox',
+            'default'     => '1'
+        ];
     }
 
     /**
