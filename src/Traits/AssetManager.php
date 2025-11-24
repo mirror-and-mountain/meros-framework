@@ -33,14 +33,21 @@ trait AssetManager
      *
      * @var string
      */
-    protected string $assetsDir  = 'assets/build';
+    protected string $assetsDir = 'assets/build';
 
     /**
      * Discovered scripts.
      *
      * @var array
      */
-    protected array $scripts    = [];
+    protected array $scripts = [];
+
+    /**
+     * Discovered script conditions.
+     *
+     * @var array
+     */
+    protected array $scriptConditions = [];
 
     /**
      * Discovered script dependancies.
@@ -61,7 +68,14 @@ trait AssetManager
      *
      * @var array
      */
-    protected array $styles    = [];
+    protected array $styles = [];
+
+    /**
+     * Discovered style conditions.
+     *
+     * @var array
+     */
+    protected array $styleConditions = [];
 
     /**
      * Discovered style dependancies.
@@ -84,7 +98,7 @@ trait AssetManager
      *
      * @var array
      */
-    protected array $registeredStyles  = [];
+    protected array $registeredStyles = [];
 
     /**
      * Determines whether script handles should use
@@ -119,9 +133,6 @@ trait AssetManager
         }
 
         $this->registerAssets();
-
-        // Reset the hasAssets indicator depending on whether any assets have been discovered.
-        $this->hasAssets = $this->registeredScripts !== [] || $this->registeredStyles !== [];
     }
 
     /**
@@ -151,19 +162,24 @@ trait AssetManager
         foreach ( $assets as $asset ) {
 
             $pathInfo = pathinfo( $asset );
-            $dependancyFile = trailingslashit( $pathInfo['dirname'] ) . $pathInfo['filename'] . 'asset.php';
+            $conditionFile = trailingslashit( $pathInfo['dirname'] ) . $pathInfo['filename'] . '.conditions.php';
+            $dependancyFile = trailingslashit( $pathInfo['dirname'] ) . $pathInfo['filename'] . '.asset.php';
             $name = $this->useFullNameForAssets ? $this->fullName : $this->name;
             $handle = $name . '_' . $type . '_' . $pathInfo['filename'] . '_' . $i;
 
             if ( $extension === 'js' ) {
 
-                $this->scriptDeps[ $type ][ $handle ] = file_exists( $dependancyFile ) ? include $dependancyFile : [];
-                $this->scripts[ $type ][ $handle ]    = Str::replace( $this->path, $this->uri, $asset );
-
+                $dependencies = file_exists( $dependancyFile ) ? include $dependancyFile : [];
+                $this->scriptConditions[ $type ][ $handle ] = file_exists( $conditionFile ) ? include $conditionFile : [];
+                $this->scriptDeps[ $type ][ $handle ] = $dependencies['dependencies'] ?? [];
+                $this->scripts[ $type ][ $handle ] = Str::replace( $this->path, $this->uri, $asset );
+            
             } elseif ( $extension === 'css' ) {
 
-                $this->styleDeps[ $type ][ $handle ] = file_exists( $dependancyFile ) ? include $dependancyFile : [];
-                $this->styles[ $type ][ $handle ]    = Str::replace( $this->path, $this->uri, $asset );
+                $dependencies = file_exists( $dependancyFile ) ? include $dependancyFile : [];
+                $this->styleConditions[ $type ][ $handle ] = file_exists( $conditionFile ) ? include $conditionFile : [];
+                $this->styleDeps[ $type ][ $handle ] = $dependencies['dependencies'] ?? [];
+                $this->styles[ $type ][ $handle ] = Str::replace( $this->path, $this->uri, $asset );
                 
             }
 
@@ -232,12 +248,48 @@ trait AssetManager
         foreach ( $this->assetTypes as $type => $hook ) {
             add_action( $hook, function () use ( $type ) {
                 foreach ( $this->registeredScripts[ $type ] ?? [] as $handle => $_ ) {
-                    wp_enqueue_script( $handle );
+                    $shouldEnqueue = $this->shouldEnqueueScript( $type, $handle );
+                    if ( $shouldEnqueue ) {
+                        wp_enqueue_script( $handle );
+                    }
                 }
                 foreach ( $this->registeredStyles[ $type ] ?? [] as $handle => $_ ) {
-                    wp_enqueue_style( $handle );
+                    $shouldEnqueue = $this->shouldEnqueueScript( $type, $handle );
+                    if ( $shouldEnqueue ) {
+                        wp_enqueue_style( $handle );
+                    }
                 }
+                // Reset the hasAssets indicator depending on whether any assets have been discovered.
+                $this->hasAssets = $this->registeredScripts !== [] || $this->registeredStyles !== [];
             });
         }
+    }
+
+    private function shouldEnqueueScript( string $type, string $handle ): bool
+    {
+        $shouldEnqueue = true;
+        $conditions = $this->scriptConditions[ $type ][ $handle ] ?? [];
+        if ( is_array( $conditions ) && count( $conditions ) > 0 ) {
+            switch ($type) {
+                case 'admin':
+                    $page = $_GET['page'] ?? '';
+                    if ( !in_array( $page, $conditions ) ) {
+                        $shouldEnqueue = false;
+                    }
+                    break;
+                case 'site':
+                    global $post;
+                    if ( isset( $post ) ) {
+                        $slug= $post->post_name;
+                        if ( !in_array( $slug, $conditions ) ) {
+                            $shouldEnqueue = false;
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+        return $shouldEnqueue;
     }
 }

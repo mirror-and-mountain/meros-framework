@@ -6,7 +6,6 @@ use Roots\Acorn\Application as RootsApplication;
 use MM\Meros\Providers\MerosServiceProvider;
 
 use MM\Meros\Helpers\Livewire;
-use MM\Meros\Helpers\CarbonFields;
 use MM\Meros\Traits\ContextManager;
 use MM\Meros\Traits\AuthorManager;
 use MM\Meros\Traits\AdminManager;
@@ -58,21 +57,6 @@ abstract class ThemeManager
      * @var bool
      */
     public bool $livewireInitialisedAdmin = false;
-
-    /**
-     * Determines whether Carbon Fields should always be booted.
-     *
-     * @var bool
-     */
-    public bool $always_boot_carbon_fields = false;
-
-    /**
-     * Used by Carbon Fields helper to determine whether
-     * Carbon Fields has already been initialised.
-     *
-     * @var bool
-     */
-    public bool $carbonFieldsInitialised = false;
 
     use ContextManager, AuthorManager, AdminManager;
 
@@ -167,22 +151,9 @@ abstract class ThemeManager
     final public function initialise(): void
     {
         $this->initialiseAdmin();
-        $this->initialiseCarbonFields();
         $this->initialiseAssets();
         $this->initialiseFeatures();
-    }
-
-    /**
-     * Boots Carbon Fields if the always_boot_carbon_fields 
-     * property is set to true.
-     *
-     * @return void
-     */
-    private function initialiseCarbonFields(): void
-    {
-        if ( $this->always_boot_carbon_fields ) {
-            CarbonFields::boot();
-        }
+        $this->afterInitialiseFeatures();
     }
 
     /**
@@ -239,6 +210,22 @@ abstract class ThemeManager
 
         foreach ( $features as $feature ) {
             $feature->initialise();
+        }
+    }
+
+    /**
+     * Calls the runAfterInitialise method on each of the theme's features.
+     * Allows features to perform tasks after all of the theme's features
+     * have been initialised.
+     *
+     * @return void
+     */
+    private function afterInitialiseFeatures():void
+    {
+        $features = Arr::dot( $this->features );
+
+        foreach ( $features as $feature ) {
+            $feature->runAfterInitialise();
         }
     }
 

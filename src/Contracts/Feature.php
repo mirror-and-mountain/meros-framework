@@ -6,6 +6,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
 use MM\Meros\Traits\AssetManager;
+use MM\Meros\Traits\FieldsManager;
 use MM\Meros\Traits\BlockManager;
 use MM\Meros\Traits\IncludeManager;
 use MM\Meros\Traits\ComponentManager;
@@ -96,6 +97,7 @@ abstract class Feature
     protected string|array $author = 'unknown';
 
     use AssetManager, 
+        FieldsManager,
         BlockManager, 
         IncludeManager, 
         ComponentManager, 
@@ -248,6 +250,11 @@ abstract class Feature
             $this->enqueueAssets();
         }
 
+        if ($this->hasFieldTypes) {
+            $this->loadFields();
+            $this->enqueueFieldTypeScripts();
+        }
+
         if ($this->hasComponents) {
             $this->loadComponents();
             $this->loadViews();
@@ -259,6 +266,10 @@ abstract class Feature
         }
 
         $this->initialised = true;
+    }
+
+    public function runAfterInitialise(): void {
+        // Intentionally left blank for child classes to override.
     }
 
     /**
