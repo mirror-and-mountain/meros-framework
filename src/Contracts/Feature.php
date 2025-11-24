@@ -6,7 +6,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
 use MM\Meros\Traits\AssetManager;
-use MM\Meros\Traits\FieldsManager;
+use MM\Meros\Traits\FieldManager;
 use MM\Meros\Traits\BlockManager;
 use MM\Meros\Traits\IncludeManager;
 use MM\Meros\Traits\ComponentManager;
@@ -97,7 +97,7 @@ abstract class Feature
     protected string|array $author = 'unknown';
 
     use AssetManager,
-        FieldsManager,
+        FieldManager,
         BlockManager, 
         IncludeManager, 
         ComponentManager, 

@@ -5,7 +5,7 @@ namespace MM\Meros\Traits;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
-trait FieldsManager
+trait FieldManager
 {
     /**
      * Indicates whether the feature has assets.
