@@ -96,7 +96,7 @@ abstract class Feature
      */
     protected string|array $author = 'unknown';
 
-    use AssetManager, 
+    use AssetManager,
         FieldsManager,
         BlockManager, 
         IncludeManager, 
@@ -252,7 +252,7 @@ abstract class Feature
 
         if ($this->hasFieldTypes) {
             $this->loadFields();
-            $this->enqueueFieldTypeScripts();
+            $this->enqueueFieldAssets();
         }
 
         if ($this->hasComponents) {

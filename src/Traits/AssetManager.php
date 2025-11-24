@@ -24,7 +24,7 @@ trait AssetManager
     protected array $assetTypes = [
         'admin'  => 'admin_enqueue_scripts', 
         'editor' => 'enqueue_block_editor_assets', 
-        'site'   => 'wp_enqueue_scripts'
+        'site'   => 'wp_enqueue_scripts',
     ];
     
     /**
@@ -119,7 +119,7 @@ trait AssetManager
     private function loadAssets(): void
     {   
         $assetsPath = $this->path . $this->assetsDir;
-
+        
         foreach ( $this->assetTypes as $type => $_ ) {
     
             if ( $this->scripts[ $type ] ?? [] === [] ) {
@@ -152,7 +152,7 @@ trait AssetManager
             return;
         }
 
-        $assets = File::glob( "{$path}/{$type}/*.{$extension}" );
+        $assets = File::glob("{$path}/{$type}/*.{$extension}");
 
         if ( $assets === [] ) {
             return;
@@ -253,6 +253,7 @@ trait AssetManager
                         wp_enqueue_script( $handle );
                     }
                 }
+
                 foreach ( $this->registeredStyles[ $type ] ?? [] as $handle => $_ ) {
                     $shouldEnqueue = $this->shouldEnqueueScript( $type, $handle );
                     if ( $shouldEnqueue ) {
