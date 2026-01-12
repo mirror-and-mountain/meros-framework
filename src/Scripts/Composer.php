@@ -287,7 +287,14 @@ class Composer {
             exec($setOptionCommand);
         }
 
-        // 5. Activate Theme
+        // 5. Flush rewrite rules
+        $flushCommand = sprintf(
+            'cd %s && wp rewrite flush',
+            escapeshellarg($wordpressRoot)
+        );
+        exec($flushCommand);
+
+        // 6. Activate Theme
         exec($activateThemeCommand, $activateOutput, $activateStatus);
         if ($activateStatus !== 0) {
             $io->write('<error>Failed to activate Meros theme.</error>');
