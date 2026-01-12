@@ -2,12 +2,12 @@
 
 namespace {{namespace}};
 
-use {{extension}} as Feature;
+use {{extension}} as Base;
 
-class {{class}} extends Feature
+class {{class}} extends Base
 {
     protected function override(): void
     {
-        $this->enabled = true;
+        // Overrides for the extension can be set here.
     }
 }

@@ -14,7 +14,7 @@ if [[ -z "$NAMESPACE" ]]; then
 fi
 
 if [[ -d "app/Features/$FEATURE" ]]; then
-    echo "⚠️ Directory app/Features/$FEATURE already exists. Aborting."
+    echo "Directory app/Features/$FEATURE already exists. Aborting."
     exit 1
 fi
 
@@ -26,7 +26,7 @@ cd "app/Features/$FEATURE" || exit 1
 STUB_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../stubs" && pwd)/Feature.stub"
 
 if [[ ! -f "$STUB_PATH" ]]; then
-    echo "❌ Stub file not found at $STUB_PATH"
+    echo "Stub file not found at $STUB_PATH"
     exit 1
 fi
 
@@ -36,4 +36,4 @@ SAFE_NAMESPACE=$(printf '%s\n' "$NAMESPACE" | sed 's/[\/&]/\\&/g')
 # Replace both placeholders
 sed -e "s/{{NewFeature}}/FeatureDefinition/g" -e "s/{{namespace}}/$SAFE_NAMESPACE/g" "$STUB_PATH" > "FeatureDefinition.php"
 
-echo "✅ Feature created: app/Features/$FEATURE/FeatureDefinition.php"
+echo "Feature created: app/Features/$FEATURE/FeatureDefinition.php"

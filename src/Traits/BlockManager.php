@@ -1,96 +1,132 @@
-<?php 
+<?php
 
 namespace MM\Meros\Traits;
 
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
-trait BlockManager
-{
+trait BlockManager {
     /**
      * Indicates whether the feature has blocks.
-     *
-     * @var bool
      */
-    protected bool $hasBlocks = false;
+    private bool $hasBlocks = false;
+
+    /**
+     * Whether to allow block enabling/disabling
+     * via the settings page by default.
+     */
+    protected bool $allowBlockSwitchingByDefault = true;
 
     /**
      * The directory to search for blocks in relative to the
-     * feature directory. Blocks are discovered by the the 
+     * feature directory. Blocks are discovered by the the
      * existance of a block.json file.
-     *
-     * @var string
      */
     protected string $blocksDir = 'blocks/build';
 
     /**
-     * Discovered blocks.
-     *
-     * @var array
+     * Loaded blocks.
      */
-    protected array $blocks = [];
+    private array $blocks = [];
 
     /**
-     * Sets absolute path and calls setBlocks.
-     *
-     * @return void
+     * Sets absolute path and calls findBlocks.
      */
-    private function loadBlocks(): void
-    {
+    protected function loadBlocks(): void {
         $blocksPath = $this->path . $this->blocksDir;
-        
-        $this->setBlocks( $blocksPath );
-
-        // Resets the hasBlocks indicator depending on whether any blocks have been discovered.
-        $this->hasBlocks = $this->blocks !== [];
+        $this->findBlocks($blocksPath);
     }
 
     /**
      * Uses glob to search for blocks using the given path.
      * A block will be discovered if the given directory
      * includes a valid block.json file.
-     *
-     * @param  string $path
-     * @return void
      */
-    private function setBlocks( string $path ): void
-    {
-        if ( !File::exists( $path ) ) {
+    private function findBlocks(string $path): void {
+        if (! File::exists($path)) {
             return;
         }
-        
-        $candidates = File::glob( $path . '/*', GLOB_ONLYDIR );
-        
-        foreach ( $candidates as $blockPath ) {
 
-            $name = Str::kebab( basename( $blockPath ) );
+        $candidates = File::glob($path . '/*', GLOB_ONLYDIR);
 
-            if ( File::exists( trailingslashit( $blockPath ) . 'block.json' ) ) {
+        foreach ($candidates as $blockPath) {
+            $name = Str::kebab(basename($blockPath));
 
-                $this->blocks[ $name ] = [
-                    'enabled' => true,
-                    'path'    => $blockPath
-                ];
-
-            } 
+            if (File::exists(trailingslashit($blockPath) . 'block.json')) {
+                $this->addBlock(
+                    $name,
+                    $blockPath,
+                    true,
+                    $this->allowBlockSwitchingByDefault
+                );
+            }
         }
     }
 
     /**
-     * Registers blocks using register_block_type.
+     * Adds a block to the blocks array.
      *
-     * @return void
+     * @param  bool  $enabled
      */
-    private function registerBlocks(): void
-    {   
-        add_action('init', function () {
+    protected function addBlock(
+        string $name,
+        string $path,
+        bool $enabledByDefault = true,
+        bool $allowSwitching = true,
+        bool $isExperimental = false
+    ): void {
+        $switchSetting = '';
+        $enabled = $enabledByDefault;
+        $blockJson = $this->getBlockJson($path);
+        $description = is_array($blockJson) && array_key_exists('description', $blockJson)
+            ? $blockJson['description']
+            : '';
 
-            foreach ( $this->blocks ?? [] as $block ) {
-                if ( ! is_array($block) ) { continue; }
-                if ( ! $block['enabled'] ) { continue; }
-                register_block_type( $block['path'] );
+        if ($allowSwitching) {
+            $settingName = $this->createBlockSwitchSetting($name, $description, $isExperimental);
+            if (is_string($settingName)) {
+                $switchSetting = get_option($settingName, $enabledByDefault);
+                $enabled = $switchSetting === '1' || $switchSetting === 1 || $switchSetting === true;
             }
+        }
 
+        $this->blocks[$name] = [
+            'enabled' => $enabled,
+            'switchable' => $allowSwitching,
+            'path' => $path,
+            'json' => $blockJson,
+        ];
+
+        $this->hasBlocks = true;
+    }
+
+    /**
+     * Retrieves and decodes the block.json file for a block.
+     */
+    private function getBlockJson(string $path): array|string {
+        $blockJsonPath = trailingslashit($path) . 'block.json';
+
+        if (! File::exists($blockJsonPath)) {
+            return '';
+        }
+
+        return File::json($blockJsonPath);
+    }
+
+    /**
+     * Registers blocks using register_block_type.
+     */
+    private function registerBlocks(): void {
+        add_action('init', function () {
+            foreach ($this->blocks ?? [] as $block) {
+                if (! is_array($block)) {
+                    continue;
+                }
+                if (! $block['enabled']) {
+                    continue;
+                }
+                register_block_type($block['path']);
+            }
         });
     }
 }

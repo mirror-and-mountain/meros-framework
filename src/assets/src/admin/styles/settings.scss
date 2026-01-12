@@ -1,0 +1,71 @@
+th[scope="row"]:has(.meros-settings-label) {
+    width: 400px;
+}
+
+.meros-toggle-btn {
+    width: 100px;
+
+    &[data-value="1"] {
+        background-color: #218c4a !important;
+        border-color: #218c4a !important;
+
+        :hover {
+            background-color: #176c38 !important;
+            border-color: #176c38 !important;
+        }
+    }
+
+    &[data-value="0"]:hover {
+        background-color: #2980b9 !important;
+        border-color: #2980b9 !important;
+    }
+
+    + span {
+        vertical-align: middle;
+    }
+}
+
+.meros-toggle-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+
+    .meros-toggle-label {
+        font-size: 13px;
+        color: #1d2327;
+    }
+
+    .meros-toggle-track {
+        width: 42px;
+        height: 22px;
+        border-radius: 11px;
+        background: #c0392b;
+        position: relative;
+        transition: background 0.2s ease;
+
+        .meros-toggle-thumb {
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s ease;
+        }
+    }
+
+    &.is-enabled {
+        .meros-toggle-track {
+            background: #2ecc71;
+        }
+
+        .meros-toggle-thumb {
+            transform: translateX(20px);
+        }
+    }
+}

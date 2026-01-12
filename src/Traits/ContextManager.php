@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 namespace MM\Meros\Traits;
 
@@ -12,42 +12,51 @@ trait ContextManager
 {
     /**
      * The theme name.
-     *
-     * @var string
      */
     protected string $themeName;
 
     /**
+     * The theme directory.
+     */
+    protected string $themeDir;
+
+    /**
      * The theme's uri.
-     *
-     * @var string
      */
     protected string $themeUri;
 
     /**
      * The theme's slug e.g. my_theme.
-     *
-     * @var string
      */
     protected string $themeSlug;
 
     /**
+     * The framework directory relative to the theme root.
+     */
+    private string $frameworkDir;
+
+    /**
+     * The framework uri.
+     */
+    private string $frameworkUri = '';
+
+    /**
      * Sets theme identifier properties.
-     *
-     * @return void
      */
     private function setContext(): void
     {
-        $theme           = wp_get_theme();
+        $theme = wp_get_theme();
         $this->themeName = $theme->get('Name');
-        $this->themeUri  = get_theme_file_uri();
-        $this->themeSlug = Str::slug( $this->themeName, '_' );
+        $this->themeDir = get_stylesheet_directory();
+        $this->themeUri = get_theme_file_uri();
+        $this->themeSlug = Str::slug($this->themeName, '_');
+
+        $this->frameworkDir = 'vendor/mirror-and-mountain/meros-framework/src/';
+        $this->frameworkUri = trailingslashit($this->themeUri).$this->frameworkDir;
     }
 
     /**
      * Returns the theme name.
-     *
-     * @return string
      */
     final public function getThemeName(): string
     {
@@ -56,8 +65,6 @@ trait ContextManager
 
     /**
      * Returns the theme uri.
-     *
-     * @return string
      */
     final public function getThemeUri(): string
     {
@@ -66,8 +73,6 @@ trait ContextManager
 
     /**
      * Returns the theme sluf.
-     *
-     * @return string
      */
     final public function getThemeSlug(): string
     {
@@ -76,15 +81,13 @@ trait ContextManager
 
     /**
      * Returns an array of theme properties.
-     *
-     * @return array
      */
     final public function getThemeContext(): array
     {
         return [
             'name' => $this->themeName,
-            'uri'  => $this->themeUri,
-            'slug' => $this->themeSlug
+            'uri' => $this->themeUri,
+            'slug' => $this->themeSlug,
         ];
     }
 }

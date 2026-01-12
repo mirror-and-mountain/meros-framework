@@ -1,17 +1,14 @@
-<?php 
+<?php
 
 namespace MM\Meros\Contracts;
 
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\File;
-
 use MM\Meros\Traits\AssetManager;
-use MM\Meros\Traits\FieldManager;
 use MM\Meros\Traits\BlockManager;
-use MM\Meros\Traits\IncludeManager;
 use MM\Meros\Traits\ComponentManager;
-use MM\Meros\Traits\SettingsManager;
 use MM\Meros\Traits\DatabaseManager;
+use MM\Meros\Traits\FieldManager;
+use MM\Meros\Traits\SettingsManager;
 
 /**
  * Features should extend this class and define
@@ -20,234 +17,214 @@ use MM\Meros\Traits\DatabaseManager;
 abstract class Feature
 {
     /**
+     * The instantiated theme manager. Used to bind
+     * valid features to the object.
+     */
+    protected object $theme;
+
+    /**
      * The type of feature. This is set automatically
      * based on the type of child class used.
-     *
-     * @var string
+     * 
      */
     public string $type = 'feature';
 
     /**
      * Whether the feature is enabled.
      * Determines whether actions are taken in the initialise() method.
-     *
-     * @var bool
      */
     public bool $enabled = true;
 
     /**
+     * Determines whether the feature is experimental.
+     */
+    public bool $experimental = false;
+
+    /**
      * Determines whether an 'enabled' option is available to
      * users via the WP dashboard.
-     *
-     * @var bool
      */
-    public bool $userSwitchable = true;
+    public bool $switchable = true;
 
     /**
      * Whether the feature's initialised() method has been called.
-     *
-     * @var bool
      */
     public bool $initialised = false;
 
     /**
      * The name of the feature in slug_format. Used in various
      * filter hooks.
-     *
-     * @var string
      */
     protected string $name;
 
     /**
      * The feature's name including author_name_feature_name.
-     *
-     * @var string
      */
     protected string $fullName;
 
     /**
+     * The feature's description.
+     */
+    protected string $description = '';
+
+    /**
      * The feature's path.
-     *
-     * @var string
      */
     protected string $path;
 
     /**
      * The feature's URI.
-     *
-     * @var string
      */
     protected string $uri;
 
     /**
-     * The feature's category. This deterines which area of the 
-     * THeme's settings page the feature's options appear in if
-     * configured.
-     *
-     * @var string
+     * The feature's author information
      */
-    protected string $category = 'miscellaneous';
+    protected string $authorName;
 
-    /**
-     * The feature's author. May be initialised as a string or
-     * an array with additional information.
-     *
-     * @var string|array
-     */
-    protected string|array $author = 'unknown';
+    protected string $authorDesc;
+
+    protected string $authorUrl;
+
+    protected string $authorSupportUrl;
 
     use AssetManager,
+        BlockManager,
+        ComponentManager,
+        DatabaseManager,
         FieldManager,
-        BlockManager, 
-        IncludeManager, 
-        ComponentManager, 
-        SettingsManager,
-        DatabaseManager;
+        SettingsManager;
 
-    public function __construct( string|null $name, string $path, string $uri, array $pluginInfo = [] )
+    public function __construct(object $theme, ?string $name, array $authorInfo, string $path, string $uri)
     {
+        // Set the theme object
+        $this->theme = $theme;
+
         // Set the feature's name
-        if ( isset($name) ) {
-
-            $name = Str::lower( Str::headline( $name ) );
-            $this->name = Str::slug( $name, '_' );
-
-        } else {
-
-            $class = Str::afterLast( get_class($this), '\\' );
-            $class = Str::lower( Str::headline( $class ) );
-        
-            $this->name = Str::slug( $class, '_' );
-        }
+        $this->setName($name);
 
         // Set the feature's path
-        $this->path = trailingslashit( $path );
+        $this->path = trailingslashit($path);
+
         // Set the feature's URI
-        $this->uri = trailingslashit( $uri );
+        $this->uri = trailingslashit($uri);
 
-        // If the feature is a plugin, set the pluginInfo property
-        if ( $this instanceof Plugin ) {
-            $this->pluginInfo = $pluginInfo;
-        }
+        // Set the feature's author info
+        $this->setAuthorInfo($authorInfo);
 
+        // Set the feature's full name
+        $this->fullName = Str::slug($this->authorName, '_').'_'.$this->name;
+
+        // Set up the feature
         $this->setUp();
-        $this->initialiseSettings();
     }
 
     /**
-     * Sanitizes and sets various properties based on the type of 
-     * feature being instantiated.
-     *
-     * @return void
+     * Sets the feature's name property.
+     */
+    private function setName(?string $name = null): void
+    {
+        if (isset($name)) {
+            $name = Str::lower(Str::headline($name));
+            $this->name = Str::slug($name, '_');
+        } else {
+            $class = Str::afterLast(get_class($this), '\\');
+            $class = Str::lower(Str::headline($class));
+            $this->name = Str::slug($class, '_');
+        }
+    }
+
+    /**
+     * Sets the feature's author information properties.
+     */
+    private function setAuthorInfo(array $authorInfo): void
+    {
+        if (! isset($this->authorName)) {
+            $this->authorName = $authorInfo['name'] ?? 'Unknown';
+        }
+
+        if (! isset($this->authorDesc)) {
+            $this->authorDesc = $authorInfo['description'] ?? '';
+        }
+
+        if (! isset($this->authorUrl)) {
+            $this->authorUrl = $authorInfo['url'] ?? '';
+        }
+
+        if (! isset($this->authorSupportUrl)) {
+            $this->authorSupportUrl = $authorInfo['support_url'] ?? '';
+        }
+    }
+
+    /**
+     * Calls the configure method followed by the override method
+     * for extensions.
      */
     private function setUp(): void
     {
-        // Sets author info based on the properties provided by the main plugin file, if available.
-        if ( $this instanceof Plugin ) {
-            $this->type = 'plugin';
-            
-            $this->author = [
-                'name'        => isset( $this->pluginInfo['Author'] ) ? $this->pluginInfo['Author'] : 'unknown',
-                'description' => '',
-                'support'     => '',
-                'link'        => isset( $this->pluginInfo['Author URI'] ) ? $this->pluginInfo['Author URI'] : '',
-            ];
+        // Create WP dashboard switch if userSwitchable is true
+        if ($this->switchable === true) {
+            $this->createFeatureSwitchSetting(
+                $this->description,
+                $this->experimental
+            );
         }
 
+        // Stop if the feature has been disabled in the WP dashboard
+        $switch = get_option($this->featureEnabledSettingName, '1');
+        if ($this->switchable === true &&
+             $switch === '0'
+        ) {
+            $this->enabled = false;
+
+            return;
+        }
+
+        // Call the configure method
         $this->configure();
 
-        if ( $this instanceof Extension ) {
+        // If the feature is an extension, set the type and call override()
+        if ($this instanceof Extension) {
             $this->type = 'extension';
             $this->override();
-        }
-
-        $this->sanitizeAuthor();
-
-        $this->fullName = Str::slug( $this->author['name'], '_' ) . '_' . $this->name;
-    }
-
-    /**
-     * Sanitizes the author property with the allowed keys.
-     *
-     * @return void
-     */
-    private function sanitizeAuthor(): void
-    {
-        if ( is_string( $this->author ) ) {
-            $this->author = [
-                'name'        => $this->author,
-                'description' => '',
-                'support'     => '',
-                'link'        => ''
-            ];
-        } else if ( is_array( $this->author ) ) {
-            $author = [
-                'name'        => $this->author['name'] ?? 'unknown',
-                'description' => $this->author['description'] ?? '',
-                'support'     => $this->author['support'] ?? '',
-                'link'        => $this->author['link'] ?? ''
-            ];
-            
-            $this->author = $author;
         }
     }
 
     /**
      * This method should be defined in the feature's main class
      * found in app/Features/<Feature> by default.
-     * 
-     * Where a feature is a plugin the Plugin contract extends
-     * this class and this method should be defined in the plugin's
-     * configuration class found in app/Plugins by default.
-     * 
+     *
+     *
      * Where a feature is an extension, the extension package should
      * extend the Extension contract and define this method. Users
      * can then override any configuration using the Extension
      * contract's override() method which is called after configure().
-     *
-     * @return void
      */
     abstract protected function configure(): void;
 
     /**
      * Prepares and hooks the feature's declared supports into
      * the Wordpress lifecycle.
-     *
-     * @return void
      */
     final public function initialise(): void
     {
         // Stop if the feature isn't enabled
-        if ( $this->enabled === false ) {
+        if ($this->enabled === false) {
             return;
-        }
-
-        // Stop if the feature has been disabled in the WP dashboard
-        if ( $this->userSwitchable === true &&
-             $this->settings['enabled'] === '0' 
-        ) {
-            $this->enabled = false;
-            return;
-        }
-
-        // If the feature is a plugin, check the main plugin file exists and include it
-        if (
-            $this instanceof Plugin &&
-            File::exists( base_path( $this->pluginInfo['File'] ) ) 
-        ) {
-            include_once base_path( $this->pluginInfo['File'] );
-            $this->initialised = true;
-            return;
-        }
-
-        if ($this->hasIncludes) {
-            $this->loadIncludes();
-            $this->include();
         }
 
         if ($this->hasAssets) {
-            $this->loadAssets();
             $this->enqueueAssets();
+        }
+
+        if ($this->hasBlocks) {
+            $this->registerBlocks();
+        }
+
+        if ($this->hasComponents) {
+            $this->bindComponents();
+            $this->bindViews();
+            $this->theme->initialiseLivewire();
         }
 
         if ($this->hasFieldTypes) {
@@ -255,20 +232,11 @@ abstract class Feature
             $this->enqueueFieldAssets();
         }
 
-        if ($this->hasComponents) {
-            $this->loadComponents();
-            $this->loadViews();
-        }
-
-        if ($this->hasBlocks) {
-            $this->loadBlocks();
-            $this->registerBlocks();
-        }
-
         $this->initialised = true;
     }
 
-    public function runAfterInitialise(): void {
+    public function runAfterInitialise(): void
+    {
         // Intentionally left blank for child classes to override.
     }
 
@@ -277,18 +245,26 @@ abstract class Feature
      *
      * @return array
      */
-    final public function getAuthor(): array
+    final public function getAuthorInfo(string $prop = ''): array|string
     {
-        return $this->author;
+        return match ($prop) {
+            'name' => $this->authorName,
+            'description' => $this->authorDesc,
+            'url' => $this->authorUrl,
+            'support_url' => $this->authorSupportUrl,
+            default => [
+                'name' => $this->authorName,
+                'description' => $this->authorDesc,
+                'url' => $this->authorUrl,
+                'support_url' => $this->authorSupportUrl,
+            ],
+        };
     }
 
     /**
      * Returns either the feature's name or fullname if requested.
-     *
-     * @param  bool   $full
-     * @return string
      */
-    final public function getName( bool $full = false ): string
+    final public function getName(bool $full = false): string
     {
         return $full === false ? $this->name : $this->fullName;
     }

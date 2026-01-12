@@ -1,0 +1,10 @@
+{
+    "private": true,
+    "scripts": {
+        "build": "wp-scripts build --config webpack.assets.config.js"
+    },
+    "devDependencies": {
+        "@wordpress/i18n": "^5.20.0",
+        "@wordpress/scripts": "^30.13.0"
+    }
+}

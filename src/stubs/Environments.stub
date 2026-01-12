@@ -1,0 +1,51 @@
+<?php 
+
+return [
+    'environment_default_options' => [
+        'permalink_structure' => '/%postname%/'
+    ],
+    'remote_environments' => [
+        'dev' => [
+            'url'  => 'https://dev.example.com',
+            'path' => 'path/to/wordpress',
+            'ssh'  => [
+                'host' => 'example.com',
+                'port' => '22',
+                'user' => 'username',
+                'key'  => 'ida_rsa_example'
+            ],
+            'db'  => [
+                'name'   => 'wordpress',
+                'prefix' => 'wp_'
+            ]
+        ],
+        'staging' => [
+            'url'  => 'https://staging.example.com',
+            'path' => 'path/to/wordpress',
+            'ssh'  => [
+                'host' => 'example.com',
+                'port' => '22',
+                'user' => 'username',
+                'key'  => 'ida_rsa_example'
+            ],
+            'db'  => [
+                'name'   => 'wordpress',
+                'prefix' => 'wp_'
+            ]
+        ],
+        'production' => [
+            'url'  => 'https://example.com',
+            'path' => 'path/to/wordpress',
+            'ssh'  => [
+                'host' => 'example.com',
+                'port' => '22',
+                'user' => 'username',
+                'key'  => 'ida_rsa_example'
+            ],
+            'db'  => [
+                'name'   => 'wordpress',
+                'prefix' => 'wp_'
+            ]
+        ]
+    ]
+];

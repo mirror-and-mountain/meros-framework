@@ -1,16 +1,14 @@
-<?php 
+<?php
 
 namespace MM\Meros\Traits;
 
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 trait FieldManager
 {
     /**
      * Indicates whether the feature has assets.
-     *
-     * @var bool
      */
     protected bool $hasFieldTypes = false;
 
@@ -18,109 +16,84 @@ trait FieldManager
      * Maps assets types/directories to Wordpress hooks.
      * Example: assets/build/admin/index.js will be enqueued using
      * admin_enqueue_scripts.
-     *
-     * @var array
      */
     protected array $fieldAssetTypes = [
-        'form_editor' => 'admin_enqueue_scripts', 
+        'form_editor' => 'admin_enqueue_scripts',
         'form_render' => 'wp_enqueue_scripts',
     ];
-    
+
     /**
      * The directory to search for assets in relative to the
      * feature directory.
-     *
-     * @var string
      */
     protected string $fieldsDir = 'field-types/build';
 
     /**
      * Discovered scripts.
-     *
-     * @var array
      */
     protected array $fieldScripts = [];
 
     /**
      * Discovered script conditions.
-     *
-     * @var array
      */
     protected array $fieldScriptConditions = [];
 
     /**
      * Discovered script dependancies.
-     *
-     * @var array
      */
     protected array $fieldScriptDeps = [];
 
     /**
      * Discovered styles.
-     *
-     * @var array
      */
     protected array $fieldStyles = [];
 
     /**
      * Discovered style conditions.
-     *
-     * @var array
      */
     protected array $fieldStyleConditions = [];
 
     /**
      * Discovered style dependancies.
-     *
-     * @var array
      */
     protected array $fieldStyleDeps = [];
 
     /**
-     * Scripts that have been registered using 
+     * Scripts that have been registered using
      * wp_register_script.
-     *
-     * @var array
      */
     protected array $registeredFieldScripts = [];
 
     /**
      * Styles that have been registered using
      * wp_register_style.
-     *
-     * @var array
      */
     protected array $registeredFieldStyles = [];
 
     /**
      * Determines whether script handles should use
-     * the feature's fullName. This can be useful if 
+     * the feature's fullName. This can be useful if
      * the feature has a common name and we need to
      * avoid conflicts.
-     *
-     * @var bool
      */
     protected bool $useFullNameForFieldAssets = true;
-
 
     /**
      * Sets the absolute path and calls setAssets.
      * Continues to register discovered assets.
-     *
-     * @return void
      */
     private function loadFields(): void
-    {   
-        $assetsPath = $this->path . $this->fieldsDir;
-        
-        foreach ( $this->fieldAssetTypes as $type => $_ ) {
-    
-            if ( $this->fieldScripts[ $type ] ?? [] === [] ) {
-                $this->setFieldAssets( $assetsPath, $type, 'js' );
+    {
+        $assetsPath = $this->path.$this->fieldsDir;
+
+        foreach ($this->fieldAssetTypes as $type => $_) {
+
+            if ($this->fieldScripts[$type] ?? [] === []) {
+                $this->setFieldAssets($assetsPath, $type, 'js');
             }
-            
-            if ( $this->fieldStyles[ $type ] ?? [] === [] ) {
-                $this->setFieldAssets( $assetsPath, $type, 'css' );
+
+            if ($this->fieldStyles[$type] ?? [] === []) {
+                $this->setFieldAssets($assetsPath, $type, 'css');
             }
 
         }
@@ -133,15 +106,10 @@ trait FieldManager
      * Sets asset handles to be used in wp_enqueue functions and updates the
      * scripts and styles properties. This method will also discover any
      * dependancies for each asset.
-     *
-     * @param  string $path
-     * @param  string $type
-     * @param  string $extension
-     * @return void
      */
-    private function setFieldAssets( string $path, string $type, string $extension ): void
+    private function setFieldAssets(string $path, string $type, string $extension): void
     {
-        if ( !File::exists( $path ) ) {
+        if (! File::exists($path)) {
             return;
         }
 
@@ -151,33 +119,33 @@ trait FieldManager
             File::glob("{$path}/*/{$typeMod}-style.{$extension}")
         );
 
-        if ( $assets === [] ) {
+        if ($assets === []) {
             return;
         }
 
         $i = 0;
-        foreach ( $assets as $asset ) {
+        foreach ($assets as $asset) {
 
-            $pathInfo = pathinfo( $asset );
-            $conditionFile = trailingslashit( $pathInfo['dirname'] ) . $pathInfo['filename'] . '.conditions.php';
-            $dependancyFile = trailingslashit( $pathInfo['dirname'] ) . $pathInfo['filename'] . '.asset.php';
+            $pathInfo = pathinfo($asset);
+            $conditionFile = trailingslashit($pathInfo['dirname']).$pathInfo['filename'].'.conditions.php';
+            $dependancyFile = trailingslashit($pathInfo['dirname']).$pathInfo['filename'].'.asset.php';
             $name = $this->useFullNameForFieldAssets ? $this->fullName : $this->name;
-            $handle = $name . '_' . basename($pathInfo['dirname']) . '_' . $type . '_' . $i;
+            $handle = $name.'_'.basename($pathInfo['dirname']).'_'.$type.'_'.$i;
 
-            if ( $extension === 'js' ) {
+            if ($extension === 'js') {
 
-                $dependencies = file_exists( $dependancyFile ) ? include $dependancyFile : [];
-                $this->fieldScriptConditions[ $type ][ $handle ] = file_exists( $conditionFile ) ? include $conditionFile : [];
-                $this->fieldScriptDeps[ $type ][ $handle ] = $dependencies['dependencies'] ?? [];
-                $this->fieldScripts[ $type ][ $handle ] = Str::replace( $this->path, $this->uri, $asset );
-            
-            } elseif ( $extension === 'css' ) {
+                $dependencies = file_exists($dependancyFile) ? include $dependancyFile : [];
+                $this->fieldScriptConditions[$type][$handle] = file_exists($conditionFile) ? include $conditionFile : [];
+                $this->fieldScriptDeps[$type][$handle] = $dependencies['dependencies'] ?? [];
+                $this->fieldScripts[$type][$handle] = Str::replace($this->path, $this->uri, $asset);
 
-                $dependencies = file_exists( $dependancyFile ) ? include $dependancyFile : [];
-                $this->fieldStyleConditions[ $type ][ $handle ] = file_exists( $conditionFile ) ? include $conditionFile : [];
-                $this->fieldStyleDeps[ $type ][ $handle ] = $dependencies['dependencies'] ?? [];
-                $this->fieldStyles[ $type ][ $handle ] = Str::replace( $this->path, $this->uri, $asset );
-                
+            } elseif ($extension === 'css') {
+
+                $dependencies = file_exists($dependancyFile) ? include $dependancyFile : [];
+                $this->fieldStyleConditions[$type][$handle] = file_exists($conditionFile) ? include $conditionFile : [];
+                $this->fieldStyleDeps[$type][$handle] = $dependencies['dependencies'] ?? [];
+                $this->fieldStyles[$type][$handle] = Str::replace($this->path, $this->uri, $asset);
+
             }
 
             $i++;
@@ -186,48 +154,46 @@ trait FieldManager
 
     /**
      * Registers discovered assets using wp_register_* functions.
-     *
-     * @return void
      */
     private function registerFieldAssets(): void
     {
         add_action('init', function () {
-            foreach ( $this->fieldAssetTypes as $type => $_ ) {
+            foreach ($this->fieldAssetTypes as $type => $_) {
                 $i = 0;
-                foreach ( $this->fieldScripts[ $type ] ?? [] as $handle => $src ) {
-                    if ( !is_string( $handle ) ) {
+                foreach ($this->fieldScripts[$type] ?? [] as $handle => $src) {
+                    if (! is_string($handle)) {
                         $handle = "{$this->name}_{$type}_script_{$i}";
                     }
 
                     $registered = wp_register_script(
                         $handle,
                         $src,
-                        $this->fieldScriptDeps[ $type ][ $handle ] ?? [],
+                        $this->fieldScriptDeps[$type][$handle] ?? [],
                         filemtime(Str::replace($this->uri, $this->path, $src)),
                         false
                     );
 
-                    if ( $registered !== false ) {
-                        $this->registeredFieldScripts[ $type ][ $handle ] = $src; 
+                    if ($registered !== false) {
+                        $this->registeredFieldScripts[$type][$handle] = $src;
                     }
                     $i++;
                 }
 
                 $i = 0;
-                foreach ( $this->fieldStyles[ $type ] ?? [] as $handle => $src ) {
-                    if ( !is_string( $handle ) ) {
+                foreach ($this->fieldStyles[$type] ?? [] as $handle => $src) {
+                    if (! is_string($handle)) {
                         $handle = "{$this->name}_{$type}_style_{$i}";
                     }
 
                     $registered = wp_register_style(
                         $handle,
                         $src,
-                        $this->fieldStyleDeps[ $type ][ $handle ] ?? [],
+                        $this->fieldStyleDeps[$type][$handle] ?? [],
                         filemtime(Str::replace($this->uri, $this->path, $src))
                     );
 
-                    if ( $registered !== false ) {
-                        $this->registeredFieldStyles[ $type ][ $handle ] = $src; 
+                    if ($registered !== false) {
+                        $this->registeredFieldStyles[$type][$handle] = $src;
                     }
                     $i++;
                 }
@@ -237,34 +203,32 @@ trait FieldManager
 
     /**
      * Enqueues assets using wp_enqueue_* functions.
-     *
-     * @return void
      */
     private function enqueueFieldAssets(): void
     {
-        foreach ( $this->fieldAssetTypes as $type => $hook ) {
-            add_action( $hook, function () use ( $type ) {
-                foreach ( $this->registeredFieldScripts[ $type ] ?? [] as $handle => $_ ) {
+        foreach ($this->fieldAssetTypes as $type => $hook) {
+            add_action($hook, function () use ($type) {
+                foreach ($this->registeredFieldScripts[$type] ?? [] as $handle => $_) {
                     $shouldEnqueue = true;
-                    
+
                     if ($type === 'form_editor') {
                         $shouldEnqueue = ($_GET['page'] ?? '') === 'meros-form-builder';
                     }
 
-                    if ( $shouldEnqueue ) {
-                        wp_enqueue_script( $handle );
+                    if ($shouldEnqueue) {
+                        wp_enqueue_script($handle);
                     }
                 }
 
-                foreach ( $this->registeredFieldStyles[ $type ] ?? [] as $handle => $_ ) {
+                foreach ($this->registeredFieldStyles[$type] ?? [] as $handle => $_) {
                     $shouldEnqueue = true;
-                    
+
                     if ($type === 'form_editor') {
                         $shouldEnqueue = ($_GET['page'] ?? '') === 'meros-form-builder';
                     }
 
-                    if ( $shouldEnqueue ) {
-                        wp_enqueue_style( $handle );
+                    if ($shouldEnqueue) {
+                        wp_enqueue_style($handle);
                     }
                 }
                 // Reset the hasAssets indicator depending on whether any assets have been discovered.

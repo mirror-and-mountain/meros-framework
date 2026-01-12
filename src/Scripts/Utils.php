@@ -1,168 +1,264 @@
-<?php 
+<?php
 
 namespace MM\Meros\Scripts;
 
-class Utils 
-{
-    /**
-     * Returns directories relative to this file if possible.
-     * False otherwise.
-     *
-     * @param  string|null   $vendorDir
-     * @return array|boolean
-     */
-    public static function getDirectories( ?string $vendorDir ): array|bool {
+use Dotenv\Dotenv;
+
+class Utils {
+    public static function createEnvironment(string $envName, string $projectRoot, string $stubDir) {        
+        if ($envName === 'local') {
+            $config = self::getLocalEnvironmentConfig($projectRoot);
+        } else {
+            $config = self::getConfig('environments', $projectRoot, $stubDir);
+            if (isset($config['remote_envs'][$envName])) {
+                $config = $config['remote_envs'][$envName];
+            } else {
+                return null;
+            }
+        }
+    }
+
+    public static function getLocalEnvironmentConfig(string $projectRoot): array {
+        $localEnvPath = $projectRoot . DIRECTORY_SEPARATOR . '.devcontainer' . DIRECTORY_SEPARATOR . '.env';
+
+        // Load environment variables from .env file if it exists (inside .devcontainer)
+        if (file_exists($localEnvPath)) {
+            $dotenv = Dotenv::createImmutable(dirname($localEnvPath));
+            $dotenv->load();
+        }
+
+        // Determine URL for Codespaces or default to localhost
+        $port = $_ENV['WP_PORT'] ?? '8000';
+        $url  = 'http://localhost:' . $port;
+        if (isset($_ENV['CODESPACE_NAME'])) {
+            $codespaceName = $_ENV['CODESPACE_NAME'];
+            $url = "https://{$codespaceName}-80.app.github.dev";
+        }
+
+        return [
+            'site_title' => $_ENV['SITE_TITLE'] ?? 'Meros WP',
+            'url'  => $url,
+            'path' => realpath(dirname($projectRoot, 3)),
+            'admin'  => [
+                'user'     => $_ENV['ADMIN_USER'] ?? 'admin',
+                'password' => $_ENV['ADMIN_PASSWORD'] ?? 'password',
+                'email'    => $_ENV['ADMIN_EMAIL'] ?? 'admin@example.com',
+            ],
+            'db' => [
+                'name'    => $_ENV['DB_NAME'] ?? 'wordpress',
+                'user'    => $_ENV['DB_USER'] ?? 'dbuser',
+                'pass'    => $_ENV['DB_PASSWORD'] ?? 'dbpassword',
+                'host'    => $_ENV['DB_HOST'] ?? 'db',
+                'prefix'  => $_ENV['DB_PREFIX'] ?? 'wp_',
+                'charset' => $_ENV['DB_CHARSET'] ?? 'utf8mb4',
+                'collate' => $_ENV['DB_COLLATE'] ?? 'utf8mb4_unicode_ci',
+            ],
+        ];
+    }
+
+    public static function makeProjectEnvFile(string $projectRoot): void {
+        $projectEnvPath = $projectRoot . DIRECTORY_SEPARATOR . '.env';
+
+        // Create an empty .env file if it doesn't exist
+        if (! file_exists($projectEnvPath)) {
+            file_put_contents($projectEnvPath, '');
+        }
+
+        // Get .env content
+        $envContent = file_get_contents($projectEnvPath);
+
+        // Bail if file can't be read
+        if ($envContent === false) {
+            return;
+        }
+
+        // Check if APP_KEY is already set or create a new one
+        if (! preg_match('/^APP_KEY=.*$/m', $envContent)) {
+            $key = 'base64:'.base64_encode(random_bytes(32));
+            $comment = '# App key required for Livewire functionality';
+            $envContent = rtrim($envContent)."{$comment}\nAPP_KEY={$key}\n";
+            file_put_contents($projectEnvPath, $envContent);
+        }
+
+        return;
+    }
+
+    public static function getDirectories(?string $vendorDir): array|bool {
+        $wordpressRoot = '';
         $projectRoot = '';
+        $frameworkRoot = '';
 
-        if ( !isset($vendorDir) ) {
-            $vendorDir = realpath( dirname( __DIR__, 4 ) );
+        if (! isset($vendorDir)) {
+            $vendorDir = realpath(dirname(__DIR__, 4));
         }
 
-        if ( is_dir($vendorDir) ) {
-            $projectRoot = dirname( $vendorDir );
+        if (is_dir($vendorDir)) {
+            $projectRoot = realpath(dirname($vendorDir));
+            $frameworkRoot = realpath(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'src');
+
+            $runningInMeros = getenv('MEROS_ENVIRONMENT') === 'true';
+            if ($runningInMeros) {
+                $wordpressRoot = realpath(dirname($projectRoot, 3));
+            }
         }
-        
-        $stubDir = realpath( dirname( __DIR__ ) . DIRECTORY_SEPARATOR . 'stubs' );
 
-        $loaded = is_dir($vendorDir) && is_dir($projectRoot) && is_dir($stubDir) ? true : false;
+        $keysDir = $projectRoot . DIRECTORY_SEPARATOR . '.devcontainer' . DIRECTORY_SEPARATOR . 'keys';
+        $scriptsDir = $frameworkRoot . DIRECTORY_SEPARATOR . 'Scripts';
+        $stubDir = $frameworkRoot . DIRECTORY_SEPARATOR . 'stubs';
+        $loaded = is_dir($vendorDir) &&
+            is_dir($projectRoot) &&
+            is_dir($keysDir) &&
+            is_dir($frameworkRoot) &&
+            is_dir($scriptsDir) &&
+            is_dir($stubDir)
+            ? true
+            : false;
 
-        if ( $loaded ) {
+        if ($loaded) {
             return [
-                'vendorDir'   => $vendorDir,
+                'wordpressRoot' => $wordpressRoot,
                 'projectRoot' => $projectRoot,
-                'stubDir'     => $stubDir 
+                'vendorDir' => $vendorDir,
+                'frameworkRoot' => $frameworkRoot,
+                'keysDir' => $keysDir,
+                'scriptsDir' => $scriptsDir,
+                'stubDir' => $stubDir,
             ];
         } else {
             return false;
         }
     }
 
-     /**
-     * Checks that a theme config file exists and creates one if not.
-     * Returns contents of file.
-     *
-     * @return array The theme configuration.
-     */
-    public static function getThemeConfig( string $projectRoot, string $stubDir ): array {
-        $themeConfigPath     = $projectRoot . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'theme.php';
-        $themeConfigTemplate = $stubDir . DIRECTORY_SEPARATOR . 'theme.template.php';
+    public static function getConfig(string $fileName, string $projectRoot, string $stubDir): array {
+        $configPath = $projectRoot . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . $fileName . '.php';
 
-        // Check if the actual theme config file exists
-        if ( ! file_exists( $themeConfigPath ) ) {
+        // Check if the actual config file exists
+        if (file_exists($configPath)) {
+            return require $configPath;
+        }
 
-            if ( ! file_exists( $themeConfigTemplate ) ) {
-                return [];
-            }
+        // Path to the config template stub
+        $configStub = $stubDir . DIRECTORY_SEPARATOR . ucfirst($fileName) . '.stub';
 
-            // Ensure the config directory exists
-            if ( ! is_dir( dirname( $themeConfigPath ) ) ) {
-                mkdir( dirname( $themeConfigPath ), 0755, true );
-            }
+        if (! file_exists($configStub)) {
+            return [];
+        }
 
-            // Create new config file from template
-            $newThemeConfig = copy( $themeConfigTemplate, $themeConfigPath );
+        // Ensure the config directory exists
+        if (! is_dir(dirname($configPath))) {
+            mkdir(dirname($configPath), 0755, true);
+        }
 
-            if ( ! $newThemeConfig ) {
-                return [];
-            }
+        // Create new config file from stub
+        if ($fileName === 'environments') {
+            $newConfig = copy($configStub, $configPath);
+        } else {
+            $stubContent = file_get_contents($configStub);
+            $newConfig = self::makeFeaturesConfig($stubContent, $configPath);
+        }
+
+        if (! $newConfig) {
+            return [];
         }
 
         // Return the loaded configuration, or an empty array if not found/created
-        return file_exists( $themeConfigPath ) ? require $themeConfigPath : [];
+        return file_exists($configPath) ? require $configPath : [];
     }
 
-    /**
-     * Regenerates the theme config file after a feature, extension or
-     * plugin is installed.
-     *
-     * @return void
-     */
-    public static function regenerateThemeConfig( 
-        string $stubDir, 
-        string $projectRoot, 
-        array  $themeConfig, 
-        array  $features,
-        array  $extensions,
-        array  $plugins
+    public static function regenerateFeaturesConfig(
+        string $stubDir,
+        string $projectRoot,
+        array $featuresConfig,
+        array $features,
+        array $extensions
     ): bool {
-        $stubPath = $stubDir . DIRECTORY_SEPARATOR . 'ThemeConfig.stub';
+        $stubPath = $stubDir . DIRECTORY_SEPARATOR . 'Features.stub';
 
-        if ( file_exists( $stubPath ) ) {
-            $stub     = file_get_contents( $stubPath );
+        if (file_exists($stubPath)) {
+            $stub = file_get_contents($stubPath);
             $rendered = str_replace(
                 [
                     '{{theme_class}}',
                     '{{features_namespace}}',
                     '{{extensions_namespace}}',
-                    '{{plugins_namespace}}',
                     '{{features}}',
                     '{{extensions}}',
-                    '{{plugins}}'
                 ],
                 [
-                    var_export( $themeConfig['theme_class'] ?? 'App\\Theme', true ),
-                    var_export( $themeConfig['features_namespace'] ?? 'App\\Features', true ),
-                    var_export( $themeConfig['extensions_namespace'] ?? 'App\\Extensions', true ),
-                    var_export( $themeConfig['plugins_namespace'] ?? 'App\\Plugins', true ),
-                    self::formatArray( $themeConfig, $features, 'features', 2 ),
-                    self::formatArray( $themeConfig, $extensions, 'extensions', 2 ),
-                    self::formatArray( $themeConfig, $plugins, 'plugins', 2 )
+                    var_export($featuresConfig['theme_class'] ?? 'App\\Theme', true),
+                    var_export($featuresConfig['features_namespace'] ?? 'App\\Features', true),
+                    var_export($featuresConfig['extensions_namespace'] ?? 'App\\Extensions', true),
+                    self::formatArray($featuresConfig, $features, 'features', 2),
+                    self::formatArray($featuresConfig, $extensions, 'extensions', 2),
                 ],
                 $stub
             );
 
             // Theme config file path relative to project root
-            $themeConfigFilePath = $projectRoot . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'theme.php';
+            $featuresConfigFilePath = $projectRoot . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'features.php';
 
             // Ensure the directory exists before writing the file
-            if ( ! is_dir( dirname( $themeConfigFilePath ) ) ) {
-                mkdir( dirname( $themeConfigFilePath ), 0755, true );
+            if (! is_dir(dirname($featuresConfigFilePath))) {
+                mkdir(dirname($featuresConfigFilePath), 0755, true);
             }
 
-            if ( file_put_contents( $themeConfigFilePath, $rendered ) !== false ) {
+            if (file_put_contents($featuresConfigFilePath, $rendered) !== false) {
                 return true;
             }
-
             return false;
-            
         }
-
         return false;
     }
 
-    /**
-     * Formats arrays for the theme config file.
-     *
-     * @param  array       $array
-     * @param  string|null $type
-     * @param  int         $indentLevel
-     * @return string
-     */
+    private static function makeFeaturesConfig( string $stub, string $path ): bool {
+        $themeClass = 'App\\Theme';
+        $featuresNamespace = 'App\\Features';
+        $extensionsNamespace = 'App\\Extensions';
+        $features = [];
+        $extensions = [];
+
+        $rendered = str_replace(
+            [
+                '{{theme_class}}',
+                '{{features_namespace}}',
+                '{{extensions_namespace}}',
+                '{{features}}',
+                '{{extensions}}',
+            ],
+            [
+                var_export($themeClass, true),
+                var_export($featuresNamespace, true),
+                var_export($extensionsNamespace, true),
+                var_export($features, true),
+                var_export($extensions, true),
+            ],
+            $stub
+        );
+
+        return file_put_contents($path, $rendered) !== false;
+    }
+
     private static function formatArray(
-        array $themeConfig, 
-        array $array, 
-        ?string $type, 
-        int $indentLevel = 2 
+        array $featuresConfig,
+        array $array,
+        string $type,
+        int $indentLevel = 2
     ): string {
-        $indent = str_repeat( '    ', $indentLevel );
-        $lines  = ['['];
+        $indent = str_repeat('    ', $indentLevel);
+        $lines = ['['];
 
-        if ( $type !== null ) {
-            // Merge with existing config values for the given type
-            $array = array_merge( $themeConfig[ $type ] ?? [], $array );
+        $array = array_unique(array_merge(
+            array_values($featuresConfig[$type] ?? []),
+            array_values($array)
+        ));
+
+        foreach ($array as $value) {
+            $formattedValue = var_export($value, true);
+            $lines[] = "{$indent}{$formattedValue},";
         }
 
-        foreach ( $array as $key => $value ) {
-            $formattedKey   = var_export( $key, true );
-            $formattedValue = is_array( $value )
-                ? self::formatArray( $themeConfig, $value, null, $indentLevel + 1 )
-                : var_export( $value, true );
+        $lines[] = str_repeat('    ', $indentLevel - 1) . ']';
 
-            $lines[] = "{$indent}{$formattedKey} => {$formattedValue},";
-        }
-
-        $lines[] = str_repeat( '    ', $indentLevel - 1 ) . ']';
-
-        return implode( "\n", $lines );
+        return implode("\n", $lines);
     }
 }

@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 namespace MM\Meros\Helpers;
 
@@ -9,50 +9,22 @@ class Livewire
     /**
      * Checks whether Livewire assets have already been injected
      * and injects them if they haven't.
-     *
-     * @return void
      */
-    public static function injectAssets( bool $admin = false ): void
+    public static function injectAssets(bool $admin = false): bool
     {
-        $theme       = app()->make('meros.theme_manager');
+        $styleHook = $admin ? 'admin_head' : 'wp_head';
+        $scriptHook = $admin ? 'admin_footer' : 'wp_footer';
 
-        if ( !$admin ) {
-            $initialised = $theme->livewireInitialised;
-            
-            if ( $initialised ) {
-                return;
-            }
+        // Add Livewire styles to the admin head
+        add_action($styleHook, function () {
+            echo Blade::render('@livewireStyles');
+        });
 
-            // Add Livewire styles to the head
-            add_action('wp_head', function () {
-                echo Blade::render('@livewireStyles');
-            });
+        // Add Livewire scripts to the admin footer
+        add_action($scriptHook, function () {
+            echo Blade::render('@livewireScripts');
+        });
 
-            // Add Livewire scripts to the footer
-            add_action('wp_footer', function () {
-                echo Blade::render('@livewireScripts');
-            });
-
-            $theme->livewireInitialised = true;
-
-        } else {
-            $initialised = $theme->livewireInitialisedAdmin;
-
-            if ( $initialised ) {
-                return;
-            }
-
-            // Add Livewire styles to the admin head
-            add_action('admin_head', function () {
-                echo Blade::render('@livewireStyles');
-            });
-
-            // Add Livewire scripts to the admin footer
-            add_action('admin_footer', function () {
-                echo Blade::render('@livewireScripts');
-            });
-
-            $theme->livewireInitialisedAdmin = true;
-        }
+        return true;
     }
 }

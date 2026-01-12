@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 namespace MM\Meros\Helpers;
 
@@ -13,52 +13,40 @@ class ClassInfo
 {
     /**
      * The fully qualified name of the class.
-     *
-     * @var string|null
      */
     public ?string $name = null;
 
     /**
      * The class's namespace
-     *
-     * @var string|null
      */
     public ?string $namespace = null;
 
     /**
      * The full path to the file defining the class.
-     *
-     * @var string|null
      */
     public ?string $path = null;
 
     /**
      * The URI to the file defining the class.
-     *
-     * @var string|null
      */
     public ?string $uri = null;
 
     /**
      * The classes parent if available.
-     *
-     * @var string|null
      */
     public ?string $parent = null;
 
     /**
-     * Returns instance of this class if the given class 
-     * exists. False otherwise. Sets properties for further 
+     * Returns instance of this class if the given class
+     * exists. False otherwise. Sets properties for further
      * inspection by the caller.
-     *
-     * @param  string    $class
-     * @return self|bool
      */
-    public static function get( string $class ): self|bool
+    public static function get(string $class): self|bool
     {
-        if ( class_exists( $class ) ) {
-            $instance = new self();
-            $instance->setProps( $instance, $class );
+        if (class_exists($class)) {
+            $instance = new self;
+            $instance->setProps($instance, $class);
+
             return $instance;
         }
 
@@ -71,28 +59,28 @@ class ClassInfo
      * False otherwise. Sets properties for further inspection
      * by the caller.
      *
-     * @param  string $path
      * @return self
      */
-    public static function getFromPath( string $path ): self|bool
+    public static function getFromPath(string $path): self|bool
     {
-        $instance  = new self();
-        $contents  = File::get( $path );
+        $instance = new self;
+        $contents = File::get($path);
         $namespace = null;
 
-        if ( preg_match('/namespace\s+([\w\\\\]+);/', $contents, $matches) ) {
+        if (preg_match('/namespace\s+([\w\\\\]+);/', $contents, $matches)) {
             $namespace = $matches[1];
         }
 
-        if ( preg_match('/class\s+(\w+)\s+extends/', $contents, $matches) ) {
+        if (preg_match('/class\s+(\w+)\s+extends/', $contents, $matches)) {
             $class = $namespace ? "{$namespace}\\{$matches[1]}" : null;
 
-            if ( $class ) {
+            if ($class) {
                 require_once $path;
             }
 
-            if ( class_exists( $class ) ) {
-                $instance->setProps( $instance, $class );
+            if (class_exists($class)) {
+                $instance->setProps($instance, $class);
+
                 return $instance;
             }
         }
@@ -102,35 +90,28 @@ class ClassInfo
 
     /**
      * Uses a Reflection class to set this class's properties.
-     *
-     * @param  object $instance
-     * @param  string $class
-     * @return void
      */
-    private function setProps( object $instance, string $class ): void
+    private function setProps(object $instance, string $class): void
     {
-        $reflection           = new \ReflectionClass( $class );
-        $instance->name       = $reflection->getName();
-        $instance->namespace  = $reflection->getNamespaceName();
-        $instance->path       = dirname( $reflection->getFileName() );
-        $instance->parent     = $reflection->getParentClass()->getName();
+        $reflection = new \ReflectionClass($class);
+        $instance->name = $reflection->getName();
+        $instance->namespace = $reflection->getNamespaceName();
+        $instance->path = dirname($reflection->getFileName());
+        $instance->parent = $reflection->getParentClass()->getName();
 
         $themePath = get_theme_file_path();
-        $themeUri  = get_template_directory_uri();
+        $themeUri = get_template_directory_uri();
 
-        $instance->uri = Str::replaceFirst( $themePath, $themeUri, $instance->path );
+        $instance->uri = Str::replaceFirst($themePath, $themeUri, $instance->path);
     }
 
     /**
      * Determines whether the given class extends the given
      * base class.
-     *
-     * @param  string $baseClass
-     * @return bool
      */
-    public function extends( string $baseClass ): bool
+    public function extends(string $baseClass): bool
     {
-        return $this->name && 
+        return $this->name &&
                is_subclass_of($this->name, $baseClass);
     }
 
@@ -139,12 +120,11 @@ class ClassInfo
      * base class. It will check up to two levels.
      *
      * @param  [type] $baseClass
-     * @return bool
      */
-    public function isDescendantOf( string $baseClass ): bool
+    public function isDescendantOf(string $baseClass): bool
     {
         return $this->name &&
-               is_subclass_of( $this->name, $baseClass ) ||
-               is_subclass_of( $this->parent, $baseClass );
+               is_subclass_of($this->name, $baseClass) ||
+               is_subclass_of($this->parent, $baseClass);
     }
 }
