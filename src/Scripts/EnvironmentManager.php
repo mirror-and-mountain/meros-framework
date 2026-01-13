@@ -65,13 +65,37 @@ class EnvironmentManager {
         return $instance;   
     }
 
-    public function connect(): ?string {
+    public function createLocal() {
+        if (! $this->error !== '') {
+            return false;
+        }
+
+        if (! $this->isLocal) {
+            $this->error = 'Environment is not local.';
+            return false;
+        }
+
+        $configCommand = sprintf(
+        'cd %s && wp config create --dbname=%s --dbuser=%s --dbpass=%s --dbhost=%s --dbcharset=%s --dbcollate=%s --dbprefix=%s',
+            escapeshellarg($this->config['path']),
+            escapeshellarg($this->config['db']['name']),
+            escapeshellarg($this->config['db']['user']),
+            escapeshellarg($this->config['db']['pass']),
+            escapeshellarg($this->config['db']['host']),
+            escapeshellarg($this->config['db']['charset']),
+            escapeshellarg($this->config['db']['collate']),
+            escapeshellarg($this->config['db']['prefix'])
+        );
+    }
+
+    public function connect(): bool {
         if ($this->error !== '') {
-            return $this->error;
+            return false;
         }
 
         if ($this->isLocal) {
-            return 'Cannot connect to local environment.';
+            $this->error = 'Cannot connect to local environment.';
+            return false;
         }
 
         $script = $this->scripts['connect-env'] ?? '';
@@ -84,35 +108,39 @@ class EnvironmentManager {
 
         passthru($command, $return_var);
         if ($return_var !== 0) {
-            return 'Failed to connect to remote environment.';
+            return false;
         }
 
-        return null;
+        return true;
     }
 
-    public function syncTheme(string $destName, bool $makeDir = true, bool $activate = true): string {
+    public function syncTheme(string $destName, bool $makeDir = true, bool $activate = true): bool {
         if ($this->error !== '') {
-            return $this->error;
+            return false;
         }
 
         if ($destName === $this->name) {
-            return 'Source and destination environments cannot be the same.';
+            $this->error = 'Source and destination environments cannot be the same.';
+            return false;
         }
 
         if ($destName === 'local_dev') {
-            return 'Syncing the theme to local environment is not supported.';
+            $this->error = 'Syncing the theme to local environment is not supported.';
+            return false;
         }
 
         $dest = EnvironmentManager::get($destName, $this->themePath);
         $destConfig = $dest->getConfig();
         
         if (is_string($destConfig)) {
-            return $destConfig;
+            $this->error = $destConfig;
+            return false;
         }
 
         $script = $this->scripts['sync-theme'] ?? '';
         if ($script === '') {
-            return 'Sync theme script not found.';
+            $this->error = 'Sync theme script not found.';
+            return false;
         }
 
         $command = 'bash ' . escapeshellarg($script) . ' ' ;
@@ -129,14 +157,19 @@ class EnvironmentManager {
         passthru($command, $return_var);
 
         if ($return_var !== 0) {
-            return 'Failed to sync theme from ' . $this->name . ' to ' . $destName . '.';
+            $this->error = 'Failed to sync theme from ' . $this->name . ' to ' . $destName . '.';
+            return false;
         }
 
-        return 'Successfully synced theme from ' . $this->name . ' to ' . $destName . '.';
+        return true;
     }
 
     public function getConfig(): string|array {
         return $this->error !== '' ? $this->error : $this->config;
+    }
+
+    public function getError(): string {
+        return $this->error;
     }
 
     public function getSSHCommand(): string {
@@ -249,11 +282,13 @@ class EnvironmentManager {
 
                 $file = $this->keysPath . $separator . $name;
                 if (file_exists($file)) {
+                    chmod($file, 0600);
                     return $file;
                 } 
                 
                 $file = $this->keysPath . $separator . $this->name . $separator . $name;
                 if (file_exists($file)) {
+                    chmod($file, 0600);
                     return $file;
                 }
 

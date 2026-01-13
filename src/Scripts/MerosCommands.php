@@ -329,9 +329,9 @@ class MerosCommands {
         $manager = EnvironmentManager::get($environmentName);
 
         // Connect to environment
-        $error = $manager->connect();
-        if ($error !== null) {
-            \WP_CLI::error($error);
+        $status = $manager->connect();
+        if ($status === false) {
+            \WP_CLI::error($manager->getError());
         }
     }
 
@@ -377,8 +377,8 @@ class MerosCommands {
 
         // Sync theme
         $status = $manager->syncTheme($to, $makeDir, $activate);
-        if ($status !== null) {
-            \WP_CLI::error($status);
+        if ($status === false) {
+            \WP_CLI::error($manager->getError());
         } else {
             \WP_CLI::success(sprintf('Theme sync from "%s" to "%s" completed successfully.', $from, $to));
         }
