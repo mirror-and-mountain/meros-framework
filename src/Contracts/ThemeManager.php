@@ -9,6 +9,7 @@ use MM\Meros\Providers\MerosServiceProvider;
 use MM\Meros\Traits\AdminManager;
 use MM\Meros\Traits\AuthorManager;
 use MM\Meros\Traits\ContextManager;
+use MM\Meros\Traits\PermalinkManager;
 use Roots\Acorn\Application as RootsApplication;
 
 /**
@@ -39,7 +40,7 @@ abstract class ThemeManager {
      */
     private bool $livewireInitialisedAdmin = false;
 
-    use AdminManager, AuthorManager, ContextManager;
+    use AdminManager, AuthorManager, ContextManager, PermalinkManager;
 
     final public function __construct(protected Application $app) {
         $this->setContext();
@@ -100,6 +101,9 @@ abstract class ThemeManager {
 
             // Ensure an APP_KEY exists for Livewire.
             Livewire::ensureAppKey();
+
+            // Ensure pretty permalinks are set.
+            $this->ensurePrettyPermalinks();
         });
 
         // Hook for when theme is switched.
@@ -116,7 +120,7 @@ abstract class ThemeManager {
             }
         });
 
-        add_filter('big_image_size_threshold', '__return_false');
+        // Hook for when theme is uninstalled.
     }
 
     /**

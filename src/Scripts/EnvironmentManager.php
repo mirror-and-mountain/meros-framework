@@ -488,6 +488,71 @@ class EnvironmentManager {
         return true;
     }
 
+    public function syncTables(
+        string $destName, 
+        array  $tables = [], 
+        array  $excludedTables = [],
+        bool   $dropTables = false,
+        bool   $themeOptions = false
+    ): bool {
+        if ($this->error !== '') {
+            return false;
+        }
+
+        if ($destName === $this->name) {
+            $this->error = 'Source and destination environments cannot be the same.';
+            return false;
+        }
+
+        $dest = EnvironmentManager::get($destName, $this->themePath);
+        $destConfig = $dest->getConfig();
+        if (is_string($destConfig)) {
+            $this->error = $destConfig;
+            return false;
+        }
+
+        $prefixedTables = [];
+        if ($tables !== ['all']) {
+            foreach ($tables as $table) {
+                $prefixedTables[] = $this->config['db']['prefix'] . $table;
+            }
+        } else {
+            $prefixedTables = 'all';
+        }
+
+        $prefixedExcludedTables = [];
+        foreach ($excludedTables as $table) {
+            $prefixedExcludedTables[] = $this->config['db']['prefix'] . $table;
+        }
+
+        $script = $this->scripts['sync-tables'] ?? '';
+        if ($script === '') {
+            $this->error = 'Sync tables script not found.';
+            return false;
+        }
+
+        $command = 'bash ' . escapeshellarg($script) . ' ' ;
+        $command .= escapeshellarg($destName) . ' ';
+        $command .= escapeshellarg($destConfig['url']) . ' ';
+        $command .= $dest->getSSHCommand() . ' ';
+        $command .= escapeshellarg($this->name) . ' ';
+        $command .= escapeshellarg($this->config['url']) . ' ';
+        $command .= $this->getSSHCommand() . ' ';
+        $command .= escapeshellarg($destConfig['db']['prefix']) . ' ';
+        $command .= escapeshellarg($this->config['db']['prefix']) . ' ';
+        $command .= escapeshellarg(is_array($prefixedTables) ? implode(',', $prefixedTables) : $prefixedTables) . ' ';
+        $command .= escapeshellarg(implode(',', $prefixedExcludedTables)) . ' ';
+        $command .= escapeshellarg($dropTables ? 'true' : 'false') . ' ';
+        
+        if ($themeOptions) {
+            $theme = app()->make('meros.theme_manager');
+            $options = $theme->getRegisteredSettingKeys();
+            $command .= escapeshellarg(implode(',', $options)) . ' ';
+        }
+
+        dd($command);
+    }
+
     /**
      * Returns the environment's configuration array
      * or an error message if initialisation failed.
@@ -728,7 +793,7 @@ class EnvironmentManager {
      * @return void
      */
     private function initScripts(string $separator): void {
-        $scripts = ['create-feature', 'connect-env', 'clone-content', 'sync-theme'];
+        $scripts = ['create-feature', 'connect-env', 'clone-content', 'sync-theme', 'sync-tables'];
         foreach ($scripts as $script) {
             $path = $this->scriptsPath . $separator . $script . '.sh';
             if (file_exists($path)) {

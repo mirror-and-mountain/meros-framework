@@ -8,25 +8,55 @@ class MerosCommands {
      *
      * ## OPTIONS
      *
+     * <tables>...
+     * : The database tables to clone (comma-separated).
      * <to>
      * : The environment to clone to.
      * [<from>]
-     * : The environment to clone from.
+     * : The environment to clone from (default: local_dev).
+     * 
+     * [--except=<tables>]
+     * : A comma-separated list of tables to exclude when using --all (default: none).
+     * 
+     * [--add-drop-table]
+     * : Whether to add DROP TABLE statements before CREATE TABLE statements (default: false).
+     * 
+     * [--theme-options]
+     * : Whether to clone registered theme options as well (default: false).
      * 
      * 
      * ## EXAMPLES
      *
-     * wp meros clone-content staging
-     * wp meros clone-content staging development
+     * wp meros sync-table posts staging
+     * wp meros sync-table posts development production
+     * wp meros sync-table --all staging
      *
-     * @subcommand clone-content
+     * @subcommand sync-tables
      *
      * @when after_wp_load
      *
-     * @param  array  $args  Positional arguments.
+     * @param array $args Positional arguments.
      */
-    public function cloneContent($args) {
+    public function syncTables($args, $assoc_args) {
+        // Parse arguments
+        $tables = explode(',', $args[0]);
+        $from   = isset($args[2]) ? $args[2] : 'local_dev';
+        $to     = $args[1];
+        
+        $excludedTables = isset($assoc_args['except']) ? explode(',', $assoc_args['except']) : [];
+        $dropTables     = isset($assoc_args['add-drop-table']) && $assoc_args['add-drop-table'] === true ? true : false;
+        $themeOptions   = isset($assoc_args['theme-options']) && $assoc_args['theme-options'] === true ? true : false;
 
+        // Get Environment Manager
+        $manager = EnvironmentManager::get($from);
+
+        // Sync table
+        $status = $manager->syncTables($to, $tables, $excludedTables, $dropTables, $themeOptions);
+        if ($status === false) {
+            \WP_CLI::error($manager->getError());
+        } else {
+            \WP_CLI::success(sprintf('Table "%s" sync from "%s" to "%s" completed successfully.', implode(',', $tables), $from, $to));
+        }
     }
 
     /**
@@ -105,7 +135,7 @@ class MerosCommands {
      * <to>
      * : The environment to sync the theme to.
      * [<from>]
-     * : The environment to sync the theme from.
+     * : The environment to sync the theme from (default: local_dev).
      *
      * [--activate]
      * : Whether to activate the theme after syncing. (default: true)
@@ -128,7 +158,7 @@ class MerosCommands {
     public function syncTheme($args, $assoc_args) {
         // Parse arguments
         $from = $args[1] ?? 'local_dev';
-        $to = $args[0] === 'local' ? 'local_dev' : $args[0];
+        $to   = $args[0];
 
         // Determine flags
         $makeDir  = isset($assoc_args['make-dir']) && $assoc_args['make-dir'] === false ? false : true;

@@ -69,3 +69,9 @@ th[scope="row"]:has(.meros-settings-label) {
         }
     }
 }
+
+.structure-selection {
+    .row:has(#permalink-input-plain) {
+        display: none !important;
+    }
+}

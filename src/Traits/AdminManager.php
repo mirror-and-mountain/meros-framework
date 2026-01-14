@@ -36,6 +36,9 @@ trait AdminManager {
 
     /**
      * Initialises option pages if enabled.
+     * Applies admin scripts and styles.
+     * 
+     * @return void
      */
     private function initialiseAdmin(): void {
         if (! is_admin()) {
@@ -43,6 +46,7 @@ trait AdminManager {
         }
 
         $this->enqueueAdminScripts();
+        $this->hidePlainPermalinkOption();
 
         foreach ($this->optionsPages as $_ => $config) {
             if (is_callable($config['callback'])) {
@@ -99,6 +103,18 @@ trait AdminManager {
                 'nonce' => wp_create_nonce('mm_meros_toggle_' . $option),
             ]);
         });
+    }
+
+    final public function getRegisteredSettingKeys(): array {
+        $settings = [];
+        foreach (self::$registeredSettings as $_ => $optionGroups) {
+            foreach ($optionGroups as $optionGroup => $options) {
+                foreach ($options as $optionKey => $_) {
+                    $settings[] = $optionKey;
+                }
+            }
+        }
+        return $settings;
     }
 
     /**
