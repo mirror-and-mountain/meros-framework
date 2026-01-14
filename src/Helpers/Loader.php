@@ -12,20 +12,40 @@ use MM\Meros\Contracts\Feature;
  * Provides utilities for loading the theme's
  * features, extensions and plugins.
  */
-class Loader
-{
-    // Properties set by the init() method
+class Loader {
+    /**
+     * The namespace for extensions.
+     * 
+     * @var string
+     */
     public string $extensionsNamespace;
 
+    /**
+     * The extensions defined in the theme config.
+     * 
+     * @var array
+     */
     public array $extensions;
 
+    /**
+     * The features defined in the theme config.
+     * 
+     * @var array
+     */
     public array $features;
 
+    /**
+     * The default author info for features/extensions.
+     * 
+     * @var array
+     */
     public array $defaultAuthorInfo;
 
     /**
      * The instantiated theme manager. Used to bind
      * valid features to the object.
+     * 
+     * @var object
      */
     public object $theme;
 
@@ -34,9 +54,11 @@ class Loader
      * config file located in config/theme.php. Returns an
      * instance of the Loader for further inspection and usage
      * by the caller.
+     * 
+     * @param object $theme The theme manager instance.
+     * @return self The Loader instance.
      */
-    public static function init(object $theme): self
-    {
+    public static function init(object $theme): self {
         $instance = new self;
         $instance->theme = $theme;
         $featuresConfig = base_path('config/features.php');
@@ -58,9 +80,11 @@ class Loader
      * Loads features of the given type. This includes validating then
      * instantiating each feature's class and adding them to the theme's
      * feature array.
+     * 
+     * @param string $type The type of feature to load.
+     * @return void
      */
-    public function load(string $type): void
-    {
+    public function load(string $type): void {
         $extensionDefs = [];
         $baseClass = '';
 
@@ -92,6 +116,7 @@ class Loader
      *
      * @param  string  $extPath
      * @param  string|array  $file
+     * @return void
      */
     private function loadItem(
         string $class,
@@ -156,7 +181,7 @@ class Loader
         $author = Str::slug($feature->getAuthorInfo('name'), '_');
         $name = $feature->getName();
 
-        $featureName = $author.'.'.$name;
+        $featureName = $author . '.' . $name;
 
         // Bind the feature to the theme manager class
         $this->theme->addFeature($featureName, $feature);

@@ -5,8 +5,7 @@ namespace MM\Meros\Traits;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
-trait FieldManager
-{
+trait FieldManager {
     /**
      * Indicates whether the feature has assets.
      */
@@ -82,9 +81,8 @@ trait FieldManager
      * Sets the absolute path and calls setAssets.
      * Continues to register discovered assets.
      */
-    private function loadFields(): void
-    {
-        $assetsPath = $this->path.$this->fieldsDir;
+    private function loadFields(): void {
+        $assetsPath = $this->path . $this->fieldsDir;
 
         foreach ($this->fieldAssetTypes as $type => $_) {
 
@@ -95,7 +93,6 @@ trait FieldManager
             if ($this->fieldStyles[$type] ?? [] === []) {
                 $this->setFieldAssets($assetsPath, $type, 'css');
             }
-
         }
 
         $this->registerFieldAssets();
@@ -107,8 +104,7 @@ trait FieldManager
      * scripts and styles properties. This method will also discover any
      * dependancies for each asset.
      */
-    private function setFieldAssets(string $path, string $type, string $extension): void
-    {
+    private function setFieldAssets(string $path, string $type, string $extension): void {
         if (! File::exists($path)) {
             return;
         }
@@ -127,10 +123,10 @@ trait FieldManager
         foreach ($assets as $asset) {
 
             $pathInfo = pathinfo($asset);
-            $conditionFile = trailingslashit($pathInfo['dirname']).$pathInfo['filename'].'.conditions.php';
-            $dependancyFile = trailingslashit($pathInfo['dirname']).$pathInfo['filename'].'.asset.php';
+            $conditionFile = trailingslashit($pathInfo['dirname']) . $pathInfo['filename'] . '.conditions.php';
+            $dependancyFile = trailingslashit($pathInfo['dirname']) . $pathInfo['filename'] . '.asset.php';
             $name = $this->useFullNameForFieldAssets ? $this->fullName : $this->name;
-            $handle = $name.'_'.basename($pathInfo['dirname']).'_'.$type.'_'.$i;
+            $handle = $name . '_' . basename($pathInfo['dirname']) . '_' . $type . '_' . $i;
 
             if ($extension === 'js') {
 
@@ -138,14 +134,12 @@ trait FieldManager
                 $this->fieldScriptConditions[$type][$handle] = file_exists($conditionFile) ? include $conditionFile : [];
                 $this->fieldScriptDeps[$type][$handle] = $dependencies['dependencies'] ?? [];
                 $this->fieldScripts[$type][$handle] = Str::replace($this->path, $this->uri, $asset);
-
             } elseif ($extension === 'css') {
 
                 $dependencies = file_exists($dependancyFile) ? include $dependancyFile : [];
                 $this->fieldStyleConditions[$type][$handle] = file_exists($conditionFile) ? include $conditionFile : [];
                 $this->fieldStyleDeps[$type][$handle] = $dependencies['dependencies'] ?? [];
                 $this->fieldStyles[$type][$handle] = Str::replace($this->path, $this->uri, $asset);
-
             }
 
             $i++;
@@ -155,8 +149,7 @@ trait FieldManager
     /**
      * Registers discovered assets using wp_register_* functions.
      */
-    private function registerFieldAssets(): void
-    {
+    private function registerFieldAssets(): void {
         add_action('init', function () {
             foreach ($this->fieldAssetTypes as $type => $_) {
                 $i = 0;
@@ -204,8 +197,7 @@ trait FieldManager
     /**
      * Enqueues assets using wp_enqueue_* functions.
      */
-    private function enqueueFieldAssets(): void
-    {
+    private function enqueueFieldAssets(): void {
         foreach ($this->fieldAssetTypes as $type => $hook) {
             add_action($hook, function () use ($type) {
                 foreach ($this->registeredFieldScripts[$type] ?? [] as $handle => $_) {

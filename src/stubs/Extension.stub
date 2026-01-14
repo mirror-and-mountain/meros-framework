@@ -4,10 +4,8 @@ namespace {{namespace}};
 
 use {{extension}} as Base;
 
-class {{class}} extends Base
-{
-    protected function override(): void
-    {
+class {{class}} extends Base {
+    protected function override(): void {
         // Overrides for the extension can be set here.
     }
 }

@@ -9,30 +9,39 @@ use Illuminate\Support\Str;
  * Provides utilities to inspect classes for
  * validation purposes.
  */
-class ClassInfo
-{
+class ClassInfo {
     /**
      * The fully qualified name of the class.
+     * 
+     * @var string|null
      */
     public ?string $name = null;
 
     /**
      * The class's namespace
+     * 
+     * @var string|null
      */
     public ?string $namespace = null;
 
     /**
      * The full path to the file defining the class.
+     * 
+     * @var string|null
      */
     public ?string $path = null;
 
     /**
      * The URI to the file defining the class.
+     * 
+     * @var string|null
      */
     public ?string $uri = null;
 
     /**
      * The classes parent if available.
+     * 
+     * @var string|null
      */
     public ?string $parent = null;
 
@@ -40,9 +49,11 @@ class ClassInfo
      * Returns instance of this class if the given class
      * exists. False otherwise. Sets properties for further
      * inspection by the caller.
+     * 
+     * @param string $class The fully qualified class name.
+     * @return self|bool
      */
-    public static function get(string $class): self|bool
-    {
+    public static function get(string $class): self|bool {
         if (class_exists($class)) {
             $instance = new self;
             $instance->setProps($instance, $class);
@@ -59,10 +70,10 @@ class ClassInfo
      * False otherwise. Sets properties for further inspection
      * by the caller.
      *
-     * @return self
+     * @param string $path The file path to the class.
+     * @return self|bool
      */
-    public static function getFromPath(string $path): self|bool
-    {
+    public static function getFromPath(string $path): self|bool {
         $instance = new self;
         $contents = File::get($path);
         $namespace = null;
@@ -90,9 +101,12 @@ class ClassInfo
 
     /**
      * Uses a Reflection class to set this class's properties.
+     * 
+     * @param object $instance The instance of this class.
+     * @param string $class The fully qualified class name.
+     * @return void
      */
-    private function setProps(object $instance, string $class): void
-    {
+    private function setProps(object $instance, string $class): void {
         $reflection = new \ReflectionClass($class);
         $instance->name = $reflection->getName();
         $instance->namespace = $reflection->getNamespaceName();
@@ -108,23 +122,25 @@ class ClassInfo
     /**
      * Determines whether the given class extends the given
      * base class.
+     * 
+     * @param string $baseClass
+     * @return bool
      */
-    public function extends(string $baseClass): bool
-    {
+    public function extends(string $baseClass): bool {
         return $this->name &&
-               is_subclass_of($this->name, $baseClass);
+            is_subclass_of($this->name, $baseClass);
     }
 
     /**
      * Determines whether the given class is descended from the given
      * base class. It will check up to two levels.
      *
-     * @param  [type] $baseClass
+     * @param string $baseClass
+     * @return bool
      */
-    public function isDescendantOf(string $baseClass): bool
-    {
+    public function isDescendantOf(string $baseClass): bool {
         return $this->name &&
-               is_subclass_of($this->name, $baseClass) ||
-               is_subclass_of($this->parent, $baseClass);
+            is_subclass_of($this->name, $baseClass) ||
+            is_subclass_of($this->parent, $baseClass);
     }
 }

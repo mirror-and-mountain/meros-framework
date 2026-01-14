@@ -6,12 +6,19 @@ namespace MM\Meros\Helpers;
  * A utility to generate fields of varying types for use
  * in Wordpress settings pages or metaboxes.
  */
-class Fields
-{
+class Fields {
     /**
      * Makes a field.
      *
-     * @param  string  $description
+     * @param string $name The name of the field.
+     * @param string $valueType The data type of the field's value.
+     * @param mixed $default The default value for the field.
+     * @param string $fieldType The type of field to generate.
+     * @param string $id An optional ID for the field.
+     * @param bool $required Whether the field is required.
+     * @param array $options An array of options for select fields.
+     * @return string The generated HTML for the field.
+     * 
      */
     public static function make(
         string $name,
@@ -68,6 +75,11 @@ class Fields
 
     /**
      * Makes a checkbox field.
+     * 
+     * @param string $name The name of the field.
+     * @param string $id An optional ID for the field.
+     * @param mixed $value The value to compare for checked state.
+     * @return string The generated HTML for the checkbox.
      */
     private static function makeCheckbox(
         string $name,
@@ -76,14 +88,21 @@ class Fields
     ): string {
         $checked = checked(get_option($name, $value), '1', false);
 
-        $html = '<input type="hidden" name="'.esc_attr($name).'" value="0" />';
-        $html .= '<input type="checkbox" id="'.esc_attr($id).'" name="'.esc_attr($name).'" value="1" '.$checked.' />';
+        $html = '<input type="hidden" name="' . esc_attr($name) . '" value="0" />';
+        $html .= '<input type="checkbox" id="' . esc_attr($id) . '" name="' . esc_attr($name) . '" value="1" ' . $checked . ' />';
 
         return $html;
     }
 
     /**
      * Makes an input field.
+     * 
+     * @param string $name The name of the field.
+     * @param string $id An optional ID for the field.
+     * @param string $type The type of input field.
+     * @param mixed $value The value of the field.
+     * @param bool $required Whether the field is required.
+     * @return string The generated HTML for the input field.
      */
     private static function makeInput(
         string $name,
@@ -92,7 +111,7 @@ class Fields
         mixed $value = null,
         bool $required = false
     ): string {
-        $html = '<input type="'.$type.'" id="'.esc_attr($id).'" name="'.esc_attr($name).'" value="'.esc_attr($value).'"';
+        $html = '<input type="' . $type . '" id="' . esc_attr($id) . '" name="' . esc_attr($name) . '" value="' . esc_attr($value) . '"';
 
         if ($required) {
             $html .= ' required';
@@ -105,6 +124,12 @@ class Fields
 
     /**
      * Makes a textarea field.
+     * 
+     * @param string $name The name of the field.
+     * @param string $id An optional ID for the field.
+     * @param mixed $value The value of the field.
+     * @param bool $required Whether the field is required.
+     * @return string The generated HTML for the textarea field.
      */
     private static function makeTextarea(
         string $name,
@@ -112,19 +137,26 @@ class Fields
         mixed $value = null,
         bool $required = false
     ): string {
-        $html = '<textarea id="'.esc_attr($id).'" name="'.esc_attr($name).'"';
+        $html = '<textarea id="' . esc_attr($id) . '" name="' . esc_attr($name) . '"';
 
         if ($required) {
             $html .= ' required';
         }
 
-        $html .= '>'.esc_textarea($value).'</textarea>';
+        $html .= '>' . esc_textarea($value) . '</textarea>';
 
         return $html;
     }
 
     /**
      * Makes a select field.
+     * 
+     * @param string $name The name of the field.
+     * @param string $id An optional ID for the field.
+     * @param mixed $value The value of the field.
+     * @param array $options An array of options for the select field.
+     * @param bool $multiple Whether the select allows multiple selections.
+     * @return string The generated HTML for the select field.
      */
     private static function makeSelect(
         string $name,
@@ -133,11 +165,11 @@ class Fields
         array $options = [],
         bool $multiple = false
     ): string {
-        $html = '<select id="'.esc_attr($id).'" name="'.esc_attr($name).'"'.($multiple ? ' multiple' : '').'>';
+        $html = '<select id="' . esc_attr($id) . '" name="' . esc_attr($name) . '"' . ($multiple ? ' multiple' : '') . '>';
 
         foreach ($options as $key => $label) {
             $selected = selected($value, $key, false);
-            $html .= '<option value="'.esc_attr($key).'" '.$selected.'>'.esc_html($label).'</option>';
+            $html .= '<option value="' . esc_attr($key) . '" ' . $selected . '>' . esc_html($label) . '</option>';
         }
 
         $html .= '</select>';
@@ -145,6 +177,15 @@ class Fields
         return $html;
     }
 
+    /**
+     * Makes a button field.
+     * 
+     * @param string $name The name of the field.
+     * @param string $id An optional ID for the field.
+     * @param string $labelEnabled The label when the button is in enabled state.
+     * @param string $labelDisabled The label when the button is in disabled state.
+     * @return string The generated HTML for the button.
+     */
     private static function makeButton(
         string $name,
         string $id = '',
@@ -156,7 +197,7 @@ class Fields
 
         $label = $isEnabled ? $labelEnabled : $labelDisabled;
         $button_id = $id !== '' ? $id : $name;
-        $nonce = wp_create_nonce('mm_meros_toggle_'.$name);
+        $nonce = wp_create_nonce('mm_meros_toggle_' . $name);
 
         return sprintf(
             '<button
@@ -177,6 +218,15 @@ class Fields
         );
     }
 
+    /**
+     * Makes a toggle switch field.
+     * 
+     * @param string $name The name of the field.
+     * @param string $id An optional ID for the field.
+     * @param string $labelEnabled The label when the toggle is in enabled state.
+     * @param string $labelDisabled The label when the toggle is in disabled state.
+     * @return string The generated HTML for the toggle switch.
+     */
     private static function makeToggle(
         string $name,
         string $id = '',
@@ -185,8 +235,8 @@ class Fields
     ): string {
         $isEnabled = (bool) get_option($name);
 
-        $toggle_id = $id !== '' ? $id : $name.'_toggle';
-        $nonce = wp_create_nonce('mm_meros_toggle_'.$name);
+        $toggle_id = $id !== '' ? $id : $name . '_toggle';
+        $nonce = wp_create_nonce('mm_meros_toggle_' . $name);
 
         return sprintf(
             '<button

@@ -14,11 +14,12 @@ use MM\Meros\Traits\SettingsManager;
  * Features should extend this class and define
  * the configure method().
  */
-abstract class Feature
-{
+abstract class Feature {
     /**
      * The instantiated theme manager. Used to bind
      * valid features to the object.
+     * 
+     * @var object
      */
     protected object $theme;
 
@@ -26,66 +27,102 @@ abstract class Feature
      * The type of feature. This is set automatically
      * based on the type of child class used.
      * 
+     * @var string
      */
     public string $type = 'feature';
 
     /**
      * Whether the feature is enabled.
      * Determines whether actions are taken in the initialise() method.
+     * 
+     * @var bool
      */
     public bool $enabled = true;
 
     /**
      * Determines whether the feature is experimental.
+     * 
+     * @var bool
      */
     public bool $experimental = false;
 
     /**
      * Determines whether an 'enabled' option is available to
      * users via the WP dashboard.
+     * 
+     * @var bool
      */
     public bool $switchable = true;
 
     /**
      * Whether the feature's initialised() method has been called.
+     * 
+     * @var bool
      */
     public bool $initialised = false;
 
     /**
      * The name of the feature in slug_format. Used in various
      * filter hooks.
+     * 
+     * @var string
      */
     protected string $name;
 
     /**
      * The feature's name including author_name_feature_name.
+     * 
+     * @var string
      */
     protected string $fullName;
 
     /**
      * The feature's description.
+     * 
+     * @var string
      */
     protected string $description = '';
 
     /**
      * The feature's path.
+     * 
+     * @var string
      */
     protected string $path;
 
     /**
      * The feature's URI.
+     * 
+     * @var string
      */
     protected string $uri;
 
     /**
-     * The feature's author information
+     * The feature's author name.
+     * 
+     * @var string
      */
     protected string $authorName;
 
+    /**
+     * The feature's author description.
+     * 
+     * @var string
+     */
     protected string $authorDesc;
 
+    /**
+     * The feature's author URL.
+     * 
+     * @var string
+     */
     protected string $authorUrl;
 
+    /**
+     * The feature's author support URL.
+     * 
+     * @var string
+     */
     protected string $authorSupportUrl;
 
     use AssetManager,
@@ -95,8 +132,13 @@ abstract class Feature
         FieldManager,
         SettingsManager;
 
-    public function __construct(object $theme, ?string $name, array $authorInfo, string $path, string $uri)
-    {
+    public function __construct(
+        object $theme, 
+        ?string $name, 
+        array $authorInfo, 
+        string $path, 
+        string $uri
+    ) {
         // Set the theme object
         $this->theme = $theme;
 
@@ -113,7 +155,7 @@ abstract class Feature
         $this->setAuthorInfo($authorInfo);
 
         // Set the feature's full name
-        $this->fullName = Str::slug($this->authorName, '_').'_'.$this->name;
+        $this->fullName = Str::slug($this->authorName, '_') . '_' . $this->name;
 
         // Set up the feature
         $this->setUp();
@@ -121,9 +163,11 @@ abstract class Feature
 
     /**
      * Sets the feature's name property.
+     * 
+     * @param string|null $name The name to set. If null, the class name is used.
+     * @return void
      */
-    private function setName(?string $name = null): void
-    {
+    private function setName(?string $name = null): void {
         if (isset($name)) {
             $name = Str::lower(Str::headline($name));
             $this->name = Str::slug($name, '_');
@@ -136,9 +180,11 @@ abstract class Feature
 
     /**
      * Sets the feature's author information properties.
+     * 
+     * @param array $authorInfo
+     * @return void
      */
-    private function setAuthorInfo(array $authorInfo): void
-    {
+    private function setAuthorInfo(array $authorInfo): void {
         if (! isset($this->authorName)) {
             $this->authorName = $authorInfo['name'] ?? 'Unknown';
         }
@@ -159,9 +205,10 @@ abstract class Feature
     /**
      * Calls the configure method followed by the override method
      * for extensions.
+     * 
+     * @return void
      */
-    private function setUp(): void
-    {
+    private function setUp(): void {
         // Create WP dashboard switch if userSwitchable is true
         if ($this->switchable === true) {
             $this->createFeatureSwitchSetting(
@@ -172,8 +219,9 @@ abstract class Feature
 
         // Stop if the feature has been disabled in the WP dashboard
         $switch = get_option($this->featureEnabledSettingName, '1');
-        if ($this->switchable === true &&
-             $switch === '0'
+        if (
+            $this->switchable === true &&
+            $switch === '0'
         ) {
             $this->enabled = false;
 
@@ -199,15 +247,18 @@ abstract class Feature
      * extend the Extension contract and define this method. Users
      * can then override any configuration using the Extension
      * contract's override() method which is called after configure().
+     * 
+     * @return void
      */
     abstract protected function configure(): void;
 
     /**
      * Prepares and hooks the feature's declared supports into
      * the Wordpress lifecycle.
+     * 
+     * @return void
      */
-    final public function initialise(): void
-    {
+    final public function initialise(): void {
         // Stop if the feature isn't enabled
         if ($this->enabled === false) {
             return;
@@ -235,18 +286,22 @@ abstract class Feature
         $this->initialised = true;
     }
 
-    public function runAfterInitialise(): void
-    {
+    /**
+     * This method is called after all features have been
+     * initialised.
+     * 
+     * @return void
+     */
+    public function runAfterInitialise(): void {
         // Intentionally left blank for child classes to override.
     }
 
     /**
      * Returns the feature's author info.
      *
-     * @return array
+     * @return array|string
      */
-    final public function getAuthorInfo(string $prop = ''): array|string
-    {
+    final public function getAuthorInfo(string $prop = ''): array|string {
         return match ($prop) {
             'name' => $this->authorName,
             'description' => $this->authorDesc,
@@ -263,9 +318,11 @@ abstract class Feature
 
     /**
      * Returns either the feature's name or fullname if requested.
+     * 
+     * @param bool $full Whether to return the full name.
+     * @return string
      */
-    final public function getName(bool $full = false): string
-    {
+    final public function getName(bool $full = false): string {
         return $full === false ? $this->name : $this->fullName;
     }
 }

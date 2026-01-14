@@ -6,22 +6,123 @@ use Dotenv\Dotenv;
 use Illuminate\Support\Str;
 
 class EnvironmentManager {
+    /** 
+     * The environment name.
+     * 
+     * @var string
+     */
     private string $name;
+
+    /** 
+     * The theme path.
+     * 
+     * @var string
+     */
     private string $themePath;
+
+    /** 
+     * The theme slug.
+     * 
+     * @var string
+     */
     private string $themeSlug;
+
+    /** 
+     * The Meros framework path.
+     * 
+     * @var string
+     */
     private string $frameworkPath;
+
+    /** 
+     * The scripts path.
+     * 
+     * @var string
+     */
     private string $scriptsPath;
+
+    /** 
+     * The devcontainer path.
+     * 
+     * @var string
+     */
     private string $devContainerPath;
+
+    /** 
+     * The devcontainer keys path.
+     * 
+     * @var string
+     */
     private string $keysPath;
+
+    /** 
+     * The theme class name.
+     * 
+     * @var string
+     */
     private string $themeClass;
+
+    /** 
+     * The theme's features namespace.
+     * 
+     * @var string
+     */
     private string $featuresNamespace;
+    
+    /** 
+     * The theme's extensions namespace.
+     * 
+     * @var string
+     */
     private string $extensionsNamespace;
-    private bool   $isLocal = false;
-    private array  $config = [];
-    private array  $featuresConfig = [];
-    private array  $scripts = [];
-    private array  $features = [];
-    private array  $extensions = [];
+
+    /** 
+     * Whether the environment is local.
+     * 
+     * @var bool
+     */
+    private bool $isLocal = false;
+
+    /** 
+     * The environment configuration.
+     * 
+     * @var array
+     */
+    private array $config = [];
+
+    /** 
+     * The theme's features configuration.
+     * 
+     * @var array
+     */
+    private array $featuresConfig = [];
+
+    /** 
+     * The available scripts.
+     * 
+     * @var array
+     */
+    private array $scripts = [];
+
+    /** 
+     * The theme's features.
+     * 
+     * @var array
+     */
+    private array $features = [];
+
+    /** 
+     * The theme's extensions.
+     * 
+     * @var array
+     */
+    private array $extensions = [];
+
+    /** 
+     * The last error message.
+     * 
+     * @var string
+     */
     private string $error = '';
 
     private function __construct( string $name, string $themePath ) {
@@ -56,6 +157,14 @@ class EnvironmentManager {
         $this->initScripts( $separator );
     }
 
+    /**
+     * Returns an instance of the EnvironmentManager
+     * for the given environment name and theme path.
+     * 
+     * @param string $name The environment name.
+     * @param string|null $themePath The theme path.
+     * @return self The EnvironmentManager instance.
+     */
     public static function get(string $name, ?string $themePath = null): self {
         if ($themePath === null) {
             $themePath = get_stylesheet_directory();
@@ -70,6 +179,12 @@ class EnvironmentManager {
         return $instance;   
     }
 
+    /**
+     * Creates a new WordPress installation
+     * in the environment's configured path.
+     * 
+     * @return bool True on success, false on failure.
+     */
     public function create(): bool {
         if (! $this->error !== '') {
             return false;
@@ -160,6 +275,14 @@ class EnvironmentManager {
         return true;
     }
 
+    /**
+     * Installs an extension in the environment's theme.
+     * 
+     * @param string $namespace The extension's namespace.
+     * @param string $loader The extension's loader class name.
+     * @param bool $allowOverrides Whether to allow overrides in the theme.
+     * @return bool True on success, false on failure.
+     */
     public function installExtension(string $namespace, string $loader, bool $allowOverrides = false): bool {
         if ($this->error !== '') {
             return false;
@@ -229,6 +352,11 @@ class EnvironmentManager {
         }
     }
 
+    /**
+     * Connects to the remote environment via SSH.
+     * 
+     * @return bool True on success, false on failure.
+     */
     public function connect(): bool {
         if ($this->error !== '') {
             return false;
@@ -255,6 +383,12 @@ class EnvironmentManager {
         return true;
     }
 
+    /**
+     * Adds a new feature to the environment's theme.
+     * 
+     * @param string $name The feature name.
+     * @return bool True on success, false on failure.
+     */
     public function addFeature(string $name): bool {
         if ($this->error !== '') {
             return false;
@@ -295,6 +429,15 @@ class EnvironmentManager {
         }
     }
 
+    /**
+     * Syncs the theme from this environment to the specified
+     * destination environment.
+     * 
+     * @param string $destName The destination environment name.
+     * @param bool $makeDir Whether to create the destination directory if it doesn't exist.
+     * @param bool $activate Whether to activate the theme on the destination environment.
+     * @return bool True on success, false on failure.
+     */
     public function syncTheme(string $destName, bool $makeDir = true, bool $activate = true): bool {
         if ($this->error !== '') {
             return false;
@@ -345,14 +488,31 @@ class EnvironmentManager {
         return true;
     }
 
+    /**
+     * Returns the environment's configuration array
+     * or an error message if initialisation failed.
+     * 
+     * @return string|array The configuration array or error message.
+     */
     public function getConfig(): string|array {
         return $this->error !== '' ? $this->error : $this->config;
     }
 
+    /**
+     * Returns the last error message.
+     * 
+     * @return string The error message.
+     */
     public function getError(): string {
         return $this->error;
     }
 
+    /**
+     * Constructs the SSH command for connecting
+     * to the remote environment.
+     * 
+     * @return string The SSH command.
+     */
     public function getSSHCommand(): string {
         $command = escapeshellarg($this->config['path']) . ' ';        
         if (! $this->isLocal ) {
@@ -368,6 +528,12 @@ class EnvironmentManager {
         return $command;
     }
 
+    /**
+     * Initialises the framework path properties.
+     * 
+     * @param string $separator The directory separator.
+     * @return string|bool True on success, error message on failure.
+     */
     private function initFrameworkPath(string $separator): string|bool {
         $vendorPath = $this->themePath . $separator . 'vendor' . $separator;
         $frameworkPath = 'mirror-and-mountain' . $separator . 'meros-framework' . $separator . 'src';
@@ -382,6 +548,12 @@ class EnvironmentManager {
         }
     }
 
+    /**
+     * Initialises the devcontainer path properties.
+     * 
+     * @param string $separator The directory separator.
+     * @return string|bool True on success, error message on failure.
+     */
     private function initDevContainerPath(string $separator): string|bool {
         $devContainerPath = $this->themePath . $separator . '.devcontainer';
 
@@ -398,6 +570,13 @@ class EnvironmentManager {
         }
     }
 
+    /**
+     * Initialises the local environment configuration
+     * from the devcontainer .env file.
+     * 
+     * @param string $separator The directory separator.
+     * @return string|bool True on success, error message on failure.
+     */
     private function initLocalConfig(string $separator): string|bool {
         $containerEnv = $this->devContainerPath . $separator . '.env';
         $wordpressPath = realpath( dirname( $this->themePath, 3 ) );
@@ -440,6 +619,13 @@ class EnvironmentManager {
         return true;
     }
 
+    /**
+     * Initialises the remote environment configuration
+     * from the theme's config/environments.php file.
+     * 
+     * @param string $separator The directory separator.
+     * @return string|bool True on success, error message on failure.
+     */
     private function initRemoteConfig(string $separator): string|bool {
         $configPath = $this->themePath . $separator . 'config' . $separator . 'environments.php';
         if (file_exists($configPath)) {
@@ -535,6 +721,12 @@ class EnvironmentManager {
         return 'Environment configuration not found.';
     }
 
+    /**
+     * Initialises the available scripts.
+     * 
+     * @param string $separator The directory separator.
+     * @return void
+     */
     private function initScripts(string $separator): void {
         $scripts = ['create-feature', 'connect-env', 'clone-content', 'sync-theme'];
         foreach ($scripts as $script) {
@@ -548,6 +740,13 @@ class EnvironmentManager {
         }
     }
 
+    /**
+     * Initialises the features configuration
+     * from the theme's config/features.php file.
+     * 
+     * @param string $separator The directory separator.
+     * @return bool True on success, false on failure.
+     */
     private function initFeatures(string $separator): bool {
         $configPath = $this->themePath . $separator . 'config' . $separator . 'features.php';
         if (file_exists($configPath)) {
@@ -570,6 +769,12 @@ class EnvironmentManager {
         }
     }
  
+    /**
+     * Regenerates the features configuration file
+     * in the theme's config/features.php file.
+     * 
+     * @return bool True on success, false on failure.
+     */
     private function regenerateFeaturesConfig(): bool {
         $stubsPath = $this->frameworkPath . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR;
         $stub = $stubsPath . 'Features.stub';
@@ -629,6 +834,17 @@ class EnvironmentManager {
         }
     }
 
+    /**
+     * Waits for the database to be ready for connections.
+     * 
+     * @param string $host The database host.
+     * @param string $user The database user.
+     * @param string $pass The database password.
+     * @param int $port The database port.
+     * @param int $timeoutSeconds The timeout in seconds.
+     * @return void
+     * @throws \RuntimeException If the database is not ready within the timeout.
+     */
     private function waitForDBReady(
         string $host,
         string $user,

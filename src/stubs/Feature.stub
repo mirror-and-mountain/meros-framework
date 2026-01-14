@@ -4,10 +4,8 @@ namespace {{namespace}};
 
 use MM\Meros\Contracts\Feature;
 
-class {{NewFeature}} extends Feature
-{
-    protected function configure(): void
-    {
+class {{NewFeature}} extends Feature {
+    protected function configure(): void {
         // You can call loaders or add blocks, scripts and more inside this method.
     }
 }

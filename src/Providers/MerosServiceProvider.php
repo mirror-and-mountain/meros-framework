@@ -3,27 +3,24 @@
 namespace MM\Meros\Providers;
 
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
-use Livewire\Livewire;
+
 use MM\Meros\Contracts\ThemeManager;
 use MM\Meros\Helpers\ClassInfo;
 use MM\Meros\Helpers\Loader;
+use MM\Meros\Helpers\Livewire;
 use MM\Meros\Scripts\MerosCommands;
 
-/**
- * Binds Meros contracts to the Laravel application.
- */
-class MerosServiceProvider extends ServiceProvider
-{
+class MerosServiceProvider extends ServiceProvider {
     private bool $registered = false;
 
     /**
      * Retrieves the theme manager class from theme config and binds
      * it as a singleton.
+     * 
+     * @return void
      */
-    public function register(): void
-    {
+    public function register(): void {
         $themeClass = Config::get('features.theme_class');
         $themeClass = ClassInfo::get($themeClass);
 
@@ -38,12 +35,15 @@ class MerosServiceProvider extends ServiceProvider
     }
 
     /**
-     * Loads theme features, extensions and plugins before
-     * initialising them via the the theme manager class.
+     * Loads theme features before initialising them via the
+     * theme manager class. Also sets up the WP CLI commands if
+     * running in the console.
+     * 
+     * @return void
      */
-    public function boot(): void
-    {
-        $this->configureLivewire();
+    public function boot(): void {
+        // Setup Livewire
+        Livewire::setScriptRoute();    
 
         if ($this->registered) {
             $theme = $this->app->make('meros.theme_manager');
@@ -65,16 +65,5 @@ class MerosServiceProvider extends ServiceProvider
                 \WP_CLI::add_command('meros', $merosCli);
             }
         }
-    }
-
-    /**
-     * Configures Livewire settings for the theme.
-     */
-    private function configureLivewire(): void
-    {
-        // Set the livewire script route to use theme assets dir.
-        Livewire::setScriptRoute(function ($handle) {
-            return Route::get(get_theme_file_uri('assets/livewire/livewire.min.js'), $handle);
-        });
     }
 }

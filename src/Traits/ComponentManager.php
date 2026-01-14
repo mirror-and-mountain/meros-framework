@@ -9,8 +9,7 @@ use Livewire\Component;
 use Livewire\Livewire;
 use MM\Meros\Helpers\ClassInfo;
 
-trait ComponentManager
-{
+trait ComponentManager {
     /**
      * Indicates whether the feature has components.
      * Note: by component we mean a Livewire component.
@@ -55,18 +54,16 @@ trait ComponentManager
     /**
      * Sets absolute path and calls setComponents.
      */
-    protected function loadComponents(): void
-    {
-        $componentsPath = $this->path.$this->componentsDir;
+    protected function loadComponents(): void {
+        $componentsPath = $this->path . $this->componentsDir;
         $this->findComponents($componentsPath);
     }
 
     /**
      * Sets absolute path and calls setViews.
      */
-    protected function loadViews(): void
-    {
-        $viewsPath = $this->path.$this->viewsDir;
+    protected function loadViews(): void {
+        $viewsPath = $this->path . $this->viewsDir;
         $this->findViews($viewsPath);
     }
 
@@ -75,13 +72,12 @@ trait ComponentManager
      * Components will be indentified as a php file that contains
      * a class extending Livewire\\Component.
      */
-    private function findComponents(string $path): void
-    {
+    private function findComponents(string $path): void {
         if (! File::exists($path)) {
             return;
         }
 
-        $candidates = File::glob($path.'/*.php');
+        $candidates = File::glob($path . '/*.php');
 
         foreach ($candidates as $component) {
 
@@ -89,7 +85,7 @@ trait ComponentManager
 
             if ($class->extends(Component::class)) {
                 $handle = $this->useFullNameForComponents ? $this->fullName : $this->name;
-                $handle .= '.'.Str::lower(Str::replace('.php', '', basename($component)));
+                $handle .= '.' . Str::lower(Str::replace('.php', '', basename($component)));
                 $this->addComponent($handle, $class);
             }
         }
@@ -101,13 +97,12 @@ trait ComponentManager
      * Uses glob to search the given path for valid views.
      * Views will be identified as files with a blade.php extension.
      */
-    private function findViews(string $path): void
-    {
+    private function findViews(string $path): void {
         if (! File::exists($path)) {
             return;
         }
 
-        $candidates = File::glob($path.'/*.blade.php');
+        $candidates = File::glob($path . '/*.blade.php');
 
         foreach ($candidates as $view) {
             $handle = $this->useFullNameForComponents ? $this->fullName : $this->name;
@@ -120,24 +115,21 @@ trait ComponentManager
     /**
      * Registers a Livewire component.
      */
-    protected function addComponent(string $handle, object $class): void
-    {
+    protected function addComponent(string $handle, object $class): void {
         $this->components[$handle] = $class->name;
     }
 
     /**
      * Registers a Blade view.
      */
-    protected function addView(string $handle, string $path): void
-    {
+    protected function addView(string $handle, string $path): void {
         $this->views[$handle] = $path;
     }
 
     /**
      * Binds discovered Livewire components.
      */
-    private function bindComponents(): void
-    {
+    private function bindComponents(): void {
         foreach ($this->components ?? [] as $handle => $class) {
             Livewire::component($handle, $class);
         }
@@ -146,8 +138,7 @@ trait ComponentManager
     /**
      * Binds discovered Blade views.
      */
-    private function bindViews(): void
-    {
+    private function bindViews(): void {
         foreach ($this->views ?? [] as $handle => $path) {
             View::addNamespace($handle, dirname($path));
         }

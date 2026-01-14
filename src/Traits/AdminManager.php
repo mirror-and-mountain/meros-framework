@@ -9,14 +9,11 @@ use Illuminate\Support\Str;
  * Used by the theme manager to initialise settings
  * pages in the Wordpress dashboard.
  */
-trait AdminManager
-{
+trait AdminManager {
     protected array $optionsPages = [];
-
     protected static array $registeredSettings = [];
 
-    private function setOptionsPages(): void
-    {
+    private function setOptionsPages(): void {
         $this->optionsPages = [
             'theme_settings' => [
                 'page_title' => "{$this->themeName} Settings",
@@ -40,8 +37,7 @@ trait AdminManager
     /**
      * Initialises option pages if enabled.
      */
-    private function initialiseAdmin(): void
-    {
+    private function initialiseAdmin(): void {
         if (! is_admin()) {
             return;
         }
@@ -58,25 +54,24 @@ trait AdminManager
     /**
      * Enqueues admin scripts and styles.
      */
-    private function enqueueAdminScripts(): void
-    {
-        $assetsUri = trailingslashit($this->frameworkUri).'assets/build/admin/';
-        $assetsDir = trailingslashit(get_stylesheet_directory()).$this->frameworkDir.'assets/build/admin/';
+    private function enqueueAdminScripts(): void {
+        $assetsUri = trailingslashit($this->frameworkUri) . 'assets/build/admin/';
+        $assetsDir = trailingslashit(get_stylesheet_directory()) . $this->frameworkDir . 'assets/build/admin/';
 
         add_action('admin_enqueue_scripts', function () use ($assetsUri, $assetsDir) {
             wp_enqueue_script(
                 'mm-meros-toggle',
-                $assetsUri.'index.js',
+                $assetsUri . 'index.js',
                 [],
-                filemtime($assetsDir.'index.js'),
+                filemtime($assetsDir . 'index.js'),
                 true
             );
 
             wp_enqueue_style(
                 'mm-meros-admin-style',
-                $assetsUri.'style-index.css',
+                $assetsUri . 'style-index.css',
                 [],
-                filemtime($assetsDir.'style-index.css')
+                filemtime($assetsDir . 'style-index.css')
             );
         });
 
@@ -84,7 +79,7 @@ trait AdminManager
             $option = sanitize_key($_POST['option'] ?? '');
             $nonce = $_POST['nonce'] ?? '';
 
-            if (! $option || ! wp_verify_nonce($nonce, 'mm_meros_toggle_'.$option)) {
+            if (! $option || ! wp_verify_nonce($nonce, 'mm_meros_toggle_' . $option)) {
                 wp_send_json_error('Invalid request');
             }
 
@@ -101,7 +96,7 @@ trait AdminManager
                 'label' => $label,
                 'title' => $new_value ? 'Disable' : 'Enable',
                 'next_value' => $next_value,
-                'nonce' => wp_create_nonce('mm_meros_toggle_'.$option),
+                'nonce' => wp_create_nonce('mm_meros_toggle_' . $option),
             ]);
         });
     }
@@ -109,8 +104,7 @@ trait AdminManager
     /**
      * Adds a theme settings page to the WP dashboard.
      */
-    private function renderThemeSettingsPage(array $config): void
-    {
+    private function renderThemeSettingsPage(array $config): void {
         add_action('admin_menu', function () use ($config) {
             add_theme_page(
                 $config['page_title'],
@@ -124,8 +118,7 @@ trait AdminManager
         });
     }
 
-    private function renderThemeFeaturesPage(array $config): void
-    {
+    private function renderThemeFeaturesPage(array $config): void {
         add_action('admin_menu', function () use ($config) {
             add_options_page(
                 $config['page_title'],
@@ -140,38 +133,37 @@ trait AdminManager
         });
     }
 
-    private function renderSettingsPageTabs(array $config, bool $showSumit = true): void
-    {
+    private function renderSettingsPageTabs(array $config, bool $showSumit = true): void {
         foreach ($config['tabs'] as $tab) {
             $tabs[$tab] = Str::ucfirst(Str::replace('_', ' ', $tab));
         }
-        ?>
+?>
         <div class="wrap">
             <h1><?php echo esc_html($config['page_title']) ?></h1>
             <?php
             $settingsIntro = esc_html(apply_filters("{$config['menu_slug']}_settings_intro", ''));
-        $settingsIntroHtml = $settingsIntro !== '' ? "<p>{$settingsIntro}</p>" : '';
+            $settingsIntroHtml = $settingsIntro !== '' ? "<p>{$settingsIntro}</p>" : '';
 
-        echo $settingsIntroHtml;
-        $current_tab = isset($_GET['tab'], $tabs[$_GET['tab']]) ? $_GET['tab'] : array_key_first($tabs);
-        ?>
+            echo $settingsIntroHtml;
+            $current_tab = isset($_GET['tab'], $tabs[$_GET['tab']]) ? $_GET['tab'] : array_key_first($tabs);
+            ?>
             <form method='post' action='options.php'>
                 <nav class="nav-tab-wrapper">
                     <?php
-                foreach ($tabs as $tab => $name) {
-                    $current = $tab === $current_tab ? ' nav-tab-active' : '';
-                    $url = add_query_arg(['page' => $config['menu_slug'], 'tab' => $tab], '');
-                    echo "<a class=\"nav-tab{$current}\" href=\"{$url}\">{$name}</a>";
-                }
-        ?>
+                    foreach ($tabs as $tab => $name) {
+                        $current = $tab === $current_tab ? ' nav-tab-active' : '';
+                        $url = add_query_arg(['page' => $config['menu_slug'], 'tab' => $tab], '');
+                        echo "<a class=\"nav-tab{$current}\" href=\"{$url}\">{$name}</a>";
+                    }
+                    ?>
                 </nav>
                 <?php
                 settings_fields("{$config['menu_slug']}_{$current_tab}");
-        do_settings_sections("{$config['menu_slug']}_{$current_tab}");
-        if ($showSumit) {
-            submit_button();
-        }
-        ?>
+                do_settings_sections("{$config['menu_slug']}_{$current_tab}");
+                if ($showSumit) {
+                    submit_button();
+                }
+                ?>
             </form>
         </div>
         <?php
@@ -180,8 +172,7 @@ trait AdminManager
     /**
      * Adds a database migrations page to the WP dashboard.
      */
-    private function initialiseMigrationsSettingsPage(): void
-    {
+    private function initialiseMigrationsSettingsPage(): void {
         if ($this->migrations_page_registered) {
             return;
         }
@@ -201,44 +192,44 @@ trait AdminManager
                 'Database',
                 'Database',
                 'manage_options',
-                $this->themeSlug.'_db_migrations',
+                $this->themeSlug . '_db_migrations',
                 function () use ($features) {
-                    ?>
+        ?>
                 <div class="wrap">
                     <h1>Database Migrations</h1>
                     <?php
-                        foreach ($features as $feature) {
-                            $featureName = str_replace('_', ' ', $feature->getName());
-                            $featureName = ucwords($featureName);
-                            ?>
+                    foreach ($features as $feature) {
+                        $featureName = str_replace('_', ' ', $feature->getName());
+                        $featureName = ucwords($featureName);
+                    ?>
                         <div style="margin-bottom: 2rem">
                             <h2><?php echo esc_html($featureName); ?></h2>
                             <form method="post" action="">
-                                <?php wp_nonce_field($feature->getName().'_migrate_action', $feature->getName().'_migrate_nonce'); ?>
+                                <?php wp_nonce_field($feature->getName() . '_migrate_action', $feature->getName() . '_migrate_nonce'); ?>
                                 <input type="hidden" name="feature_name" value="<?php echo esc_attr($feature->getName()); ?>">
                                 <p>Run database migrations for the <?php echo esc_html($featureName); ?> feature.</p>
                                 <?php
-                                        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_migrations']) && isset($_POST['feature_name']) && $_POST['feature_name'] === $feature->getName()) {
-                                            if (isset($_POST[$feature->getName().'_migrate_nonce']) && wp_verify_nonce($_POST[$feature->getName().'_migrate_nonce'], $feature->getName().'_migrate_action')) {
-                                                if (method_exists($feature, 'runMigrations')) {
-                                                    $feature->runMigrations();
-                                                    echo '<div class="notice notice-success"><p>Migrations ran successfully for '.esc_html($featureName).'.</p></div>';
-                                                } else {
-                                                    echo '<div class="notice notice-error"><p>runMigrations method not found on '.esc_html($featureName).'.</p></div>';
-                                                }
-                                            } else {
-                                                echo '<div class="notice notice-error"><p>Invalid nonce. Please try again.</p></div>';
-                                            }
+                                if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_migrations']) && isset($_POST['feature_name']) && $_POST['feature_name'] === $feature->getName()) {
+                                    if (isset($_POST[$feature->getName() . '_migrate_nonce']) && wp_verify_nonce($_POST[$feature->getName() . '_migrate_nonce'], $feature->getName() . '_migrate_action')) {
+                                        if (method_exists($feature, 'runMigrations')) {
+                                            $feature->runMigrations();
+                                            echo '<div class="notice notice-success"><p>Migrations ran successfully for ' . esc_html($featureName) . '.</p></div>';
+                                        } else {
+                                            echo '<div class="notice notice-error"><p>runMigrations method not found on ' . esc_html($featureName) . '.</p></div>';
                                         }
-                            ?>
+                                    } else {
+                                        echo '<div class="notice notice-error"><p>Invalid nonce. Please try again.</p></div>';
+                                    }
+                                }
+                                ?>
                                 <button type="submit" name="run_migrations" class="button button-primary">Run Migrations</button>
                             </form>
                         </div>
                     <?php
-                        }
+                    }
                     ?>
                 </div>
-                <?php
+<?php
                 }
             );
         });
@@ -246,13 +237,11 @@ trait AdminManager
         $this->migrations_page_registered = true;
     }
 
-    final public function getOptionsPages(): array
-    {
+    final public function getOptionsPages(): array {
         return $this->optionsPages ?? [];
     }
 
-    final public function addOptionsPageTab(string $page, string $tab): void
-    {
+    final public function addOptionsPageTab(string $page, string $tab): void {
         $this->optionsPages[$page]['tabs'][] = $tab;
     }
 }

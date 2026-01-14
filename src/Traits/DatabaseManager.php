@@ -4,8 +4,7 @@ namespace MM\Meros\Traits;
 
 use Illuminate\Support\Facades\Artisan;
 
-trait DatabaseManager
-{
+trait DatabaseManager {
     /**
      * Whether the feature has database tables to migrate.
      */
@@ -20,12 +19,11 @@ trait DatabaseManager
     /**
      * Runs the feature's migrations.
      */
-    final public function runMigrations(): void
-    {
+    final public function runMigrations(): void {
         $migrationsPath =
-            trailingslashit('App').
-            trailingslashit('Features').
-            trailingslashit(ucfirst($this->getName())).
+            trailingslashit('App') .
+            trailingslashit('Features') .
+            trailingslashit(ucfirst($this->getName())) .
             $this->migrationsDir;
 
         Artisan::call('migrate', [

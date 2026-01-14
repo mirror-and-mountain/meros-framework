@@ -5,8 +5,7 @@ namespace MM\Meros\Traits;
 use Illuminate\Support\Str;
 use MM\Meros\Helpers\Fields;
 
-trait SettingsManager
-{
+trait SettingsManager {
     /**
      * The given settings for the feature. These are translated
      * into registered settings with wp's register_setting function.
@@ -93,9 +92,8 @@ trait SettingsManager
      * Creates a setting to enable/disable the feature
      * if it is user switchable.
      */
-    private function createFeatureSwitchSetting(string $description = '', bool $isExperimental = false): void
-    {
-        $label = 'Enable '.Str::title(Str::replace('_', ' ', $this->name));
+    private function createFeatureSwitchSetting(string $description = '', bool $isExperimental = false): void {
+        $label = 'Enable ' . Str::title(Str::replace('_', ' ', $this->name));
 
         $result = $this->addSetting(
             'enabled',
@@ -131,7 +129,7 @@ trait SettingsManager
         bool $isExperimental = false
     ): string|bool {
         $blockName = Str::slug($blockName, '_');
-        $label = 'Enable '.Str::title(Str::replace(['_', '-'], ' ', $blockName));
+        $label = 'Enable ' . Str::title(Str::replace(['_', '-'], ' ', $blockName));
 
         if ($isExperimental) {
             $label .= ' (Experimental)';
@@ -225,7 +223,7 @@ trait SettingsManager
 
         // Generate section ID if not provided
         if ($sectionId === '') {
-            $sectionId = $this->name.'_'.$page.'_'.$tab.'_section';
+            $sectionId = $this->name . '_' . $page . '_' . $tab . '_section';
         }
 
         // Ensure hasField is set
@@ -246,7 +244,7 @@ trait SettingsManager
         ];
 
         // Add the setting and corresponding section
-        $optionGroup = $optionPageSlug.'_'.$tab;
+        $optionGroup = $optionPageSlug . '_' . $tab;
         // Add settings section
         $this->addSettingsSection($sectionId, $sectionTitle, $optionPageSlug, $tab, $linkToFeature);
 
@@ -273,8 +271,8 @@ trait SettingsManager
     ): string {
         $featureName = $this->name;
         $optionName = $this->useFullNameInSettings
-            ? $this->fullName.'_'.$name
-            : $featureName.'_'.$name;
+            ? $this->fullName . '_' . $name
+            : $featureName . '_' . $name;
 
         $current = get_option($optionName, $config['default'] ?? null);
         $this->fqSettings[$optionGroup][$optionName] = $current;
@@ -288,7 +286,9 @@ trait SettingsManager
             $config
         ) {
             register_setting(
-                $optionGroup, $optionName, [
+                $optionGroup,
+                $optionName,
+                [
                     'type' => $config['type'],
                     'default' => $config['default'],
                     'description' => $config['description'],
@@ -305,14 +305,14 @@ trait SettingsManager
             if ($config['hasField']) {
                 // Add a settings field if specified
                 $type = $config['type'] === 'integer' ? 'number' : $config['type'];
-                $label = '<label id="'.esc_attr($optionName).'" for="'.esc_attr($optionName).'" class="meros-settings-label">'.esc_html($label).'</label>';
+                $label = '<label id="' . esc_attr($optionName) . '" for="' . esc_attr($optionName) . '" class="meros-settings-label">' . esc_html($label) . '</label>';
                 $description = $config['description'] !== ''
-                    ? '<p class="description">'.esc_html($config['description']).'</p>'
+                    ? '<p class="description">' . esc_html($config['description']) . '</p>'
                     : '';
 
                 add_settings_field(
                     $optionName,
-                    $label.$description,
+                    $label . $description,
                     function () use ($optionName, $config, $type) {
                         if (is_callable($config['hasField'])) {
                             call_user_func($config['hasField']);
@@ -370,16 +370,16 @@ trait SettingsManager
 
                         if ($linkToFeature && $this->featureEnabledSettingName !== '') {
                             $tab = $this->experimental ? 'experimental-features' : 'features';
-                            $featureUrl = admin_url('options-general.php?page=theme_features&tab='.$tab.'#'.$this->featureEnabledSettingName);
+                            $featureUrl = admin_url('options-general.php?page=theme_features&tab=' . $tab . '#' . $this->featureEnabledSettingName);
                             $content .= " | <a href=\"{$featureUrl}\">View Feature</a>";
                         }
 
                         $content .= '</p>';
-                        $content = apply_filters($this->name.'_settings_section_'.$id.'_content', $content);
+                        $content = apply_filters($this->name . '_settings_section_' . $id . '_content', $content);
                     }
                     echo $content;
                 },
-                $page.'_'.$tab,
+                $page . '_' . $tab,
                 []
             );
         }, 5);
@@ -388,8 +388,7 @@ trait SettingsManager
     /**
      * Callback to sanitize a setting when modified in the WP dashboard.
      */
-    private function sanitizeSetting(mixed $value, array $config): mixed
-    {
+    private function sanitizeSetting(mixed $value, array $config): mixed {
         $requiredType = $config['type'];
         $type = gettype($value);
 
@@ -423,7 +422,6 @@ trait SettingsManager
             case 'boolean':
                 $value = $value === '1' ? '1' : '0';
                 break;
-
         }
 
         return $value;
@@ -433,8 +431,7 @@ trait SettingsManager
      * Helper to sanitize text values. Called by the sanitizeSetting
      * method.
      */
-    private function sanitizeTextValue(mixed $value, string $type, string $requiredType): string
-    {
+    private function sanitizeTextValue(mixed $value, string $type, string $requiredType): string {
         if ($type === 'string') {
 
             if (in_array($requiredType, ['text', 'select'])) {
@@ -442,7 +439,6 @@ trait SettingsManager
             } elseif ($requiredType === 'textarea') {
                 $value = sanitize_textarea_field($value);
             }
-
         } elseif (in_array($type, ['integer', 'boolean', 'double'])) {
             $value = (string) $value;
         }
@@ -455,8 +451,7 @@ trait SettingsManager
      *
      * @param  bool  $fq  Whether to use fully qualified setting names.
      */
-    final public function getSettings(bool $fq = true): array
-    {
+    final public function getSettings(bool $fq = true): array {
         return $fq ? $this->fqSettings : $this->settings;
     }
 
@@ -466,8 +461,7 @@ trait SettingsManager
      *
      * @param  bool  $fq  Whether to use fully qualified setting name.
      */
-    final public function getSetting(string $optionGroup, string $name, bool $fq = false): mixed
-    {
+    final public function getSetting(string $optionGroup, string $name, bool $fq = false): mixed {
         if ($fq) {
             return $this->fqSettings[$optionGroup][$name] ?? null;
         } else {
