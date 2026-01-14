@@ -83,25 +83,28 @@ abstract class ThemeManager {
             }, 0);
         }
 
-        // Clear out any existing session files when the theme is activated.
+        // Hook for when theme is activated.
         add_action('after_switch_theme', function () {
+            // Clear session files.
             $sessionDir = get_theme_file_path('storage/framework/sessions');
 
-            if (! is_dir($sessionDir)) {
-                return;
-            }
+            if (is_dir($sessionDir)) {
+                $files = glob($sessionDir . '/*');
 
-            $files = glob($sessionDir . '/*');
-
-            foreach ($files as $file) {
-                if (is_file($file)) {
-                    unlink($file);
+                foreach ($files as $file) {
+                    if (is_file($file)) {
+                        unlink($file);
+                    }
                 }
             }
+
+            // Ensure an APP_KEY exists for Livewire.
+            Livewire::ensureAppKey();
         });
 
-        // Unregister all settings when the theme is switched.
+        // Hook for when theme is switched.
         add_action('switch_theme', function () {
+            // Unregister theme settings.
             $settings = self::$registeredSettings;
             foreach ($settings as $_ => $optionGroups) {
                 foreach ($optionGroups as $optionGroup => $options) {
