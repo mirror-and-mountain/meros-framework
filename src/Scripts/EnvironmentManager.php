@@ -3,8 +3,7 @@
 namespace MM\Meros\Scripts;
 
 use Dotenv\Dotenv;
-
-use function PHPSTORM_META\map;
+use Illuminate\Support\Str;
 
 class EnvironmentManager {
     private string $name;
@@ -14,9 +13,15 @@ class EnvironmentManager {
     private string $scriptsPath;
     private string $devContainerPath;
     private string $keysPath;
+    private string $themeClass;
+    private string $featuresNamespace;
+    private string $extensionsNamespace;
     private bool   $isLocal = false;
     private array  $config = [];
+    private array  $featuresConfig = [];
     private array  $scripts = [];
+    private array  $features = [];
+    private array  $extensions = [];
     private string $error = '';
 
     private function __construct( string $name, string $themePath ) {
@@ -65,7 +70,7 @@ class EnvironmentManager {
         return $instance;   
     }
 
-    public function createLocal() {
+    public function create(): bool {
         if (! $this->error !== '') {
             return false;
         }
@@ -73,6 +78,13 @@ class EnvironmentManager {
         if (! $this->isLocal) {
             $this->error = 'Environment is not local.';
             return false;
+        }
+
+        $options = [];
+        $configPath = $this->themePath . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'environments.php';
+        if (file_exists($configPath)) {
+            $config = require $configPath;
+            $options = $config['environment_default_options'] ?? [];
         }
 
         $configCommand = sprintf(
@@ -86,6 +98,135 @@ class EnvironmentManager {
             escapeshellarg($this->config['db']['collate']),
             escapeshellarg($this->config['db']['prefix'])
         );
+
+          $installCommand = sprintf(
+            'cd %s && wp core install --url=%s --title=%s --admin_user=%s --admin_password=%s --admin_email=%s --skip-email',
+            escapeshellarg($this->config['path']),
+            escapeshellarg($this->config['url']),
+            escapeshellarg($this->config['site_title']),
+            escapeshellarg($this->config['admin']['user']),
+            escapeshellarg($this->config['admin']['password']),
+            escapeshellarg($this->config['admin']['email'])
+        );
+
+        $activateThemeCommand = sprintf(
+            'cd %s && wp theme activate %s',
+            escapeshellarg($this->config['path']),
+            escapeshellarg($this->themeSlug)
+        );
+
+        $this->waitForDBReady(
+            $this->config['db']['host'],
+            $this->config['db']['user'],
+            $this->config['db']['pass'],
+            3306,
+            60
+        );
+
+        exec($configCommand, $configOutput, $configStatus);
+        if ($configStatus !== 0) {
+            $this->error = 'Failed to create wp-config.php: ' . implode("\n", $configOutput);
+            return false;
+        }
+
+        exec($installCommand, $installOutput, $installStatus);
+        if ($installStatus !== 0) {
+            $this->error = 'Failed to install WordPress: ' . implode("\n", $installOutput);
+            return false;
+        }
+
+        foreach($options as $option => $value) {
+            $optionCommand = sprintf(
+                'cd %s && wp option update %s %s',
+                escapeshellarg($this->config['path']),
+                escapeshellarg($option),
+                escapeshellarg($value)
+            );
+            exec($optionCommand);
+        }
+
+        $flushCommand = sprintf(
+            'cd %s && wp rewrite flush',
+            escapeshellarg($this->config['path'])
+        );
+        exec($flushCommand);
+
+        exec($activateThemeCommand, $themeOutput, $themeStatus);
+        if ($themeStatus !== 0) {
+            $this->error = 'Failed to activate theme: ' . implode("\n", $themeOutput);
+            return false;
+        }
+
+        return true;
+    }
+
+    public function installExtension(string $namespace, string $loader, bool $allowOverrides = false): bool {
+        if ($this->error !== '') {
+            return false;
+        }
+
+        if (! $this->isLocal) {
+            $this->error = 'Extensions can only be installed on local environment.';
+            return false;
+        }
+
+        if ( $namespace === '' || $loader === '' ) {
+            $this->error = 'Invalid extension configuration.';
+            return false;
+        }
+
+        $featuresInitialised = $this->initFeatures( DIRECTORY_SEPARATOR );
+        if (! $featuresInitialised ) {
+            $this->error = 'Failed to initialise features configuration.';
+            return false;
+        }
+
+        if ($allowOverrides) {
+            $stubsPath     = $this->frameworkPath . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR;
+            $stub          = $stubsPath . 'Extension.stub';
+            $overrideDef   = $this->themePath . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Extensions' . DIRECTORY_SEPARATOR . $loader . '.php';
+            $fqOverrideDef = $this->extensionsNamespace . '\\' . $loader;
+            $installed     = file_exists($overrideDef && in_array($fqOverrideDef, $this->extensions));
+
+            if ($installed) {
+                $this->error = 'Extension already installed.';
+                return false;
+            }
+
+            if (file_exists($stub) && ! file_exists($overrideDef)) {
+                $stubContent = file_get_contents($stub);
+                $replacements = [
+                    '{{namespace}}' => $this->extensionsNamespace,
+                    '{{extension}}' => $fqOverrideDef,
+                    '{{class}}'     => $loader,
+                ];
+
+                $rendered = str_replace(
+                    array_keys($replacements),
+                    array_values($replacements),
+                    $stubContent
+                );
+
+                if (! is_dir(dirname($overrideDef))) {
+                    mkdir(dirname($overrideDef), 0755, true);
+                }
+                file_put_contents($overrideDef, $rendered);
+
+                $this->extensions[] = $fqOverrideDef;
+                return $this->regenerateFeaturesConfig();
+            } else {
+                $this->error = 'Extension stub not found or override file already exists.';
+                return false;
+            }
+        } else {
+            $fqDef = $namespace . '\\' . $loader;
+            if (in_array($fqDef, $this->extensions)) {
+                $this->error = 'Extension already installed.';
+                return false;
+            }
+            $this->extensions[] = $fqDef;
+            return $this->regenerateFeaturesConfig();
+        }
     }
 
     public function connect(): bool {
@@ -112,6 +253,46 @@ class EnvironmentManager {
         }
 
         return true;
+    }
+
+    public function addFeature(string $name): bool {
+        if ($this->error !== '') {
+            return false;
+        }
+
+        if (! $this->isLocal) {
+            $this->error = 'Features can only be added on local environment.';
+            return false;
+        }
+
+        $featuresInitialised = $this->initFeatures( DIRECTORY_SEPARATOR );
+        if (! $featuresInitialised ) {
+            $this->error = 'Failed to initialise features configuration.';
+            return false;
+        }
+
+        $formattedName = Str::studly($name);
+        $fqFeature = $this->featuresNamespace . '\\' . $formattedName;
+        if (in_array($fqFeature, $this->features)) {
+            $this->error = 'Feature already added.';
+            return false;
+        }
+
+        $script = $this->scripts['create-feature'] ?? '';
+        if ($script === '') {
+            $this->error = 'Create feature script not found.';
+            return false;
+        }
+
+        $command = 'bash ' . escapeshellarg($script) . ' ' . escapeshellarg($formattedName) . ' ' . escapeshellarg($fqFeature);
+        passthru($command, $return_var);
+        if ($return_var !== 0) {
+            $this->error = 'Failed to create feature.';
+            return false;
+        } else {
+            $this->features[] = $fqFeature . '\\FeatureDefinition';
+            return $this->regenerateFeaturesConfig();
+        }
     }
 
     public function syncTheme(string $destName, bool $makeDir = true, bool $activate = true): bool {
@@ -355,7 +536,7 @@ class EnvironmentManager {
     }
 
     private function initScripts(string $separator): void {
-        $scripts = ['create-feature', 'connect-env', 'clone-content', 'sync-theme', 'sync-plugins'];
+        $scripts = ['create-feature', 'connect-env', 'clone-content', 'sync-theme'];
         foreach ($scripts as $script) {
             $path = $this->scriptsPath . $separator . $script . '.sh';
             if (file_exists($path)) {
@@ -365,5 +546,121 @@ class EnvironmentManager {
                 }
             }
         }
+    }
+
+    private function initFeatures(string $separator): bool {
+        $configPath = $this->themePath . $separator . 'config' . $separator . 'features.php';
+        if (file_exists($configPath)) {
+            $config = require $configPath;
+            $this->featuresConfig = $config;
+            $this->themeClass = $config['theme_class'] ?? 'App\\Theme';
+            $this->featuresNamespace = $config['features_namespace'] ?? 'App\\Features';
+            $this->extensionsNamespace = $config['extensions_namespace'] ?? 'App\\Extensions';
+            $this->features = $config['features'] ?? [];
+            $this->extensions = $config['extensions'] ?? [];
+            return true;
+        } else {
+            $this->featuresConfig = [];
+            $this->themeClass = '';
+            $this->featuresNamespace = '';
+            $this->extensionsNamespace = '';
+            $this->features = [];
+            $this->extensions = [];
+            return false;
+        }
+    }
+ 
+    private function regenerateFeaturesConfig(): bool {
+        $stubsPath = $this->frameworkPath . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR;
+        $stub = $stubsPath . 'Features.stub';
+
+        if (file_exists($stub)) {
+            $formatArray = function(array $config, array $array, string $type, int $indentLevel = 2): string {
+                $indent = str_repeat('    ', $indentLevel);
+                $lines = ['['];
+
+                $array = array_unique(array_merge(
+                    array_values($config[$type] ?? []),
+                    array_values($array)
+                ));
+
+                foreach ($array as $item) {
+                    $formattedValye = var_export($item, true);
+                    $lines[] = "{$indent}{$formattedValye},";
+                }
+
+                $lines[] = str_repeat('    ', $indentLevel - 1) . ']';
+                return implode("\n", $lines);
+            };
+
+            $stubContent = file_get_contents($stub);
+            $rendered = str_replace(
+                [
+                    '{{theme_class}}',
+                    '{{features_namespace}}',
+                    '{{extensions_namespace}}',
+                    '{{features}}',
+                    '{{extensions}}',
+                ],
+                [
+                    var_export($this->themeClass, true),
+                    var_export($this->featuresNamespace, true),
+                    var_export($this->extensionsNamespace, true),
+                    $formatArray($this->featuresConfig, $this->features, 'features'),
+                    $formatArray($this->featuresConfig, $this->extensions, 'extensions'),
+                ],
+                $stubContent
+            );
+
+            $featuresConfigFilePath = $this->themePath . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'features.php';
+            if (! is_dir(dirname($featuresConfigFilePath))) {
+                mkdir(dirname($featuresConfigFilePath), 0755, true);
+            }
+
+            if (file_put_contents($featuresConfigFilePath, $rendered) !== false) {
+                return true;
+            }
+
+            $this->error = 'Failed to write features configuration file.';
+            return false;
+        } else {
+            $this->error = 'Features stub file not found.';
+            return false;
+        }
+    }
+
+    private function waitForDBReady(
+        string $host,
+        string $user,
+        string $pass,
+        int $port = 3306,
+        int $timeoutSeconds = 60
+    ): void {
+        $start = time();
+        $lastError = null;
+
+        do {
+            $mysqli = new \mysqli($host, $user, $pass, null, $port);
+
+            if ($mysqli->connect_errno === 0) {
+                $mysqli->close();
+
+                return;
+            }
+
+            $lastError = $mysqli->connect_error;
+            $mysqli->close();
+
+            sleep(1);
+        } while (time() - $start < $timeoutSeconds);
+
+        throw new \RuntimeException(
+            sprintf(
+                'Timed out waiting for MySQL at %s:%d. Last error: %s',
+                $host,
+                $port,
+                $lastError
+            )
+        );
     }
 }

@@ -7,83 +7,32 @@ use Composer\IO\IOInterface;
 use Composer\Script\Event;
 
 class Composer {
-    /**
-     * Features configuration.
-     */
-    private static array $featuresConfig;
+    private static string $wordpressRoot = '';
+    private static string $projectRoot = '';
+    private static string $vendorRoot = '';
+    private static string $frameworkRoot = '';
 
-    /**
-     * Environment configuration.
-     */
-    private static array $environmentConfig;
-
-    /**
-     * Features defined in the theme's config.
-     */
-    private static array $features;
-
-    /**
-     * Extensions defined in the theme's config.
-     */
-    private static array $extensions;
-
-    /**
-     * The root path of the WordPress installation.
-     */
-    private static string $wordpressRoot;
-
-    /**
-     * The root path of the Composer project (and assumed theme root).
-     */
-    private static string $projectRoot;
-
-    /**
-     * The path to the 'vendor' directory.
-     */
-    private static string $vendorDir;
-
-    /**
-     * The path to the 'stubs' directory for Meros scripts.
-     */
-    private static string $stubDir;
-
-    /**
-     * Initializes static properties based on the Composer event.
-     * This should be called at the beginning of any public static method that
-     * needs path information.
-     */
     private static function initialise(ComposerInstance $composer, IOInterface $io): void {
-        $vendorDir = realpath($composer->getConfig()->get('vendor-dir'));
-        $directories = Utils::getDirectories($vendorDir);
+        self::$vendorRoot = realpath($composer->getConfig()->get('vendor-dir'));
+        self::$projectRoot = realpath(dirname(self::$vendorRoot));
+        self::$frameworkRoot = realpath(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'src');
 
-        if ($directories !== false) {
-            // Set paths
-            self::$wordpressRoot = $directories['wordpressRoot'] ?? '';
-            self::$vendorDir = $directories['vendorDir'] ?? '';
-            self::$projectRoot = $directories['projectRoot'] ?? '';
-            self::$stubDir = $directories['stubDir'] ?? '';
-
-            // Set configurations
-            self::$featuresConfig = Utils::getConfig('features', self::$projectRoot, self::$stubDir);
-            self::$features = self::$featuresConfig['features'] ?? [];
-            self::$extensions = self::$featuresConfig['extensions'] ?? [];
-            self::$environmentConfig = Utils::getConfig('environments', self::$projectRoot, self::$stubDir);
+        $runningInMeros = getenv('MEROS_ENVIRONMENT') === 'true';
+        if ($runningInMeros) {
+            self::$wordpressRoot = realpath(dirname(self::$projectRoot, 3));
         }
 
-        if (
-            self::$vendorDir === '' ||
-            self::$projectRoot === '' ||
-            self::$stubDir === '' ||
-            self::$featuresConfig === []
-        ) {
-            $io->write('<error>Cannot load meros dependancies. Aborting.</error>');
+        if (!is_dir(self::$vendorRoot) ||
+            !is_dir(self::$projectRoot) ||
+            !is_dir(self::$frameworkRoot)) {
+            $io->write('<error>Cannot load meros dependencies. Aborting.</error>');
             exit(1);
         }
     }
 
     /**
      * Runs after composer dump-autoload. Will check installed packages and
-     * handle any relevant theme plugin or extension installations.
+     * handle any relevant theme extension installations.
      */
     public static function postAutoloadDump(Event $event): void {
         $composer = $event->getComposer();
@@ -91,17 +40,19 @@ class Composer {
         $io = $event->getIO();
 
         self::initialise($composer, $io);
+        $environmentManager = EnvironmentManager::get('local_dev', self::$projectRoot);
 
         $runningInMeros = getenv('MEROS_ENVIRONMENT') === 'true';
         $wordpressInstalled =
             is_dir(self::$wordpressRoot) &&
             is_file(self::$wordpressRoot . DIRECTORY_SEPARATOR . 'wp-config.php');
 
+        // Initialise local environment if WP not installed
         if ($runningInMeros && ! $wordpressInstalled) {
-            self::configureEnvironment($io);
+            self::configureEnvironment($io, $environmentManager);
         }
 
-        $regenerateConfig = false;
+        // Handle package installations
         foreach ($composer->getRepositoryManager()->getLocalRepository()->getPackages() as $package) {
             $packageName = $package->getName();
             $extra = $package->getExtra();
@@ -115,31 +66,19 @@ class Composer {
                 continue;
             }
 
-            // Handle Extensions
+            // Install extension
             elseif (isset($extra['meros'], $extra['meros']['loader'], $extra['meros']['namespace'])) {
-                $installed = self::installExtension($io, $extra['meros']);
-                if ($installed) {
-                    $regenerateConfig = true;
-                }
+                $environmentManager->installExtension(
+                    $extra['meros']['namespace'], 
+                    $extra['meros']['loader'], 
+                    $extra['meros']['allow_overrides'] ?? false
+                );
             }
 
             // Update livewire assets
             elseif ($packageName === 'livewire/livewire') {
                 self::publishLivewireAssets($io);
             }
-        }
-
-        if ($regenerateConfig) {
-            $io->write('<info>Regenerating theme config</info>');
-
-            // Regenerate theme config
-            Utils::regenerateFeaturesConfig(
-                self::$stubDir,
-                self::$projectRoot,
-                self::$featuresConfig,
-                self::$features,
-                self::$extensions
-            );
         }
     }
 
@@ -153,7 +92,7 @@ class Composer {
      * @param IOInterface $io Composer IO interface for output.
      * @return void
      */
-    public static function publishLivewireAssets(IOInterface $io): void {
+    private static function publishLivewireAssets(IOInterface $io): void {
         $projectRoot = self::$projectRoot;
 
         $io->write("<info>Updating Livewire Assets in the theme directory: {$projectRoot}/assets/livewire</info>");
@@ -163,7 +102,6 @@ class Composer {
 
         if ($testStatus !== 0) {
             $io->write('Meros theme not currently activated or WP CLI unavailable. Skipping publish Livewire assets.');
-
             return;
         }
 
@@ -204,213 +142,14 @@ class Composer {
      * @param IOInterface $io Composer IO interface for output.
      * @return void
      */
-    protected static function configureEnvironment(IOInterface $io): void {
+    private static function configureEnvironment(IOInterface $io, object $environmentManager): void {
         $io->write('<info>Installing & Configuring WordPress...</info>');
         
-        // Load environment variables
-        $config = Utils::getLocalEnvironmentConfig(self::$projectRoot);
-
-        // Ensure environment config file exists (for Livewire)
-        Utils::makeProjectEnvFile(self::$projectRoot);
-
-        // Ensure we can get the WordPress root
-        $wordpressRoot = self::$wordpressRoot !== '' ? self::$wordpressRoot : false;
-        if (! $wordpressRoot) {
-            $io->write('<error>Cannot determine WordPress root. Aborting.</error>');
-            exit(1);
-        }
-
-        // Determine theme slug for activation
-        $themeSlug = basename(self::$projectRoot);
-
-        // Command for creating wp-config.php
-        $configCommand = sprintf(
-            'cd %s && wp config create --dbname=%s --dbuser=%s --dbpass=%s --dbhost=%s --dbcharset=%s --dbcollate=%s --dbprefix=%s',
-            escapeshellarg($wordpressRoot),
-            escapeshellarg($config['db']['name']),
-            escapeshellarg($config['db']['user']),
-            escapeshellarg($config['db']['pass']),
-            escapeshellarg($config['db']['host']),
-            escapeshellarg($config['db']['charset']),
-            escapeshellarg($config['db']['collate']),
-            escapeshellarg($config['db']['prefix'])
-        );
-
-        // Command for installing WordPress
-        $installCommand = sprintf(
-            'cd %s && wp core install --url=%s --title=%s --admin_user=%s --admin_password=%s --admin_email=%s --skip-email',
-            escapeshellarg($wordpressRoot),
-            escapeshellarg($config['url']),
-            escapeshellarg($config['site_title']),
-            escapeshellarg($config['admin']['user']),
-            escapeshellarg($config['admin']['password']),
-            escapeshellarg($config['admin']['email'])
-        );
-
-        // Command for activating the Meros theme
-        $activateThemeCommand = sprintf(
-            'cd %s && wp theme activate %s',
-            escapeshellarg($wordpressRoot),
-            escapeshellarg($themeSlug)
-        );
-
-        // 1. Wait for DB
-        self::waitForMysql(
-            $config['db']['host'], 
-            $config['db']['user'], 
-            $config['db']['pass']
-        );
-
-        // 2. Create wp-config.php
-        exec($configCommand, $configOutput, $configStatus);
-        if ($configStatus !== 0) {
-            $io->write('<error>Failed to create wp-config.php.</error>');
-            exit(1);
-        }
-
-        // 3. Install WordPress
-        exec($installCommand, $installOutput, $installStatus);
-        if ($installStatus !== 0) {
-            $io->write('<error>Failed to install WordPress.</error>');
-            exit(1);
-        }
-
-        // 4. Configure default options
-        $options = self::$environmentConfig['default_options'] ?? [];
-        foreach ($options as $optionName => $optionValue) {
-            $setOptionCommand = sprintf(
-                'cd %s && wp option update %s %s',
-                escapeshellarg($wordpressRoot),
-                escapeshellarg($optionName),
-                escapeshellarg($optionValue)
-            );
-            exec($setOptionCommand);
-        }
-
-        // 5. Flush rewrite rules
-        $flushCommand = sprintf(
-            'cd %s && wp rewrite flush',
-            escapeshellarg($wordpressRoot)
-        );
-        exec($flushCommand);
-
-        // 6. Activate Theme
-        exec($activateThemeCommand, $activateOutput, $activateStatus);
-        if ($activateStatus !== 0) {
-            $io->write('<error>Failed to activate Meros theme.</error>');
-            exit(1);
-        }
-
-        $io->write('<info>WordPress installation complete.</info>');
-    }
-
-    /**
-     * Waits for a MySQL server to become available.
-     *
-     * @param  string  $host  The MySQL host.
-     * @param  string  $user  The MySQL username.
-     * @param  string  $pass  The MySQL password.
-     * @param  int  $port  The MySQL port.
-     * @param  int  $timeoutSeconds  The timeout in seconds.
-     *
-     * @throws \RuntimeException If the MySQL server does not become available within the timeout.
-     */
-    private static function waitForMysql(
-        string $host,
-        string $user,
-        string $pass,
-        int $port = 3306,
-        int $timeoutSeconds = 60
-    ): void {
-        $start = time();
-        $lastError = null;
-
-        do {
-            $mysqli = new \mysqli($host, $user, $pass, null, $port);
-
-            if ($mysqli->connect_errno === 0) {
-                $mysqli->close();
-
-                return;
-            }
-
-            $lastError = $mysqli->connect_error;
-            $mysqli->close();
-
-            sleep(1);
-        } while (time() - $start < $timeoutSeconds);
-
-        throw new \RuntimeException(
-            sprintf(
-                'Timed out waiting for MySQL at %s:%d. Last error: %s',
-                $host,
-                $port,
-                $lastError
-            )
-        );
-    }
-
-    /**
-     * Installs or registers a Meros extension based on the provided configuration.
-     *
-     * If overrides are allowed, this method will generate an override class file from a stub,
-     * unless it already exists. Otherwise, it registers the extension by its fully qualified class name.
-     *
-     * @param  IOInterface  $io Composer IO interface for output.
-     * @param  array  $config Extension configuration array.
-     * 
-     * @return boolean True if the extension was installed or registered, false otherwise.
-     */
-    private static function installExtension(IOInterface $io, array $config): bool {
-        $namespace = $config['namespace'];
-        $loader = $config['loader'];
-        $allowOverrides = $config['allow_overrides'] ?? false;
-
-        if ($allowOverrides === true) {
-            $extensionsNamespace = self::$featuresConfig['extensions_namespace'] ?? 'App\\Extensions;';
-            $overrideClass = $loader;
-            $fqOverrideClass = $extensionsNamespace . '\\' . $overrideClass;
-
-            $overrideFile = self::$projectRoot . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Extensions' . DIRECTORY_SEPARATOR . "{$overrideClass}.php";
-            $stubPath = self::$stubDir . DIRECTORY_SEPARATOR . 'Extension.stub';
-            $installed = file_exists($overrideFile) && in_array($fqOverrideClass, self::$extensions, true);
-
-            if ($installed) {
-                return false;
-            }
-
-            if (file_exists($stubPath) && ! file_exists($overrideFile)) {
-                $io->write("<info>Installing extension {$fqOverrideClass}</info>");
-                $stub = file_get_contents($stubPath);
-                $replacements = [
-                    '{{namespace}}' => $extensionsNamespace,
-                    '{{extension}}' => $config['class'],
-                    '{{class}}' => $overrideClass,
-                ];
-
-                $rendered = str_replace(array_keys($replacements), array_values($replacements), $stub);
-
-                if (! is_dir(dirname($overrideFile))) {
-                    mkdir(dirname($overrideFile), 0755, true);
-                }
-                file_put_contents($overrideFile, $rendered);
-
-                $io->write("<info>Generated: {$overrideFile}</info>");
-
-                self::$extensions[] = $overrideClass;
-                return true;
-            } else {
-                $io->write("<error>Could not find stub file at {$stubPath} or override file already exists at {$overrideFile}. Skipping extension installation.</error>");
-                return false;
-            }
+        $status = $environmentManager->create();
+        if (! $status) {
+            $io->write('<error>Failed to install and configure WordPress: ' . $environmentManager->getError() . '</error>');
         } else {
-            $fullQualifiedClass = $namespace . '\\' . $loader;
-            if (in_array($fullQualifiedClass, self::$extensions, true)) {
-                return false;
-            }
-            $io->write("<info>Registering extension {$fullQualifiedClass}</info>");
-            self::$extensions[] = $fullQualifiedClass;
-            return true;
+            $io->write('<info>WordPress installed and configured successfully.</info>');
         }
     }
 
@@ -419,7 +158,7 @@ class Composer {
      *
      * @param  string  $dir  The directory to delete.
      */
-    protected static function deleteDirectory(string $dir): void {
+    private static function deleteDirectory(string $dir): void {
         if (! file_exists($dir)) {
             return;
         }
