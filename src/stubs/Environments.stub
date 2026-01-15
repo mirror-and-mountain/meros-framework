@@ -2,7 +2,7 @@
 
 return [
     'environment_default_options' => [
-        'permalink_structure' => '/%postname%/'
+        'blog_public' => 0,
     ],
     'remote_environments' => [
         'dev' => [

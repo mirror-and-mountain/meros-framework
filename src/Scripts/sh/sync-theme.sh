@@ -35,7 +35,7 @@ ACTIVATE="${15:-"false"}"
 # ---------------------------------------------------------------------
 if [ $SOURCE_ENV = 'local_dev' ]; then
     # Ensure theme directory exists on destination
-    ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" \
+    ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
         "[ -d '${DEST_PATH}/wp-content/themes/${THEME_SLUG}' ] || { \
             if [ '${MAKE_DIR}' = 'true' ]; then \
                 echo 'Destination theme directory does not exist. Creating...'; \
@@ -50,7 +50,7 @@ if [ $SOURCE_ENV = 'local_dev' ]; then
         }"
 
     rsync -avz \
-        -e "ssh -i ${DEST_SSH_KEY} -p ${DEST_SSH_PORT}" \
+        -e "ssh -i ${DEST_SSH_KEY} -p ${DEST_SSH_PORT} -o StrictHostKeyChecking=no" \
         "${SOURCE_PATH}/wp-content/themes/${THEME_SLUG}/" \
         "${DEST_SSH_HOST}:${DEST_PATH}/wp-content/themes/${THEME_SLUG}/" \
             --exclude='/.devcontainer/' \
@@ -86,7 +86,7 @@ if [ $SOURCE_ENV = 'local_dev' ]; then
 
     if [ "${ACTIVATE}" = "true" ]; then
         echo "Activating theme '${THEME_SLUG}' on destination..."
-        ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" \
+        ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
             "wp theme activate '${THEME_SLUG}' --url='${DEST_URL}' --path='${DEST_PATH}' --quiet"
     fi
     
@@ -101,7 +101,7 @@ else
     mkdir -p "$TMP_DIR/remote-theme"
 
     # Ensure source theme exists
-    ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" \
+    ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" -o StrictHostKeyChecking=no \
         "[ -d '${SOURCE_PATH}/wp-content/themes/${THEME_SLUG}' ]" || {
             echo "Error: Source theme directory does not exist."
             exit 1
@@ -122,7 +122,7 @@ else
 
     if [ "${ACTIVATE}" = "true" ]; then
         echo "Activating theme '${THEME_SLUG}' on destination..."
-        ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" \
+        ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
             "wp theme activate '${THEME_SLUG}' --url='${DEST_URL}' --path='${DEST_PATH}' --quiet"
     fi
 fi

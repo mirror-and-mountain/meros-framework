@@ -32,6 +32,7 @@ TABLES="${15:-""}"
 EXCLUDE_TABLES="${16:-""}"
 ADD_DROP_TABLE="${17:-"false"}"
 THEME_OPTIONS="${18:-""}"
+SEARCH_REPLACE="${19:-"true"}"
 
 # ---------------------------------------------------------------------
 # Constants
@@ -40,48 +41,65 @@ TMP_DIR=$(mktemp -d)
 trap cleanup EXIT
 trap on_error ERR
 TMP_DB="$TMP_DIR/source-db.sql"
-EXCLUDE_TABLES_PARAM="--exclude_tables=$EXCLUDE_TABLES"
+
+# Prepare exclude tables parameter
+if [ -n "$EXCLUDE_TABLES" ]; then
+    EXCLUDE_TABLES_PARAM="--exclude_tables=$EXCLUDE_TABLES"
+else 
+    EXCLUDE_TABLES_PARAM=""
+fi
+
+# Prepare drop table flag
+if [ "$ADD_DROP_TABLE" = "true" ]; then
+    ADD_DROP_TABLE_FLAG="--add-drop-table"
+else
+    ADD_DROP_TABLE_FLAG=""
+fi
 
 # ---------------------------------------------------------------------
 # Export source database from source environment
 # ---------------------------------------------------------------------
 if [ "$SOURCE_ENV" = "local_dev" ]; then    
     # Export local database
+    echo "Exporting source database from local host..."
     if [ "$TABLES" = "all" ]; then
         wp db export "$TMP_DB" \
             --path="$SOURCE_PATH" \
-            $( [ "$ADD_DROP_TABLE" = "true" ] && echo "--add-drop-table" ) \
             --skip-themes \
-            $EXCLUDE_TABLES_PARAM
+            $EXCLUDE_TABLES_PARAM \
+            $ADD_DROP_TABLE_FLAG
     else
         wp db export "$TMP_DB" \
             --path="$SOURCE_PATH" \
-            $( [ "$ADD_DROP_TABLE" = "true" ] && echo "--add-drop-table" ) \
             --skip-themes \
-            --tables="$TABLES"
+            --tables="$TABLES" \
+            $ADD_DROP_TABLE_FLAG
     fi
 else
     # Export remote database
+    echo "Exporting source database from remote host..."
     if [ "$TABLES" = "all" ]; then
-        ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" \
+        ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" -o StrictHostKeyChecking=no \
         "wp db export - \
             --path='${SOURCE_PATH}' \
-            $( [ \"$ADD_DROP_TABLE\" = \"true\" ] && echo \"--add-drop-table\" ) \
             --skip-themes \
-            $EXCLUDE_TABLES_PARAM" \
+            --defaults=true \
+            $EXCLUDE_TABLES_PARAM \
+            $ADD_DROP_TABLE_FLAG" \
         > "$TMP_DB"
     else
-        ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" \
+        ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" -o StrictHostKeyChecking=no \
         "wp db export - \
             --path='${SOURCE_PATH}' \
-            $( [ \"$ADD_DROP_TABLE\" = \"true\" ] && echo \"--add-drop-table\" ) \
             --skip-themes \
-            --tables='${TABLES}'" \
+            --tables='${TABLES}' \
+            $ADD_DROP_TABLE_FLAG" \
         > "$TMP_DB"
     fi
 fi
 
 # Configure table prefix replacement if needed
+echo "Configuring table prefix replacements..."
 if [ -n "$DEST_PREFIX" ] && [ -n "$SOURCE_PREFIX" ]; then
     sed "s/\`$SOURCE_PREFIX/\`$DEST_PREFIX/g" "$TMP_DB" > "${TMP_DB}-prefixed"
     TMP_DB="${TMP_DB}-prefixed"
@@ -98,11 +116,13 @@ fi
 # Handle local import
 if [ "$DEST_ENV" = "local_dev" ]; then
     # Import database
+    echo "Importing database to local host..."
     wp db import "$TMP_DB" --path="$DEST_PATH"
 
 else
     # Handle remote import
-    cat "$TMP_DB" | ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" \
+    echo "Importing database on remote host..."
+    cat "$TMP_DB" | ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
         "wp db import - --path='${DEST_PATH}'"
 fi
 
@@ -110,18 +130,61 @@ fi
 # Update theme options
 # ---------------------------------------------------------------------
 if [ -n "$THEME_OPTIONS" ]; then
+    echo "Updating theme options..."
     if [ "$DEST_ENV" = "local_dev" ]; then
         IFS=',' read -ra OPTIONS <<< "$THEME_OPTIONS"
         for opt in "${OPTIONS[@]}"; do
-            wp option update "$opt" "$(wp option get "$opt" --path="$SOURCE_PATH")" --path="$DEST_PATH"
+            VALUE=$(ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" -o StrictHostKeyChecking=no \
+                "wp option get '$opt' --path='${SOURCE_PATH}'" 2>/dev/null || true)
+
+            if [ -n "$VALUE" ]; then
+                wp option update "$opt" "$VALUE" --path="$DEST_PATH"
+            fi
         done
-    else 
+    elif [ "$SOURCE_ENV" = "local_dev" ]; then
         IFS=',' read -ra OPTIONS <<< "$THEME_OPTIONS"
         for opt in "${OPTIONS[@]}"; do
-            VALUE=$(ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" \
-                "wp option get '$opt' --path='${SOURCE_PATH}'")
-            ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" \
-                "wp option update '$opt' '$VALUE' --path='${DEST_PATH}'"
+            VALUE=$(wp option get "$opt" --path="$SOURCE_PATH" 2>/dev/null || true)
+
+            if [ -n "$VALUE" ]; then
+                ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
+                    "wp option update '$opt' '$VALUE' --path='${DEST_PATH}'"
+            fi
         done
+    else
+        IFS=',' read -ra OPTIONS <<< "$THEME_OPTIONS"
+        for opt in "${OPTIONS[@]}"; do
+            VALUE=$(ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" -o StrictHostKeyChecking=no \
+                "wp option get '$opt' --path='${SOURCE_PATH}'" 2>/dev/null || true)
+            
+            if [ -n "$VALUE" ]; then
+                ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
+                    "wp option update '$opt' '$VALUE' --path='${DEST_PATH}'"
+            fi
+        done
+    fi
+fi
+
+# ---------------------------------------------------------------------
+# Clean up and search and replace URLs if needed
+# ---------------------------------------------------------------------
+echo "Cleaning up..."
+if [ "$DEST_ENV" = "local_dev" ]; then
+    wp cache flush --path="$DEST_PATH"
+    wp transient delete --all --path="$DEST_PATH"
+    wp rewrite flush --path="$DEST_PATH"
+
+    if [ "$SEARCH_REPLACE" = "true" ]; then
+        echo "Performing search and replace of URLs..."
+        wp search-replace "$SOURCE_URL" "$DEST_URL" --path="$DEST_PATH" --quiet
+    fi
+else
+    ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
+        "wp cache flush --path='${DEST_PATH}' && wp transient delete --all --path='${DEST_PATH}' && wp rewrite flush --path='${DEST_PATH}'"
+    
+    if [ "$SEARCH_REPLACE" = "true" ]; then
+        echo "Performing search and replace of URLs on remote host..."
+        ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
+            "wp search-replace '$SOURCE_URL' '$DEST_URL' --path='${DEST_PATH}' --quiet"
     fi
 fi

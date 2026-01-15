@@ -186,7 +186,7 @@ class EnvironmentManager {
      * @return bool True on success, false on failure.
      */
     public function create(): bool {
-        if (! $this->error !== '') {
+        if ($this->error !== '') {
             return false;
         }
 
@@ -214,7 +214,7 @@ class EnvironmentManager {
             escapeshellarg($this->config['db']['prefix'])
         );
 
-          $installCommand = sprintf(
+        $installCommand = sprintf(
             'cd %s && wp core install --url=%s --title=%s --admin_user=%s --admin_password=%s --admin_email=%s --skip-email',
             escapeshellarg($this->config['path']),
             escapeshellarg($this->config['url']),
@@ -448,7 +448,7 @@ class EnvironmentManager {
             return false;
         }
 
-        if ($destName === 'local_dev') {
+        if ($destName === 'local_dev' || $destName === 'local') {
             $this->error = 'Syncing the theme to local environment is not supported.';
             return false;
         }
@@ -480,6 +480,11 @@ class EnvironmentManager {
 
         passthru($command, $return_var);
 
+        if ($return_var === 2) {
+            $this->error = 'Sync theme operation cancelled by user.';
+            return false;
+        }
+
         if ($return_var !== 0) {
             $this->error = 'Failed to sync theme from ' . $this->name . ' to ' . $destName . '.';
             return false;
@@ -492,12 +497,16 @@ class EnvironmentManager {
         string $destName, 
         array  $tables = [], 
         array  $excludedTables = [],
+        bool   $skipGlobalExcludes = false,
+        bool   $themeOptions = false,
         bool   $dropTables = false,
-        bool   $themeOptions = false
+        bool   $searchReplace = true
     ): bool {
         if ($this->error !== '') {
             return false;
         }
+
+        $destName = $destName === 'local' ? 'local_dev' : $destName;
 
         if ($destName === $this->name) {
             $this->error = 'Source and destination environments cannot be the same.';
@@ -511,10 +520,22 @@ class EnvironmentManager {
             return false;
         }
 
+        if (! $skipGlobalExcludes) {
+            $excludedTables = array_merge($excludedTables, [
+                'users',
+                'usermeta',
+                'options',
+                'comments',
+                'commentmeta'
+            ]);
+        }
+
         $prefixedTables = [];
         if ($tables !== ['all']) {
             foreach ($tables as $table) {
-                $prefixedTables[] = $this->config['db']['prefix'] . $table;
+                if (! in_array($table, $excludedTables)) {
+                    $prefixedTables[] = $this->config['db']['prefix'] . $table;
+                }
             }
         } else {
             $prefixedTables = 'all';
@@ -538,8 +559,8 @@ class EnvironmentManager {
         $command .= escapeshellarg($this->name) . ' ';
         $command .= escapeshellarg($this->config['url']) . ' ';
         $command .= $this->getSSHCommand() . ' ';
-        $command .= escapeshellarg($destConfig['db']['prefix']) . ' ';
         $command .= escapeshellarg($this->config['db']['prefix']) . ' ';
+        $command .= escapeshellarg($destConfig['db']['prefix']) . ' '; 
         $command .= escapeshellarg(is_array($prefixedTables) ? implode(',', $prefixedTables) : $prefixedTables) . ' ';
         $command .= escapeshellarg(implode(',', $prefixedExcludedTables)) . ' ';
         $command .= escapeshellarg($dropTables ? 'true' : 'false') . ' ';
@@ -547,10 +568,25 @@ class EnvironmentManager {
         if ($themeOptions) {
             $theme = app()->make('meros.theme_manager');
             $options = $theme->getRegisteredSettingKeys();
-            $command .= escapeshellarg(implode(',', $options)) . ' ';
+            $command .= escapeshellarg(implode(',', $options));
+        } else {
+            $command .= escapeshellarg('');
         }
 
-        dd($command);
+        $command .= ' ' . escapeshellarg($searchReplace ? 'true' : 'false');
+
+        passthru($command, $return_var);
+        if ($return_var === 2) {
+            $this->error = 'Sync tables operation cancelled by user.';
+            return false;
+        }
+
+        if ($return_var !== 0) {
+            $this->error = 'Failed to sync tables from ' . $this->name . ' to ' . $destName . '.';
+            return false;
+        }
+
+        return true;
     }
 
     /**

@@ -4,12 +4,15 @@ namespace MM\Meros\Contracts;
 
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Arr;
+
 use MM\Meros\Helpers\Livewire;
 use MM\Meros\Providers\MerosServiceProvider;
+
 use MM\Meros\Traits\AdminManager;
 use MM\Meros\Traits\AuthorManager;
 use MM\Meros\Traits\ContextManager;
 use MM\Meros\Traits\PermalinkManager;
+
 use Roots\Acorn\Application as RootsApplication;
 
 /**
@@ -103,7 +106,7 @@ abstract class ThemeManager {
             Livewire::ensureAppKey();
 
             // Ensure pretty permalinks are set.
-            $this->ensurePrettyPermalinks();
+            self::ensurePrettyPermalinks();
         });
 
         // Hook for when theme is switched.
