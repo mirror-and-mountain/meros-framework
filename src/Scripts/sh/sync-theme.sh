@@ -49,6 +49,10 @@ if [ $SOURCE_ENV = 'local_dev' ]; then
             fi \
         }"
 
+    # Clear laravel caches
+    wp acorn view:clear --path="${SOURCE_PATH}" --quiet || true
+    wp acorn cache:clear --path="${SOURCE_PATH}" --quiet || true
+
     rsync -avz \
         -e "ssh -i ${DEST_SSH_KEY} -p ${DEST_SSH_PORT} -o StrictHostKeyChecking=no" \
         "${SOURCE_PATH}/wp-content/themes/${THEME_SLUG}/" \
@@ -80,7 +84,6 @@ if [ $SOURCE_ENV = 'local_dev' ]; then
             --exclude='**/package.json' \
             --exclude='**/package-lock.json' \
             --exclude='**/webpack.assets.config.js' \
-            --exclude='**/storage/logs/laravel.log' \
             --delete \
             --delete-excluded
 
