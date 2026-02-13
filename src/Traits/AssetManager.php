@@ -17,9 +17,9 @@ trait AssetManager {
      * admin_enqueue_scripts.
      */
     protected array $assetLocations = [
-        'admin' => 'admin_enqueue_scripts',
+        'admin'  => 'admin_enqueue_scripts',
         'editor' => 'enqueue_block_editor_assets',
-        'site' => 'wp_enqueue_scripts',
+        'site'   => 'wp_enqueue_scripts',
     ];
 
     /**
@@ -192,6 +192,7 @@ trait AssetManager {
                 $deps = $properties['dependencies'];
                 $version = $properties['version'];
 
+                $hook = $hook === 'enqueue_block_editor_assets' ? 'enqueue_block_assets' : $hook;
                 add_action($hook, function () use ($location, $handle, $src, $deps, $version) {
                     $shouldEnqueue = $this->shouldEnqueueAsset('styles', $location, $handle);
                     if ($shouldEnqueue) {
