@@ -12,6 +12,14 @@ trait AssetManager {
     private bool $hasAssets = false;
 
     /**
+     * The structure to search for assets in. This will be used
+     * to generate the glob pattern for finding assets.
+     * {location} and {extension} will be replaced with the
+     * appropriate values.
+     */
+    protected string $assetsStructure = '/{location}/*.{extension}';
+
+    /**
      * Maps assets locations/directories to Wordpress hooks.
      * Example: assets/build/admin/index.js will be enqueued using
      * admin_enqueue_scripts.
@@ -53,11 +61,11 @@ trait AssetManager {
         $assetsPath = $this->path . $this->assetsDir;
         foreach ($this->assetLocations as $location => $_) {
             if ($this->scripts[$location] ?? [] === []) {
-                $this->findAssets($assetsPath, $location, 'js');
+                $this->findAssets($assetsPath, $location, 'js', $inFooter);
             }
 
             if ($this->styles[$location] ?? [] === []) {
-                $this->findAssets($assetsPath, $location, 'css');
+                $this->findAssets($assetsPath, $location, 'css', $inFooter);
             }
         }
     }
@@ -74,12 +82,11 @@ trait AssetManager {
             return;
         }
 
-        $assets = File::glob("{$path}/{$location}/*.{$extension}");
+        $assetStructure = Str::replace(['{location}', '{extension}'], [$location, $extension], $this->assetsStructure);
+        $assets = File::glob($path . $assetStructure, GLOB_BRACE);
+
         if ($assets === []) {
-            $assets = File::glob("{$path}/{$location}/**/*.{$extension}");
-            if ($assets === []) {
-                return;
-            }
+            return;
         }
 
         $i = 0;
@@ -193,6 +200,7 @@ trait AssetManager {
                 $version = $properties['version'];
 
                 $hook = $hook === 'enqueue_block_editor_assets' ? 'enqueue_block_assets' : $hook;
+                
                 add_action($hook, function () use ($location, $handle, $src, $deps, $version) {
                     $shouldEnqueue = $this->shouldEnqueueAsset('styles', $location, $handle);
                     if ($shouldEnqueue) {
@@ -210,6 +218,7 @@ trait AssetManager {
     private function generateHandle(string $path, string $type, string $location, int $index): string {
         $pathInfo = pathinfo($path);
         $inSubDir = Str::afterLast(rtrim(dirname($path), '/'), '/') !== $location;
+        
         $name = $inSubDir
             ? Str::afterLast($pathInfo['dirname'], '/') . '_' . $pathInfo['filename']
             : $pathInfo['filename'];
