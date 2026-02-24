@@ -172,7 +172,7 @@ abstract class ThemeManager {
     final public function initialise(): void {
         $this->initialiseAdmin();
         $this->initialiseAssets();
-        $this->initialiseFeatures();
+        $this->hookFeatures();
         $this->afterInitialiseFeatures();
     }
 
@@ -217,15 +217,15 @@ abstract class ThemeManager {
     }
 
     /**
-     * Calls the initialise method on each of the theme's features.
+     * Calls the hook method on each of the theme's features.
      * This ultimately hooks any registered features into Wordpress.
      * 
      * @return void
      */
-    private function initialiseFeatures(): void {
+    private function hookFeatures(): void {
         $features = Arr::dot($this->features);
         foreach ($features as $feature) {
-            $feature->initialise();
+            $feature->hook();
             $featureName = $feature->getName(true);
             $featureSettings = $feature->getSettings();
             self::$registeredSettings[$featureName] = $featureSettings;
@@ -233,17 +233,17 @@ abstract class ThemeManager {
     }
 
     /**
-     * Calls the runAfterInitialise method on each of the theme's features.
+     * Calls the runAfterHook method on each of the theme's features.
      * Allows features to perform tasks after all of the theme's features
-     * have been initialised.
+     * have been hooked.
      * 
      * @return void
      */
-    private function afterInitialiseFeatures(): void {
+    private function afterHookFeatures(): void {
         $features = Arr::dot($this->features);
 
         foreach ($features as $feature) {
-            $feature->runAfterInitialise();
+            $feature->runAfterHook();
         }
     }
 

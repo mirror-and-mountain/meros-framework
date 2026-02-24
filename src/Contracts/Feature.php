@@ -203,7 +203,7 @@ abstract class Feature {
     }
 
     /**
-     * Calls the configure method followed by the override method
+     * Calls the boot method followed by the override method
      * for extensions.
      * 
      * @return void
@@ -228,8 +228,8 @@ abstract class Feature {
             return;
         }
 
-        // Call the configure method
-        $this->configure();
+        // Call the boot method
+        $this->boot();
 
         // If the feature is an extension, set the type and call override()
         if ($this instanceof Extension) {
@@ -250,7 +250,7 @@ abstract class Feature {
      * 
      * @return void
      */
-    abstract protected function configure(): void;
+    abstract protected function boot(): void;
 
     /**
      * Prepares and hooks the feature's declared supports into
@@ -258,7 +258,7 @@ abstract class Feature {
      * 
      * @return void
      */
-    final public function initialise(): void {
+    final public function hook(): void {
         // Stop if the feature isn't enabled
         if ($this->enabled === false) {
             return;
@@ -288,11 +288,11 @@ abstract class Feature {
 
     /**
      * This method is called after all features have been
-     * initialised.
+     * hooked.
      * 
      * @return void
      */
-    public function runAfterInitialise(): void {
+    public function runAfterHook(): void {
         // Intentionally left blank for child classes to override.
     }
 
