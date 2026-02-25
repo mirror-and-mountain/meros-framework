@@ -499,7 +499,7 @@ trait SettingsManager {
      */
     final public function getSetting(string $optionGroup, string $name, bool $fq = false): mixed {
         if ($fq) {
-            return $this->fqSettings[$optionGroup][$name] ?? null;
+            return $this->fqSettings[$optionGroup]['m_' . $name] ?? null;
         } else {
             return $this->settings[$optionGroup][$name] ?? null;
         }
