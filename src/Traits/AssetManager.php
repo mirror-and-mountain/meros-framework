@@ -8,6 +8,8 @@ use Illuminate\Support\Str;
 trait AssetManager {
     /**
      * Indicates whether the feature has assets.
+     *
+     * @var boolean
      */
     private bool $hasAssets = false;
 
@@ -16,13 +18,17 @@ trait AssetManager {
      * to generate the glob pattern for finding assets.
      * {location} and {extension} will be replaced with the
      * appropriate values.
+     * 
+     * @var string
      */
-    protected string $assetsStructure = '/{location}/*.{extension}';
+    protected string $assetsStructure = '/**/{location}/*.{extension}';
 
     /**
      * Maps assets locations/directories to Wordpress hooks.
      * Example: assets/build/admin/index.js will be enqueued using
      * admin_enqueue_scripts.
+     * 
+     * @var array
      */
     protected array $assetLocations = [
         'admin'  => 'admin_enqueue_scripts',
@@ -33,29 +39,48 @@ trait AssetManager {
     /**
      * The directory to search for assets in relative to the
      * feature directory.
+     * 
+     * @var string
      */
     protected string $assetsDir = 'assets/build';
 
     /**
      * Loaded scripts organised by location.
+     * 
+     * @var array
      */
     protected array $registeredScripts = [];
 
     /**
      * Loaded styles organised by location.
+     * 
+     * @var array
      */
     protected array $registeredStyles = [];
+
+    /**
+    * Whether to allow asset enabling/disabling
+    * via the settings page by default.
+    *
+    * @var boolean
+    */
+    protected bool $allowAssetSwitchingByDefault = true;
 
     /**
      * Determines whether script handles should use
      * the feature's fullName. This can be useful if
      * the feature has a common name and we need to
      * avoid conflicts.
+     * 
+     * @var boolean
      */
     protected bool $useFullNameForAssets = true;
 
     /**
      * Sets the absolute path and calls setAssets.
+     *
+     * @param boolean $inFooter Whether to enqueue scripts in the footer. Default false.
+     * @return void
      */
     protected function loadAssets(bool $inFooter = false): void {
         $assetsPath = $this->path . $this->assetsDir;
@@ -65,7 +90,7 @@ trait AssetManager {
             }
 
             if ($this->styles[$location] ?? [] === []) {
-                $this->findAssets($assetsPath, $location, 'css', $inFooter);
+                $this->findAssets($assetsPath, $location, 'css');
             }
         }
     }
@@ -75,9 +100,21 @@ trait AssetManager {
      * Sets asset handles to be used in wp_enqueue functions and
      * registers assets to be enqueued.
      *
-     * This method will also discover any dependencies for each asset.
+     * Will also discover any dependencies, conditions, or config for each asset.
+     *
+     * @param string $path
+     * @param string $location
+     * @param string $extension
+     * @param boolean $inFooter
+     * @return void
      */
-    private function findAssets(string $path, string $location, string $extension, bool $inFooter = false): void {
+    private function findAssets(
+        string $path, 
+        string $location, 
+        string $extension, 
+        bool $inFooter = false
+    ): void {
+        // Check the path exists
         if (! File::exists($path)) {
             return;
         }
@@ -93,31 +130,75 @@ trait AssetManager {
 
         foreach ($assets as $asset) {
             $pathInfo = pathinfo($asset);
-            $type = $extension === 'js' ? 'scripts' : 'styles';
-            $conditionFile = trailingslashit($pathInfo['dirname']) . $pathInfo['filename'] . '.conditions.php';
+
+            $configFile = trailingslashit(dirname($pathInfo['dirname'])) . 'config.php';
+            $conditionFile = trailingslashit($pathInfo['dirname']) . 'conditions.php';
             $dependancyFile = trailingslashit($pathInfo['dirname']) . $pathInfo['filename'] . '.asset.php';
 
-            $handle = $this->generateHandle($asset, $type, $location, $i);
-            $dependancies = File::exists($dependancyFile) ? include $dependancyFile : [];
+            $config = File::exists($configFile) ? include $configFile : [];
             $conditions = File::exists($conditionFile) ? include $conditionFile : [];
+            $dependancies = File::exists($dependancyFile) ? include $dependancyFile : [];
 
-            $this->addAsset($asset, $location, $handle, $dependancies['dependencies'] ?? [], $conditions, $inFooter, $i);
-            $i++;
+            if (! is_array($config)) {
+                $config = [];
+            }
+
+            if (!is_array($conditions)) {
+                $conditions = [];
+            }
+
+            if (!is_array($dependancies)) {
+                $dependancies = [];
+            }
+
+            $this->addAsset(
+                $asset, 
+                $location, 
+                '', 
+                $config,
+                $conditions,
+                $dependancies['dependencies'] ?? [],
+                true,
+                $this->allowAssetSwitchingByDefault,
+                false,
+                $inFooter,
+                $i++
+            );
         }
     }
 
     /**
      * Registers an asset to be enqueued.
+     *
+     * @param string $path
+     * @param string $location
+     * @param string $handle
+     * @param array $config
+     * @param array $conditions
+     * @param array $dependencies
+     * @param boolean $enabledByDefault
+     * @param boolean $allowSwitching
+     * @param boolean $isExperimental
+     * @param boolean $inFooter
+     * @param integer $index
+     * @return void
      */
     protected function addAsset(
         string $path,
         string $location,
         string $handle = '',
-        array $dependencies = [],
-        array $conditions = [],
-        bool $inFooter = false,
-        int $index = 0
+        array  $config = [],
+        array  $conditions = [],
+        array  $dependencies = [],
+        bool   $enabledByDefault = true,
+        bool   $allowSwitching = false,
+        bool   $isExperimental = false,
+        bool   $inFooter = false,
+        int    $index = 0
     ): void {
+        // For switching if enabled
+        $enabled = $enabledByDefault;
+
         // Check the asset exists
         if (! File::exists($path)) {
             $path = $this->path . trailingslashit($this->assetsDir) . $path;
@@ -138,29 +219,52 @@ trait AssetManager {
             return;
         }
 
-        // Determine asset handle
+        // Get path info
+        $pathInfo = pathinfo($path);
+
+        // Determine handle
         if ($handle === '') {
-            $handle = $this->generateHandle($path, $type, $location, $index);
+            $handle = $this->generateHandle(
+                $pathInfo, 
+                $type, 
+                $location, 
+                $index
+            );
         }
 
         // Set SRC
         $src = Str::replace($this->path, $this->uri, $path);
 
+        // Create a switch if switchable
+        $isSwitchable = $this->determineIsSwitchable($config);
+
+        if ($allowSwitching && $isSwitchable) {
+            $enabled = $this->createAssetSwitch(
+                $config,
+                $isExperimental,
+                $enabledByDefault
+            );
+       }
+
         // Store the asset
         if ($type === 'scripts') {
             $this->registeredScripts[$location][$handle] = [
-                'src' => $src,
+                'enabled'      => $enabled,
+                'src'          => $src,
+                'config'       => $config,
+                'conditions'   => $conditions,
                 'dependencies' => $dependencies,
-                'conditions' => $conditions,
-                'version' => filemtime($path),
-                'in_footer' => $inFooter,
+                'version'      => filemtime($path),
+                'in_footer'    => $inFooter,
             ];
         } else {
             $this->registeredStyles[$location][$handle] = [
-                'src' => $src,
+                'enabled'      => $enabled,
+                'src'          => $src,
+                'config'       => $config,
+                'conditions'   => $conditions,
                 'dependencies' => $dependencies,
-                'conditions' => $conditions,
-                'version' => filemtime($path),
+                'version'      => filemtime($path),
             ];
         }
 
@@ -169,14 +273,22 @@ trait AssetManager {
 
     /**
      * Enqueues registered assets using the appropriate hooks.
+     *
+     * @return void
      */
     private function enqueueAssets(): void {
         foreach ($this->assetLocations as $location => $_) {
             foreach ($this->registeredScripts[$location] ?? [] as $handle => $properties) {
-                $hook = $this->assetLocations[$location];
-                $src = $properties['src'];
-                $deps = $properties['dependencies'];
-                $version = $properties['version'];
+                $enabled = $properties['enabled'] ?? false;
+
+                if (!$enabled) {
+                    continue;
+                }
+
+                $hook     = $this->assetLocations[$location];
+                $src      = $properties['src'];
+                $deps     = $properties['dependencies'];
+                $version  = $properties['version'];
                 $inFooter = $properties['in_footer'];
 
                 add_action($hook, function () use ($location, $handle, $src, $deps, $version, $inFooter) {
@@ -194,11 +306,18 @@ trait AssetManager {
             }
 
             foreach ($this->registeredStyles[$location] ?? [] as $handle => $properties) {
-                $hook = $this->assetLocations[$location];
-                $src = $properties['src'];
-                $deps = $properties['dependencies'];
+                $enabled = $properties['enabled'] ?? false;
+
+                if (!$enabled) {
+                    continue;
+                }
+
+                $hook    = $this->assetLocations[$location];
+                $src     = $properties['src'];
+                $deps    = $properties['dependencies'];
                 $version = $properties['version'];
 
+                // Fix for block editor styles
                 $hook = $hook === 'enqueue_block_editor_assets' ? 'enqueue_block_assets' : $hook;
                 
                 add_action($hook, function () use ($location, $handle, $src, $deps, $version) {
@@ -212,27 +331,96 @@ trait AssetManager {
     }
 
     /**
+     * Determines whether an asset can be switchable in WP Admin.
+     *
+     * @param array $config
+     * @return boolean
+     */
+    private function determineIsSwitchable(array $config): bool {
+        return 
+            is_string($config['name'] ?? false) &&
+            is_string($config['description'] ?? false);
+    }
+
+    /**
+     * Creates a switch for the asset in WP Admin.
+     *
+     * @param array $config
+     * @param boolean $isExperimental
+     * @param boolean $enabledByDefault
+     * @return boolean
+     */
+    private function createAssetSwitch(
+        array $config, 
+        bool $isExperimental,
+        bool $enabledByDefault = true
+    ): bool {
+        $enabled = $enabledByDefault;
+
+        $configName = Str::slug($config['name'], '_');
+        $hook       = $this->hookPrefix . '_' . $configName;
+
+        $isSwitchable = apply_filters($hook . '_is_switchable', true);
+
+        if ($isSwitchable) {
+            $experimental = apply_filters($hook . '_is_experimental', $isExperimental);
+        
+            $settingName = $this->createSwitch(
+                'asset',
+                $configName,
+                'theme_settings',
+                'scripts_and_styles',
+                $config['description'] ?? '',
+                $experimental
+            );
+
+            if (is_string($settingName)) {
+                $switchSetting = get_option($settingName, $enabledByDefault);
+                $enabled = $switchSetting === '1' || $switchSetting === 1 || $switchSetting === true;
+            }
+        }
+
+        return $enabled;
+    }
+
+    /**
      * Generates a unique handle for an asset based on its
      * path, type, location and index.
+     *
+     * @param array $pathInfo
+     * @param string $type
+     * @param string $location
+     * @param integer $index
+     * @return string
      */
-    private function generateHandle(string $path, string $type, string $location, int $index): string {
-        $pathInfo = pathinfo($path);
-        $inSubDir = Str::afterLast(rtrim(dirname($path), '/'), '/') !== $location;
-        
-        $name = $inSubDir
-            ? Str::afterLast($pathInfo['dirname'], '/') . '_' . $pathInfo['filename']
-            : $pathInfo['filename'];
+    private function generateHandle(
+        array  $pathInfo, 
+        string $type, 
+        string $location, 
+        int    $index, 
+    ): string {
+        $subDir = Str::afterLast(dirname($pathInfo['dirname']), DIRECTORY_SEPARATOR);
 
-        $name = $type . '_' . Str::replace('-', '_', $name);
+        if ($subDir !== $location) {
+            $name = $type . '_' . $subDir . '_' . Str::replace('-', '_', $pathInfo['filename']);
+        } else {
+            $name = $type . '_' . Str::replace('-', '_', $pathInfo['filename']);
+        }
 
         $featureName = $this->useFullNameForAssets ? $this->fullName : $this->name;
+        $handle = $featureName . '_' . $location . '_' . Str::replace('-', '_', $name) . '_' . $index;
 
-        return $featureName . '_' . $location . '_' . Str::replace('-', '_', $name) . '_' . $index;
+        return $handle;
     }
 
     /**
      * Determines whether an asset should be enqueued based on its
-     * conditions.
+     * conditions (if available).
+     *
+     * @param string $type
+     * @param string $location
+     * @param string $handle
+     * @return boolean
      */
     private function shouldEnqueueAsset(string $type, string $location, string $handle): bool {
         $shouldEnqueue = true;

@@ -8,12 +8,16 @@ use Illuminate\Support\Str;
 trait BlockManager {
     /**
      * Indicates whether the feature has blocks.
+     * 
+     * @var boolean
      */
     private bool $hasBlocks = false;
 
     /**
      * Whether to allow block enabling/disabling
      * via the settings page by default.
+     *
+     * @var boolean
      */
     protected bool $allowBlockSwitchingByDefault = true;
 
@@ -21,16 +25,22 @@ trait BlockManager {
      * The directory to search for blocks in relative to the
      * feature directory. Blocks are discovered by the the
      * existance of a block.json file.
+     * 
+     * @var string
      */
     protected string $blocksDir = 'blocks/build';
 
     /**
      * Loaded blocks.
+     *
+     * @var array
      */
     private array $blocks = [];
 
     /**
      * Sets absolute path and calls findBlocks.
+     * 
+     * @return void
      */
     protected function loadBlocks(): void {
         $blocksPath = $this->path . $this->blocksDir;
@@ -41,6 +51,9 @@ trait BlockManager {
      * Uses glob to search for blocks using the given path.
      * A block will be discovered if the given directory
      * includes a valid block.json file.
+     * 
+     * @param string $path
+     * @return void
      */
     private function findBlocks(string $path): void {
         if (! File::exists($path)) {
@@ -66,7 +79,12 @@ trait BlockManager {
     /**
      * Adds a block to the blocks array.
      *
-     * @param  bool  $enabled
+     * @param string $name
+     * @param string $path
+     * @param bool $enabledByDefault
+     * @param bool $allowSwitching
+     * @param bool $isExperimental
+     * @return void
      */
     protected function addBlock(
         string $name,
@@ -83,18 +101,32 @@ trait BlockManager {
             : '';
 
         if ($allowSwitching) {
-            $settingName = $this->createBlockSwitchSetting($name, $description, $isExperimental);
-            if (is_string($settingName)) {
-                $switchSetting = get_option($settingName, $enabledByDefault);
-                $enabled = $switchSetting === '1' || $switchSetting === 1 || $switchSetting === true;
+            $hookName = $this->fullName . '_' . Str::slug($name, '_');
+            $isSwitchable = apply_filters($hookName . '_is_switchable', true);
+
+            if ($isSwitchable) {
+                $experimental = apply_filters($hookName . '_is_experimental', $isExperimental);
+                $settingName = $this->createSwitch(
+                    'block',
+                    $name,
+                    'theme_settings',
+                    'blocks',
+                    $description,
+                    $experimental
+                );
+
+                if (is_string($settingName)) {
+                    $switchSetting = get_option($settingName, $enabledByDefault);
+                    $enabled = $switchSetting === '1' || $switchSetting === 1 || $switchSetting === true;
+                }
             }
         }
 
         $this->blocks[$name] = [
-            'enabled' => $enabled,
+            'enabled'    => $enabled,
             'switchable' => $allowSwitching,
-            'path' => $path,
-            'json' => $blockJson,
+            'path'       => $path,
+            'json'       => $blockJson,
         ];
 
         $this->hasBlocks = true;
@@ -102,6 +134,9 @@ trait BlockManager {
 
     /**
      * Retrieves and decodes the block.json file for a block.
+     * 
+     * @param string $path
+     * @return array|string
      */
     private function getBlockJson(string $path): array|string {
         $blockJsonPath = trailingslashit($path) . 'block.json';
@@ -115,6 +150,8 @@ trait BlockManager {
 
     /**
      * Registers blocks using register_block_type.
+     * 
+     * @return void
      */
     private function registerBlocks(): void {
         add_action('init', function () {

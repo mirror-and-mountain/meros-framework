@@ -130,8 +130,7 @@ abstract class ThemeManager {
      * This method should be defined in the theme's main class
      * found at app/Theme.php by default.
      *
-     * Can be used to change the values of various properties
-     * before they are used.
+     * Can be used for things like adding theme supports.
      * 
      * @return void
      */
@@ -173,7 +172,7 @@ abstract class ThemeManager {
         $this->initialiseAdmin();
         $this->initialiseAssets();
         $this->hookFeatures();
-        $this->afterInitialiseFeatures();
+        $this->afterHookFeatures();
     }
 
     /**
@@ -204,6 +203,7 @@ abstract class ThemeManager {
 
     /**
      * Handles Livewire assets injection.
+     * Called by features when required.
      * 
      * @param bool $admin Whether to initialise for the admin area.
      * @return void

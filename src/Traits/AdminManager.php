@@ -10,33 +10,50 @@ use Illuminate\Support\Str;
  * pages in the Wordpress dashboard.
  */
 trait AdminManager {
+    /**
+     * Available options pages for WP Admin.
+     *
+     * @var array
+     */
     protected array $optionsPages = [];
+
+    /**
+     * An array of settings registered by all features
+     * and extensions in the theme.
+     *
+     * @var array
+     */
     protected static array $registeredSettings = [];
 
+    /**
+     * Sets optionsPages array.
+     *
+     * @return void
+     */
     private function setOptionsPages(): void {
         $this->optionsPages = [
             'theme_settings' => [
                 'page_title' => "{$this->themeName} Settings",
                 'menu_title' => 'Settings',
-                'menu_slug' => 'theme_settings',
-                'tabs' => ['blocks', 'styles', 'miscellaneous'],
+                'menu_slug'  => 'theme_settings',
+                'tabs'       => ['blocks', 'scripts_and_styles', 'miscellaneous'],
                 'capability' => 'manage_options',
-                'callback' => [$this, 'renderThemeSettingsPage'],
+                'callback'   => [$this, 'renderThemeSettingsPage'],
             ],
             'theme_features' => [
                 'page_title' => 'Theme Features',
                 'menu_title' => 'Features',
-                'menu_slug' => 'theme_features',
-                'tabs' => ['features', 'experimental_features'],
+                'menu_slug'  => 'theme_features',
+                'tabs'       => ['features', 'experimental_features'],
                 'capability' => 'manage_options',
-                'callback' => [$this, 'renderThemeFeaturesPage'],
+                'callback'   => [$this, 'renderThemeFeaturesPage'],
             ],
         ];
     }
 
     /**
      * Initialises option pages if enabled.
-     * Applies admin scripts and styles.
+     * Enqueues admin scripts and styles.
      * 
      * @return void
      */
@@ -57,6 +74,8 @@ trait AdminManager {
 
     /**
      * Enqueues admin scripts and styles.
+     * 
+     * @return void
      */
     private function enqueueAdminScripts(): void {
         $assetsUri = trailingslashit($this->frameworkUri) . 'assets/build/admin/';
@@ -105,6 +124,11 @@ trait AdminManager {
         });
     }
 
+    /**
+     * Returns all the theme's features' registered setting keys.
+     *
+     * @return array
+     */
     final public function getRegisteredSettingKeys(): array {
         $settings = [];
         foreach (self::$registeredSettings as $_ => $optionGroups) {
@@ -119,6 +143,9 @@ trait AdminManager {
 
     /**
      * Adds a theme settings page to the WP dashboard.
+     *
+     * @param array $config
+     * @return void
      */
     private function renderThemeSettingsPage(array $config): void {
         add_action('admin_menu', function () use ($config) {
@@ -134,6 +161,12 @@ trait AdminManager {
         });
     }
 
+    /**
+     * Renders the theme features page.
+     *
+     * @param array $config
+     * @return void
+     */
     private function renderThemeFeaturesPage(array $config): void {
         add_action('admin_menu', function () use ($config) {
             add_options_page(
@@ -149,11 +182,21 @@ trait AdminManager {
         });
     }
 
+    /**
+     * Renders settings page tabs.
+     *
+     * @param array $config
+     * @param boolean $showSumit
+     * @return void
+     */
     private function renderSettingsPageTabs(array $config, bool $showSumit = true): void {
+        $tabs = [];
+
         foreach ($config['tabs'] as $tab) {
             $tabs[$tab] = Str::ucfirst(Str::replace('_', ' ', $tab));
         }
-?>
+        
+        ?>
         <div class="wrap">
             <h1><?php echo esc_html($config['page_title']) ?></h1>
             <?php
@@ -187,6 +230,8 @@ trait AdminManager {
 
     /**
      * Adds a database migrations page to the WP dashboard.
+     * 
+     * @return void
      */
     private function initialiseMigrationsSettingsPage(): void {
         if ($this->migrations_page_registered) {
@@ -245,7 +290,7 @@ trait AdminManager {
                     }
                     ?>
                 </div>
-<?php
+                <?php
                 }
             );
         });
@@ -253,10 +298,22 @@ trait AdminManager {
         $this->migrations_page_registered = true;
     }
 
+    /**
+     * Returns available options pages.
+     *
+     * @return array
+     */
     final public function getOptionsPages(): array {
         return $this->optionsPages ?? [];
     }
 
+    /**
+     * Adds an options page tab to an options page.
+     *
+     * @param string $page
+     * @param string $tab
+     * @return void
+     */
     final public function addOptionsPageTab(string $page, string $tab): void {
         $this->optionsPages[$page]['tabs'][] = $tab;
     }

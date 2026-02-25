@@ -11,35 +11,35 @@ trait SettingsManager {
      * into registered settings with wp's register_setting function.
      */
     protected array $fqSettings = [];
-
     protected array $settings = [];
 
     /**
      * The name of the setting used to enable/disable
      * the feature if it is user switchable.
+     * 
+     * @var string
      */
     private string $featureEnabledSettingName = '';
 
     /**
-     * Whether to use the full feature name in settings
-     * option names. If false, only the feature slug
-     * will be used.
-     */
-    protected bool $useFullNameInSettings = true;
-
-    /**
      * The capability required to edit this feature's settings
      * in the WP dashboard.
+     * 
+     * @var string
      */
     protected string $settingsCapability = 'manage_options';
 
     /**
      * The sections for the feature's settings.
+     * 
+     * @var array
      */
     protected array $settingsSections = [];
 
     /**
      * Valid option types for settings.
+     * 
+     * @var array
      */
     protected array $validOptionTypes = [
         'text',
@@ -58,99 +58,98 @@ trait SettingsManager {
 
     /**
      * Default setting configuration.
+     * 
+     * @var array
      */
     protected array $defaultSettingConfig = [
-        'type' => 'text',
+        'type'        => 'text',
         'description' => '',
-        'hasField' => true,
-        'fieldType' => '',
-        'default' => null,
-        'required' => false,
-        'options' => [],
+        'hasField'    => true,
+        'fieldType'   => '',
+        'default'     => null,
+        'required'    => false,
+        'options'     => [],
         'sanitize_callback' => null,
     ];
 
     /**
      * Mapping of setting types to field types.
+     * 
+     * @var array
      */
     protected array $settingFieldTypes = [
-        'text' => 'text',
-        'url' => 'url',
-        'email' => 'email',
-        'password' => 'password',
-        'date' => 'date',
-        'textarea' => 'textarea',
-        'number' => 'number',
-        'integer' => 'number',
-        'boolean' => ['checkbox', 'toggle', 'button'],
-        'select' => 'select',
+        'text'         => 'text',
+        'url'          => 'url',
+        'email'        => 'email',
+        'password'     => 'password',
+        'date'         => 'date',
+        'textarea'     => 'textarea',
+        'number'       => 'number',
+        'integer'      => 'number',
+        'boolean'      => ['checkbox', 'toggle', 'button'],
+        'select'       => 'select',
         'multi_select' => 'select',
-        'color' => 'color',
+        'color'        => 'color',
     ];
 
     /**
-     * Creates a setting to enable/disable the feature
-     * if it is user switchable.
+     * Creates an 'Enabled' switch for the given feature package or feature
+     * in WP Admin. This is essentially a shortcut for adding a
+     * boolean setting via the addSetting method.
+     *
+     * @param string $type
+     * @param string $name
+     * @param string $page
+     * @param string $tab
+     * @param string $description
+     * @param boolean $isExperimental
+     * @return void
      */
-    private function createFeatureSwitchSetting(string $description = '', bool $isExperimental = false): void {
-        $label = 'Enable ' . Str::title(Str::replace('_', ' ', $this->name));
-
-        $result = $this->addSetting(
-            'enabled',
-            $label,
-            'theme_features',
-            $isExperimental ? 'experimental-features' : 'features',
-            '',
-            '',
-            [
-                'type' => 'boolean',
-                'description' => $description !== ''
-                    ? $description
-                    : "Enable or disable the {$this->name}.",
-                'default' => '1',
-                'hasField' => true,
-                'fieldType' => 'toggle',
-            ],
-            false
-        );
-
-        if (is_string($result)) {
-            $this->featureEnabledSettingName = $result;
-        }
-    }
-
-    /**
-     * Creates a setting to enable/disable a block
-     * provided by the feature.
-     */
-    private function createBlockSwitchSetting(
-        string $blockName,
+    private function createSwitch(
+        string $type,
+        string $name,
+        string $page,
+        string $tab,
         string $description = '',
         bool $isExperimental = false
-    ): string|bool {
-        $blockName = Str::slug($blockName, '_');
-        $label = 'Enable ' . Str::title(Str::replace(['_', '-'], ' ', $blockName));
+    ) {
+        $name = Str::slug($name, '_');
+        $label = 'Enable ' . Str::title(Str::replace(['_', '-'], ' ', $name));
 
         if ($isExperimental) {
             $label .= ' (Experimental)';
         }
 
+        $config = [
+            'type'        => 'boolean',
+            'description' => $description !== ''
+                ? $description
+                : "Enable or disable the {$name} {$type}.",
+            'default'     => '1',
+            'hasField'    => true
+        ];
+
+        if ($type === 'feature') {
+            $config['fieldType'] = 'toggle';
+
+            if ($isExperimental) {
+                $tab = 'experimental-features';
+            }
+        }
+
         $result = $this->addSetting(
-            "enable_{$blockName}_block",
-            $label,
-            'theme_settings',
-            'blocks',
-            '',
-            '',
-            [
-                'type' => 'boolean',
-                'description' => $description !== ''
-                    ? $description
-                    : "Enable or disable the {$blockName} block.",
-                'default' => true,
-                'hasField' => true,
-            ]
+            "enable_{$name}_{$type}", 
+            $label, 
+            $page, 
+            $tab, 
+            '', 
+            '', 
+            $config
         );
+
+        if ($type === 'feature' && is_string($result)) {
+            $this->featureEnabledSettingName = $result;
+        }
 
         return $result;
     }
@@ -158,6 +157,16 @@ trait SettingsManager {
     /**
      * Adds a setting to the specified settings page.
      * This method will also create a settings section.
+     *
+     * @param string $name
+     * @param string $label
+     * @param string $page
+     * @param string $tab
+     * @param string $sectionId
+     * @param string $sectionTitle
+     * @param array $config
+     * @param boolean $linkToFeature
+     * @return string|boolean The name of the registered setting or false if registration failed.
      */
     protected function addSetting(
         string $name,
@@ -167,13 +176,13 @@ trait SettingsManager {
         string $sectionId = '',
         string $sectionTitle = '',
         array $config = [
-            'type' => 'text',
+            'type'        => 'text',
             'description' => '',
-            'hasField' => true,
-            'fieldType' => '',
-            'default' => null,
-            'required' => false,
-            'options' => [],
+            'hasField'    => true,
+            'fieldType'   => '',
+            'default'     => null,
+            'required'    => false,
+            'options'     => [],
             'sanitize_callback' => null,
         ],
         bool $linkToFeature = true
@@ -233,13 +242,13 @@ trait SettingsManager {
 
         // Sanitize config
         $sanitizedConfig = [
-            'type' => is_string($config['type']) ? $config['type'] : 'text',
-            'description' => is_string($config['description']) ? $config['description'] : '',
-            'hasField' => is_callable($config['hasField']) ? $config['hasField'] : (bool) $config['hasField'],
-            'fieldType' => is_string($config['fieldType']) ? $config['fieldType'] : '',
-            'default' => $config['default'] ?? null,
-            'required' => isset($config['required']) ? (bool) $config['required'] : false,
-            'options' => is_array($config['options']) ? $config['options'] : [],
+            'type'              => is_string($config['type']) ? $config['type'] : 'text',
+            'description'       => is_string($config['description']) ? $config['description'] : '',
+            'hasField'          => is_callable($config['hasField']) ? $config['hasField'] : (bool) $config['hasField'],
+            'fieldType'         => is_string($config['fieldType']) ? $config['fieldType'] : '',
+            'default'           => $config['default'] ?? null,
+            'required'          => isset($config['required']) ? (bool) $config['required'] : false,
+            'options'           => is_array($config['options']) ? $config['options'] : [],
             'sanitize_callback' => is_callable($config['sanitize_callback']) ? $config['sanitize_callback'] : null,
         ];
 
@@ -261,6 +270,13 @@ trait SettingsManager {
     /**
      * Registers a setting with Wordpress and retrieves its
      * current value.
+     *
+     * @param string $name
+     * @param string $label
+     * @param string $optionGroup
+     * @param string $sectionId
+     * @param array $config
+     * @return string
      */
     private function registerSetting(
         string $name,
@@ -269,10 +285,11 @@ trait SettingsManager {
         string $sectionId,
         array $config
     ): string {
-        $featureName = $this->name;
-        $optionName = $this->useFullNameInSettings
-            ? $this->fullName . '_' . $name
-            : $featureName . '_' . $name;
+        $fullName = Str::startsWith($this->fullName, 'meros')
+            ? Str::after($this->fullName, 'meros_')
+            : $this->fullName;
+
+        $optionName = 'm_' . $fullName . '_' . $name;
 
         $current = get_option($optionName, $config['default'] ?? null);
         $this->fqSettings[$optionGroup][$optionName] = $current;
@@ -339,6 +356,13 @@ trait SettingsManager {
 
     /**
      * Adds a settings section to the specified settings page.
+     *
+     * @param string $id
+     * @param string $title
+     * @param string $page
+     * @param string $tab
+     * @param boolean $linkToFeature
+     * @return void
      */
     protected function addSettingsSection(
         string $id,
@@ -387,6 +411,10 @@ trait SettingsManager {
 
     /**
      * Callback to sanitize a setting when modified in the WP dashboard.
+     *
+     * @param mixed $value
+     * @param array $config
+     * @return mixed
      */
     private function sanitizeSetting(mixed $value, array $config): mixed {
         $requiredType = $config['type'];
@@ -430,6 +458,11 @@ trait SettingsManager {
     /**
      * Helper to sanitize text values. Called by the sanitizeSetting
      * method.
+     *
+     * @param mixed $value
+     * @param string $type
+     * @param string $requiredType
+     * @return string
      */
     private function sanitizeTextValue(mixed $value, string $type, string $requiredType): string {
         if ($type === 'string') {
@@ -449,7 +482,7 @@ trait SettingsManager {
     /**
      * Returns all settings for the feature.
      *
-     * @param  bool  $fq  Whether to use fully qualified setting names.
+     * @param bool $fq Whether to use fully qualified setting names.
      */
     final public function getSettings(bool $fq = true): array {
         return $fq ? $this->fqSettings : $this->settings;
@@ -459,7 +492,10 @@ trait SettingsManager {
      * Returns a specific setting's current value as retrieved
      * from the database.
      *
-     * @param  bool  $fq  Whether to use fully qualified setting name.
+     * @param string $optionGroup
+     * @param string $name
+     * @param bool $fq Whether to use fully qualified setting name.
+     * @return mixed
      */
     final public function getSetting(string $optionGroup, string $name, bool $fq = false): mixed {
         if ($fq) {

@@ -11,36 +11,50 @@ use Illuminate\Support\Str;
 trait ContextManager {
     /**
      * The theme name.
+     * 
+     * @var string
      */
     protected string $themeName;
 
     /**
      * The theme directory.
+     * 
+     * @var string
      */
     protected string $themeDir;
 
     /**
      * The theme's uri.
+     * 
+     * @var string
      */
     protected string $themeUri;
 
     /**
      * The theme's slug e.g. my_theme.
+     * 
+     * @var string
      */
     protected string $themeSlug;
 
     /**
      * The framework directory relative to the theme root.
+     * 
+     * @var string
      */
     private string $frameworkDir;
 
     /**
      * The framework uri.
+     * 
+     * @var string
      */
     private string $frameworkUri = '';
 
     /**
      * Sets theme identifier properties.
+     * 
+     * @return void
      */
     private function setContext(): void {
         $theme = wp_get_theme();
@@ -55,6 +69,8 @@ trait ContextManager {
 
     /**
      * Returns the theme name.
+     * 
+     * @return string
      */
     final public function getThemeName(): string {
         return $this->themeName;
@@ -62,13 +78,17 @@ trait ContextManager {
 
     /**
      * Returns the theme uri.
+     * 
+     * @return string
      */
     final public function getThemeUri(): string {
         return $this->themeUri;
     }
 
     /**
-     * Returns the theme sluf.
+     * Returns the theme slug.
+     * 
+     * @return string
      */
     final public function getThemeSlug(): string {
         return $this->themeSlug;
@@ -76,11 +96,13 @@ trait ContextManager {
 
     /**
      * Returns an array of theme properties.
+     * 
+     * @return array
      */
     final public function getThemeContext(): array {
         return [
             'name' => $this->themeName,
-            'uri' => $this->themeUri,
+            'uri'  => $this->themeUri,
             'slug' => $this->themeSlug,
         ];
     }

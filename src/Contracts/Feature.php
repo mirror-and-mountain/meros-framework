@@ -55,7 +55,7 @@ abstract class Feature {
     public bool $switchable = true;
 
     /**
-     * Whether the feature's initialised() method has been called.
+     * Whether the feature's hook() method has been called.
      * 
      * @var bool
      */
@@ -75,6 +75,13 @@ abstract class Feature {
      * @var string
      */
     protected string $fullName;
+
+    /**
+     * The prefix for any hooks related to this feature.
+     * 
+     * @var string
+     */
+    protected string $hookPrefix;
 
     /**
      * The feature's description.
@@ -129,7 +136,6 @@ abstract class Feature {
         BlockManager,
         ComponentManager,
         DatabaseManager,
-        FieldManager,
         SettingsManager;
 
     public function __construct(
@@ -156,6 +162,11 @@ abstract class Feature {
 
         // Set the feature's full name
         $this->fullName = Str::slug($this->authorName, '_') . '_' . $this->name;
+
+        // Set hook prefix
+        $this->hookPrefix = Str::startsWith($this->fullName, 'meros')
+            ? $this->fullName
+            : 'meros_' . $this->fullName;
 
         // Set up the feature
         $this->setUp();
@@ -211,7 +222,11 @@ abstract class Feature {
     private function setUp(): void {
         // Create WP dashboard switch if userSwitchable is true
         if ($this->switchable === true) {
-            $this->createFeatureSwitchSetting(
+            $this->createSwitch(
+                'feature',
+                $this->name,
+                'theme_features',
+                'features',
                 $this->description,
                 $this->experimental
             );
@@ -246,7 +261,7 @@ abstract class Feature {
      * Where a feature is an extension, the extension package should
      * extend the Extension contract and define this method. Users
      * can then override any configuration using the Extension
-     * contract's override() method which is called after configure().
+     * contract's override() method which is called after boot().
      * 
      * @return void
      */
@@ -276,11 +291,6 @@ abstract class Feature {
             $this->bindComponents();
             $this->bindViews();
             $this->theme->initialiseLivewire();
-        }
-
-        if ($this->hasFieldTypes) {
-            $this->loadFields();
-            $this->enqueueFieldAssets();
         }
 
         $this->initialised = true;

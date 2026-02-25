@@ -25,9 +25,14 @@ class MerosServiceProvider extends ServiceProvider {
         $themeClass = ClassInfo::get($themeClass);
 
         if ($themeClass->extends(ThemeManager::class)) {
-            $this->app->singleton(
-                'meros.theme_manager', fn ($app) => new $themeClass->name($app)
-            );
+            // $this->app->singleton(
+            //     'meros.theme_manager', fn ($app) => new $themeClass->name($app)
+            // );
+
+            $this->app->singleton('meros.theme_manager', function ($app) use ($themeClass) {
+                return new ($themeClass->name)($app);
+            });
+
             $this->registered = true;
         }
 
@@ -43,7 +48,7 @@ class MerosServiceProvider extends ServiceProvider {
      */
     public function boot(): void {
         // Setup Livewire
-        Livewire::setScriptRoute();    
+        Livewire::setScriptRoute();
 
         if ($this->registered) {
             $theme = $this->app->make('meros.theme_manager');

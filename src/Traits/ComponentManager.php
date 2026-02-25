@@ -13,33 +13,45 @@ trait ComponentManager {
     /**
      * Indicates whether the feature has components.
      * Note: by component we mean a Livewire component.
+     * 
+     * @var boolean
      */
     private bool $hasComponents = false;
 
     /**
      * Indicates whether the feature has views.
+     * 
+     * @var boolean
      */
     private bool $hasViews = false;
 
     /**
      * The components directory relative to the feature
      * directory.
+     * 
+     * @var string
      */
     protected string $componentsDir = 'components';
 
     /**
      * The views directory relative to the feature
      * directory.
+     * 
+     * @var string
      */
     protected string $viewsDir = 'views';
 
     /**
      * Discovered components.
+     * 
+     * @var array
      */
     protected array $components = [];
 
     /**
      * Discovered views.
+     * 
+     * @var array
      */
     protected array $views = [];
 
@@ -48,11 +60,15 @@ trait ComponentManager {
      * the feature's fullName. This can be useful if
      * the feature has a common name and we need to
      * avoid conflicts.
+     * 
+     * @var boolean
      */
     protected bool $useFullNameForComponents = false;
 
     /**
      * Sets absolute path and calls setComponents.
+     * 
+     * @return void
      */
     protected function loadComponents(): void {
         $componentsPath = $this->path . $this->componentsDir;
@@ -61,6 +77,8 @@ trait ComponentManager {
 
     /**
      * Sets absolute path and calls setViews.
+     * 
+     * @return void
      */
     protected function loadViews(): void {
         $viewsPath = $this->path . $this->viewsDir;
@@ -71,6 +89,9 @@ trait ComponentManager {
      * Uses glob to search the given path for valid components.
      * Components will be indentified as a php file that contains
      * a class extending Livewire\\Component.
+     *
+     * @param string $path
+     * @return void
      */
     private function findComponents(string $path): void {
         if (! File::exists($path)) {
@@ -94,8 +115,10 @@ trait ComponentManager {
     }
 
     /**
-     * Uses glob to search the given path for valid views.
-     * Views will be identified as files with a blade.php extension.
+     * Uses glob to search the given path for blade files and adds them as views.
+     *
+     * @param string $path
+     * @return void
      */
     private function findViews(string $path): void {
         if (! File::exists($path)) {
@@ -114,6 +137,10 @@ trait ComponentManager {
 
     /**
      * Registers a Livewire component.
+     *
+     * @param string $handle
+     * @param object $class
+     * @return void
      */
     protected function addComponent(string $handle, object $class): void {
         $this->components[$handle] = $class->name;
@@ -121,6 +148,10 @@ trait ComponentManager {
 
     /**
      * Registers a Blade view.
+     * 
+     * @param string $handle
+     * @param string $path
+     * @return void
      */
     protected function addView(string $handle, string $path): void {
         $this->views[$handle] = $path;
@@ -128,6 +159,8 @@ trait ComponentManager {
 
     /**
      * Binds discovered Livewire components.
+     * 
+     * @return void
      */
     private function bindComponents(): void {
         foreach ($this->components ?? [] as $handle => $class) {
@@ -137,6 +170,8 @@ trait ComponentManager {
 
     /**
      * Binds discovered Blade views.
+     * 
+     * @return void
      */
     private function bindViews(): void {
         foreach ($this->views ?? [] as $handle => $path) {
