@@ -103,6 +103,7 @@ trait SettingsManager {
      * @param string $tab
      * @param string $description
      * @param boolean $isExperimental
+     * @param boolean $linkToFeatures
      * @return void
      */
     private function createSwitch(
@@ -111,10 +112,15 @@ trait SettingsManager {
         string $page,
         string $tab,
         string $description = '',
-        bool $isExperimental = false
+        bool $isExperimental = false,
+        bool $linkToFeatures = true
     ) {
         $name = Str::slug($name, '_');
         $label = 'Enable ' . Str::title(Str::replace(['_', '-'], ' ', $name));
+
+        if ($this->experimental) {
+            $isExperimental = true;
+        }
 
         if ($isExperimental) {
             $label .= ' (Experimental)';
@@ -144,7 +150,9 @@ trait SettingsManager {
             $tab, 
             '', 
             '', 
-            $config
+            $config,
+            $linkToFeatures,
+            $isExperimental
         );
 
         if ($type === 'feature' && is_string($result)) {
@@ -166,6 +174,7 @@ trait SettingsManager {
      * @param string $sectionTitle
      * @param array $config
      * @param boolean $linkToFeature
+     * @param boolean $isExperimental
      * @return string|boolean The name of the registered setting or false if registration failed.
      */
     protected function addSetting(
@@ -185,7 +194,8 @@ trait SettingsManager {
             'options'     => [],
             'sanitize_callback' => null,
         ],
-        bool $linkToFeature = true
+        bool $linkToFeature  = true,
+        bool $isExperimental = false
     ): string|bool {
         // Merge and filter config to only allow keys present in defaultSettingConfig
         $config = array_merge($this->defaultSettingConfig, $config);
@@ -230,11 +240,6 @@ trait SettingsManager {
             $this->theme->addOptionsPageTab($page, $tab);
         }
 
-        // Generate section ID if not provided
-        if ($sectionId === '') {
-            $sectionId = $this->name . '_' . $page . '_' . $tab . '_section';
-        }
-
         // Ensure hasField is set
         if (! isset($config['hasField'])) {
             $config['hasField'] = true;
@@ -252,10 +257,16 @@ trait SettingsManager {
             'sanitize_callback' => is_callable($config['sanitize_callback']) ? $config['sanitize_callback'] : null,
         ];
 
+        // Generate section ID if not provided
+        if ($sectionId === '') {
+            $sectionId = Str::slug($this->authorName, '_') . '_' . $page . '_' . $tab . '_section';
+        }
+
         // Add the setting and corresponding section
         $optionGroup = $optionPageSlug . '_' . $tab;
+
         // Add settings section
-        $this->addSettingsSection($sectionId, $sectionTitle, $optionPageSlug, $tab, $linkToFeature);
+        $sectionId = $this->addSettingsSection($sectionId, $sectionTitle, $optionPageSlug, $tab, $name);
 
         // Register setting and return option name
         return $this->registerSetting(
@@ -263,7 +274,9 @@ trait SettingsManager {
             $label,
             $optionGroup,
             $sectionId,
-            $sanitizedConfig
+            $sanitizedConfig,
+            $linkToFeature,
+            $isExperimental
         );
     }
 
@@ -276,6 +289,8 @@ trait SettingsManager {
      * @param string $optionGroup
      * @param string $sectionId
      * @param array $config
+     * @param boolean $linkToFeature
+     * @param boolean $isExperimental
      * @return string
      */
     private function registerSetting(
@@ -283,7 +298,9 @@ trait SettingsManager {
         string $label,
         string $optionGroup,
         string $sectionId,
-        array $config
+        array  $config,
+        bool   $linkToFeature = true,
+        bool   $isExperimental = false
     ): string {
         $fullName = Str::startsWith($this->fullName, 'meros')
             ? Str::after($this->fullName, 'meros_')
@@ -300,7 +317,9 @@ trait SettingsManager {
             $label,
             $optionGroup,
             $sectionId,
-            $config
+            $config,
+            $linkToFeature,
+            $isExperimental
         ) {
             register_setting(
                 $optionGroup,
@@ -322,7 +341,17 @@ trait SettingsManager {
             if ($config['hasField']) {
                 // Add a settings field if specified
                 $type = $config['type'] === 'integer' ? 'number' : $config['type'];
-                $label = '<label id="' . esc_attr($optionName) . '" for="' . esc_attr($optionName) . '" class="meros-settings-label">' . esc_html($label) . '</label>';
+                $label = '<label id="' . esc_attr($optionName) . '" for="' . esc_attr($optionName) . '" class="meros-settings-label">' . esc_html($label);
+
+                if ($linkToFeature && $this->featureEnabledSettingName !== '') {
+                    $featuresTab = $isExperimental ? 'experimental_features' : 'features';
+
+                    $featureUrl = admin_url('options-general.php?page=theme_features&tab=' . $featuresTab . '#' . $this->featureEnabledSettingName);
+                    $label .= " | <a style=\"font-weight:400;\" href=\"{$featureUrl}\">View Feature</a></label>";
+                } else {
+                    $label .= '</label>';
+                }
+
                 $description = $config['description'] !== ''
                     ? '<p class="description">' . esc_html($config['description']) . '</p>'
                     : '';
@@ -361,45 +390,44 @@ trait SettingsManager {
      * @param string $title
      * @param string $page
      * @param string $tab
-     * @param boolean $linkToFeature
-     * @return void
+     * @param boolean $linkToFeatures
+     * @return string The ID of the added section.
      */
     protected function addSettingsSection(
         string $id,
         string $title,
         string $page,
         string $tab,
-        bool $linkToFeature = true
-    ): void {
+        string $settingName
+    ): string {
         if (isset($this->settingsSections[$id])) {
-            return;
+            $this->settingsSections[$id]['settings'][] = $settingName;
+        } else {
+            $this->settingsSections[$id] = [
+                'title'    => $title,
+                'page'     => $page,
+                'tab'      => $tab,
+                'settings' => [$settingName],
+            ];
         }
 
-        $this->settingsSections[$id] = [
-            'title' => $title,
-            'page' => $page,
-            'tab' => $tab,
-        ];
+        if ($this->theme->getRegisteredSettingsSection($page, $tab, $id) !== null) {
+            $this->theme->updateSettingsSection($id, $settingName);
+            return $id;
+        }
 
-        add_action('admin_init', function () use ($id, $title, $page, $tab, $linkToFeature) {
+        add_action('admin_init', function () use ($id, $title, $page, $tab) {
             add_settings_section(
                 $id,
                 $title,
-                function () use ($id, $linkToFeature) {
+                function () use ($id) {
                     $content = '';
                     if ($this->authorName !== 'Unknown') {
-                        $content = "<h3 style=\"margin-bottom: -8px;\">Provided by {$this->authorName}</h3><p style=\"margin-bottom: -8px;\">";
+                        $content = "<h3 id=\"{$id}\" style=\"margin-bottom: -8px;\">Provided by {$this->authorName}</h3><p style=\"margin-bottom: -8px;\">";
                         $content .= $this->authorUrl !== '' ? "<a href=\"{$this->authorUrl}\" target=\"_blank\">Website</a>" : '';
                         $content .= $this->authorSupportUrl !== '' ? " | <a href=\"{$this->authorSupportUrl}\" target=\"_blank\">Support</a>" : '';
-
-                        if ($linkToFeature && $this->featureEnabledSettingName !== '') {
-                            $tab = $this->experimental ? 'experimental-features' : 'features';
-                            $featureUrl = admin_url('options-general.php?page=theme_features&tab=' . $tab . '#' . $this->featureEnabledSettingName);
-                            $content .= " | <a href=\"{$featureUrl}\">View Feature</a>";
-                        }
-
                         $content .= '</p>';
-                        $content = apply_filters($this->name . '_settings_section_' . $id . '_content', $content);
+                        $content = apply_filters($this->hookPrefix . '_' . $id . '_content', $content, $content);
                     }
                     echo $content;
                 },
@@ -407,6 +435,9 @@ trait SettingsManager {
                 []
             );
         }, 5);
+
+        $this->theme->addSettingsSection($id, $this->settingsSections[$id]);
+        return $id;
     }
 
     /**

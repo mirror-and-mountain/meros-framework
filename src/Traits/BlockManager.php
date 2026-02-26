@@ -101,7 +101,7 @@ trait BlockManager {
             : '';
 
         if ($allowSwitching) {
-            $hookName = $this->fullName . '_' . Str::slug($name, '_');
+            $hookName = $this->hookPrefix . '_' . Str::slug($name, '_');
             $isSwitchable = apply_filters($hookName . '_is_switchable', true);
 
             if ($isSwitchable) {

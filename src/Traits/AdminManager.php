@@ -26,6 +26,14 @@ trait AdminManager {
     protected static array $registeredSettings = [];
 
     /**
+     * An array of settings sections registered by
+     * all features and extensions in the theme.
+     *
+     * @var array
+     */
+    protected array $registeredSettingsSections = [];
+
+    /**
      * Sets optionsPages array.
      *
      * @return void
@@ -49,6 +57,17 @@ trait AdminManager {
                 'callback'   => [$this, 'renderThemeFeaturesPage'],
             ],
         ];
+
+        foreach($this->optionsPages as $config) {
+            $tabs = [];
+            foreach ($config['tabs'] as $tab) {
+                $tabs[$tab] = [];
+            }
+
+            $this->registeredSettingsSections[$config['menu_slug']] = [
+                'tabs' => $tabs,
+            ];
+        }
     }
 
     /**
@@ -190,10 +209,10 @@ trait AdminManager {
      * @return void
      */
     private function renderSettingsPageTabs(array $config, bool $showSumit = true): void {
-        $tabs = [];
+        $tabLabels = [];
 
         foreach ($config['tabs'] as $tab) {
-            $tabs[$tab] = Str::ucfirst(Str::replace('_', ' ', $tab));
+            $tabLabels[$tab] = Str::headline(Str::replace('_', ' ', $tab));
         }
         
         ?>
@@ -204,15 +223,19 @@ trait AdminManager {
             $settingsIntroHtml = $settingsIntro !== '' ? "<p>{$settingsIntro}</p>" : '';
 
             echo $settingsIntroHtml;
-            $current_tab = isset($_GET['tab'], $tabs[$_GET['tab']]) ? $_GET['tab'] : array_key_first($tabs);
+            $current_tab = isset($_GET['tab'], $tabLabels[$_GET['tab']]) ? $_GET['tab'] : array_key_first($tabLabels);
             ?>
             <form method='post' action='options.php'>
                 <nav class="nav-tab-wrapper">
                     <?php
-                    foreach ($tabs as $tab => $name) {
+                    foreach ($tabLabels as $tab => $label) {
+                        if ($this->registeredSettingsSections[$config['menu_slug']]['tabs'][ $tab ] === []) {
+                            continue; // Don't show the tab if it has no registered settings sections
+                        }
+
                         $current = $tab === $current_tab ? ' nav-tab-active' : '';
                         $url = add_query_arg(['page' => $config['menu_slug'], 'tab' => $tab], '');
-                        echo "<a class=\"nav-tab{$current}\" href=\"{$url}\">{$name}</a>";
+                        echo "<a class=\"nav-tab{$current}\" href=\"{$url}\">{$label}</a>";
                     }
                     ?>
                 </nav>
@@ -315,6 +338,82 @@ trait AdminManager {
      * @return void
      */
     final public function addOptionsPageTab(string $page, string $tab): void {
-        $this->optionsPages[$page]['tabs'][] = $tab;
+        $this->optionsPages[ $page ]['tabs'][] = $tab;
+
+        if (
+            array_key_exists($page, $this->registeredSettingsSections) &&
+            is_array($this->registeredSettingsSections[$page]['tabs'] ?? null) &&
+            !array_key_exists($tab, $this->registeredSettingsSections[$page]['tabs'])
+        ) {
+            $this->registeredSettingsSections[$page]['tabs'][ $tab ] = [];
+        }
+    }
+
+    /**
+     * Records a feature settings section.
+     *
+     * @param string $id
+     * @param array $config
+     * @return void
+     */
+    final public function addSettingsSection(string $id, array $config): void {
+        $page     = $config['page'] ?? null;
+        $tab      = $config['tab'] ?? null;
+        $settings = $config['settings'] ?? [];
+    
+        if (!isset($page, $tab, $settings)) {
+            return;
+        }
+
+        if (
+            in_array($tab, array_keys($this->registeredSettingsSections[$page]['tabs'] ?? []), true) &&
+            is_array($this->registeredSettingsSections[$page]['tabs'][$tab])
+        ) {
+            if (!in_array($id, array_keys($this->registeredSettingsSections[$page]['tabs'][$tab] ?? []), true)) {
+                $this->registeredSettingsSections[$page]['tabs'][$tab][$id] = $settings;
+            }
+        }
+    }
+
+    /**
+     * Updates a registered feature settings section with a new setting.
+     *
+     * @param string $id
+     * @param string $settingName
+     * @return void
+     */
+    final public function updateSettingsSection(string $id, string $settingName): void {
+        foreach ($this->registeredSettingsSections as $page => $config) {
+            foreach ($config['tabs'] as $tab => $sections) {
+                if (
+                    array_key_exists($id, $sections) &&
+                    !in_array($settingName, $sections[$id], true)
+                ) {
+                    $this->registeredSettingsSections[$page]['tabs'][$tab][$id][] = $settingName;
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * Returns all registered settings sections.
+     *
+     * @return array
+     */
+    final public function getRegisteredSettingsSections(): array {
+        return $this->registeredSettingsSections;
+    }
+
+    /**
+     * Returns a registered settings section by ID.
+     *
+     * @param string $page
+     * @param string $tab
+     * @param string $id
+     * @return array|null
+     */
+    final public function getRegisteredSettingsSection(string $page, string $tab, string $id): ?array {
+        return $this->registeredSettingsSections[$page]['tabs'][$tab][$id] ?? null;
     }
 }

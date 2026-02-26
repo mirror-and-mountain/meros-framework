@@ -7,7 +7,6 @@ use MM\Meros\Traits\AssetManager;
 use MM\Meros\Traits\BlockManager;
 use MM\Meros\Traits\ComponentManager;
 use MM\Meros\Traits\DatabaseManager;
-use MM\Meros\Traits\FieldManager;
 use MM\Meros\Traits\SettingsManager;
 
 /**
@@ -165,7 +164,7 @@ abstract class Feature {
 
         // Set hook prefix
         $this->hookPrefix = Str::startsWith($this->fullName, 'meros')
-            ? $this->fullName
+            ? Str::after($this->fullName, 'meros_')
             : 'meros_' . $this->fullName;
 
         // Set up the feature
@@ -228,7 +227,8 @@ abstract class Feature {
                 'theme_features',
                 'features',
                 $this->description,
-                $this->experimental
+                $this->experimental,
+                false
             );
         }
 
