@@ -219,6 +219,12 @@ abstract class Feature {
      * @return void
      */
     private function setUp(): void {
+        // Stop if the theme doesn't allow experimental features and this feature is experimental
+        if (!$this->theme->allowsExperimentalFeatures() && $this->experimental) {
+            $this->enabled = false;
+            return;
+        }
+
         // Create WP dashboard switch if userSwitchable is true
         if ($this->switchable === true) {
             $this->createSwitch(

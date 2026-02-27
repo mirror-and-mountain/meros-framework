@@ -118,14 +118,6 @@ trait SettingsManager {
         $name = Str::slug($name, '_');
         $label = 'Enable ' . Str::title(Str::replace(['_', '-'], ' ', $name));
 
-        if ($this->experimental) {
-            $isExperimental = true;
-        }
-
-        if ($isExperimental) {
-            $label .= ' (Experimental)';
-        }
-
         $config = [
             'type'        => 'boolean',
             'description' => $description !== ''
@@ -267,6 +259,15 @@ trait SettingsManager {
 
         // Add settings section
         $sectionId = $this->addSettingsSection($sectionId, $sectionTitle, $optionPageSlug, $tab, $name);
+
+        // Mark as experimental in the label if specified
+        if ($this->experimental) {
+            $isExperimental = true;
+        }
+
+        if ($isExperimental) {
+            $label .= ' (Experimental)';
+        }
 
         // Register setting and return option name
         return $this->registerSetting(

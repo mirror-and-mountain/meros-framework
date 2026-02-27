@@ -43,6 +43,13 @@ abstract class ThemeManager {
      */
     private bool $livewireInitialisedAdmin = false;
 
+    /**
+     * Whether to allow features marked as experimental.
+     *
+     * @var boolean
+     */
+    protected bool $allowExperimentalFeatures = true;
+
     use AdminManager, AuthorManager, ContextManager, PermalinkManager;
 
     final public function __construct(protected Application $app) {
@@ -283,5 +290,14 @@ abstract class ThemeManager {
      */
     final public function livewireInitialised(bool $admin = false): bool {
         return $admin ? $this->livewireInitialisedAdmin : $this->livewireInitialised;
+    }
+
+    /**
+     * Returns whether the theme allows experimental features.
+     *
+     * @return boolean
+     */
+    final public function allowsExperimentalFeatures(): bool {
+        return $this->allowExperimentalFeatures;
     }
 }
