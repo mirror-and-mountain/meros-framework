@@ -1,0 +1,1 @@
+<p>Hello from the livewire portal component!</p>

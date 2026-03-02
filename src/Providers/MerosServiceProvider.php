@@ -4,11 +4,13 @@ namespace MM\Meros\Providers;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
+use Livewire\Component;
 
 use MM\Meros\Contracts\ThemeManager;
 use MM\Meros\Helpers\ClassInfo;
 use MM\Meros\Helpers\Loader;
-use MM\Meros\Helpers\Livewire;
+use MM\Meros\Helpers\Livewire as LivewireHelper;
 use MM\Meros\Scripts\MerosCommands;
 
 class MerosServiceProvider extends ServiceProvider {
@@ -48,7 +50,7 @@ class MerosServiceProvider extends ServiceProvider {
      */
     public function boot(): void {
         // Setup Livewire
-        Livewire::setScriptRoute();
+        LivewireHelper::setScriptRoute();
 
         if ($this->registered) {
             $theme = $this->app->make('meros.theme_manager');
@@ -61,6 +63,9 @@ class MerosServiceProvider extends ServiceProvider {
             do_action("{$themeSlug}_add_features", $theme);
 
             $theme->initialise();
+
+            // Load portal resources
+            $this->loadPortalResources();
         }
 
         // Enable wp meros cli if appropriate
@@ -70,5 +75,17 @@ class MerosServiceProvider extends ServiceProvider {
                 \WP_CLI::add_command('meros', $merosCli);
             }
         }
+    }
+
+    public function loadPortalResources(): void {
+        $portalClass = ClassInfo::getFromPath(__DIR__ . '/../Components/Portal.php');
+        
+        if ($portalClass->extends(Component::class)) {
+            Livewire::component('meros.portal', $portalClass->name);
+        }
+
+
+        $this->loadRoutesFrom(__DIR__ . '/../routes/portal.php');
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'meros');
     }
 }
