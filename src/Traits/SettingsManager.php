@@ -307,7 +307,7 @@ trait SettingsManager {
             ? Str::after($this->fullName, 'meros_')
             : $this->fullName;
 
-        $optionName = 'm_' . $fullName . '_' . $name;
+        $optionName = '_m_' . $fullName . '_' . $name;
 
         $current = get_option($optionName, $config['default'] ?? null);
         $this->fqSettings[$optionGroup][$optionName] = $current;
@@ -531,7 +531,7 @@ trait SettingsManager {
      */
     final public function getSetting(string $optionGroup, string $name, bool $fq = false): mixed {
         if ($fq) {
-            return $this->fqSettings[$optionGroup]['m_' . $name] ?? null;
+            return $this->fqSettings[$optionGroup]['_m_' . $name] ?? null;
         } else {
             return $this->settings[$optionGroup][$name] ?? null;
         }

@@ -16,11 +16,7 @@
     },
     "autoload": {
         "psr-4": {
-            "MM\\Meros\\Contracts\\": "src/Contracts",
-            "MM\\Meros\\Helpers\\": "src/Helpers",
-            "MM\\Meros\\Providers\\": "src/Providers",
-            "MM\\Meros\\Scripts\\": "src/Scripts",
-            "MM\\Meros\\Traits\\": "src/Traits"
+            "MM\\Meros\\": "src/"
         }
     },
     "minimum-stability": "stable",
