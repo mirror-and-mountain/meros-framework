@@ -121,11 +121,11 @@ trait DatabaseManager {
      * 
      * @return void
      */
-    private function setMerosCoreMigrations(): void {
+    final public function setMerosCoreMigrations(): void {
         $migrations = File::files(
             trailingslashit($this->themeDir) . 
             trailingslashit($this->frameworkDir) .
-            'database/migrations'
+            'Database/Migrations'
         );
 
         foreach($migrations as $migrationFile) {
@@ -140,7 +140,7 @@ trait DatabaseManager {
      * 
      * @return void
      */
-    private function runMigrations(string $fromSource = '', bool $coreFirstRun = false): void {
+    final public function runMigrations(string $fromSource = '', bool $coreFirstRun = false): void {
         if ($this->isRunningMigrations) {
             return;
         }
@@ -177,7 +177,6 @@ trait DatabaseManager {
                     'priority'       => $migrationClass::$priority,
                     'path_reference' => $pathReference
                 ]);
-                
             }
         }
 
@@ -189,7 +188,7 @@ trait DatabaseManager {
      * 
      * @return void
      */
-    private function rollbackMigrations(string $fromSource = ''): void {
+    final public function rollbackMigrations(string $fromSource = ''): void {
         if ($this->isRunningMigrations) {
             return;
         }

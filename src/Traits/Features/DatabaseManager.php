@@ -17,7 +17,7 @@ trait DatabaseManager {
      *
      * @var string
      */
-    protected string $migrationsDir = 'database/migrations';
+    protected string $migrationsDir = 'Database/Migrations';
 
     /**
      * Migration classes discovered from the feature's migrations directory.
@@ -40,7 +40,7 @@ trait DatabaseManager {
 
         foreach ($migrationFiles as $migrationFile) {
             $file = $migrationFile->getPathname();
-            $this->theme->addMigrationFromPath($file, $this->fullName);
+            $this->theme->addMigrationFromPath($file, $this->hookPrefix);
         }
 
         $this->hasMigrations = count($migrationFiles) > 0;
