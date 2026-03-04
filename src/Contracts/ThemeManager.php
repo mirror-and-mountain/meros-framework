@@ -8,10 +8,11 @@ use Illuminate\Support\Arr;
 use MM\Meros\Helpers\Livewire;
 use MM\Meros\Providers\MerosServiceProvider;
 
-use MM\Meros\Traits\AdminManager;
-use MM\Meros\Traits\AuthorManager;
-use MM\Meros\Traits\ContextManager;
-use MM\Meros\Traits\PermalinkManager;
+use MM\Meros\Traits\Theme\AdminManager;
+use MM\Meros\Traits\Theme\AuthorManager;
+use MM\Meros\Traits\Theme\ContextManager;
+use MM\Meros\Traits\Theme\PermalinkManager;
+use MM\Meros\Traits\Theme\DatabaseManager;
 
 use Roots\Acorn\Application as RootsApplication;
 
@@ -50,7 +51,11 @@ abstract class ThemeManager {
      */
     protected bool $allowExperimentalFeatures = true;
 
-    use AdminManager, AuthorManager, ContextManager, PermalinkManager;
+    use AdminManager, 
+        AuthorManager, 
+        ContextManager, 
+        PermalinkManager, 
+        DatabaseManager;
 
     final public function __construct(protected Application $app) {
         $this->setContext();
@@ -96,6 +101,8 @@ abstract class ThemeManager {
 
         // Hook for when theme is activated.
         add_action('after_switch_theme', function () {
+            // Get theme instance from the container.
+            $themeInstance = app()->make('meros.theme_manager');
             // Clear session files.
             $sessionDir = get_theme_file_path('storage/framework/sessions');
 
@@ -108,18 +115,26 @@ abstract class ThemeManager {
                     }
                 }
             }
-
+    
             // Ensure an APP_KEY exists for Livewire.
             Livewire::ensureAppKey();
 
             // Ensure pretty permalinks are set.
-            self::ensurePrettyPermalinks();
+            $themeInstance->ensurePrettyPermalinks();
+
+            // Run meros core database migrations.
+            if ($themeInstance->allowDatabaseMigrations !== false) {
+                $themeInstance->setMerosCoreMigrations();
+                $themeInstance->runMigrations('meros_core', true);
+            }
         });
 
         // Hook for when theme is switched.
         add_action('switch_theme', function () {
+            // Get theme instance from the container.
+            $themeInstance = app()->make('meros.theme_manager');
             // Unregister theme settings.
-            $settings = self::$registeredSettings;
+            $settings = $themeInstance->registeredSettings;
             foreach ($settings as $_ => $optionGroups) {
                 foreach ($optionGroups as $optionGroup => $options) {
                     foreach ($options as $optionName => $_) {
@@ -127,6 +142,12 @@ abstract class ThemeManager {
                         delete_option($optionName);
                     }
                 }
+            }
+
+            // Drop migrated tables if the theme allows database migrations.
+            if ($themeInstance->allowDatabaseMigrations !== false) {
+                $themeInstance->setMerosCoreMigrations();
+                $themeInstance->rollbackMigrations();
             }
         });
 
@@ -235,7 +256,7 @@ abstract class ThemeManager {
             $feature->hook();
             $featureName = $feature->getName(true);
             $featureSettings = $feature->getSettings();
-            self::$registeredSettings[$featureName] = $featureSettings;
+            $this->registeredSettings[$featureName] = $featureSettings;
         }
     }
 

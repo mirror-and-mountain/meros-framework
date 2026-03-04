@@ -1,6 +1,6 @@
 <?php
 
-namespace MM\Meros\Traits;
+namespace MM\Meros\Traits\Features;
 
 use Illuminate\Support\Str;
 use MM\Meros\Helpers\Fields;

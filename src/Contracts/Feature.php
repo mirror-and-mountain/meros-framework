@@ -3,11 +3,11 @@
 namespace MM\Meros\Contracts;
 
 use Illuminate\Support\Str;
-use MM\Meros\Traits\AssetManager;
-use MM\Meros\Traits\BlockManager;
-use MM\Meros\Traits\ComponentManager;
-use MM\Meros\Traits\DatabaseManager;
-use MM\Meros\Traits\SettingsManager;
+use MM\Meros\Traits\Features\AssetManager;
+use MM\Meros\Traits\Features\BlockManager;
+use MM\Meros\Traits\Features\ComponentManager;
+use MM\Meros\Traits\Features\SettingsManager;
+use MM\Meros\Traits\Features\DatabaseManager;
 
 /**
  * Features should extend this class and define
@@ -134,8 +134,8 @@ abstract class Feature {
     use AssetManager,
         BlockManager,
         ComponentManager,
-        DatabaseManager,
-        SettingsManager;
+        SettingsManager,
+        DatabaseManager;
 
     public function __construct(
         object $theme, 

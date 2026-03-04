@@ -12,6 +12,13 @@ class Portal extends Component {
     private User $user;
 
     public function mount() {
+        global $post;
+        
+        $portal = get_post(10515);
+
+        setup_postdata($portal);
+        $post = $portal;
+
         $userId = get_current_user_id();
         
         if ($userId === 0) {

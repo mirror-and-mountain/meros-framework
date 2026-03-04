@@ -1,6 +1,6 @@
 <?php
 
-namespace MM\Meros\Traits;
+namespace MM\Meros\Traits\Theme;
 
 trait PermalinkManager {
     /**
@@ -28,7 +28,7 @@ trait PermalinkManager {
      * 
      * @return void
      */
-    private static function ensurePrettyPermalinks(): void {
+    private function ensurePrettyPermalinks(): void {
         global $wp_rewrite;
         $permalinkStructure = get_option('permalink_structure');
         if (empty($permalinkStructure) || $permalinkStructure === '/') {

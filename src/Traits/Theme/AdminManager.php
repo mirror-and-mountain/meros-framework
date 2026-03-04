@@ -1,6 +1,6 @@
 <?php
 
-namespace MM\Meros\Traits;
+namespace MM\Meros\Traits\Theme;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -23,7 +23,7 @@ trait AdminManager {
      *
      * @var array
      */
-    protected static array $registeredSettings = [];
+    protected array $registeredSettings = [];
 
     /**
      * An array of settings sections registered by

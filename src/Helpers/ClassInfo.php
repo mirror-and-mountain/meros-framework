@@ -25,11 +25,18 @@ class ClassInfo {
     public ?string $namespace = null;
 
     /**
-     * The full path to the file defining the class.
+     * The full path to the directory containing the class file.
      * 
      * @var string|null
      */
     public ?string $path = null;
+
+    /**
+     * The full path to the file defining the class.
+     *
+     * @var string|null
+     */
+    public ?string $fullPath = null;
 
     /**
      * The URI to the file defining the class.
@@ -111,6 +118,7 @@ class ClassInfo {
         $instance->name = $reflection->getName();
         $instance->namespace = $reflection->getNamespaceName();
         $instance->path = dirname($reflection->getFileName());
+        $instance->fullPath = $reflection->getFileName();
         $instance->parent = $reflection->getParentClass()->getName();
 
         $themePath = get_theme_file_path();
@@ -142,5 +150,60 @@ class ClassInfo {
         return $this->name &&
             is_subclass_of($this->name, $baseClass) ||
             is_subclass_of($this->parent, $baseClass);
+    }
+
+    /**
+     * Determines whether the given class has the given method with the specified visibility.
+     * 
+     * @param string $method The name of the method to check for.
+     * @param string $visibility The visibility to check for ('public', 'protected', 'private').
+     * @return bool
+     */
+    public function hasMethod(string $method, string $visibility = 'public', bool $static = false): bool {
+        if (!method_exists($this->name, $method)) {
+            return false;
+        }
+
+        $reflection = new \ReflectionMethod($this->name, $method);
+
+        if ($static) {
+            $reflection = new \ReflectionMethod($this->name, $method);
+            if (!$reflection->isStatic()) {
+                return false;
+            }
+        }
+
+        return match($visibility) {
+            'public'    => $reflection->isPublic(),
+            'protected' => $reflection->isProtected(),
+            'private'   => $reflection->isPrivate(),
+            default     => false,
+        };
+    }
+
+    /**
+     * Determines whether the given class has the given property with the specified visibility.
+     *
+     * @param string $property The name of the property to check for.
+     * @param string $visibility The visibility to check for ('public', 'protected', 'private').
+     * @return bool
+     */
+    public function hasProperty(string $property, string $visibility = 'public', bool $static = false): bool {
+        if (!property_exists($this->name, $property)) {
+            return false;
+        }
+
+        $reflection = new \ReflectionProperty($this->name, $property);
+
+        if ($static && !$reflection->isStatic()) {
+            return false;
+        }
+
+        return match($visibility) {
+            'public'    => $reflection->isPublic(),
+            'protected' => $reflection->isProtected(),
+            'private'   => $reflection->isPrivate(),
+            default     => false,
+        };
     }
 }

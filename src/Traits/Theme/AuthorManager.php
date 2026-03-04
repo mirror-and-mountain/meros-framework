@@ -1,6 +1,6 @@
 <?php
 
-namespace MM\Meros\Traits;
+namespace MM\Meros\Traits\Theme;
 
 use Illuminate\Support\Arr;
 
