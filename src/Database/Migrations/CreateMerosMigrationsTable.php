@@ -7,7 +7,18 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 class CreateMerosMigrationsTable extends Migration {
-    public static string $label = 'Create Meros Migrations Table';
+    /**
+     * A unique slug for the migration, used for tracking which migrations have been run.
+     *
+     * @var string
+     */
+    public static string $slug = 'create_meros_migrations_table';
+
+    /**
+     * The priority of the migration. Lower numbers run first.
+     *
+     * @var string
+     */
     public static int $priority = 100;
 
     /**
@@ -19,6 +30,7 @@ class CreateMerosMigrationsTable extends Migration {
             $table->id();
             $table->string('source');
             $table->string('label');
+            $table->string('slug')->unique();
             $table->integer('priority');
             $table->string('path_reference')->unique();
             $table->timestamps();

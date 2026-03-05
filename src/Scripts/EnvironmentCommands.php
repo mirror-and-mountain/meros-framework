@@ -2,9 +2,7 @@
 
 namespace MM\Meros\Scripts;
 
-use MM\Meros\Models\MerosMigration;
-
-class MerosCommands {
+class EnvironmentCommands {
     /**
      * Clones content from one environment to another environment.
      *
@@ -35,9 +33,9 @@ class MerosCommands {
      * 
      * ## EXAMPLES
      *
-     * wp meros sync-table posts staging
-     * wp meros sync-table posts development production
-     * wp meros sync-table --all staging
+     * wp meros:env sync-table posts staging
+     * wp meros:env sync-table posts development production
+     * wp meros:env sync-table --all staging
      *
      * @subcommand sync-tables
      *
@@ -110,8 +108,8 @@ class MerosCommands {
      *
      * ## EXAMPLES
      *
-     * wp meros create-feature MyNewFeature
-     * wp meros create-feature my-new-feature
+     * wp meros:env create-feature MyNewFeature
+     * wp meros:env create-feature my-new-feature
      *
      * @subcommand create-feature
      *
@@ -145,9 +143,9 @@ class MerosCommands {
      *
      * ## EXAMPLES
      *
-     * wp meros connect-env production
+     * wp meros:env connect production
      *
-     * @subcommand connect-env
+     * @subcommand connect
      *
      * @when after_wp_load
      *
@@ -185,8 +183,8 @@ class MerosCommands {
      *
      * ## EXAMPLES
      *
-     * wp meros sync-theme production
-     * wp meros sync-theme staging development
+     * wp meros:env sync-theme production
+     * wp meros:env sync-theme staging development
      *
      * @subcommand sync-theme
      *
@@ -225,151 +223,5 @@ class MerosCommands {
         } else {
             \WP_CLI::success(sprintf('Theme sync from "%s" to "%s" completed successfully.', $from, $to));
         }
-    }
-
-    /**
-     * Runs feature database migrations on an environment.
-     *
-     * ## OPTIONS
-     *
-     * <feature>
-     * : The feature to run migrations for. This should be the name of a registered feature.
-     * [<environment>]
-     * : The environment to run the migrations on (default: local_dev).
-     * 
-     * [--refresh]
-     * : Whether to rollback migrations before running them again. (default: false)
-     *
-     * ## EXAMPLES
-     *
-     * wp meros run-migrations my_feature
-     * wp meros run-migrations my_feature staging
-     * wp meros run-migrations my_feature staging --refresh
-     *
-     * @subcommand run-migrations
-     *
-     * @when after_wp_load
-     *
-     * @param  array  $args  Positional arguments.
-     * @param  array  $assoc_args  Associative arguments.
-     */
-    public function runMigrations($args, $assoc_args) {
-        // Parse arguments
-        $feature = $args[0];
-        if (!isset($args[1])) {
-            $environment = 'local_dev';
-        } else {
-            $environment = $args[1] === 'local' ? 'local_dev' : $args[1];
-        }
-
-        if ($feature === 'meros_core') {
-            \WP_CLI::error('Meros core migrations cannot be run using this command. Please use the "wp meros run-meros-migrations" command to run core migrations.');
-            return;
-        }
-        
-        $refresh = isset($assoc_args['refresh']) && $assoc_args['refresh'] === true ? true : false;
-
-        $themeManager = app()->make('meros.theme_manager');
-
-        if ($refresh) {
-            $themeManager->rollbackMigrations($feature);
-            $themeManager->runMigrations($feature);
-        } else {
-            $themeManager->runMigrations($feature);
-        }
-
-        \WP_CLI::success('Meros core migrations run successfully.');
-
-    }
-
-    /**
-     * Rolls back feature database migrations on an environment.
-     *
-     * ## OPTIONS
-     *
-     * <feature>
-     * : The feature to run migrations for. This should be the name of a registered feature.
-     * [<environment>]
-     * : The environment to run the migrations on (default: local_dev).
-     *
-     * ## EXAMPLES
-     *
-     * wp meros rollback-migrations my_feature
-     * wp meros rollback-migrations my_feature staging
-     *
-     * @subcommand rollback-migrations
-     *
-     * @when after_wp_load
-     *
-     * @param  array  $args  Positional arguments.
-     */
-    public function rollbackMigrations($args) {
-        // Parse arguments
-        $feature = $args[0];
-        if (!isset($args[1])) {
-            $environment = 'local_dev';
-        } else {
-            $environment = $args[1] === 'local' ? 'local_dev' : $args[1];
-        }
-
-        if ($feature === 'meros_core') {
-            \WP_CLI::error('Meros core migrations cannot be rolled back individually. Please use the "wp meros run-meros-migrations" command with the --refresh flag to rollback and re-run core migrations.');
-            return;
-        }
-
-        $themeManager = app()->make('meros.theme_manager');
-        $themeManager->rollbackMigrations($feature);
-        \WP_CLI::success('Meros core migrations rolled back successfully.');
-    }
-
-    /**
-     * Runs meros framework database migrations in the local environment.
-     *
-     * ## OPTIONS
-     * 
-     * [<environment>]
-     * : The environment to run the migrations on (default: local_dev).
-     * 
-     * [--refresh]
-     * : Whether to rollback migrations before running them again. (default: false)
-     *
-     * ## EXAMPLES
-     *
-     * wp meros run-meros-migrations staging
-     * wp meros run-meros-migrations staging --refresh
-     *
-     * @subcommand run-meros-migrations
-     *
-     * @when after_wp_load
-     * 
-     * @param  array  $args  Positional arguments.
-     * @param  array  $assoc_args  Associative arguments.
-     */
-    public function runMerosMigrations($args, $assoc_args) {
-        // Parse arguments
-        if (!isset($args[1])) {
-            $environment = 'local_dev';
-        } else {
-            $environment = $args[1] === 'local' ? 'local_dev' : $args[1];
-        }
-
-        $refresh = isset($assoc_args['refresh']) && $assoc_args['refresh'] === true ? true : false;
-
-        $themeManager = app()->make('meros.theme_manager');
-        $themeManager->setMerosCoreMigrations();
-
-        if ($refresh) {
-            $migrationRecords = MerosMigration::where('source', '!=', 'meros_core')->get();
-            if ($migrationRecords->count() > 0) {
-                \WP_CLI::error('Meros core migrations cannot be rolled back because there are already non-core migrations that have been run. Please rollback all non-core migrations before re-running core migrations.');
-                return;
-            }
-            $themeManager->rollbackMigrations('meros_core');
-            $themeManager->runMigrations('meros_core', true);
-        } else {
-            $themeManager->runMigrations('meros_core');
-        }
-
-        \WP_CLI::success('Meros core migrations run successfully.');
     }
 }

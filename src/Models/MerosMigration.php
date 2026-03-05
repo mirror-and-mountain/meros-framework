@@ -12,6 +12,7 @@ class MerosMigration extends Model {
         'path_reference',
         'source',
         'label',
+        'slug',
         'priority'
     ];
 }

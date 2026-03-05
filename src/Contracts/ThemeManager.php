@@ -65,7 +65,7 @@ abstract class ThemeManager {
 
     /**
      * Bootstraps the theme's Laravel App using Acorn's Application class.
-     * Additional providers can be passed. Registers theme activation and switch hooks.
+     * Additional providers can be passed.
      *
      * This method should be called from the theme's functions.php file.
      * 
@@ -98,60 +98,6 @@ abstract class ThemeManager {
                     ->boot();
             }, 0);
         }
-
-        // Hook for when theme is activated.
-        add_action('after_switch_theme', function () {
-            // Get theme instance from the container.
-            $themeInstance = app()->make('meros.theme_manager');
-            // Clear session files.
-            $sessionDir = get_theme_file_path('storage/framework/sessions');
-
-            if (is_dir($sessionDir)) {
-                $files = glob($sessionDir . '/*');
-
-                foreach ($files as $file) {
-                    if (is_file($file)) {
-                        unlink($file);
-                    }
-                }
-            }
-    
-            // Ensure an APP_KEY exists for Livewire.
-            Livewire::ensureAppKey();
-
-            // Ensure pretty permalinks are set.
-            $themeInstance->ensurePrettyPermalinks();
-
-            // Run meros core database migrations.
-            if ($themeInstance->allowDatabaseMigrations !== false) {
-                $themeInstance->setMerosCoreMigrations();
-                $themeInstance->runMigrations('meros_core', true);
-            }
-        });
-
-        // Hook for when theme is switched.
-        add_action('switch_theme', function () {
-            // Get theme instance from the container.
-            $themeInstance = app()->make('meros.theme_manager');
-            // Unregister theme settings.
-            $settings = $themeInstance->registeredSettings;
-            foreach ($settings as $_ => $optionGroups) {
-                foreach ($optionGroups as $optionGroup => $options) {
-                    foreach ($options as $optionName => $_) {
-                        unregister_setting($optionGroup, $optionName);
-                        delete_option($optionName);
-                    }
-                }
-            }
-
-            // Drop migrated tables if the theme allows database migrations.
-            if ($themeInstance->allowDatabaseMigrations !== false) {
-                $themeInstance->setMerosCoreMigrations();
-                $themeInstance->rollbackMigrations();
-            }
-        });
-
-        // Hook for when theme is uninstalled.
     }
 
     /**

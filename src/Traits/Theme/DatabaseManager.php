@@ -2,13 +2,13 @@
 
 namespace MM\Meros\Traits\Theme;
 
-use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 
 use MM\Meros\Contracts\Migration;
 use MM\Meros\Helpers\ClassInfo;
 use MM\Meros\Models\MerosMigration;
-use MM\Meros\Database\Migrations\CreateMerosMigrationsTable;
 
 trait DatabaseManager {
     /**
@@ -17,6 +17,13 @@ trait DatabaseManager {
      * @var boolean
      */
     protected bool $allowDatabaseMigrations = true;
+
+    /**
+     * Whether to only allow database migrations to be run from WP CLI.
+     *
+     * @var boolean
+     */
+    protected bool $onlyAllowDatabaseMigrationsFromCli = false;
 
     /**
      * Whether the theme has database tables to migrate.
@@ -41,12 +48,38 @@ trait DatabaseManager {
     protected array $migrations = [];
 
     /**
+     * Messages for migration operations.
+     *
+     * @var array
+     */
+    private array $messages = [
+        'core_migrations_not_set' => 'Meros core migrations have not been run. Please run the "wp meros setup-migrations" command to set up core migrations before running any other migrations.',
+        'migrations_running'      => 'Cannot run migrations at this time.',
+        'no_permission'           => 'The current user does not have permission to run migrations.',
+        'no_migrations'           => 'No migrations to run.',
+        'no_rollbacks'            => 'No rollbacks to run.',
+        'slug_not_found'          => 'Migration with the provided slug was not found.',
+        'slug_already_run'        => 'Migration with the provided slug has already been run.',
+        'slug_not_run'            => 'Migration with the provided slug has not been run.',
+        'core_migration_rollback' => 'The core migrations table cannot be rolled back.'
+    ];
+
+    /**
      * Gets whether the theme allows features to add database migrations.
      * 
      * @return bool
      */
     final public function allowsMigrations(): bool {
         return $this->allowDatabaseMigrations;
+    }
+
+    /**
+     * Gets whether the theme only allows database migrations to be run from WP CLI.
+     * 
+     * @return bool
+     */
+    final public function onlyAllowsMigrationsFromCli(): bool {
+        return $this->onlyAllowDatabaseMigrationsFromCli;
     }
 
     /**
@@ -90,15 +123,21 @@ trait DatabaseManager {
             $class->extends(Migration::class) &&
             $class->hasMethod('up') &&
             $class->hasMethod('down') &&
-            $class->hasProperty('label', 'public', true) &&
+            $class->hasProperty('slug', 'public', true) &&
             $class->hasProperty('priority', 'public', true)
         ) {
-            if (!is_string($class->name::$label) || $class->name::$label === '') {
+            $slug = $class->name::$slug;
+            if (!is_string($slug) || $slug === '') {
                 return false;
             }
 
-            $priority = $class->name::$priority;
+            $label = $class->hasProperty('label', 'public', true) 
+            && is_string($class->name::$label) 
+            && $class->name::$label !== ''
+                ? $class->name::$label 
+                : Str::title(Str::replace('_', ' ', $class->name::$slug));
 
+            $priority = $class->name::$priority;
             if (
                 !is_int($priority) ||
                 $priority < 100 ||
@@ -107,7 +146,15 @@ trait DatabaseManager {
                 return false;
             }
 
-            $this->migrations[$source][$class->name::$priority] = $class->name;
+            $this->migrations[$source][$priority] = [
+                'source'   => $source,
+                'label'    => $label,
+                'slug'     => $slug,
+                'priority' => $priority,
+                'class'    => $class->name,
+                'path_reference' => $path
+            ];
+
             $this->hasMigrations = true;
 
             return true;
@@ -138,11 +185,21 @@ trait DatabaseManager {
     /**
      * Runs discovered migrations.
      * 
-     * @return void
+     * @return array|string Array of completed migration slugs, or error message string if migrations cannot be run.
      */
-    final public function runMigrations(string $fromSource = '', bool $coreFirstRun = false): void {
+    final public function runMigrations(string $fromSource = ''): array|string {
         if ($this->isRunningMigrations) {
-            return;
+            return $this->messages['migrations_running'];
+        }
+
+        if (!current_user_can('manage_options')) {
+            return $this->messages['no_permission'];
+        }
+
+
+        $coreReady = $this->checkMerosCoreMigrationsSet();
+        if ($coreReady === false && $fromSource !== 'meros_core') {
+            return $this->messages['core_migrations_not_set'];
         }
 
         $this->isRunningMigrations = true;
@@ -150,17 +207,18 @@ trait DatabaseManager {
         // Get migrations ordered by priority
         $migrationsToRun = $this->getMigrationsToRun($fromSource);
 
-        foreach($migrationsToRun as $_priorityGroup => $migrationClasses) {
-            foreach ($migrationClasses as $migrationClass) {
-                $pathReference = ClassInfo::get($migrationClass)->fullPath ?? '';
+        // Track completed migrations
+        $completedMigrations = [];
 
-                if ($pathReference === '') {
+        foreach($migrationsToRun as $_priorityGroup => $migrationConfigurations) {
+            foreach ($migrationConfigurations as $migrationConfig) {
+                if ($migrationConfig['slug'] === '') {
                     continue;
                 }
 
-                if (!$coreFirstRun) {
+                if ($coreReady) {
                     $migrationRecord = MerosMigration::where(
-                        'path_reference', $pathReference
+                        'slug', $migrationConfig['slug']
                     )->first();
                     
                     if ($migrationRecord) {
@@ -168,29 +226,46 @@ trait DatabaseManager {
                     }
                 }
 
-                $instance = new $migrationClass;
+                $instance = new $migrationConfig['class'];
                 $instance->up();
 
                 MerosMigration::create([
-                    'source'         => $fromSource,
-                    'label'          => $migrationClass::$label,
-                    'priority'       => $migrationClass::$priority,
-                    'path_reference' => $pathReference
+                    'source'         => $migrationConfig['source'],
+                    'label'          => $migrationConfig['label'],
+                    'slug'           => $migrationConfig['slug'],
+                    'priority'       => $migrationConfig['priority'],
+                    'path_reference' => $migrationConfig['path_reference']
                 ]);
+
+                $completedMigrations[] = $migrationConfig['slug'];
             }
         }
 
         $this->isRunningMigrations = false;
+
+        if ($completedMigrations === []) {
+            return $this->messages['no_migrations'];
+        }
+
+        return $completedMigrations;
     }
 
     /**
      * Rolls back discovered migrations.
      * 
-     * @return void
+     * @return array|string Array of rolled back migration slugs, or error message string if rollbacks cannot be run.
      */
-    final public function rollbackMigrations(string $fromSource = ''): void {
+    final public function rollbackMigrations(string $fromSource = ''): array|string {
         if ($this->isRunningMigrations) {
-            return;
+            return $this->messages['rollbacks_running'];
+        }
+
+        if (!current_user_can('manage_options')) {
+            return $this->messages['no_permission'];
+        }
+
+        if ($this->checkMerosCoreMigrationsSet() === false) {
+            return $this->messages['core_migrations_not_set'];
         }
 
         $this->isRunningMigrations = true;
@@ -198,32 +273,41 @@ trait DatabaseManager {
         // Get migrations in reverse order to how they were run
         $migrationsToRun = $this->getMigrationsToRun($fromSource, true);
 
-        foreach( $migrationsToRun as $_priorityGroup => $migrationClasses) {
-            foreach ($migrationClasses as $migrationClass) {
-                $pathReference = ClassInfo::get($migrationClass)->fullPath ?? '';
+        // Track rolled back migrations
+        $rolledBackMigrations = [];
 
-                if ($pathReference === '') {
+        foreach( $migrationsToRun as $_priorityGroup => $migrationConfigurations) {
+            foreach ($migrationConfigurations as $migrationConfig) {
+                if ($migrationConfig['slug'] === '') {
                     continue;
                 }
 
                 $migrationRecord = MerosMigration::where(
-                    'path_reference', $pathReference
+                    'slug', $migrationConfig['slug']
                 )->first();
 
                 if (!$migrationRecord) {
                     continue;
                 }
 
-                $instance = new $migrationClass;
+                $instance = new $migrationConfig['class'];
                 $instance->down();
 
-                if ($migrationClass !== CreateMerosMigrationsTable::class) {
+                if ($migrationConfig['slug'] !== 'create_meros_migrations_table') {
                     $migrationRecord->delete();
                 }
+
+                $rolledBackMigrations[] = $migrationConfig['slug'];
             }
         }
 
         $this->isRunningMigrations = false;
+
+        if ($rolledBackMigrations === []) {
+            return $this->messages['no_rollbacks'];
+        }
+
+        return $rolledBackMigrations;
     }
 
     /**
@@ -243,11 +327,11 @@ trait DatabaseManager {
                 continue;
             }
 
-            foreach($migrations as $priority => $migrationClass) {
+            foreach($migrations as $priority => $config) {
                 if ($migrationsToRun[$priority] ?? false) {
-                    $migrationsToRun[$priority][] = $migrationClass;
+                    $migrationsToRun[$priority][] = $config;
                 } else {
-                    $migrationsToRun[$priority] = [$migrationClass];
+                    $migrationsToRun[$priority] = [$config];
                 }
             }
         }
@@ -264,91 +348,132 @@ trait DatabaseManager {
     /**
      * Runs a migration using its classname.
      *
-     * @param string $migrationClass
-     * @param string $source
-     * @return void
+     * @param string $slug
+     * @return string Returns slug of completed migration, or error message string if migration cannot be run.
      */
-    final public function runMigrationFromClass(string $migrationClass, string $source): void {
+    final public function runMigrationFromSlug(string $slug): string {
         if ($this->isRunningMigrations) {
-            return;
+            return $this->messages['migrations_running'];
+        }
+
+        if (!current_user_can('manage_options')) {
+            return $this->messages['no_permission'];
+        }
+
+        if ($this->checkMerosCoreMigrationsSet() === false) {
+            return $this->messages['core_migrations_not_set'];
         }
 
         $this->isRunningMigrations = true;
-        $classInfo = ClassInfo::get($migrationClass);
+        $migrationConfig = $this->getRegisteredMigrationFromSlug($slug);
 
-        if ($classInfo === false || !$classInfo->extends(Migration::class)) {
-            return;
-        }
-
-        $pathReference = $classInfo->fullPath ?? '';
-        
-        if ($pathReference === '') {
-            return;
+        if ($migrationConfig === null) {
+            $this->isRunningMigrations = false;
+            return $this->messages['slug_not_found'];
         }
 
         $migrationRecord = MerosMigration::where(
-            'path_reference', $pathReference
+            'slug', $migrationConfig['slug']
         )->first();
 
         if ($migrationRecord !== null) {
-            return;
+            $this->isRunningMigrations = false;
+            return $this->messages['slug_already_run'];
         }
 
-        $instance = new $migrationClass;
+        $instance = new $migrationConfig['class'];
         $instance->up();
 
         MerosMigration::create([
-            'source' => $source,
-            'label' => $migrationClass::$label,
-            'priority' => $migrationClass::$priority,
-            'path_reference' => $pathReference
+            'source'         => $migrationConfig['source'],
+            'label'          => $migrationConfig['label'],
+            'slug'           => $migrationConfig['slug'],
+            'priority'       => $migrationConfig['priority'],
+            'path_reference' => $migrationConfig['path_reference']
         ]);
 
         $this->isRunningMigrations = false;
+        return 'Migration ' . $migrationConfig['slug'] . ' completed successfully.';
     }
 
     /**
-     * Rolls back a migration using its classname.
+     * Rolls back a migration using its slug.
      *
-     * @param string $migrationClass
-     * @return void
+     * @param string $slug
+     * @return string Returns slug of rolled back migration, or error message string if migration cannot be rolled back.
      */
-    final public function rollbackMigrationFromClass(string $migrationClass): void {
-        if ($migrationClass === CreateMerosMigrationsTable::class) {
-            return;
+    final public function rollbackMigrationFromSlug(string $slug): string {
+        if ($slug === 'create_meros_migrations_table') {
+            return $this->messages['core_migration_rollback'];
         }
 
         if ($this->isRunningMigrations) {
-            return;
+            return $this->messages['migrations_running'];
+        }
+
+        if (!current_user_can('manage_options')) {
+            return $this->messages['no_permission'];
+        }
+
+        if ($this->checkMerosCoreMigrationsSet() === false) {
+            return $this->messages['core_migrations_not_set'];
         }
 
         $this->isRunningMigrations = true;
+        $migrationConfig = $this->getRegisteredMigrationFromSlug($slug);
 
-        $classInfo = ClassInfo::get($migrationClass);
-
-        if ($classInfo === false || !$classInfo->extends(Migration::class)) {
-            return;
-        }
-
-        $pathReference = $classInfo->fullPath ?? '';
-
-        if ($pathReference === '') {
-            return;
+        if ($migrationConfig === null) {
+            $this->isRunningMigrations = false;
+            return $this->messages['slug_not_found'];
         }
 
         $migrationRecord = MerosMigration::where(
-            'path_reference', $pathReference
+            'slug', $migrationConfig['slug']
         )->first();
 
         if ($migrationRecord === null) {
-            return;
+            $this->isRunningMigrations = false;
+            return $this->messages['slug_not_run'];
         };
 
-        $instance = new $migrationClass;
+        $instance = new $migrationConfig['class'];
         $instance->down();
 
         $migrationRecord->delete();
 
         $this->isRunningMigrations = false;
+        return 'Migration ' . $migrationConfig['slug'] . ' rolled back successfully.';
+    }
+
+    /**
+     * Gets registered migration config from slug.
+     *
+     * @param string $slug
+     * @return array|null Returns migration config, or null if not found.
+     */
+    private function getRegisteredMigrationFromSlug(string $slug): ?array {
+        foreach ($this->migrations as $source => $migrations) {
+            foreach ($migrations as $priority => $configs) {
+                foreach ($configs as $config) {
+                    if ($config['slug'] === $slug) {
+                        return $config;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private function checkMerosCoreMigrationsSet(): bool {
+        if (Schema::hasTable('db_migrations')) {
+            $coreMigrationRecord = MerosMigration::where(
+                'slug', 'create_meros_migrations_table'
+            )->first();
+
+            if ($coreMigrationRecord !== null) {
+                return true;
+            }
+        }
+        return false;
     }
 }
