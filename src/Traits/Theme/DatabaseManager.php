@@ -85,10 +85,15 @@ trait DatabaseManager {
     /**
      * Gets the discovered migrations.
      * 
+     * @param string $fromSource Optional source to get migrations from. If not provided, gets from all sources.
      * @return array
      */
-    final public function getMigrations(): array {
-        return $this->migrations;
+    final public function getMigrations(string $fromSource = ''): array {
+        if ($fromSource === '') {
+            return $this->migrations;
+        }
+
+        return $this->migrations[$fromSource] ?? [];
     }
 
     /**
@@ -205,7 +210,10 @@ trait DatabaseManager {
         $this->isRunningMigrations = true;
 
         // Get migrations ordered by priority
-        $migrationsToRun = $this->getMigrationsToRun($fromSource);
+        $migrationsToRun = $this->getMigrationsToRun($fromSource, '', false);
+
+        // Batch ID
+        $batchId = Str::ulid();
 
         // Track completed migrations
         $completedMigrations = [];
@@ -234,7 +242,8 @@ trait DatabaseManager {
                     'label'          => $migrationConfig['label'],
                     'slug'           => $migrationConfig['slug'],
                     'priority'       => $migrationConfig['priority'],
-                    'path_reference' => $migrationConfig['path_reference']
+                    'path_reference' => $migrationConfig['path_reference'],
+                    'batch_id'       => $batchId
                 ]);
 
                 $completedMigrations[] = $migrationConfig['slug'];
@@ -253,9 +262,11 @@ trait DatabaseManager {
     /**
      * Rolls back discovered migrations.
      * 
+     * @param string $fromSource Optional source to roll back migrations from. If not provided, rolls back from all sources.
+     * @param string $fromBatch Optional batch ID to roll back migrations from. If not provided, rolls back all batches.
      * @return array|string Array of rolled back migration slugs, or error message string if rollbacks cannot be run.
      */
-    final public function rollbackMigrations(string $fromSource = ''): array|string {
+    final public function rollbackMigrations(string $fromSource = '', string $fromBatch = ''): array|string {
         if ($this->isRunningMigrations) {
             return $this->messages['rollbacks_running'];
         }
@@ -271,7 +282,7 @@ trait DatabaseManager {
         $this->isRunningMigrations = true;
 
         // Get migrations in reverse order to how they were run
-        $migrationsToRun = $this->getMigrationsToRun($fromSource, true);
+        $migrationsToRun = $this->getMigrationsToRun($fromSource, $fromBatch, true);
 
         // Track rolled back migrations
         $rolledBackMigrations = [];
@@ -308,6 +319,60 @@ trait DatabaseManager {
         }
 
         return $rolledBackMigrations;
+    }
+
+    /**
+     * Rolls back the last migration that was run.
+     * 
+     * @return string Returns slug of rolled back migration, or error message string if rollbacks cannot be run.
+     */
+    final public function rollbackLastMigration(): string {
+        if ($this->isRunningMigrations) {
+            return $this->messages['rollbacks_running'];
+        }
+
+        if (!current_user_can('manage_options')) {
+            return $this->messages['no_permission'];
+        }
+
+        if ($this->checkMerosCoreMigrationsSet() === false) {
+            return $this->messages['core_migrations_not_set'];
+        }
+
+        $lastMigrationRecord = MerosMigration::orderBy('id', 'desc')->first();
+
+        if (!$lastMigrationRecord) {
+            return $this->messages['no_rollbacks'];
+        }
+
+        return $this->rollbackMigrationFromSlug($lastMigrationRecord->source, $lastMigrationRecord->slug);
+    }
+
+    /**
+     * Rolls back the last batch of migrations that were run.
+     * 
+     * @return array|string Array of rolled back migration slugs, or error message string if rollbacks cannot be run.
+     */
+    final public function rollbackLastMigrationBatch(): array|string {
+        if ($this->isRunningMigrations) {
+            return $this->messages['rollbacks_running'];
+        }
+
+        if (!current_user_can('manage_options')) {
+            return $this->messages['no_permission'];
+        }
+
+        if ($this->checkMerosCoreMigrationsSet() === false) {
+            return $this->messages['core_migrations_not_set'];
+        }
+
+        $lastBatchId = MerosMigration::orderBy('created_at', 'desc')->value('batch_id');
+
+        if (!$lastBatchId) {
+            return $this->messages['no_rollbacks'];
+        }
+
+        return $this->rollbackMigrations('', $lastBatchId);
     }
 
     /**
@@ -416,26 +481,50 @@ trait DatabaseManager {
      * Gets the discovered migrations, ordered by priority.
      * 
      * @param string $fromSource Optional source to get migrations from. If not provided, gets from all sources.
+     * @param string $fromBatch Optional batch ID to get migrations from. If not provided, gets from all batches.
      * @param bool $reverse Whether to order migrations in reverse (for rollbacks). Defaults to false.
      * @return array
      */
-    private function getMigrationsToRun(string $fromSource = '', $reverse = false): array {
+    private function getMigrationsToRun(string $fromSource = '', string $fromBatch = '', $reverse = false): array {
         $migrationsToRun = [];
 
-        foreach($this->migrations as $source => $migrations) {
-            if ($fromSource !== '' &&
-                $source !== $fromSource
-            ) {
-                continue;
-            }
+        if ($fromSource !== '') {
+            foreach($this->migrations as $source => $migrations) {
+                if ($fromSource !== '' && $source !== $fromSource ) {
+                    continue;
+                }
 
-            foreach($migrations as $priority => $config) {
-                if ($migrationsToRun[$priority] ?? false) {
-                    $migrationsToRun[$priority][] = $config;
-                } else {
-                    $migrationsToRun[$priority] = [$config];
+                foreach($migrations as $priority => $config) {
+                    if ($migrationsToRun[$priority] ?? false) {
+                        $migrationsToRun[$priority][] = $config;
+                    } else {
+                        $migrationsToRun[$priority] = [$config];
+                    }
                 }
             }
+        }
+
+        else if ($fromBatch !== '') {
+            $migrationRecords = MerosMigration::where('batch_id', $fromBatch)->get();
+            $migrationRecordSlugs = $migrationRecords->pluck('slug')->toArray();
+
+            foreach($this->migrations as $source => $migrations) {
+                foreach($migrations as $priority => $config) {
+                    if (!in_array($config['slug'], $migrationRecordSlugs)) {
+                        continue;
+                    }
+
+                    if ($migrationsToRun[$priority] ?? false) {
+                        $migrationsToRun[$priority][] = $config;
+                    } else {
+                        $migrationsToRun[$priority] = [$config];
+                    }
+                }
+            }
+        }
+
+        else {
+            $migrationsToRun = $this->migrations;
         }
 
         if ($reverse) {

@@ -3,7 +3,11 @@
 namespace MM\Meros\Traits\Features;
 
 use Illuminate\Support\Str;
+use Livewire\Livewire;
+
 use MM\Meros\Helpers\Fields;
+use MM\Meros\Models\MerosMigration;
+use MM\Meros\Components\AdminMigrationButton;
 
 trait SettingsManager {
     /**
@@ -357,14 +361,58 @@ trait SettingsManager {
                     ? '<p class="description">' . esc_html($config['description']) . '</p>'
                     : '';
 
+                // Add migration controls if allowed
+                if ($this->hasMigrations) {
+                    $migrations = $this->theme->getMigrations($this->hookPrefix);
+                    $hasInstalledInitialType = false;
+                    $hasUpdates = false;
+
+                    $lastMigration = MerosMigration::where(
+                            'source', $this->hookPrefix)
+                            ->latest('batch_id')
+                            ->first();
+
+                    $lastMigrationTime = $lastMigration ? $lastMigration->created_at->format('d-m-Y H:i:s') : false;
+
+                    foreach($migrations as $migration) {
+                        $migrationRecord = MerosMigration::where('slug', $migration['slug'])->first();
+                        $isInitialType = Str::startsWith($migration['slug'], 'create_');
+                        
+                        if ($migrationRecord !== null && $isInitialType) {
+                            $hasInstalledInitialType = true;
+                            continue;
+                        } 
+                        
+                        if ($migrationRecord === null) {
+                            $hasUpdates = true;
+                        }
+                    }
+
+                    $btnLabel = 'Up To Date';
+                    if ($hasInstalledInitialType && $hasUpdates) {
+                        $btnLabel = 'Update';
+                    } else if (!$hasInstalledInitialType) {
+                        $btnLabel = 'Install';
+                    }
+
+                    $description .= '<p class="description">';
+                    if ($lastMigrationTime) {
+                        $description .= "Last updated: {$lastMigrationTime}. ";
+                    }
+
+                    if ($this->theme->onlyAllowsMigrationsFromCli()) {
+                        $description .= "Please run migrations via WP CLI.";
+                    } // here move logic above to database trait and call something like 'hasUpdates()'
+
                 add_settings_field(
                     $optionName,
                     $label . $description,
                     function () use ($optionName, $config, $type) {
+                        $html = '';
                         if (is_callable($config['hasField'])) {
-                            call_user_func($config['hasField']);
+                            $html = call_user_func($config['hasField']);
                         } else {
-                            echo Fields::make(
+                            $html = Fields::make(
                                 $optionName,
                                 $type,
                                 $config['default'],
@@ -374,6 +422,8 @@ trait SettingsManager {
                                 $config['options']
                             );
                         }
+
+                        echo $html;
                     },
                     $optionGroup,
                     $sectionId

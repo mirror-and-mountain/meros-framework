@@ -4,6 +4,9 @@ namespace MM\Meros\Traits\Theme;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
+
+use MM\Meros\Components\AdminMigrationButton;
 
 /**
  * Used by the theme manager to initialise settings
@@ -101,20 +104,25 @@ trait AdminManager {
         $assetsDir = trailingslashit(get_stylesheet_directory()) . $this->frameworkDir . 'assets/build/admin/';
 
         add_action('admin_enqueue_scripts', function () use ($assetsUri, $assetsDir) {
-            wp_enqueue_script(
-                'mm-meros-toggle',
-                $assetsUri . 'index.js',
-                [],
-                filemtime($assetsDir . 'index.js'),
-                true
-            );
+            if (isset($_GET['page']) && $_GET['page'] === 'theme_features') {
+                $this->initialiseLivewire(true);
+                Livewire::component('meros.admin-migration-button', AdminMigrationButton::class);
+                
+                wp_enqueue_script(
+                    'mm-meros-toggle',
+                    $assetsUri . 'index.js',
+                    [],
+                    filemtime($assetsDir . 'index.js'),
+                    true
+                );
 
-            wp_enqueue_style(
-                'mm-meros-admin-style',
-                $assetsUri . 'style-index.css',
-                [],
-                filemtime($assetsDir . 'style-index.css')
-            );
+                wp_enqueue_style(
+                    'mm-meros-admin-style',
+                    $assetsUri . 'style-index.css',
+                    [],
+                    filemtime($assetsDir . 'style-index.css')
+                );
+            }
         });
 
         add_action('wp_ajax_meros_toggle_feature', function () {
@@ -415,5 +423,14 @@ trait AdminManager {
      */
     final public function getRegisteredSettingsSection(string $page, string $tab, string $id): ?array {
         return $this->registeredSettingsSections[$page]['tabs'][$tab][$id] ?? null;
+    }
+
+    /**
+     * Returns all registered settings.
+     *
+     * @return array
+     */
+    final public function getRegisteredSettings(): array {
+        return $this->registeredSettings;
     }
 }

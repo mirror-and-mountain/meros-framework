@@ -156,6 +156,59 @@ class MigrationCommands {
     }
 
     /**
+     * Rolls back the last migration batch.
+     * A Wordpress user with 'manage_options' capability must run this command with the global --user flag set.
+     *
+     * ## EXAMPLES
+     *
+     * wp meros:migration rollback-last-batch --user=admin
+     *
+     * @subcommand rollback-last-batch
+     *
+     * @when after_wp_load
+     *
+     */
+    public function rollbackLastMigrationBatch() {
+        $themeManager = app()->make('meros.theme_manager');
+
+        $rollbackMsg = $themeManager->rollbackLastMigrationBatch();
+        
+        if (!is_array($rollbackMsg)) {
+            \WP_CLI::error('A message was received while rolling back the last migration batch: ' . $rollbackMsg);
+            return;
+        }
+
+        \WP_CLI::success('Last migration batch rolled back successfully.');
+    }
+
+    /**
+     * Rolls back the last migration.
+     * A Wordpress user with 'manage_options' capability must run this command with the global --user flag set.
+     *
+     * ## EXAMPLES
+     *
+     * wp meros:migration rollback-last --user=admin
+     *
+     * @subcommand rollback-last
+     *
+     * @when after_wp_load
+     *
+     */
+    public function rollbackLastMigration() {
+        $themeManager = app()->make('meros.theme_manager');
+
+        $rollbackMsg = $themeManager->rollbackLastMigration();
+        
+        if (!str_contains($rollbackMsg, 'successfully')) {
+            \WP_CLI::error('A message was received while rolling back the last migration: ' . $rollbackMsg);
+            return;
+        }
+
+        \WP_CLI::success('Last migration rolled back successfully.');
+    }
+    
+
+    /**
      * Runs meros framework database migrations in the local environment.
      * A Wordpress user with 'manage_options' capability must run this command with the global --user flag set.
      *

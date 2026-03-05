@@ -2,6 +2,40 @@ th[scope="row"]:has(.meros-settings-label) {
     width: 400px;
 }
 
+.meros-admin-migration-button {
+    margin-left: 20px !important;
+    width: 100px;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+
+    &.meros-admin-migration-install-button {
+        background-color: #218c4a !important;
+        border-color: #218c4a !important;
+
+        &:hover {
+            background-color: #176c38 !important;
+            border-color: #176c38 !important;
+        }
+    }
+
+    &.meros-admin-migration-update-button {
+        background-color: #2980b9 !important;
+        border-color: #2980b9 !important;
+
+        &:hover {
+            background-color: #2471a3 !important;
+            border-color: #2471a3 !important;
+        }
+    }
+
+    &.meros-admin-migration-up-to-date-button {
+        background-color: #d4edda !important;
+        border-color: #a8d5ba !important;
+        color: #155724 !important;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+}
+
 .meros-toggle-btn {
     width: 100px;
 
@@ -9,7 +43,7 @@ th[scope="row"]:has(.meros-settings-label) {
         background-color: #218c4a !important;
         border-color: #218c4a !important;
 
-        :hover {
+        &:hover {
             background-color: #176c38 !important;
             border-color: #176c38 !important;
         }

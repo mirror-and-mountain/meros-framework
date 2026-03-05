@@ -13,6 +13,7 @@ class MerosMigration extends Model {
         'source',
         'label',
         'slug',
-        'priority'
+        'priority',
+        'batch_id'
     ];
 }

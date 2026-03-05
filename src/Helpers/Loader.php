@@ -123,6 +123,7 @@ class Loader {
         string $baseClass
     ): void {
         $class = ClassInfo::get($class);
+
         $feature = false;
 
         // Check the main feature class exists/is loadable

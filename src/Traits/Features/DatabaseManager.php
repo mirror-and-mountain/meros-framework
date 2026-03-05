@@ -19,13 +19,6 @@ trait DatabaseManager {
      */
     protected string $migrationsDir = 'Database/Migrations';
 
-    /**
-     * Migration classes discovered from the feature's migrations directory.
-     *
-     * @var array
-     */
-    protected array $discoveredMigrations = [];
-
     protected function loadMigrations(): void {
         if ($this->theme->allowsMigrations() === false) {
             return;

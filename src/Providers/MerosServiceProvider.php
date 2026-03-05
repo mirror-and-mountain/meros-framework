@@ -156,7 +156,7 @@ class MerosServiceProvider extends ServiceProvider {
         // Get theme manager instance.
         $themeInstance = $this->app->make('meros.theme_manager');
         // Unregister theme settings.
-        $settings = $themeInstance->registeredSettings;
+        $settings = $themeInstance->getRegisteredSettings();
         foreach ($settings as $_ => $optionGroups) {
             foreach ($optionGroups as $optionGroup => $options) {
                 foreach ($options as $optionName => $_) {

@@ -28,7 +28,7 @@ trait PermalinkManager {
      * 
      * @return void
      */
-    private function ensurePrettyPermalinks(): void {
+    final public function ensurePrettyPermalinks(): void {
         global $wp_rewrite;
         $permalinkStructure = get_option('permalink_structure');
         if (empty($permalinkStructure) || $permalinkStructure === '/') {

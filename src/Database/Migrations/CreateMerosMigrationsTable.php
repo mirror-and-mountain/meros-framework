@@ -33,6 +33,7 @@ class CreateMerosMigrationsTable extends Migration {
             $table->string('slug')->unique();
             $table->integer('priority');
             $table->string('path_reference')->unique();
+            $table->ulid('batch_id')->index();
             $table->timestamps();
         });
     }

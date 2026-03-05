@@ -245,7 +245,6 @@ abstract class Feature {
             $switch === '0'
         ) {
             $this->enabled = false;
-
             return;
         }
 
