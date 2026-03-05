@@ -311,6 +311,108 @@ trait DatabaseManager {
     }
 
     /**
+     * Runs a migration using its classname.
+     *
+     * @param string $source
+     * @param string $slug
+     * @return string Returns slug of completed migration, or error message string if migration cannot be run.
+     */
+    final public function runMigrationFromSlug(string $source, string $slug): string {
+        if ($this->isRunningMigrations) {
+            return $this->messages['migrations_running'];
+        }
+
+        if (!current_user_can('manage_options')) {
+            return $this->messages['no_permission'];
+        }
+
+        if ($this->checkMerosCoreMigrationsSet() === false) {
+            return $this->messages['core_migrations_not_set'];
+        }
+
+        $this->isRunningMigrations = true;
+        $migrationConfig = $this->getRegisteredMigrationFromSlug($source, $slug);
+
+        if ($migrationConfig === null) {
+            $this->isRunningMigrations = false;
+            return $this->messages['slug_not_found'];
+        }
+
+        $migrationRecord = MerosMigration::where(
+            'slug', $migrationConfig['slug']
+        )->first();
+
+        if ($migrationRecord !== null) {
+            $this->isRunningMigrations = false;
+            return $this->messages['slug_already_run'];
+        }
+
+        $instance = new $migrationConfig['class'];
+        $instance->up();
+
+        MerosMigration::create([
+            'source'         => $migrationConfig['source'],
+            'label'          => $migrationConfig['label'],
+            'slug'           => $migrationConfig['slug'],
+            'priority'       => $migrationConfig['priority'],
+            'path_reference' => $migrationConfig['path_reference']
+        ]);
+
+        $this->isRunningMigrations = false;
+        return 'Migration ' . $migrationConfig['slug'] . ' completed successfully.';
+    }
+
+    /**
+     * Rolls back a migration using its slug.
+     *
+     * @param string $source
+     * @param string $slug
+     * @return string Returns slug of rolled back migration, or error message string if migration cannot be rolled back.
+     */
+    final public function rollbackMigrationFromSlug(string $source, string $slug): string {
+        if ($slug === 'create_meros_migrations_table') {
+            return $this->messages['core_migration_rollback'];
+        }
+
+        if ($this->isRunningMigrations) {
+            return $this->messages['migrations_running'];
+        }
+
+        if (!current_user_can('manage_options')) {
+            return $this->messages['no_permission'];
+        }
+
+        if ($this->checkMerosCoreMigrationsSet() === false) {
+            return $this->messages['core_migrations_not_set'];
+        }
+
+        $this->isRunningMigrations = true;
+        $migrationConfig = $this->getRegisteredMigrationFromSlug($source, $slug);
+
+        if ($migrationConfig === null) {
+            $this->isRunningMigrations = false;
+            return $this->messages['slug_not_found'];
+        }
+
+        $migrationRecord = MerosMigration::where(
+            'slug', $migrationConfig['slug']
+        )->first();
+
+        if ($migrationRecord === null) {
+            $this->isRunningMigrations = false;
+            return $this->messages['slug_not_run'];
+        };
+
+        $instance = new $migrationConfig['class'];
+        $instance->down();
+
+        $migrationRecord->delete();
+
+        $this->isRunningMigrations = false;
+        return 'Migration ' . $migrationConfig['slug'] . ' rolled back successfully.';
+    }
+
+    /**
      * Gets the discovered migrations, ordered by priority.
      * 
      * @param string $fromSource Optional source to get migrations from. If not provided, gets from all sources.
@@ -346,118 +448,17 @@ trait DatabaseManager {
     }
 
     /**
-     * Runs a migration using its classname.
-     *
-     * @param string $slug
-     * @return string Returns slug of completed migration, or error message string if migration cannot be run.
-     */
-    final public function runMigrationFromSlug(string $slug): string {
-        if ($this->isRunningMigrations) {
-            return $this->messages['migrations_running'];
-        }
-
-        if (!current_user_can('manage_options')) {
-            return $this->messages['no_permission'];
-        }
-
-        if ($this->checkMerosCoreMigrationsSet() === false) {
-            return $this->messages['core_migrations_not_set'];
-        }
-
-        $this->isRunningMigrations = true;
-        $migrationConfig = $this->getRegisteredMigrationFromSlug($slug);
-
-        if ($migrationConfig === null) {
-            $this->isRunningMigrations = false;
-            return $this->messages['slug_not_found'];
-        }
-
-        $migrationRecord = MerosMigration::where(
-            'slug', $migrationConfig['slug']
-        )->first();
-
-        if ($migrationRecord !== null) {
-            $this->isRunningMigrations = false;
-            return $this->messages['slug_already_run'];
-        }
-
-        $instance = new $migrationConfig['class'];
-        $instance->up();
-
-        MerosMigration::create([
-            'source'         => $migrationConfig['source'],
-            'label'          => $migrationConfig['label'],
-            'slug'           => $migrationConfig['slug'],
-            'priority'       => $migrationConfig['priority'],
-            'path_reference' => $migrationConfig['path_reference']
-        ]);
-
-        $this->isRunningMigrations = false;
-        return 'Migration ' . $migrationConfig['slug'] . ' completed successfully.';
-    }
-
-    /**
-     * Rolls back a migration using its slug.
-     *
-     * @param string $slug
-     * @return string Returns slug of rolled back migration, or error message string if migration cannot be rolled back.
-     */
-    final public function rollbackMigrationFromSlug(string $slug): string {
-        if ($slug === 'create_meros_migrations_table') {
-            return $this->messages['core_migration_rollback'];
-        }
-
-        if ($this->isRunningMigrations) {
-            return $this->messages['migrations_running'];
-        }
-
-        if (!current_user_can('manage_options')) {
-            return $this->messages['no_permission'];
-        }
-
-        if ($this->checkMerosCoreMigrationsSet() === false) {
-            return $this->messages['core_migrations_not_set'];
-        }
-
-        $this->isRunningMigrations = true;
-        $migrationConfig = $this->getRegisteredMigrationFromSlug($slug);
-
-        if ($migrationConfig === null) {
-            $this->isRunningMigrations = false;
-            return $this->messages['slug_not_found'];
-        }
-
-        $migrationRecord = MerosMigration::where(
-            'slug', $migrationConfig['slug']
-        )->first();
-
-        if ($migrationRecord === null) {
-            $this->isRunningMigrations = false;
-            return $this->messages['slug_not_run'];
-        };
-
-        $instance = new $migrationConfig['class'];
-        $instance->down();
-
-        $migrationRecord->delete();
-
-        $this->isRunningMigrations = false;
-        return 'Migration ' . $migrationConfig['slug'] . ' rolled back successfully.';
-    }
-
-    /**
      * Gets registered migration config from slug.
      *
      * @param string $slug
      * @return array|null Returns migration config, or null if not found.
      */
-    private function getRegisteredMigrationFromSlug(string $slug): ?array {
-        foreach ($this->migrations as $source => $migrations) {
-            foreach ($migrations as $priority => $configs) {
-                foreach ($configs as $config) {
-                    if ($config['slug'] === $slug) {
-                        return $config;
-                    }
+    private function getRegisteredMigrationFromSlug(string $source, string $slug): ?array {
+        $migrationsToRun = $this->getMigrationsToRun($source);
+        foreach ($migrationsToRun as $priority => $configs) {
+            foreach ($configs as $config) {
+                if ($config['slug'] === $slug) {
+                    return $config;
                 }
             }
         }
