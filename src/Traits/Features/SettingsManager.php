@@ -403,6 +403,7 @@ trait SettingsManager {
                     if ($this->theme->onlyAllowsMigrationsFromCli()) {
                         $description .= "Please run migrations via WP CLI.";
                     } // here move logic above to database trait and call something like 'hasUpdates()'
+                }
 
                 add_settings_field(
                     $optionName,
