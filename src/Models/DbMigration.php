@@ -4,7 +4,7 @@ namespace MM\Meros\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class MerosMigration extends Model {
+class DbMigration extends Model {
     protected $table = 'db_migrations';
     protected $primaryKey = 'id';
 

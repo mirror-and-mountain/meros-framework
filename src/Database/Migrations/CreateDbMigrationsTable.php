@@ -6,13 +6,13 @@ use MM\Meros\Contracts\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateMerosMigrationsTable extends Migration {
+class CreateDbMigrationsTable extends Migration {
     /**
      * A unique slug for the migration, used for tracking which migrations have been run.
      *
      * @var string
      */
-    public static string $slug = 'create_meros_migrations_table';
+    public static string $slug = 'create_db_migrations_table';
 
     /**
      * The priority of the migration. Lower numbers run first.
