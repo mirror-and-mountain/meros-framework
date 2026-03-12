@@ -24,21 +24,25 @@ class CreateIntegrationCredentialsTable extends Migration {
     /**
      * Run the migrations.
      */
-    public function up(): void
-    {
+    public function up(): void {
         Schema::create('integration_credentials', function (Blueprint $table) {
             $table->id();
 
+            $table->foreignId('integration_id')
+                ->nullable()
+                ->constrained('integrations')
+                ->cascadeOnDelete()
+                ->index();
+
             $table->foreignId('connection_id')
+                ->nullable()
                 ->constrained('integration_connections')
-                ->cascadeOnDelete();
+                ->cascadeOnDelete()
+                ->index();
 
-            $table->string('key');
-            $table->string('secret')->nullable();
-
-            $table->string('type')->default('api_key');
-
-            $table->json('meta')->nullable();
+            $table->string('name')->nullable();
+            $table->string('type')->index();
+            $table->json('credentials');
 
             $table->timestamps();
         });

@@ -3,11 +3,17 @@
 namespace MM\Meros\Services\Integrations;
 
 use MM\Meros\Models\Integration;
+use MM\Meros\Services\Integrations\IntegrationDriver;
 
 class IntegrationManager {
+    protected RequestBuilder $requestBuilder;
 
-    protected $requestBuilder;
-    protected $httpClient;
+    protected HttpClient $httpClient;
+
+    /**
+     * Registered driver classes keyed by integration slug.
+     */
+    protected static array $drivers = [];
 
     public function __construct(
         RequestBuilder $requestBuilder,
@@ -17,19 +23,34 @@ class IntegrationManager {
         $this->httpClient = $httpClient;
     }
 
+    /**
+     * Static entrypoint for resolving drivers.
+     */
     public static function driver(string $slug): IntegrationDriver {
-        return app(self::class)->resolveDriver($slug);
+        return app()->make(self::class)->resolveDriver($slug);
     }
 
+    /**
+     * Allow packages to register custom drivers.
+     */
+    public static function registerDriver(string $slug, string $driverClass): void {
+        self::$drivers[$slug] = $driverClass;
+    }
+
+    /**
+     * Resolve the correct driver instance.
+     */
     protected function resolveDriver(string $slug): IntegrationDriver {
         $integration = Integration::where('slug', $slug)
             ->where('is_active', true)
             ->firstOrFail();
 
-        return new IntegrationDriver(
-            $integration,
-            $this->requestBuilder,
-            $this->httpClient
-        );
+        $driverClass = self::$drivers[$slug] ?? IntegrationDriver::class;
+
+        return app()->make($driverClass, [
+            'integration' => $integration,
+            'requestBuilder' => $this->requestBuilder,
+            'httpClient' => $this->httpClient,
+        ]);
     }
 }

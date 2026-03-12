@@ -36,7 +36,8 @@ class CreateIntegrationConnectionsTable extends Migration {
             $table->string('label')->nullable();
             $table->string('account_id');
             $table->unique(['integration_id', 'account_id']);
-            $table->string('instance_url');
+            $table->string('instance_url')->nullable();
+
             $table->json('settings')->nullable();
             $table->boolean('is_active')->default(false);
             $table->timestamp('last_used_at')->nullable();

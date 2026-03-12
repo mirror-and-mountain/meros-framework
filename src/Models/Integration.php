@@ -32,4 +32,8 @@ class Integration extends Model {
     public function endpoints(): HasMany {
         return $this->hasMany(IntegrationEndpoint::class, 'integration_id');
     }
+
+    public function credentials(): HasMany {
+        return $this->hasMany(IntegrationCredential::class, 'integration_id');
+    }
 }

@@ -41,7 +41,7 @@ class CreateIntegrationEndpointsTable extends Migration {
             $table->text('description')->nullable();
             $table->string('uri'); 
             $table->string('method', 10)->index(); 
-            $table->string('format');
+            $table->string('format')->default('json');
             $table->boolean('is_active')->default(false);
             $table->timestamps();
         });

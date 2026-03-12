@@ -36,7 +36,7 @@ class CreateIntegrationTokensTable extends Migration {
             $table->text('access_token');
             $table->text('refresh_token')->nullable();
 
-            $table->timestamp('expires_at')->nullable();
+            $table->timestamp('expires_at')->nullable()->index();
             $table->string('token_type')->default('Bearer');
             $table->json('scopes')->nullable();
             $table->timestamps();

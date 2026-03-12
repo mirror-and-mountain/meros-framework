@@ -25,11 +25,11 @@ class IntegrationConnection extends Model {
         'last_used_at' => 'datetime'
     ];
 
-    public function credentials(): HasOne {
-        return $this->hasOne(IntegrationCredential::class, 'connection_id');
+    public function token(): HasOne {
+        return $this->hasOne(IntegrationToken::class, 'connection_id');
     }
 
-    public function tokens(): HasOne {
-        return $this->hasOne(IntegrationToken::class, 'connection_id');
+    public function credential(): HasOne {
+        return $this->hasOne(IntegrationCredential::class, 'connection_id');
     }
 }

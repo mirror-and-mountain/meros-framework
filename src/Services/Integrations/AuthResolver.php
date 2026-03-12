@@ -1,35 +1,56 @@
-<?php 
+<?php
 
 namespace MM\Meros\Services\Integrations;
 
+use MM\Meros\Models\Integration;
+use MM\Meros\Models\IntegrationConnection;
+
 class AuthResolver {
-    public function resolve($integration, $connection) {
+    public function resolve(
+        Integration $integration,
+        IntegrationConnection $connection
+    ): array {
+
         switch ($integration->auth_type) {
 
             case 'oauth':
 
                 $token = $connection->token;
 
+                if (!$token) {
+                    return [];
+                }
+
                 return [
-                    'Authorization' => 'Bearer ' . $token->access_token
+                    'Authorization' => 'Bearer ' . $token?->access_token
                 ];
+
 
             case 'api_key':
 
-                $key = $connection->keys()->first();
+                $credentials = $connection->credential?->credentials ?? [];
+
+                if (!isset($credentials['api_key'])) {
+                    return [];
+                }
 
                 return [
-                    'Authorization' => 'Bearer ' . $key->key
+                    'Authorization' => 'Bearer ' . $credentials['api_key']
                 ];
+
 
             case 'basic':
 
-                $key = $connection->keys()->first();
+                $credentials = $connection->credential?->credentials ?? [];
+
+                if (!isset($credentials['username']) || !isset($credentials['password'])) {
+                    return [];
+                }
 
                 return [
                     'Authorization' =>
                         'Basic ' . base64_encode(
-                            $key->key . ':' . $key->secret
+                            $credentials['username'] . ':' . $credentials['password']
                         )
                 ];
         }
