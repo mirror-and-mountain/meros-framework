@@ -2,24 +2,18 @@
 
 namespace MM\Meros\Database\Migrations;
 
-use MM\Meros\Contracts\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateIntegrationTokensTable extends Migration {
-    /**
-     * A unique slug for the migration, used for tracking which migrations have been run.
-     *
-     * @var string
-     */
-    public static string $slug = 'create_integration_tokens_table';
+use MM\Meros\App\Services\Theme\Migration;
 
+return new class extends Migration {
     /**
      * The priority of the migration. Lower numbers run first.
      *
-     * @var string
+     * @var int
      */
-    public static int $priority = 120;
+    public int $priority = 120;
 
     /**
      * Run the migrations.

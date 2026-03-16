@@ -2,10 +2,9 @@
 
 namespace MM\Meros\App\Services\Theme;
 
+use MM\Meros\App\Facades\Theme;
 use MM\Meros\App\Services\Theme\Concerns\HasContext;
 use MM\Meros\App\Services\Theme\Concerns\HasFeatures;
-
-use MM\Meros\App\Facades\Theme;
 
 /**
  * Features should extend this class and define
@@ -44,22 +43,21 @@ abstract class Package {
     ) {
         // Set context
         $this->setContext($name, $path, $uri);
-
-        if ($this->contextSet === true) {
-            // Initialise the package
-            $this->initialise();
-        }
     }
 
     /**
-     * Calls the boot method followed by the override method
-     * for extensions.
+     * Intialises the package.
      * 
      * @return void
      */
-    private function initialise(): void {
-        // Stop if the theme doesn't allow experimental features and this feature is experimental
-        if (!Theme::allowsExperimentalFeatures() && $this->experimental) {
+    final public function initialise(): void {
+        // Check context is set
+        if (! $this->contextSet) {
+            return;
+        }
+
+        // Stop if the theme doesn't allow experimental packages and this package is experimental
+        if (!Theme::allowsExperimentalPackages() && $this->experimental) {
             $this->enabled = false;
             return;
         }
@@ -72,8 +70,7 @@ abstract class Package {
                 'theme_features',
                 'features',
                 $this->description,
-                $this->experimental,
-                false
+                $this->experimental
             );
         }
 
@@ -89,13 +86,9 @@ abstract class Package {
         }
 
         // Call child loaders
-        $this->addActions();
-        $this->addFilters();
+        $this->configure();
         $this->registerSettings();
         $this->registerInstallables();
         $this->loadFeatures();
-
-        // Hook features into the Wordpress lifecycle
-        $this->hookFeatures();
     }
 }

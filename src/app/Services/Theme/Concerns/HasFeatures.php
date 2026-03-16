@@ -27,6 +27,16 @@ trait HasFeatures {
     use HasSettings, HasAssets, HasBlocks, HasComponents;
 
     /**
+     * Used by child classes to add pre-load tasks, such as actions, filters.
+     * Class properties can also be overridden here.
+     *
+     * @return void
+     */
+    protected function configure(): void {
+        // Intentionally left blank for child classes to override.
+    }
+
+    /**
      * Used by child classes to register settings.
      *
      * @return void
@@ -52,23 +62,6 @@ trait HasFeatures {
      * @return void
      */
     protected function registerInstallables(): void {
-        // Intentionally left blank for child classes to override.
-    }
-
-    /**
-     * Used by child classes to register filters.
-     *
-     * @return void
-     */
-    protected function addFilters(): void {
-        // Intentionally left blank for child classes to override.
-    }
-
-    /**
-     * Used by child classes to register actions.
-     * @return void
-     */
-    protected function addActions(): void {
         // Intentionally left blank for child classes to override.
     }
 

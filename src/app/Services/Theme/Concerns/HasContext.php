@@ -92,7 +92,7 @@ trait HasContext {
      * 
      * @var string
      */
-    private string $frameworkDir = '';
+    private string $frameworkPath = '';
 
     /**
      * The framework uri.
@@ -124,8 +124,8 @@ trait HasContext {
                 ? $this->slug
                 : 'meros_' . $this->slug;
 
-            $this->frameworkDir = 'vendor/mirror-and-mountain/meros-framework/src/';
-            $this->frameworkUri = trailingslashit($this->uri) . $this->frameworkDir;
+            $this->frameworkPath = 'vendor/mirror-and-mountain/meros-framework/src/';
+            $this->frameworkUri = trailingslashit($this->uri) . $this->frameworkPath;
         } 
         
         else if ($this instanceof Package) {
@@ -157,7 +157,7 @@ trait HasContext {
      * 
      * @param array $authorInfo
      */
-    private function setAuthorInfo(array $authorInfo): void {
+    final public function addAuthorInfo(array $authorInfo): void {
         $name = $authorInfo['name'] ?? '';
         $desc = $authorInfo['description'] ?? '';
         $url  = $authorInfo['url'] ?? '';
@@ -241,6 +241,27 @@ trait HasContext {
      */
     final public function getAuthorSupportUrl(): string {
         return $this->authorSupportUrl;
+    }
+
+    /**
+     * Returns the framework directory relative to the theme root.
+     * 
+     * @param bool $full Whether to return with the full path.
+     * @return string
+     */
+    final public function getFrameworkPath(bool $full = true): string {
+        return $full 
+            ? trailingslashit($this->path) . $this->frameworkPath
+            : $this->frameworkPath;
+    }
+
+    /**
+     * Returns the framework uri.
+     * 
+     * @return string
+     */
+    final public function getFrameworkUri(): string {
+        return $this->frameworkUri;
     }
 
     /**

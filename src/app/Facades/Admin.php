@@ -4,8 +4,8 @@ namespace MM\Meros\App\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
-class Theme extends Facade {
+class Admin extends Facade {
     protected static function getFacadeAccessor() {
-        return 'meros.theme';
+        return 'meros.admin';
     }
 }

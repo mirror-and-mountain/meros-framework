@@ -2,7 +2,7 @@
 
 namespace MM\Meros\App\Helpers;
 
-use MM\Meros\App\Services\Theme\ThemeManager;
+use MM\Meros\App\Facades\Admin;
 
 class ActivationTasks {
     /**
@@ -62,13 +62,8 @@ class ActivationTasks {
         }
     }
 
-    public static function runCoreMigrations(ThemeManager $themeManager): void {
-        if (
-            $themeManager->allowsMigrations() !== false &&
-            $themeManager->onlyAllowsMigrationsFromCli() === false
-        ) {
-            $themeManager->setMerosCoreMigrations();
-            $themeManager->runMigrations('meros_core');
-        }
+    public static function runCoreMigrations(): void {
+        Admin::setMerosCoreMigrations();
+        Admin::runMigrations('meros_core');
     }
 }

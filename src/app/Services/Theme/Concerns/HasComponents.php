@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\Livewire;
 
-use MM\Meros\Helpers\ClassInfo;
+use MM\Meros\App\Helpers\ClassInfo;
 
 trait HasComponents {
     /**
@@ -58,16 +58,6 @@ trait HasComponents {
     protected array $views = [];
 
     /**
-     * Determines whether component handles should use
-     * the feature's fullName. This can be useful if
-     * the feature has a common name and we need to
-     * avoid conflicts.
-     * 
-     * @var boolean
-     */
-    protected bool $useFullNameForComponents = false;
-
-    /**
      * Sets absolute path and calls setComponents.
      * 
      * @return void
@@ -107,8 +97,7 @@ trait HasComponents {
             $class = ClassInfo::getFromPath($component);
 
             if ($class->extends(Component::class)) {
-                $handle = $this->useFullNameForComponents ? $this->fullName : $this->name;
-                $handle .= '.' . Str::lower(Str::replace('.php', '', basename($component)));
+                $handle = $this->slug . '.' . Str::lower(Str::replace('.php', '', basename($component)));
                 $this->addComponent($handle, $class);
             }
         }
@@ -130,8 +119,7 @@ trait HasComponents {
         $candidates = File::glob($path . '/*.blade.php');
 
         foreach ($candidates as $view) {
-            $handle = $this->useFullNameForComponents ? $this->fullName : $this->name;
-            $this->addView($handle, $view);
+            $this->addView($this->slug, $view);
         }
 
         $this->hasViews = $this->views !== [];

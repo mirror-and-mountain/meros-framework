@@ -1,10 +1,12 @@
 <?php 
 
-namespace MM\Meros\app\Services\Theme;
+namespace MM\Meros\App\Services\Theme;
 
-use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use Livewire\Livewire;
+use Illuminate\Support\Facades\File;
+
+use MM\Meros\App\Facades\Theme;
+use MM\Meros\App\Services\Theme\Concerns\MigrationManager;
 
 class AdminManager {
     /**
@@ -12,7 +14,7 @@ class AdminManager {
      *
      * @var array
      */
-    protected array $optionsPages = [];
+    protected array $settingsPages = [];
 
     /**
      * An array of settings registered by all features
@@ -31,6 +33,16 @@ class AdminManager {
     protected array $registeredSettingsSections = [];
 
     /**
+     * An array mapping options page areas to their corresponding WP functions.
+     *
+     * @var array
+     */
+    private array $settingsPageFunctions = [
+        'options' => 'add_options_page',
+        'theme'   => 'add_theme_page',
+    ];
+
+    /**
      * The current WP Admin page.
      *
      * @var string
@@ -38,13 +50,37 @@ class AdminManager {
     private string $currentPage = '';
 
     /**
-     * Sets the current admin page
+     * Config for WP Admin.
      *
-     * @return string
+     * @var array
      */
-    private function setCurrentAdminPage(): string {
-        $screen = get_current_screen();
-        return $screen ? $screen->id : '';
+    private array $config = [];
+
+    use MigrationManager;
+
+    final public function __construct() {
+        $configPath = dirname(__DIR__, 3) . '/config/admin.php';
+        
+        $this->config = File::exists($configPath)
+            ? include_once $configPath
+            : [];
+
+        if (is_array($this->config['settings_pages'] ?? null)) {
+            foreach ($this->config['settings_pages'] as $slug => $config) {
+                $this->registerSettingsPage($slug, $config);
+            }
+        }
+
+        foreach($this->settingsPages as $config) {
+            $tabs = [];
+            foreach ($config['tabs'] as $tab) {
+                $tabs[$tab] = [];
+            }
+
+            $this->registeredSettingsSections[$config['menu_slug']] = [
+                'tabs' => $tabs,
+            ];
+        }
     }
 
     /**
@@ -52,15 +88,32 @@ class AdminManager {
      *
      * @return void
      */
-    private function initialise(): void {
-        $this->currentPage = $this->setCurrentAdminPage();
+    final public function initialise(): void {
+        $this->enqueueAdminAssets();
         $this->hidePlainPermalinkOption();
 
-        foreach ($this->optionsPages as $_ => $config) {
+        foreach ($this->settingsPages as $_ => $config) {
             if (is_callable($config['callback'])) {
                 call_user_func($config['callback'], $config);
             }
         }
+    }
+
+    /**
+     * Enqueues admin assets.
+     *
+     * @return void
+     */
+    private function enqueueAdminAssets(): void {
+        add_action('admin_enqueue_scripts', function() {
+            $path = wp_normalize_path( 'assets/build/admin/style-index.css' );
+            wp_enqueue_style(
+                'meros-admin',
+                Theme::getFrameworkUri() . $path,
+                [],
+                filemtime(Theme::getFrameworkPath() . $path)
+            );
+        });
     }
 
     /**
@@ -84,14 +137,22 @@ class AdminManager {
     }
 
     /**
-     * Renders an options page in WP Admin.
+     * Renders a settings page in WP Admin.
      *
      * @param array $config
      * @return void
      */
-    final public function renderOptionsPage(array $config): void {
+    final public function renderSettingsPage(array $config): void {
         add_action('admin_menu', function () use ($config) {
-            add_options_page(
+            $area = $config['area'] ?? 'options';
+            
+            $areaFunction = $this->settingsPageFunctions[$area] ?? null;
+
+            if ($areaFunction === null) {
+                return;
+            }
+
+            $areaFunction(
                 $config['page_title'],
                 $config['menu_title'],
                 $config['capability'],
@@ -107,10 +168,10 @@ class AdminManager {
      * Renders settings page tabs.
      *
      * @param array $config
-     * @param boolean $showSumit
+     * @param boolean $showSubmit
      * @return void
      */
-    private function renderSettingsPageTabs(array $config, bool $showSumit = true): void {
+    private function renderSettingsPageTabs(array $config, bool $showSubmit = true): void {
         $tabLabels = [];
 
         foreach ($config['tabs'] as $tab) {
@@ -144,7 +205,7 @@ class AdminManager {
                 <?php
                 settings_fields("{$config['menu_slug']}_{$current_tab}");
                 do_settings_sections("{$config['menu_slug']}_{$current_tab}");
-                if ($showSumit) {
+                if ($showSubmit) {
                     submit_button();
                 }
                 ?>
@@ -165,14 +226,14 @@ class AdminManager {
     }
 
     /**
-     * Registers an options page to be added to the WP dashboard.
+     * Registers an Settings page to be added to the WP dashboard.
      *
      * @param string $slug
      * @param array $config
      * @return void
      */
-    final public function registerOptionsPage(string $slug, array $config): void {
-        $this->optionsPages[$slug] = $config;
+    final public function registerSettingsPage(string $slug, array $config): void {
+        $this->settingsPages[$slug] = $config;
     }
 
     /**
@@ -181,7 +242,7 @@ class AdminManager {
      * @return array
      */
     final public function getOptionsPages(): array {
-        return $this->optionsPages ?? [];
+        return $this->settingsPages ?? [];
     }
 
     /**
@@ -192,7 +253,7 @@ class AdminManager {
      * @return void
      */
     final public function addOptionsPageTab(string $page, string $tab): void {
-        $this->optionsPages[ $page ]['tabs'][] = $tab;
+        $this->settingsPages[ $page ]['tabs'][] = $tab;
 
         if (
             array_key_exists($page, $this->registeredSettingsSections) &&
@@ -279,5 +340,4 @@ class AdminManager {
     final public function getRegisteredSettings(): array {
         return $this->registeredSettings;
     }
-
 }

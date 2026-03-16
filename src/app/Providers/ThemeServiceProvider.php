@@ -6,7 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Config;
 
 use MM\Meros\App\Services\Theme\ThemeManager;
-use MM\Meros\App\Services\Theme\AdminManager;
+use MM\Meros\App\Facades\Theme;
 
 use MM\Meros\App\Helpers\ClassInfo;
 use MM\Meros\App\Helpers\BootTasks;
@@ -34,7 +34,6 @@ class ThemeServiceProvider extends ServiceProvider {
         $this->registerTheme();
 
         if ($this->registered) {
-            $this->registerAdminManager();
             $this->registerPackages();
         }
     }
@@ -51,32 +50,25 @@ class ThemeServiceProvider extends ServiceProvider {
         BootTasks::setScriptRoute();
 
         if ($this->registered) {
-            // Get theme manager instance.
-            $theme = $this->app->make('meros.theme');
-
             // Do theme ready action
-            do_action('meros_theme_ready', $theme);
-            
-            // Runs after registered features have been loaded, but before they are initialised.
-            $themeSlug = $theme->getThemeSlug();
-            do_action("{$themeSlug}_add_features", $theme);
+            do_action('meros_theme_ready', Theme::getInstance());
 
-            // Initialise registered features and extensions.
-            $theme->initialise();
+            // Initalise packages
+            foreach ($this->app->tagged('meros.theme.package') as $package) {
+                $package->initialise();
+            }
+
+            // Initialise theme.
+            Theme::initialise();
 
             // Register theme activation and deactivation hooks.
             $this->registerThemeActivationHooks();
 
-            // Admin tasks
-            if (is_admin()) {
-                // Inject Livewire assets into the admin area
-                BootTasks::injectLivewireAssets(true);
-                // Initialise admin
-                $this->initialiseAdmin();
-            } else {
-                // Inject Livewire assets into the frontend
-                BootTasks::injectLivewireAssets(false);
-            }
+            // Inject Livewire assets
+            BootTasks::injectLivewireAssets();
+
+            // Load framework views for components
+            $this->loadViewsFrom(__DIR__.'/../../resources/views', 'meros');
         }
 
         // Enable wp meros cli if appropriate
@@ -103,28 +95,11 @@ class ThemeServiceProvider extends ServiceProvider {
         $themeClass = ClassInfo::get($themeClass);
 
         if ($themeClass->extends(ThemeManager::class)) {
-            $this->app->singleton('meros.theme', function ($app) use ($themeClass) {
-                return new ($themeClass->name)($app);
-            });
-
-            $this->app->alias('meros.theme', ThemeManager::class);
+            $this->app->singleton('meros.theme', $themeClass->name);
             $this->registered = true;
         }
 
         defined('MEROS') || define('MEROS', true);
-    }
-
-    /**
-     * Registers the admin manager class as a singleton in the service container.
-     * 
-     * @return void
-     */
-    private function registerAdminManager(): void {
-        $this->app->singleton('meros.admin', function ($app) {
-            return new AdminManager()($app);
-        });
-
-        $this->app->alias('meros.admin', AdminManager::class);
     }
 
     /**
@@ -134,34 +109,13 @@ class ThemeServiceProvider extends ServiceProvider {
      * @return void
      */
     private function registerPackages(): void {
-        $packages = Config::get("theme.packages") ?? [];
-
+        $packages = Config::get("theme.packages") ?? [];;
         foreach ($packages as $serviceProvider) {
             $providerClass = ClassInfo::get($serviceProvider);
-            dd($providerClass);
             if ($providerClass->extends(PackageServiceProvider::class)) {
                 $this->app->register($providerClass->name);
             }
         }
-    }
-
-    /**
-     * Adds default options pages to WP Admin &
-     * initialises the Admin Manager service.
-     *
-     * @see boot() method of this service provider.
-     * @return void
-     */
-    private function initialiseAdmin(): void {
-        $adminManager = $this->app->make('meros.admin');
-        $adminConfig  = include_once __DIR__ . '/../../config/admin.php';
-        $defaultOptionsPages = $adminConfig['options_pages'] ?? [];
-        
-        foreach ($defaultOptionsPages as $slug => $config) {
-            $adminManager->registerOptionsPage($slug, $config);
-        }
-        
-        $adminManager->initialise();
     }
 
     /**

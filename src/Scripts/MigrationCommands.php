@@ -2,7 +2,8 @@
 
 namespace MM\Meros\Scripts;
 
-use MM\Meros\Models\MerosMigration;
+use MM\Meros\App\Models\DbTask;
+use MM\Meros\App\Facades\Admin;
 
 class MigrationCommands {
        /**
@@ -48,12 +49,10 @@ class MigrationCommands {
         
         $refresh = isset($assoc_args['refresh']) && $assoc_args['refresh'] === true ? true : false;
 
-        $themeManager = app()->make('meros.theme_manager');
-
         if ($refresh) {
             $rollbackMsg = $slug !== false
-                ? $themeManager->rollbackMigrationFromSlug($feature, $slug)
-                : $themeManager->rollbackMigrations($feature);
+                ? Admin::rollbackMigrationFromSlug($feature, $slug)
+                : Admin::rollbackMigrations($feature);
             
             if (!is_array($rollbackMsg)) {
                 \WP_CLI::error('A message was received while rolling back migrations: ' . $rollbackMsg);
@@ -61,8 +60,8 @@ class MigrationCommands {
             }
 
             $migrationMsg = $slug !== false 
-                ? $themeManager->runMigrationFromSlug($feature, $slug)
-                : $themeManager->runMigrations($feature);
+                ? Admin::runMigrationFromSlug($feature, $slug)
+                : Admin::runMigrations($feature);
             
             if (!is_array($migrationMsg) && $slug === false ) {
                 \WP_CLI::warning('A message was received while running migrations: ' . $migrationMsg);
@@ -82,8 +81,8 @@ class MigrationCommands {
         
         else {
             $migrationMsg = $slug !== false 
-                ? $themeManager->runMigrationFromSlug($feature, $slug)
-                : $themeManager->runMigrations($feature);
+                ? Admin::runMigrationFromSlug($feature, $slug)
+                : Admin::runMigrations($feature);
             
             if (!is_array($migrationMsg) && $slug === false) {
                 \WP_CLI::warning('A message was received while running migrations: ' . $migrationMsg);
@@ -136,11 +135,9 @@ class MigrationCommands {
             return;
         }
 
-        $themeManager = app()->make('meros.theme_manager');
-
         $rollbackMsg = $slug !== false 
-            ? $themeManager->rollbackMigrationFromSlug($feature, $slug)
-            : $themeManager->rollbackMigrations($feature);
+            ? Admin::rollbackMigrationFromSlug($feature, $slug)
+            : Admin::rollbackMigrations($feature);
         
         if (!is_array($rollbackMsg) && $slug === false) {
             \WP_CLI::error('A message was received while rolling back migrations: ' . $rollbackMsg);
@@ -169,9 +166,7 @@ class MigrationCommands {
      *
      */
     public function rollbackLastMigrationBatch() {
-        $themeManager = app()->make('meros.theme_manager');
-
-        $rollbackMsg = $themeManager->rollbackLastMigrationBatch();
+        $rollbackMsg = Admin::rollbackLastMigrationBatch();
         
         if (!is_array($rollbackMsg)) {
             \WP_CLI::error('A message was received while rolling back the last migration batch: ' . $rollbackMsg);
@@ -195,9 +190,7 @@ class MigrationCommands {
      *
      */
     public function rollbackLastMigration() {
-        $themeManager = app()->make('meros.theme_manager');
-
-        $rollbackMsg = $themeManager->rollbackLastMigration();
+        $rollbackMsg = Admin::rollbackLastMigration();
         
         if (!str_contains($rollbackMsg, 'successfully')) {
             \WP_CLI::error('A message was received while rolling back the last migration: ' . $rollbackMsg);
@@ -233,22 +226,21 @@ class MigrationCommands {
         // Parse arguments
         $refresh = isset($assoc_args['refresh']) && $assoc_args['refresh'] === true ? true : false;
 
-        $themeManager = app()->make('meros.theme_manager');
-        $themeManager->setMerosCoreMigrations();
+        Admin::setMerosCoreMigrations();
 
         if ($refresh) {
-            $migrationRecords = MerosMigration::where('source', '!=', 'meros_core')->get();
+            $migrationRecords = DbTask::where('source', '!=', 'meros_core')->get();
             if ($migrationRecords->count() > 0) {
                 \WP_CLI::error('Meros core migrations cannot be rolled back because there are already non-core migrations that have been run. Please rollback all non-core migrations before re-running core migrations.');
                 return;
             }
-            $rollbackMsg = $themeManager->rollbackMigrations('meros_core');
+            $rollbackMsg = Admin::rollbackMigrations('meros_core');
             if (!is_array($rollbackMsg)) {
                 \WP_CLI::error('A message was received while rolling back meros core migrations: ' . $rollbackMsg);
                 return;
             }
 
-            $migrationMsg = $themeManager->runMigrations('meros_core');
+            $migrationMsg = Admin::runMigrations('meros_core');
             if (!is_array($migrationMsg)) {
                 \WP_CLI::warning('A message was received while running meros core migrations: ' . $migrationMsg);
                 return;
@@ -257,7 +249,7 @@ class MigrationCommands {
                 return;
             }
         } else {
-            $migrationMsg = $themeManager->runMigrations('meros_core');
+            $migrationMsg = Admin::runMigrations('meros_core');
             if (!is_array($migrationMsg)) {
                 \WP_CLI::warning('A message was received while running meros core migrations: ' . $migrationMsg);
                 return;

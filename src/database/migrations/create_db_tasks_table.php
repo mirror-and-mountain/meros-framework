@@ -2,33 +2,28 @@
 
 namespace MM\Meros\Database\Migrations;
 
-use MM\Meros\Contracts\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateDbMigrationsTable extends Migration {
-    /**
-     * A unique slug for the migration, used for tracking which migrations have been run.
-     *
-     * @var string
-     */
-    public static string $slug = 'create_db_migrations_table';
+use MM\Meros\App\Services\Theme\Migration;
 
+return new class extends Migration {
     /**
      * The priority of the migration. Lower numbers run first.
      *
-     * @var string
+     * @var int
      */
-    public static int $priority = 100;
+    public int $priority = 100;
 
     /**
      * Run the migrations.
      */
     public function up(): void
     {
-        Schema::create('db_migrations', function (Blueprint $table) {
+        Schema::create('db_tasks', function (Blueprint $table) {
             $table->id();
             $table->string('source');
+            $table->string('type');
             $table->string('label');
             $table->string('slug')->unique();
             $table->integer('priority');
@@ -42,6 +37,6 @@ class CreateDbMigrationsTable extends Migration {
      * Reverse the migrations.
      */
     public function down(): void {
-        Schema::dropIfExists('db_migrations');
+        Schema::dropIfExists('db_tasks');
     }
 };

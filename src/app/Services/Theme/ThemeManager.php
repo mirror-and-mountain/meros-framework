@@ -2,14 +2,13 @@
 
 namespace MM\Meros\App\Services\Theme;
 
-
 use Illuminate\Support\Arr;
 
 use MM\Meros\App\Services\Theme\Concerns\HasContext;
 use MM\Meros\App\Services\Theme\Concerns\HasFeatures;
 
 use MM\Meros\App\Services\Theme\Package;
-use MM\Meros\App\Facades\AdminManager;
+use MM\Meros\App\Facades\Admin;
 
 /**
  * The theme's main class should extend this and define
@@ -30,6 +29,13 @@ abstract class ThemeManager {
      */
     protected bool $allowExperimentalPackages = true;
 
+    /** 
+     * Whether to allow migrations to be run from the admin area.
+     * 
+     * @var boolean
+     */
+    protected bool $allowMigrationsInAdmin = true;
+
     /**
      * Whether the theme's hookFeatures() method has been called.
      * 
@@ -42,11 +48,6 @@ abstract class ThemeManager {
     final public function __construct() {
         // Set context
         $this->setContext();
-
-        if ($this->contextSet === true) {
-            // Initialise the theme
-            $this->initialise();
-        }
     }
 
     /**
@@ -79,11 +80,15 @@ abstract class ThemeManager {
      * @return void
      */
     final public function initialise(): void {
+        // Check context is set
+        if (! $this->contextSet) {
+            return;
+        }
+
         $this->initialiseAssets();
 
         // Call child loaders
-        $this->addActions();
-        $this->addFilters();
+        $this->configure();
         $this->registerSettings();
         $this->registerInstallables();
         $this->loadFeatures();
@@ -104,7 +109,7 @@ abstract class ThemeManager {
      */
     private function initialiseAssets(): void {
         add_action('wp_enqueue_scripts', function () {
-            $handle = $this->themeSlug . '_style'; // e.g. meros_style.
+            $handle = $this->slug . '_style'; // e.g. meros_style.
             wp_enqueue_style(
                 $handle,
                 get_stylesheet_uri(),
@@ -125,7 +130,7 @@ abstract class ThemeManager {
             $package->hookFeatures();
             $packageName = $package->getName(true);
             $packageSettings = $package->getSettings();
-            AdminManager::addRegisteredSettings($packageName, $packageSettings);
+            Admin::addRegisteredSettings($packageName, $packageSettings);
         }
     }
 
@@ -179,5 +184,23 @@ abstract class ThemeManager {
      */
     final public function allowsExperimentalPackages(): bool {
         return $this->allowExperimentalPackages;
+    }
+
+    /**
+     * Returns the theme manager instance.
+     * 
+     * @return static
+     */
+    final public function getInstance(): static {
+        return $this;
+    }
+
+    /**
+     * Returns whether the theme allows migrations to be run from the admin area.
+     * 
+     * @return boolean
+     */
+    final public function allowsMigrationsInAdmin(): bool {
+        return $this->allowMigrationsInAdmin;
     }
 }

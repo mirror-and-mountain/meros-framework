@@ -3,7 +3,9 @@
 namespace MM\Meros;
 
 use Roots\Acorn\Application as RootsApplication;
+
 use MM\Meros\App\Providers\ThemeServiceProvider;
+use MM\Meros\App\Providers\AdminServiceProvider;
 use MM\Meros\App\Services\Theme\ThemeManager;
 
 class Bootstrap {
@@ -26,7 +28,13 @@ class Bootstrap {
             self::$authorSupportUrl = $authorSupportUrl;
 
             add_action('after_setup_theme', function () use ($providers) {
-                $providers = array_merge([ThemeServiceProvider::class], $providers);
+                
+                $merosProviders = [
+                    ThemeServiceProvider::class,
+                    AdminServiceProvider::class,
+                ];
+                
+                $providers = array_merge($merosProviders, $providers);
                 $root      = get_stylesheet_directory();
 
                 RootsApplication::configure($root)

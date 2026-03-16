@@ -4,16 +4,17 @@ namespace MM\Meros\App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class DbMigration extends Model {
-    protected $table = 'db_migrations';
+class DbTask extends Model {
+    protected $table = 'db_tasks';
     protected $primaryKey = 'id';
 
     protected $fillable = [
-        'path_reference',
         'source',
+        'type',
         'label',
         'slug',
         'priority',
+        'path_reference',
         'batch_id'
     ];
 }

@@ -41,14 +41,6 @@ class Fields {
                 $html .= self::makeCheckbox($name, $id, $default);
                 break;
 
-            case 'button':
-                $html .= self::makeButton($name, $id);
-                break;
-
-            case 'toggle':
-                $html .= self::makeToggle($name, $id);
-                break;
-
             case 'text':
             case 'number':
             case 'email':
@@ -175,90 +167,5 @@ class Fields {
         $html .= '</select>';
 
         return $html;
-    }
-
-    /**
-     * Makes a button field.
-     * 
-     * @param string $name The name of the field.
-     * @param string $id An optional ID for the field.
-     * @param string $labelEnabled The label when the button is in enabled state.
-     * @param string $labelDisabled The label when the button is in disabled state.
-     * @return string The generated HTML for the button.
-     */
-    private static function makeButton(
-        string $name,
-        string $id = '',
-        string $labelEnabled = 'Enabled',
-        string $labelDisabled = 'Enable'
-    ): string {
-        $stored_value = get_option($name);
-        $isEnabled = (bool) $stored_value;
-
-        $label = $isEnabled ? $labelEnabled : $labelDisabled;
-        $button_id = $id !== '' ? $id : $name;
-        $nonce = wp_create_nonce('mm_meros_toggle_' . $name);
-
-        return sprintf(
-            '<button
-                type="button"
-                id="%s"
-                title="%s"
-                class="button button-primary meros-toggle-btn"
-                data-option="%s"
-                data-value="%s"
-                data-nonce="%s"
-            >%s</button>',
-            esc_attr($button_id),
-            esc_attr($isEnabled ? 'Disable' : 'Enable'),
-            esc_attr($name),
-            esc_attr((bool) $stored_value ? '1' : '0'),
-            esc_attr($nonce),
-            esc_html($label)
-        );
-    }
-
-    /**
-     * Makes a toggle switch field.
-     * 
-     * @param string $name The name of the field.
-     * @param string $id An optional ID for the field.
-     * @param string $labelEnabled The label when the toggle is in enabled state.
-     * @param string $labelDisabled The label when the toggle is in disabled state.
-     * @return string The generated HTML for the toggle switch.
-     */
-    private static function makeToggle(
-        string $name,
-        string $id = '',
-        string $labelEnabled = 'Enabled',
-        string $labelDisabled = 'Disabled'
-    ): string {
-        $isEnabled = (bool) get_option($name);
-
-        $toggle_id = $id !== '' ? $id : $name . '_toggle';
-        $nonce = wp_create_nonce('mm_meros_toggle_' . $name);
-
-        return sprintf(
-            '<button
-                type="button"
-                id="%s"
-                class="meros-toggle-switch %s"
-                role="switch"
-                aria-checked="%s"
-                data-option="%s"
-                data-nonce="%s"
-            >
-                <span class="meros-toggle-track">
-                    <span class="meros-toggle-thumb"></span>
-                </span>
-                <span class="meros-toggle-label">%s</span>
-            </button>',
-            esc_attr($toggle_id),
-            $isEnabled ? 'is-enabled' : 'is-disabled',
-            $isEnabled ? 'true' : 'false',
-            esc_attr($name),
-            esc_attr($nonce),
-            esc_html($isEnabled ? $labelEnabled : $labelDisabled)
-        );
     }
 }
