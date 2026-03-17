@@ -4,11 +4,11 @@ namespace MM\Meros\App\Services\Theme;
 
 use Illuminate\Support\Arr;
 
-use MM\Meros\App\Services\Theme\Concerns\HasContext;
-use MM\Meros\App\Services\Theme\Concerns\HasFeatures;
-
 use MM\Meros\App\Services\Theme\Package;
 use MM\Meros\App\Facades\Admin;
+
+use MM\Meros\App\Services\Theme\Concerns\HasContext;
+use MM\Meros\App\Services\Theme\Concerns\HasFeatures;
 
 /**
  * The theme's main class should extend this and define

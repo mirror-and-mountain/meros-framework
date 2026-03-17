@@ -5,7 +5,7 @@ namespace MM\Meros\App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 class IntegrationEndpoint extends Model {
-    protected $table = 'integration_endpoints';
+    protected $table = 'meros_integration_endpoints';
     protected $primaryKey = 'id';
 
     protected $fillable = [

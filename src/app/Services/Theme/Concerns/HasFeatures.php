@@ -6,6 +6,7 @@ use MM\Meros\App\Services\Theme\Concerns\HasSettings;
 use MM\Meros\App\Services\Theme\Concerns\HasAssets;
 use MM\Meros\App\Services\Theme\Concerns\HasBlocks;
 use MM\Meros\App\Services\Theme\Concerns\HasComponents;
+use MM\Meros\App\Services\Theme\Concerns\HasInstallables;
 
 use MM\Meros\App\Services\Theme\Package;
 
@@ -24,7 +25,7 @@ trait HasFeatures {
      */
     private bool $hasInstallables = false;
 
-    use HasSettings, HasAssets, HasBlocks, HasComponents;
+    use HasSettings, HasAssets, HasBlocks, HasComponents, HasInstallables;
 
     /**
      * Used by child classes to add pre-load tasks, such as actions, filters.

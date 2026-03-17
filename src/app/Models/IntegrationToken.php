@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class IntegrationToken extends Model {
-    protected $table = 'integration_tokens';
+    protected $table = 'meros_integration_tokens';
     protected $primaryKey = 'id';
 
     protected $fillable = [

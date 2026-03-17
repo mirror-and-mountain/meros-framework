@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class IntegrationConnection extends Model {
-    protected $table = 'integration_connections';
+    protected $table = 'meros_integration_connections';
     protected $primaryKey = 'id';
 
     protected $fillable = [

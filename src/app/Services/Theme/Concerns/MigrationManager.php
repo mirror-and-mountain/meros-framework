@@ -5,10 +5,10 @@ namespace MM\Meros\App\Services\Theme\Concerns;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
-use MM\Meros\App\Services\Theme\Migration;
+use Illuminate\Database\Migrations\Migration as LaravelMigration;
 
 use MM\Meros\App\Facades\Theme;
-use MM\Meros\App\Models\DbTask;
+use MM\Meros\App\Models\Migration;
 
 trait MigrationManager {
 
@@ -73,13 +73,18 @@ trait MigrationManager {
         $instance = include_once $path;
         $slug     = Str::beforeLast(basename($path), '.');
 
-        if (!Str::startsWith($slug, ['create', 'update', 'remove'])) {
+        if (!Str::contains($slug, ['create', 'update', 'remove'])) {
             return false;
         }
 
-        $type = Str::before($slug, '_');
+        $withoutTimestamp = preg_replace('/^(?:\d{4}_\d{2}_\d{2}_\d{6}_|\d+_)/', '', $slug);
+        $type             = Str::before($withoutTimestamp, '_');
 
-        if (!($instance instanceof Migration)) {
+        if (!Str::contains($type, ['create', 'update', 'remove'])) {
+            return false;
+        }
+
+        if (!($instance instanceof LaravelMigration)) {
             return false;
         }
 
@@ -90,29 +95,16 @@ trait MigrationManager {
             return false;
         }
 
-        if (
-            !property_exists($instance, 'priority') || 
-            !is_int($instance->priority) ||
-            $instance->priority < 100 ||
-            $instance->priority > 999
-        ) {
-            return false;
-        } else {
-            $priority = $instance->priority;
-        }
-
         $config = [
             'source'         => $source,
             'type'           => $type,
-            'label'          => Str::title(Str::replace('_', ' ', $slug)),
+            'label'          => Str::title(Str::replace('_', ' ', $withoutTimestamp)),
             'slug'           => $slug,
-            'priority'       => $priority,
             'path_reference' => $path,
             'instance'       => $instance,
         ];
 
-        $this->registeredMigrations[$source][$priority] = $config;
-        
+        $this->registeredMigrations[$source][] = $config;
         return $config;
     }
 
@@ -146,37 +138,34 @@ trait MigrationManager {
         // Track completed migrations
         $completedMigrations = [];
 
-        foreach($migrationsToRun as $_priorityGroup => $migrationConfigurations) {
-            foreach ($migrationConfigurations as $migrationConfig) {
-                if ($migrationConfig['slug'] === '') {
+        foreach($migrationsToRun as $migration) {
+            if ($migration['slug'] === '') {
+                continue;
+            }
+
+            if ($this->checkServiceInstalled() === true) {
+                $migrationRecord = Migration::where(
+                    'slug', $migration['slug']
+                )->first();
+                
+                if ($migrationRecord) {
                     continue;
                 }
-
-                if ($this->checkServiceInstalled() === true) {
-                    $migrationRecord = DbTask::where(
-                        'slug', $migrationConfig['slug']
-                    )->first();
-                    
-                    if ($migrationRecord) {
-                        continue;
-                    }
-                }
-
-                $instance = $migrationConfig['instance'];
-                $instance->up();
-
-                DbTask::create([
-                    'source'         => $migrationConfig['source'],
-                    'type'           => $migrationConfig['type'],
-                    'label'          => $migrationConfig['label'],
-                    'slug'           => $migrationConfig['slug'],
-                    'priority'       => $migrationConfig['priority'],
-                    'path_reference' => $migrationConfig['path_reference'],
-                    'batch_id'       => $batchId
-                ]);
-
-                $completedMigrations[] = $migrationConfig['slug'];
             }
+
+            $instance = $migration['instance'];
+            $instance->up();
+
+            Migration::create([
+                'source'         => $migration['source'],
+                'type'           => $migration['type'],
+                'label'          => $migration['label'],
+                'slug'           => $migration['slug'],
+                'path_reference' => $migration['path_reference'],
+                'batch_id'       => $batchId
+            ]);
+
+            $completedMigrations[] = $migration['slug'];
         }
 
         $this->isRunningMigrations = false;
@@ -209,29 +198,27 @@ trait MigrationManager {
         // Track rolled back migrations
         $rolledBackMigrations = [];
 
-        foreach( $migrationsToRun as $_priorityGroup => $migrationConfigurations) {
-            foreach ($migrationConfigurations as $migrationConfig) {
-                if ($migrationConfig['slug'] === '') {
-                    continue;
-                }
-
-                $migrationRecord = DbTask::where(
-                    'slug', $migrationConfig['slug']
-                )->first();
-
-                if (!$migrationRecord) {
-                    continue;
-                }
-
-                $instance = $migrationConfig['instance'];
-                $instance->down();
-
-                if ($migrationConfig['slug'] !== 'create_db_tasks_table') {
-                    $migrationRecord->delete();
-                }
-
-                $rolledBackMigrations[] = $migrationConfig['slug'];
+        foreach( $migrationsToRun as $migration) {
+            if ($migration['slug'] === '') {
+                continue;
             }
+
+            $migrationRecord = Migration::where(
+                'slug', $migration['slug']
+            )->first();
+
+            if (!$migrationRecord) {
+                continue;
+            }
+
+            $instance = $migration['instance'];
+            $instance->down();
+
+            if ($migration['slug'] !== '001_create_meros_migrations_table') {
+                $migrationRecord->delete();
+            }
+
+            $rolledBackMigrations[] = $migration['slug'];
         }
 
         $this->isRunningMigrations = false;
@@ -254,7 +241,7 @@ trait MigrationManager {
             return $shouldRun;
         }
 
-        $lastMigrationRecord = DbTask::where('type', 'migration')->orderBy('id', 'desc')->first();
+        $lastMigrationRecord = Migration::orderBy('id', 'desc')->first();
 
         if (!$lastMigrationRecord) {
             return $this->messages['no_rollbacks'];
@@ -274,7 +261,7 @@ trait MigrationManager {
             return $shouldRun;
         }
 
-        $lastBatchId = DbTask::where('type', 'migration')->orderBy('created_at', 'desc')->value('batch_id');
+        $lastBatchId = Migration::orderBy('created_at', 'desc')->value('batch_id');
 
         if (!$lastBatchId) {
             return $this->messages['no_rollbacks'];
@@ -304,7 +291,7 @@ trait MigrationManager {
             return $this->messages['slug_not_found'];
         }
 
-        $migrationRecord = DbTask::where(
+        $migrationRecord = Migration::where(
             'slug', $migrationConfig['slug']
         )->first();
 
@@ -316,12 +303,11 @@ trait MigrationManager {
         $instance = new $migrationConfig['class'];
         $instance->up();
 
-        DbTask::create([
+        Migration::create([
             'source'         => $migrationConfig['source'],
             'type'           => $migrationConfig['type'],
             'label'          => $migrationConfig['label'],
             'slug'           => $migrationConfig['slug'],
-            'priority'       => $migrationConfig['priority'],
             'path_reference' => $migrationConfig['path_reference']
         ]);
 
@@ -355,7 +341,7 @@ trait MigrationManager {
             return $this->messages['slug_not_found'];
         }
 
-        $migrationRecord = DbTask::where(
+        $migrationRecord = Migration::where(
             'slug', $migrationConfig['slug']
         )->first();
 
@@ -390,37 +376,33 @@ trait MigrationManager {
                     continue;
                 }
 
-                foreach($migrations as $priority => $config) {
-                    if ($migrationsToRun[$priority] ?? false) {
-                        $migrationsToRun[$priority][] = $config;
-                    } else {
-                        $migrationsToRun[$priority] = [$config];
-                    }
+                foreach($migrations as $migration) {
+                    $migrationsToRun[] = $migration;
                 }
             }
         }
 
         else if ($fromBatch !== '') {
-            $migrationRecords = DbTask::where('batch_id', $fromBatch)->where('type', 'migration')->get();
+            $migrationRecords = Migration::where('batch_id', $fromBatch)->get();
             $migrationRecordSlugs = $migrationRecords->pluck('slug')->toArray();
 
             foreach($this->registeredMigrations as $source => $migrations) {
-                foreach($migrations as $priority => $config) {
-                    if (!in_array($config['slug'], $migrationRecordSlugs)) {
+                foreach($migrations as $migration) {
+                    if (!in_array($migration['slug'], $migrationRecordSlugs)) {
                         continue;
                     }
 
-                    if ($migrationsToRun[$priority] ?? false) {
-                        $migrationsToRun[$priority][] = $config;
-                    } else {
-                        $migrationsToRun[$priority] = [$config];
-                    }
+                    $migrationsToRun[] = $migration;
                 }
             }
         }
 
         else {
-            $migrationsToRun = $this->registeredMigrations;
+            foreach($this->registeredMigrations as $source => $migrations) {
+                foreach($migrations as $migration) {
+                    $migrationsToRun[] = $migration;
+                }
+            }
         }
 
         if ($reverse) {
@@ -440,11 +422,9 @@ trait MigrationManager {
      */
     private function getRegisteredMigrationFromSlug(string $source, string $slug): ?array {
         $migrationsToRun = $this->getMigrationsToRun($source);
-        foreach ($migrationsToRun as $_priority => $configs) {
-            foreach ($configs as $config) {
-                if ($config['slug'] === $slug) {
-                    return $config;
-                }
+        foreach ($migrationsToRun as $migration) {
+            if ($migration['slug'] === $slug) {
+                return $migration;
             }
         }
         return null;
@@ -490,12 +470,12 @@ trait MigrationManager {
      * @return boolean
      */
     private function checkServiceInstalled(): bool {
-        if (!Schema::hasTable('db_tasks')) {
+        if (!Schema::hasTable('meros_migrations')) {
             return false;
         }
 
-        $coreMigrationRecord = DbTask::where(
-            'slug', 'create_db_tasks_table'
+        $coreMigrationRecord = Migration::where(
+            'slug', 'like', '%create_meros_migrations_table'
         )->first();
 
         if ($coreMigrationRecord === null) {

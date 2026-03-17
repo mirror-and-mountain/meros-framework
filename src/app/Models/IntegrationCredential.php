@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class IntegrationCredential extends Model {
-    protected $table = 'integration_credentials';
+    protected $table = 'meros_integration_credentials';
     protected $primaryKey = 'id';
 
     protected $fillable = [

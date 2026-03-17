@@ -2,25 +2,17 @@
 
 namespace MM\Meros\Database\Migrations;
 
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-use MM\Meros\App\Services\Theme\Migration;
-
 return new class extends Migration {
-    /**
-     * The priority of the migration. Lower numbers run first.
-     *
-     * @var int
-     */
-    public int $priority = 105;
-
     /**
      * Run the migrations.
      */
     public function up(): void
     {
-        Schema::create('integrations', function (Blueprint $table) {
+        Schema::create('meros_integrations', function (Blueprint $table) {
             $table->id();
             $table->string('source');
             $table->string('label');
@@ -39,6 +31,6 @@ return new class extends Migration {
      * Reverse the migrations.
      */
     public function down(): void {
-        Schema::dropIfExists('integrations');
+        Schema::dropIfExists('meros_integrations');
     }
 };

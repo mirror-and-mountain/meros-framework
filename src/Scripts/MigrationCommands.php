@@ -2,7 +2,7 @@
 
 namespace MM\Meros\Scripts;
 
-use MM\Meros\App\Models\DbTask;
+use MM\Meros\App\Models\Migration;
 use MM\Meros\App\Facades\Admin;
 
 class MigrationCommands {
@@ -229,7 +229,7 @@ class MigrationCommands {
         Admin::setMerosCoreMigrations();
 
         if ($refresh) {
-            $migrationRecords = DbTask::where('source', '!=', 'meros_core')->get();
+            $migrationRecords = Migration::where('source', '!=', 'meros_core')->get();
             if ($migrationRecords->count() > 0) {
                 \WP_CLI::error('Meros core migrations cannot be rolled back because there are already non-core migrations that have been run. Please rollback all non-core migrations before re-running core migrations.');
                 return;

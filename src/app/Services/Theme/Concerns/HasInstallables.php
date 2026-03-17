@@ -59,4 +59,16 @@ trait HasInstallables {
 
         $this->hasMigrations = count($this->registeredMigrations) > 0;
     }
+
+    /**
+     * Gets the item's migrations directory.
+     *
+     * @param $full Whether to return the full path or just the directory.
+     * @return string
+     */
+    final public function getMigrationsDir(bool $full = true): string {
+        return $full 
+            ? trailingslashit($this->path) . $this->migrationsDir 
+            : $this->migrationsDir;
+    }
 }

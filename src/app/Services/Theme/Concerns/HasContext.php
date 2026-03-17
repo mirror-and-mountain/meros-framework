@@ -3,6 +3,7 @@
 namespace MM\Meros\App\Services\Theme\Concerns;
 
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Config;
 
 use MM\Meros\App\Services\Theme\Package;
 use MM\Meros\App\Services\Theme\ThemeManager;
@@ -277,5 +278,15 @@ trait HasContext {
         } else {
             return false;
         }
+    }
+
+    /**
+     * Returns the theme's namespace.
+     *
+     * @return string
+     */
+    final public function getThemeNamespace(): string {
+        $themeClass = Config::get('theme.theme_class');
+        return Str::beforeLast($themeClass, '\\');
     }
 }

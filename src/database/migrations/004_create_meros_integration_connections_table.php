@@ -2,34 +2,32 @@
 
 namespace MM\Meros\Database\Migrations;
 
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-use MM\Meros\App\Services\Theme\Migration;
-
 return new class extends Migration {
-    /**
-     * The priority of the migration. Lower numbers run first.
-     *
-     * @var int
-     */
-    public int $priority = 115;
-
     /**
      * Run the migrations.
      */
     public function up(): void
     {
-        Schema::create('integration_connections', function (Blueprint $table) {
+        Schema::create('meros_integration_connections', function (Blueprint $table) {
             $table->id();
             
             $table->foreignId('integration_id')
-                ->constrained('integrations')
+                ->references('id')
+                ->on('meros_integrations')
                 ->cascadeOnDelete();
             
             $table->string('label')->nullable();
             $table->string('account_id');
-            $table->unique(['integration_id', 'account_id']);
+            
+            $table->unique(
+                ['integration_id', 'account_id'],
+                'integration_account_unique'
+            );
+
             $table->string('instance_url')->nullable();
 
             $table->json('settings')->nullable();
@@ -43,6 +41,6 @@ return new class extends Migration {
      * Reverse the migrations.
      */
     public function down(): void {
-        Schema::dropIfExists('integration_connections');
+        Schema::dropIfExists('meros_integration_connections');
     }
 };

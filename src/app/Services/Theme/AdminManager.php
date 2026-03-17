@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\File;
 use MM\Meros\App\Facades\Theme;
 use MM\Meros\App\Services\Theme\Concerns\MigrationManager;
 
+// Move settings items to SettingsManager trait.
+
 class AdminManager {
     /**
      * Available options pages for WP Admin.

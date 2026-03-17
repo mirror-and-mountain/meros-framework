@@ -2,29 +2,22 @@
 
 namespace MM\Meros\Database\Migrations;
 
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-use MM\Meros\App\Services\Theme\Migration;
-
 return new class extends Migration {
-    /**
-     * The priority of the migration. Lower numbers run first.
-     *
-     * @var int
-     */
-    public int $priority = 120;
-
     /**
      * Run the migrations.
      */
     public function up(): void
     {
-        Schema::create('integration_tokens', function (Blueprint $table) {
+        Schema::create('meros_integration_tokens', function (Blueprint $table) {
             $table->id();
 
             $table->foreignId('connection_id')
-                ->constrained('integration_connections')
+                ->references('id')
+                ->on('meros_integration_connections')
                 ->cascadeOnDelete();
 
             $table->text('access_token');
@@ -41,6 +34,6 @@ return new class extends Migration {
      * Reverse the migrations.
      */
     public function down(): void {
-        Schema::dropIfExists('integration_tokens');
+        Schema::dropIfExists('meros_integration_tokens');
     }
 };

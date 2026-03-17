@@ -13,6 +13,7 @@ use MM\Meros\App\Helpers\BootTasks;
 use MM\Meros\App\Helpers\ActivationTasks;
 use MM\Meros\App\Helpers\DeactivationTasks;
 
+use MM\Meros\Scripts\MakeCommands;
 use MM\Meros\Scripts\EnvironmentCommands;
 use MM\Meros\Scripts\MigrationCommands;
 
@@ -74,10 +75,13 @@ class ThemeServiceProvider extends ServiceProvider {
         // Enable wp meros cli if appropriate
         if ($this->app->runningInConsole()) {
             if (defined('WP_CLI') && \WP_CLI) {
+                $makeCli         = new MakeCommands();
                 $environmentsCli = new EnvironmentCommands();
-                $migrationsCli = new MigrationCommands();
+                $migrationsCli   = new MigrationCommands();
+                
                 \WP_CLI::add_command('meros:env', $environmentsCli);
                 \WP_CLI::add_command('meros:migration', $migrationsCli);
+                \WP_CLI::add_command('meros:make', $makeCli);
             }
         }
     }

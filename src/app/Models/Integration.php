@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Integration extends Model {
-    protected $table = 'integrations';
+    protected $table = 'meros_integrations';
     protected $primaryKey = 'id';
 
     protected $fillable = [
