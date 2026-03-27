@@ -11,8 +11,9 @@ class Migration extends Model {
     protected $fillable = [
         'source',
         'type',
+        'subtype',
         'label',
-        'slug',
+        'handle',
         'path_reference',
         'batch_id'
     ];

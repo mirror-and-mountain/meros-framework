@@ -1,0 +1,98 @@
+/* Toggle switch styles for Meros Admin */
+.meros-toggle-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+
+    &[disabled] {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .meros-toggle-label {
+        font-size: 13px;
+        color: #1d2327;
+    }
+
+    .meros-toggle-track {
+        width: 42px;
+        height: 22px;
+        border-radius: 11px;
+        background: #c0392b;
+        position: relative;
+        transition: background 0.2s ease;
+
+        .meros-toggle-thumb {
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s ease;
+        }
+    }
+
+    &.checked {
+        .meros-toggle-track {
+            background: #2ecc71;
+        }
+
+        .meros-toggle-thumb {
+            transform: translateX(20px);
+        }
+    }
+}
+
+/* Action button styles for Meros Admin */
+.meros-package-tasks {
+
+    .meros-installer-info {
+        font-size: 12px;
+        color: #7f8c8d;
+        margin-bottom: -0.5rem;
+    }
+
+    .meros-action-btn-wrapper {
+        margin-top: 1rem;
+
+        &:has(.meros-action-btn) {
+            min-height: 30px;
+        }
+
+        .meros-action-btn {
+            transition: opacity 0.3s ease;
+        }
+
+        .meros-action-btn.is-busy {
+            position: relative;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .meros-action-btn.is-busy::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            transform: translateX(-100%);
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255,255,255,0.25),
+                transparent
+            );
+            animation: meros-shimmer 1.2s infinite;
+        }
+
+        @keyframes meros-shimmer {
+            100% {
+                transform: translateX(100%);
+            }
+        }
+    }
+}

@@ -3,10 +3,11 @@
 namespace MM\Meros\App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use MM\Meros\Services\Integrations\IntegrationManager;
-use MM\Meros\Services\Integrations\RequestBuilder;
-use MM\Meros\Services\Integrations\Auth\AuthResolver;
-use MM\Meros\Services\Integrations\Http\HttpClient;
+
+use MM\Meros\App\Integrations\IntegrationManager;
+use MM\Meros\App\Integrations\RequestBuilder;
+use MM\Meros\App\Integrations\Auth\AuthResolver;
+use MM\Meros\App\Integrations\Http\HttpClient;
 
 class IntegrationServiceProvider extends ServiceProvider {
     public function register(): void {

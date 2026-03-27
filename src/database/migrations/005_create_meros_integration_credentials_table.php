@@ -2,14 +2,12 @@
 
 namespace MM\Meros\Database\Migrations;
 
-use Illuminate\Database\Migrations\Migration;
+use MM\Meros\App\Features\Abstracts\TableInstaller;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
-    /**
-     * Run the migrations.
-     */
+return new class extends TableInstaller {
+    
     public function up(): void {
         Schema::create('meros_integration_credentials', function (Blueprint $table) {
             $table->id();
@@ -34,9 +32,6 @@ return new class extends Migration {
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void {
         Schema::dropIfExists('meros_integration_credentials');
     }

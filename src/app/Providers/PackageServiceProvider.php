@@ -5,10 +5,11 @@ namespace MM\Meros\App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 
-use MM\Meros\App\Services\Theme\Package;
-use MM\Meros\App\Facades\Theme;
+use MM\Meros\App\Package;
+use MM\Meros\App\FeatureRegistry;
+use MM\Meros\App\Facades\Registry;
 
-use MM\Meros\App\Helpers\ClassInfo;
+use MM\Meros\App\Support\ClassInfo;
 
 abstract class PackageServiceProvider extends ServiceProvider {
     /**
@@ -18,12 +19,6 @@ abstract class PackageServiceProvider extends ServiceProvider {
      */
     protected string $serviceClass;
 
-    /**
-     * Registers the feature by instantiating it and adding it to the theme manager's
-     * registered features.
-     *
-     * @return void
-     */
     final public function register(): void {
         $class = ClassInfo::get($this->serviceClass);
         
@@ -34,30 +29,15 @@ abstract class PackageServiceProvider extends ServiceProvider {
 
             $this->app->singleton(
                 $this->serviceClass,
-                fn () => new $this->serviceClass($name, $path, $uri)
+                fn () => new $this->serviceClass($this->app->make(FeatureRegistry::class), $name, $path, $uri)
             );
 
-            $this->app->tag($this->serviceClass, 'meros.theme.package');
-
-            $service = $this->app->make($this->serviceClass);
-            $slug    = $service->getSlug();
-
-            Theme::bindPackage($slug, $service);
-            $this->afterRegister();
+            // Add package to the registry
+            Registry::addPackage($this->app->make($this->serviceClass));
         }
     }
 
-    protected function afterRegister(): void {
-        // Additional logic to run after the feature has been registered can be added here.
-    }
-
     final public function boot(): void {
-        $this->app->booted(function () {
-            $this->afterBoot();
-        });
-    }
-
-    protected function afterBoot(): void {
-        // Additional logic to run after all providers have booted can be added here.
+        // Do nothing...
     }
 }

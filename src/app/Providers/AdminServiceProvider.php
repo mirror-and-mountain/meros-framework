@@ -4,8 +4,8 @@ namespace MM\Meros\App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 
-use MM\Meros\App\Services\Theme\AdminManager;
 use MM\Meros\App\Facades\Admin;
+use MM\Meros\App\Admin\AdminManager;
 
 class AdminServiceProvider extends ServiceProvider {
     
@@ -15,7 +15,8 @@ class AdminServiceProvider extends ServiceProvider {
      * @return void
      */
     public function register(): void {
-        $this->app->singleton('meros.admin', AdminManager::class);
+        $this->app->singleton(AdminManager::class, AdminManager::class);
+        $this->app->alias(AdminManager::class, 'meros.admin');
     }
 
     /**
@@ -24,9 +25,12 @@ class AdminServiceProvider extends ServiceProvider {
      * @return void
      */
     public function boot(): void {
-        if (is_admin()) {
-            // Initialise admin
-            Admin::initialise();
-        }
+        $this->app->booted(function () {
+            if (is_admin()) {
+                // Initialise admin
+                Admin::initialise();
+            }
+        });
+
     }
 }
