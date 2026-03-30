@@ -23,6 +23,13 @@ class Asset extends Feature {
     public string $location;
 
     /**
+     * The asset group if applicable.
+     *
+     * @var string
+     */
+    public string $group;
+
+    /**
      * The human-readable label for the asset.
      * Required only for switchable assets.
      *
@@ -113,7 +120,7 @@ class Asset extends Feature {
             $this->handle       = $sanitizedConfig['handle'];
             $this->type         = $sanitizedConfig['type'];
             $this->location     = $sanitizedConfig['location'];
-
+            $this->group        = $sanitizedConfig['group'];
             $this->label        = $sanitizedConfig['label'];
             $this->description  = $sanitizedConfig['description'];
 
@@ -133,15 +140,17 @@ class Asset extends Feature {
                 $this->makeSwitch();
             }
 
-            $hook = $this->hookMapping[$this->location];
+            if ($this->enabled) {
+                $hook = $this->hookMapping[$this->location];
 
-            if ($this->type === 'css') {
-                // Fix for styles in the block editor.
-                $hook = $hook === 'enqueue_block_editor_assets' ? 'enqueue_block_assets' : $hook;
+                if ($this->type === 'css') {
+                    // Fix for styles in the block editor.
+                    $hook = $hook === 'enqueue_block_editor_assets' ? 'enqueue_block_assets' : $hook;
+                }
+
+                // Hook the load method.
+                add_action($hook, [$this, 'load']);
             }
-
-            // Hook the load method.
-            add_action($hook, [$this, 'load']);
 
         }
 
@@ -160,6 +169,7 @@ class Asset extends Feature {
             'handle'        => ['type' => 'string', 'required' => true],
             'type'          => ['type' => 'string', 'required' => true, 'allowed_values' => ['js', 'css']],
             'location'      => ['type' => 'string', 'required' => true, 'allowed_values' => ['admin', 'editor', 'site']],
+            'group'         => ['type' => 'string', 'required' => false, 'default' => ''],
             'label'         => ['type' => 'string', 'required' => false, 'default' => ''],
             'description'   => ['type' => 'string', 'required' => false, 'default' => ''],
             'path'          => ['type' => 'string', 'required' => true],

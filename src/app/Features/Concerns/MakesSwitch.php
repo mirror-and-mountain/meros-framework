@@ -32,11 +32,32 @@ trait MakesSwitch {
      * @return void
      */
     private function makeSwitch(): void {
+        $isBlock = $this instanceof Block;
+        $isAsset = $this instanceof Asset;
+
+        if (! $isBlock && ! $isAsset) {
+            return; // Switches are currently only implemented for blocks and assets.
+        }
+
         // Determine the section suffix based on the feature type.
-        $sectionSuffix = $this instanceof Block ? 'blocks' : ($this instanceof Asset ? 'assets' : null);
+        $sectionSuffix = $isBlock ? 'blocks' : ($isAsset ? 'assets' : null);
 
         if ($sectionSuffix === null) {
             return;
+        }
+
+        // Determine the option name for the switch setting based on the feature type.
+        $optionName = '';
+        if ($isBlock) {
+            $optionName = $this->handle . '_block_enable';
+        } 
+        
+        else if ($isAsset) {
+            $optionName = $this->source->handle . '_' . $this->group . '_asset_enable';
+        }
+
+        if (Registry::get('settings')->where('handle', $optionName)->count() > 0) {
+            return; // Stop if a setting with the same name exists
         }
         
         // Make author settings section slug for the settings section.
@@ -64,7 +85,7 @@ trait MakesSwitch {
 
         // The setting config
         $setting = [
-            'option_name'  => $this->handle . '_enable',
+            'option_name'  => $optionName,
             'option_group' => 'meros_theme_settings_' . $sectionSuffix,
             'type'         => 'boolean',
             'label'        => "Enable {$this->label}",
@@ -77,15 +98,12 @@ trait MakesSwitch {
             'page'     => 'meros_theme_settings_' . $sectionSuffix,
             'section'  => $settingsSectionID,
             'type'     => 'checkbox',
-            'title'    => $this->getSwitchTitleHTML(),
+            'title'    => $this->getSwitchTitleHTML($isBlock ? 'block' : 'asset'),
             'callback' => 'default'
         ];
 
         // Make the setting
         $this->switchSetting = $this->makeSetting($setting, $field);
-
-        // Set enabled state based on the setting value.
-        $this->setEnabled();
     }
 
     /**
@@ -112,16 +130,24 @@ trait MakesSwitch {
 
     /**
      * Generates the HTML for the switch title, including a link to the feature.
+     * 
+     * @param string $type The type of the switchable item (e.g., 'block', 'asset').
      *
      * @return string The generated HTML for the switch title.
      */
-    private function getSwitchTitleHTML(): string {
-        $html = '<label id="' . esc_attr($this->handle) . '_enable_label" for="' . esc_attr($this->handle . '_enable') . '" class="meros-settings-label">' . esc_html($this->label);
+    private function getSwitchTitleHTML(string $type): string {
+        $handle = $this->handle;
+
+        if ($type === 'asset') {
+            $handle = $this->source->handle . '_' . $this->group;
+        }
+
+        $html = '<label id="' . esc_attr($handle) . '_enable_label" for="' . esc_attr($handle . '_enable') . '" class="meros-settings-label">' . esc_html($this->label);
 
         $isByPackage = $this->source instanceof \MM\Meros\App\Package;
 
         if ($isByPackage) {
-            $featureURL  = admin_url('options-general.php?page=meros_features&tab=packages#' . $this->source->handle . '_enable_label');
+            $featureURL  = admin_url('options-general.php?page=meros_features&tab=packages#' . $handle . '_enable_label');
             $html .= " | <a style=\"font-weight:400;\" href=\"{$featureURL}\">View Feature</a></label>";
         } else {
             $html .= '</label>';
@@ -132,15 +158,5 @@ trait MakesSwitch {
         }
 
         return $html;
-    }
-
-    /**
-     * Determines whether the switchable item is enabled based on the associated setting value.
-     *
-     * @return boolean
-     */
-    private function setEnabled(): void {
-        $enabled = get_option($this->handle . '_enable', $this->enabled);
-        $this->enabled = (bool) $enabled; // Update enabled state based on user preference.
     }
 }

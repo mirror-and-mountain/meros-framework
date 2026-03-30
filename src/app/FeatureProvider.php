@@ -28,6 +28,8 @@ abstract class FeatureProvider implements
     // ComponentsRegistrar, 
     InstallablesRegistrar 
 {
+    private array $requiredServices = ['core'];
+
     use HasIdentity,
         HasPreferences,
         HasAssets,
@@ -72,6 +74,40 @@ abstract class FeatureProvider implements
     }
 
     abstract protected function initialise(): void;
+
+    /**
+     * Adds a required service to the feature provider's requirements.
+     *
+     * @param string $service The name of the required service.
+     * @return void
+     */
+    protected function addRequiredService(string $service): void {
+        if (!in_array($service, $this->requiredServices)) {
+            $this->requiredServices[] = $service;
+        }
+    }
+
+    /**
+     * Removes a required service from the feature provider's requirements.
+     *
+     * @param string $service The name of the service to remove from requirements.
+     * @return void
+     */
+    protected function removeRequiredService(string $service): void {
+        $this->requiredServices = array_filter(
+            $this->requiredServices,
+            fn($s) => $s !== $service
+        );
+    }
+
+    /**
+      * Returns an array of the feature provider's required services.
+      *
+      * @return array An array of required service names.
+      */
+    protected function getRequiredServices(): array {
+        return $this->requiredServices;
+    }
 
     /**
      * If theme has just been activated, this method hooks the installMeros()

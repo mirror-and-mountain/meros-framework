@@ -125,8 +125,8 @@ trait HasIdentity {
         }
 
         else if ($this instanceof  Framework) {
-            $this->name   = 'Meros';
-            $this->handle = 'meros';
+            $this->name   = 'Meros Framework';
+            $this->handle = 'meros_framework';
 
             $this->author           = 'Meros';
             $this->authorUri        = 'https://mirrorandmountain.com';

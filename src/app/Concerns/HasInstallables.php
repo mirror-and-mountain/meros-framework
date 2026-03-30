@@ -8,8 +8,7 @@ use Illuminate\Support\Facades\File;
 
 use MM\Meros\App\Models\Migration;
 use MM\Meros\App\Features\Installable;
-
-use Illuminate\Support\Facades\Log;
+use MM\Meros\App\Facades\Framework;
 
 trait HasInstallables {
     /**
@@ -25,7 +24,6 @@ trait HasInstallables {
      * @var bool
      */
     protected bool $hasInstallables = false;
-
 
     /**
      * An array of registered migration file paths.
@@ -82,25 +80,25 @@ trait HasInstallables {
 
     /**
      * Checks if the item is installed by checking that at least one installable has been run.
+     * May be overridden to provide a different definition of "installed" if necessary.
      * 
      * @return bool
      */
     protected function isInstalled(): bool {
-        $installedItems    = collect($this->getInstallables())->where('isInstalled', true)->count();
-        $notInstalledItems = collect($this->getInstallables())->where('isInstalled', false)->count();
-        return $installedItems > 0 && $notInstalledItems === 0;
+        $installedItems = $this->getInstallables()->where('isInstalled', true)->count();
+        return $installedItems > 0;
     }
 
     /**
-      * Checks if there are any pending installables that have not been run.
+      * Checks if there are any pending installables that have not been run. 
+      * May be overridden to provide a different definition of "has updates" if necessary.
       * 
       * @return bool
       */
     protected function hasUpdates(): bool {
-        $installedItems    = collect($this->getInstallables())->where('isInstalled', true)->count();
-        $notInstalledItems = collect($this->getInstallables())->where('isInstalled', false)->count();
+        $notInstalledItems = $this->getInstallables()->where('isInstalled', false)->count();
         
-        return $installedItems > 0 && $notInstalledItems > 0;
+        return $this->isInstalled() && $notInstalledItems > 0;
     }
 
     /**
@@ -139,18 +137,42 @@ trait HasInstallables {
      * @return bool|string Returns true on successful installation, or an error message on failure.
      */
     final public function install(): bool|string {
+        // Ensure required services are installed before attempting to run installables
+        $servicesInstalled = $this->installRequiredServices();
+        if ($servicesInstalled !== true) {
+            return $servicesInstalled; // Return the error message if service installation fails.
+        }
+
+        // Get ready installables
         $installables = $this->getInstallables(true);
 
         if ($installables->isEmpty()) {
             return true; // No installables to run, consider it a successful installation.
         }
 
-        $installables->each(function($installable) {
-            $result = $installable->install(Str::ulid());
+        $batchId = Str::ulid();
+
+        $installables->each(function($installable) use ($batchId) {
+            $result = $installable->install($batchId);
             if ($result !== true) {
                 return $installable->installationError; // Return the error message if installation fails.
             }
         });
+
+        return true;
+    }
+
+    /**
+     * Attempts to install each service required by the item.
+     *
+     * @return boolean|string
+     */
+    private function installRequiredServices(): bool|string {
+        foreach ($this->requiredServices as $service) {
+            if (!Framework::isServiceInstalled($service, true)) {
+                return "Failed to install required service: $service";
+            }
+        }
 
         return true;
     }
@@ -161,6 +183,7 @@ trait HasInstallables {
      * @return bool|string Returns true on successful uninstallation, or an error message on failure.
      */
     final public function uninstall(): bool|string {
+        // Get ready installables in reverse order for uninstallation
         $installables = $this->getInstallables(true)->reverse();
 
         if ($installables->isEmpty()) {

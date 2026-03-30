@@ -332,7 +332,7 @@ class Installable extends Feature {
         }
 
         // Check core service installed and attempt to install if it isn't
-        if (Framework::isServiceInstalled('core', true) !== true) {
+        if (Framework::isServiceInstalled('core') !== true) {
             return 'The meros core service does not appear to be properly set up. Please run the core installation process first.';
         }
         

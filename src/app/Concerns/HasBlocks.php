@@ -70,15 +70,14 @@ trait HasBlocks {
         
         // Determine if the block should be switchable based on preferences.
         $isSwitchableByDefault = $this->getPreference('blocks_are_switchable_by_default');
+        $isSwitchable          = apply_filters($handle . '_block_is_switchable', $isSwitchableByDefault);
 
-        if ($isSwitchableByDefault && $label !== '' && $description !== '') {
-            $isSwitchable = apply_filters($handle . '_is_switchable', $isSwitchableByDefault);
+        if ($isSwitchable && $label !== '' && $description !== '') {
+            $enabled      = (bool) get_option($handle . '_block_enable', $enabled); // User preference for this block's enabled state.
         } else {
             $isSwitchable = false;
+            $enabled      = apply_filters($handle . '_block_is_enabled', $enabled);
         }
-
-        // Filter enabled for this block
-        $enabled = apply_filters($handle . '_is_enabled', $enabled);
 
         return [
             'name'          => $name,
@@ -130,11 +129,11 @@ trait HasBlocks {
      */
     final public function getBlocks(bool $readyOnly = false): Collection {
         if ($readyOnly) {
-            return $this->registry::get('blocks')
+            return $this->registry->get('blocks')
                     ->where('source', $this)
                     ->where('ready', true) ?? collect([]);
         } else {
-            return $this->registry::get('blocks')
+            return $this->registry->get('blocks')
                     ->where('source', $this) ?? collect([]);
         }
     }

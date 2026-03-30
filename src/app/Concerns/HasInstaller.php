@@ -28,7 +28,7 @@ trait HasInstaller {
         $isInstalled   = !$merosInstalled ? false : $this->isInstalled();
         $installedTime = !$merosInstalled ? '' : $this->getInstalledTime();
         $hasUpdates    = !$merosInstalled ? false : $isInstalled && $this->hasUpdates();
-        $updatedTime   = $hasUpdates ? $this->getUpdatedTime() : null;
+        $updatedTime   = !$merosInstalled ? '' : $this->getUpdatedTime();
 
         $isTheme = $this instanceof \MM\Meros\App\Theme;
         

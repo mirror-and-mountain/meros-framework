@@ -39,60 +39,125 @@ trait HasAssets {
             return;
         }
 
-        foreach ($this->assetLocations as $location) {
-            $extensions = ['js', 'css'];
+        $assetDirectories = File::directories($assetsPath);
 
-            foreach ($extensions as $extension) {
-                // Generate the path structure for the current location and extension.
-                $pathStructure = $this->getAssetPathStructure($location, $extension);
+        if ($assetDirectories === []) {
+            return; // No asset directories found
+        }
 
-                // Look for candidate asset files.
-                $assets = File::glob($assetsPath . $pathStructure, GLOB_BRACE);
+        $groups = [];
 
-                if ($assets === []) {
-                    continue;
-                }
+        foreach ($assetDirectories as $directory) {
+            $dirName = basename($directory);
 
-                $i = 0; // Used for handle uniqueness
+            // Handle grouped assets
+            if (! in_array($dirName, $this->assetLocations)) {
+                $group = $this->initAssetGroup($dirName, $directory);
+                $groups[ $dirName ] = $group;
+            }
 
-                foreach ($assets as $asset) {
-                    $pathInfo   = pathinfo($asset);
-                    $configPath = $this->getAssetConfigPath($pathInfo, 'config');
-                    $depsPath   = $this->getAssetConfigPath($pathInfo, 'index.asset');
+            else {
+                // Handle ungrouped assets
+                $group = $this->initAssetLocation([
+                    'name'        => $this->handle . '_' . $dirName,
+                    'label'       => '',
+                    'description' => '',
+                    'switchable'  => false,
+                ], $directory);
 
-                    // Get user config if available
-                    $userConfig = $this->getAssetUserConfig($configPath);
-                    
-                    // Get dependencies if available
-                    $deps = File::exists($depsPath) ? include $depsPath : [];
-                    $deps = is_array($deps['dependencies'] ?? []) ? $deps['dependencies'] : [];
-
-                    // Generate a unique handle
-                    $handle = $this->generateAssetHandle($pathInfo, $location, $i);
-
-                    // Get the asset src
-                    $src = Str::replace($this->path, $this->uri, $asset);
-
-                    // Generate config
-                    $config = $this->makeAssetConfig(
-                        handle: $handle,
-                        type: $extension,
-                        location: $location,
-                        path: $asset,
-                        src: $src,
-                        label: $userConfig['label'] ?? '',
-                        description: $userConfig['description'] ?? '',
-                        conditions: $userConfig['conditions'] ?? [],
-                        dependencies: $deps,
-                    );
-
-                    // Make the asset
-                    $this->makeAsset($config);
-
-                    $i++; // Increment the index used in handle generation
-                }
+                $groups[ $dirName ] = $group;
             }
         }
+
+        foreach ($groups as $group => $groupConfig) {
+            $isLocation = in_array($group, $this->assetLocations);
+            
+            if ($isLocation) {
+                $assets = ['script' => $groupConfig['script'] ?? null, 'style' => $groupConfig['style'] ?? null];
+            } 
+            
+            else {
+                // For grouped assets, iterate through each location within the group
+                foreach ($this->assetLocations as $location) {
+                    if (!isset($groupConfig[$location])) {
+                        continue;
+                    }
+                    
+                    $locationAssets = [
+                        'script' => $groupConfig[$location]['script'] ?? null,
+                        'style'  => $groupConfig[$location]['style'] ?? null
+                    ];
+                    
+                    $this->processAssets($locationAssets, $groupConfig, $group, $location, true);
+                }
+                continue;
+            }
+            
+            $this->processAssets($assets, $groupConfig, $group, $group, false);
+        }
+
+            
+            
+        }
+    
+        /**
+         * Processes assets for a group or location.
+         *
+         * @param  array  $assets       The assets to process.
+         * @param  array  $groupConfig  The group configuration.
+         * @param  string $group        The group name.
+         * @param  string $location     The location name.
+         * @param  bool   $isGrouped    Whether this is a grouped asset.
+         * 
+         * @return void
+         */
+        private function processAssets(array $assets, array $groupConfig, string $group, string $location, bool $isGrouped): void {
+            $isLocation = in_array($group, $this->assetLocations);
+            
+            foreach ($assets as $type => $assetPath) {
+                if ($assetPath === null) continue;
+    
+                $handle       = $groupConfig['name'] . '_' . (!Str::endsWith($groupConfig['name'], $location) ? $location . '_' : '') . $type;
+                $typeKey      = $type === 'script' ? 'script' : 'style';
+                $inFooter     = $type === 'script' ? apply_filters($handle . '_asset_in_footer', false) : false;
+                $isSwitchable = $groupConfig['switchable'] ?? false;
+    
+                $enabled = $this->getPreference('assets_are_enabled_by_default');
+    
+                if ($isSwitchable) {
+                    $setting = $this->handle . '_' . $group . '_asset_enable';
+                    $enabled = (bool) get_option($setting, $enabled);
+                } else {
+                    // Filter enabled for this asset
+                    $enabled = apply_filters($handle . '_asset_is_enabled', $enabled);
+                }
+                
+                $locationKey = $isGrouped ? $location : $group;
+                $conditions = $isLocation 
+                    ? ($groupConfig['conditions'] ?? [])
+                    : ($groupConfig[$locationKey]['conditions'] ?? []);
+                $dependencies = $isLocation
+                    ? (($groupConfig['dependencies'] ?? [])[$typeKey] ?? [])
+                    : (($groupConfig[$locationKey]['dependencies'] ?? [])[$typeKey] ?? []);
+                
+                $assetConfig = [
+                    'handle'        => $handle,
+                    'type'          => $type === 'script' ? 'js' : 'css',
+                    'location'      => $location,
+                    'group'         => $group,
+                    'is_switchable' => $isSwitchable,
+                    'path'          => $assetPath,
+                    'src'           => Str::replace($this->path, $this->uri, $assetPath),
+                    'label'         => $groupConfig['label'],
+                    'description'   => $groupConfig['description'],
+                    'conditions'    => $conditions,
+                    'dependencies'  => $dependencies,
+                    'in_footer'     => $inFooter,
+                    'enabled'       => $enabled,
+                ];
+    
+                $this->makeAsset($assetConfig);
+            }
     }
 
     /**
@@ -111,166 +176,172 @@ trait HasAssets {
     }
 
     /**
-     * Generates the config array for an asset.
+     * Initialises an asset group by scanning the given directory and its subdirectories for assets and config.
      *
-     * @param  string $handle       The asset handle.
-     * @param  string $type         The asset type (e.g., 'js', 'css').
-     * @param  string $location     The asset location.
-     * @param  string $path         The asset path.
-     * @param  string $src          The asset source URL.
-     * @param  string $label        The asset label.
-     * @param  string $description  The asset description.
-     * @param  array  $conditions   Conditions under which the asset should be loaded.
-     * @param  array  $dependencies Dependencies for the assets.
+     * @param  string $group          The name of the asset group.
+     * @param  string $assetDirectory The path to the asset group directory.
      * 
-     * @return array The generated config array for the asset.
+     * @return array The initialised asset group configuration.
      */
-    private function makeAssetConfig(
-        string $handle,
-        string $type,
-        string $location,
-        string $path,
-        string $src,
-        string $label = '',
-        string $description = '',
-        array  $conditions = [],
-        array  $dependencies = [],
-    ): array {
-        // Determine if the asset should be enabled based on preferences.
-        $enabled = $this->getPreference('assets_are_enabled_by_default');
-
-        // Check for a named directory to determine if the asset should be switchable.
-        $hasNamedDir = $this->hasNamedDirectory($location, pathinfo($path)) !== false;
-        
-        // Determine if the asset should be switchable based on preferences and config.
-        if ($hasNamedDir) {
-            $isSwitchableByDefault = $this->getPreference('assets_are_switchable_by_default');
-
-            if ($isSwitchableByDefault && $label !== '' && $description !== '') {
-                $isSwitchable = apply_filters($handle . '_is_switchable', $isSwitchableByDefault);
-            } else {
-                $isSwitchable = false;
-            }
-        } else {
-            $isSwitchable = false;
-        }
-
-        // Filter enabled for this asset
-        $enabled = apply_filters($handle . '_is_enabled', $enabled);
-
-        // Filter position in footer
-        $inFooter = apply_filters($handle . '_in_footer', false);
-        
-        return [
-            'handle'        => $handle,
-            'type'          => $type,
-            'location'      => $location,
-            'label'         => $label,
-            'description'   => $description,
-            'path'          => $path,
-            'src'           => $src,
-            'conditions'    => $conditions,
-            'dependencies'  => $dependencies,
-            'enabled'       => $enabled,
-            'is_switchable' => $isSwitchable,
-            'in_footer'     => $inFooter,
+    private function initAssetGroup(string $group, string $assetDirectory): array {
+        // Set the initial group properties
+        $groupConfig = [
+            'name'        => $this->handle . '_' . $group,
+            'label'       => '',
+            'description' => '',
+            'switchable'  => false,
         ];
-    }
 
-    /**
-     * Retrieves information from an asset's config file if available.
-     *
-     * @param  string        $configPath
-     *
-     * @return array|boolean Parsed config array or false if unavailable or invalid.
-     */
-    private function getAssetUserConfig(string $configPath): array|bool {
-        if (File::exists($configPath)) {
-            $config = include $configPath;
+        // Get user config for the group if available and merge with default group config
+        $groupConfig = array_merge($groupConfig, $this->getUserConfig($assetDirectory));
+        
+        // Look for 'location' named subdirectories
+        $locationDirs = File::directories($assetDirectory);
 
-            return is_array($config) ? [
-                'label'       => $config['label'] ?? '',
-                'description' => $config['description'] ?? '',
-                'conditions'  => $config['conditions'] ?? [],
-            ] : false;
+        foreach ($locationDirs as $locationDir) {
+            $groupConfig = $this->initAssetLocation($groupConfig, $locationDir, true);
         }
 
-        return false;
+        return $groupConfig;
     }
 
     /**
-     * Generates a unique handle for an asset.
+     * Initialises an asset location by scanning the given directory for assets and config.
      *
-     * @param  array  $pathInfo
-     * @param  string $type
-     * @param  string $location
-     * @param  int    $index
-     *
-     * @return string The generated handle.
+     * @param  array  $assetGroup        The current asset group configuration to be updated with the location config.
+     * @param  string $locationDirectory The path to the asset location directory.
+     * @param  bool   $grouped           Whether the location is part of a group (i.e. in a subdirectory named after the group).
+     * 
+     * @return array The updated asset group configuration with the location config added.
      */
-    private function generateAssetHandle(array $pathInfo, string $location, int $index): string {
-        $namedDir = $this->hasNamedDirectory($location, $pathInfo);
+    private function initAssetLocation(array $assetGroup, string $locationDirectory, bool $grouped = false): array {
+        $location = basename($locationDirectory);
 
-        if ($namedDir !== false) {
-            $name  = $namedDir . '_' . Str::replace('-', '_', $pathInfo['filename']);
-        } else {
-            $name = Str::replace('-', '_', $pathInfo['filename']);
+        if (! in_array($location, $this->assetLocations)) {
+            return $assetGroup; // Not a valid location directory
         }
 
-        $handle = $this->handle . '_' . $location . '_' . Str::replace('-', '_', $name) . '_' . $index;
-        return $handle;
+        // Look for asset files in the location directory
+        $assets = File::files($locationDirectory);
+        
+        if ($assets === []) {
+            return $assetGroup; // No files found in location directory
+        }
+
+        // Get user config for the location if available and merge with default group config (if not already merged via group config)
+        $assetGroup = array_merge($assetGroup, $this->getUserConfig($locationDirectory));
+
+        if ($grouped) {
+            // Initialise the dependencies array for this location
+            $assetGroup[ $location ]['dependencies'] = [
+                'style'  => [],
+                'script' => []
+            ];
+        }
+
+        foreach ($assets as $asset) {
+            $extension = $asset->getExtension();
+            $fileName  = $asset->getFilenameWithoutExtension();
+
+            if (! in_array($extension, ['js', 'css', 'php'])) {
+                continue; // Not a valid asset file
+            }
+
+            // Check for WordPress generated dependencies
+            if ($fileName === 'index.asset' && $extension === 'php') {
+                $dependencies = include $asset->getPathname();
+                if (is_array($dependencies)) {
+                    if ($grouped) {
+                        $assetGroup[ $location ]['dependencies']['script']  = $dependencies['dependencies'] ?? [];
+                    }
+
+                    else {
+                        $assetGroup['dependencies']['script']  = $dependencies['dependencies'] ?? [];
+                    }
+                }
+            }
+
+            // Check for user-defined dependencies (these will be prioritised over WP generated dependencies if both are present)
+            if ($fileName === 'dependencies' && $extension === 'php') {
+                $dependencies = include $asset->getPathname();
+                if (is_array($dependencies)) {
+                    if ($grouped) {
+                        $assetGroup[ $location ]['dependencies']['style']  = $dependencies['style'] ?? [];
+                        $assetGroup[ $location ]['dependencies']['script'] = $dependencies['script'] ?? []; 
+                    }
+
+                    else {
+                        $assetGroup['dependencies']['style']  = $dependencies['style'] ?? [];
+                        $assetGroup['dependencies']['script'] = $dependencies['script'] ?? []; 
+                    }
+                }
+            }
+
+            // Check for user-defined conditions
+            if ($fileName === 'conditions' && $extension === 'php') {
+                $conditions = include $asset->getPathname();
+                if (is_array($conditions)) {
+                    if ($grouped) {
+                        $assetGroup[ $location ]['conditions'] = $conditions;
+                    }
+
+                    else {
+                        $assetGroup['conditions'] = $conditions;
+                    }
+                }
+            }
+
+            // Check for the root script file
+            if ($fileName === 'index' && $extension === 'js') {
+                if ($grouped) {
+                    $assetGroup[ $location ]['script'] = $asset->getPathname();
+                }
+
+                else {
+                    $assetGroup['script'] = $asset->getPathname();
+                }
+            }
+
+            // Check for the root style file
+            if ($fileName === 'style-index' && $extension === 'css') {
+                if ($grouped) {
+                    $assetGroup[ $location ]['style'] = $asset->getPathname();
+                }
+
+                else {
+                    $assetGroup['style'] = $asset->getPathname();
+                }
+            }
+        }
+        
+        return $assetGroup;
     }
 
     /**
-     * Checks whether the asset exists in a named directory i.e. one above the location directory.
+     * Retrieves user config for a given asset directory if available and sanitises it.
      *
-     * @param  string  $location
-     * @param  array   $pathInfo
+     * @param  string $directory
      *
-     * @return string|false The name of the directory if it exists and is not the same as the location, otherwise false.
+     * @return array
      */
-    private function hasNamedDirectory(string $location, array $pathInfo): string|false {
-        $subDir = Str::afterLast(dirname($pathInfo['dirname']), DIRECTORY_SEPARATOR);
-        return $subDir !== $location ? $subDir : false;
-    }
+    private function getUserConfig(string $directory): array {
+        $configPath      = trailingslashit($directory) . 'config.php';
+        $config          = File::exists($configPath) ? include $configPath : null;
+        $sanitizedConfig = [];
 
-     /**
-     * Returns the asset path structure by replacing placeholders with actual values.
-     *
-     * @param  string $location  The asset location (e.g., 'admin', 'editor', 'site').
-     * @param  string $extension The asset file extension (e.g., 'js', 'css').
-     *
-     * @return string The generated asset path structure.
-     */
+        if (is_array($config)) {
+            $switchableByDefault = $this->getPreference('assets_are_switchable_by_default');
 
-    /**
-     * Generates the asset path structure by replacing placeholders with actual values.
-     *
-     * @param  string $location  The asset location (e.g., 'admin', 'editor', 'site').
-     * @param  string $extension The asset file extension (e.g., 'js', 'css').
-     *
-     * @return string The generated asset path structure.
-     */
-    private function getAssetPathStructure(string $location, string $extension): string {
-        $pref = $this->getPreference('assets_path_structure');
+            $label       = $config['label'] ?? '';
+            $description = $config['description'] ?? '';
+            $switchable  = $label !== '' && $description !== '' && $switchableByDefault ? true : false;
 
-        $pref = Str::replace('{extension}', $extension, $pref);
-        $pref = Str::replace('{location}', $location, $pref);
+            $sanitizedConfig['label']       = $label;
+            $sanitizedConfig['description'] = $description;
+            $sanitizedConfig['switchable']  = $switchable;
+        }
 
-        return $pref;
-    }
-
-    /**
-     * Returns the path to an asset's (possible) config file.
-     * Used to retrieve paths for config and dependancy file candidates when discovering assets.
-     *
-     * @param  array  $pathInfo
-     * @param  string $fileName e.g. 'config' or 'index.asset.php' for dependancies.
-     *
-     * @return string
-     */
-    private function getAssetConfigPath(array $pathInfo, string $fileName): string {
-        return trailingslashit($pathInfo['dirname']) . $fileName . '.php';
+        return $sanitizedConfig;
     }
 
     /**
@@ -282,11 +353,11 @@ trait HasAssets {
      */
     final public function getAssets(bool $readyOnly = false): Collection {
         if ($readyOnly) {
-            return $this->registry::get('assets')
+            return $this->registry->get('assets')
                     ->where('source', $this)
                     ->where('ready', true) ?? collect([]);
         } else {
-            return $this->registry::get('assets')
+            return $this->registry->get('assets')
                     ->where('source', $this) ?? collect([]);
         }
     }

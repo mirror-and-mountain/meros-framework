@@ -28,83 +28,58 @@ return [
  * Renders the Meros Features page.
  */
 function meros_render_features_page() {
-    $tabs = [
+    meros_render_settings_page('meros_features', 'Features', [
         'packages' => 'Packages',
         'theme'    => 'Theme'
-    ];
-
-    $currentTab     = isset($_GET['tab'], $tabs[$_GET['tab']]) ? $_GET['tab'] : array_key_first($tabs);
-    $tabHasSettings = Registry::get('settingsSections')->where('page', 'meros_features_' . $currentTab)->count() > 0;
-
-    ?>
-    <div class="wrap">
-        <h1>Features</h1>
-        <form method='post' action='options.php'>
-            <nav class="nav-tab-wrapper">
-                <?php
-                foreach ($tabs as $slug => $label) {
-                    if (!$tabHasSettings) {
-                        continue; // Don't show the tab if it has no registered settings sections
-                    }
-
-                    $currentClass = $slug === $currentTab ? ' nav-tab-active' : '';
-                    $url          = add_query_arg(['page' => 'meros_features', 'tab' => $slug], '');
-                    
-                    echo "<a class=\"nav-tab{$currentClass}\" href=\"{$url}\">{$label}</a>";
-                }
-                ?>
-            </nav>
-            <?php
-            if (!$tabHasSettings) {
-                echo '<p>No settings available for this tab.</p>';
-            } else {
-                settings_fields("meros_features_{$currentTab}");
-                do_settings_sections("meros_features_{$currentTab}");
-                // No submit button as we use AJAX to save settings...
-            }
-            ?>
-        </form>
-    </div>
-    <?php
+    ], false);
 }
 
 /**
  * Renders the Meros Theme Settings page.
  */
 function meros_render_theme_settings_page() {
-    $tabs = [
+    meros_render_settings_page('meros_theme_settings', 'Theme Settings', [
         'blocks' => 'Blocks',
         'assets' => 'Scripts & Styles',
         'misc'   => 'Miscellaneous',
-    ];
+    ], true);
+}
 
-    $currentTab     = isset($_GET['tab'], $tabs[$_GET['tab']]) ? $_GET['tab'] : array_key_first($tabs);
-    $tabHasSettings = Registry::get('settingsSections')->where('page', 'meros_theme_settings_' . $currentTab)->count() > 0;
+/**
+ * Generic settings page renderer.
+ */
+function meros_render_settings_page($pageSlug, $pageTitle, $tabs, $showSubmitButton) {
+    foreach ($tabs as $key => $_) {
+        $hasSettings = Registry::get('settingsSections')->where('page', $pageSlug . '_' . $key)->count() > 0;
+        if (!$hasSettings) {
+            unset($tabs[$key]);
+        }
+    }
+
+    if ($tabs === []) {
+        echo "<div class=\"wrap\"><h1>{$pageTitle}</h1><p>No settings available.</p></div>";
+        return;
+    }
+
+    $currentTab = isset($_GET['tab'], $tabs[$_GET['tab']]) ? $_GET['tab'] : array_key_first($tabs);
 
     ?>
     <div class="wrap">
-        <h1>Theme Settings</h1>
+        <h1><?php echo $pageTitle; ?></h1>
         <form method='post' action='options.php'>
             <nav class="nav-tab-wrapper">
                 <?php
                 foreach ($tabs as $slug => $label) {
-                    if (!$tabHasSettings) {
-                        continue; // Don't show the tab if it has no registered settings sections
-                    }
-
                     $currentClass = $slug === $currentTab ? ' nav-tab-active' : '';
-                    $url          = add_query_arg(['page' => 'meros_theme_settings', 'tab' => $slug], '');
-                    
+                    $url          = add_query_arg(['page' => $pageSlug, 'tab' => $slug], '');
                     echo "<a class=\"nav-tab{$currentClass}\" href=\"{$url}\">{$label}</a>";
                 }
                 ?>
             </nav>
             <?php
-            if (!$tabHasSettings) {
-                echo '<p>No settings available for this tab.</p>';
-            } else {
-                settings_fields("meros_theme_settings_{$currentTab}");
-                do_settings_sections("meros_theme_settings_{$currentTab}");
+            settings_fields("{$pageSlug}_{$currentTab}");
+            do_settings_sections("{$pageSlug}_{$currentTab}");
+            if ($showSubmitButton) {
                 submit_button();
             }
             ?>

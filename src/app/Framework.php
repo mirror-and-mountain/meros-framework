@@ -3,7 +3,6 @@
 namespace MM\Meros\App;
 
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Log;
 
 use MM\Meros\App\Models\Migration;
 use MM\Meros\App\Facades\Registry;
@@ -49,6 +48,10 @@ final class Framework extends FeatureProvider {
             return $this->isCoreInstalled($tryToInstall);
         }
 
+        if ($service === 'integrations') {
+            return $this->isIntegrationsInstalled($tryToInstall);
+        }
+
         return false; // Service not recognised
     }
 
@@ -79,6 +82,37 @@ final class Framework extends FeatureProvider {
         return $installed;
     }
 
+    /**
+     * Returns whether the integrations service is installed.
+     *
+     * @param  boolean $tryToInstall Whether to attempt to install the integrations service if it isn't installed.
+     *
+     * @return boolean Returns true if the integrations service is installed, false if it isn't or if installation fails.
+     */
+    private function isIntegrationsInstalled(bool $tryToInstall): bool {
+        $tables = [
+            'meros_integrations',
+            'meros_integration_endpoints',
+            'meros_integration_connections',
+            'meros_integration_credentials',
+            'meros_integration_tokens'
+        ];
+
+        $installed = false;
+
+        foreach ($tables as $table) {
+            if (! Schema::hasTable($table)) {
+                break;
+            }
+        }
+
+        return $installed ? true : ($tryToInstall ? $this->installIntegrations() : false);
+    }
+
+    private function installIntegrations(): bool {
+        return $this->install() === true;
+    }
+ 
     /**
      * Sets up AJAX handlers for the admin pages.
      *
