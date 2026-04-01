@@ -39,7 +39,7 @@ abstract class FeatureProvider implements
         HasSettings;
 
     public function __construct(
-        protected FeatureRegistry $registry,
+        protected Registry $registry,
         string $name = '',
         string $path = '',
         string $uri  = ''
@@ -81,7 +81,7 @@ abstract class FeatureProvider implements
      * @param string $service The name of the required service.
      * @return void
      */
-    protected function addRequiredService(string $service): void {
+    protected function require(string $service): void {
         if (!in_array($service, $this->requiredServices)) {
             $this->requiredServices[] = $service;
         }
@@ -93,7 +93,7 @@ abstract class FeatureProvider implements
      * @param string $service The name of the service to remove from requirements.
      * @return void
      */
-    protected function removeRequiredService(string $service): void {
+    protected function removeRequirement(string $service): void {
         $this->requiredServices = array_filter(
             $this->requiredServices,
             fn($s) => $s !== $service
@@ -105,7 +105,7 @@ abstract class FeatureProvider implements
       *
       * @return array An array of required service names.
       */
-    protected function getRequiredServices(): array {
+    protected function getRequirements(): array {
         return $this->requiredServices;
     }
 
@@ -136,18 +136,18 @@ abstract class FeatureProvider implements
             return false;
         }
 
-        $migrationsPath = \trailingslashit(
-            $this->path . $this->getPreference('migrations_path') . DIRECTORY_SEPARATOR . 'core'
+        $migrationPath = \trailingslashit(
+            $this->path . $this->getPreference('migrations_path') . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR
         );
 
         $installable = $this->makeCoreInstallable([
-            'path'   => $migrationsPath . '001_create_meros_migrations_table.php',
-
+            'path'   => $migrationPath . '001_create_meros_migrations_table.php',
         ]);
 
         $installed = $installable->install();
 
         if ($installed !== true) {
+            Log::notice("Failed to install core Meros service: {$installable->installationError}");
             return false;
         }
 

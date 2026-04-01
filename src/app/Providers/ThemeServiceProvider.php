@@ -15,7 +15,10 @@ class ThemeServiceProvider extends ServiceProvider {
         $themeClass = ClassInfo::get($themeClass);
 
         if ($themeClass->extends(MerosTheme::class)) {
-            $this->app->singleton(MerosTheme::class, $themeClass->name);
+            $this->app->singleton(MerosTheme::class, function ($app) use ($themeClass) {
+                return new $themeClass->name($app->make('meros.registry'));
+            });
+            
             $this->app->alias(MerosTheme::class, 'meros.theme');
 
             // Instantiate the theme to trigger the constructor and set up the theme

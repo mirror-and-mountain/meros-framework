@@ -5,10 +5,13 @@ namespace MM\Meros\App\Concerns;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 
 use MM\Meros\App\Models\Migration;
 use MM\Meros\App\Features\Installable;
 use MM\Meros\App\Facades\Framework;
+
+use MM\Meros\App\Models\Integration;
 
 trait HasInstallables {
     /**
@@ -24,15 +27,12 @@ trait HasInstallables {
      * @var bool
      */
     protected bool $hasInstallables = false;
-
-    /**
-     * An array of registered migration file paths.
-     *
-     * @var array
-     */
-    protected array $registeredMigrations = [];
-
     
+    /**
+     * Discovers installables
+     *
+     * @return void
+     */
     protected function discoverInstallables(): void {
         if (! $this->discoverInstallables) {
             return;
@@ -43,22 +43,21 @@ trait HasInstallables {
             return;
         }
         
-        $migrationsPath = $this->path . $this->getPreference('migrations_path');
+        $migrationsPath  = $this->path . $this->getPreference('migrations_path');
+        $migrationsExist = File::exists($migrationsPath) && File::isDirectory($migrationsPath);
+        $migrations      = $migrationsExist 
+            ? collect(File::files($migrationsPath))->filter(fn($file) => $file->getExtension() === 'php')->toArray()
+            : [];
 
-        if (!File::exists($migrationsPath) || !File::isDirectory($migrationsPath)) {
-            return;
-        }
 
-        $migrationFiles = File::files($migrationsPath);
-
-        // Register installables for each migration file if Meros is installed.
-        foreach ($migrationFiles as $migrationFile) {
+        // Register installables for each migration file.
+        foreach ($migrations as $migration) {
             $this->makeInstallable([
-                'path' => $migrationFile->getPathname(),
+                'path' => $migration->getPathname(),
             ]);
         }
 
-        if (count($migrationFiles) > 0) {
+        if (count($migrations) > 0) {
             $this->hasInstallables = true;
         }
     }
@@ -239,5 +238,33 @@ trait HasInstallables {
         }
 
         return null;
+    }
+
+    /**
+     * Returns whether the given tables are installed.
+     *
+     * @param  array   $tables
+     *
+     * @return boolean
+     */
+    protected function hasTables(array $tables): bool {
+        foreach ($tables as $table) {
+            if (! Schema::hasTable($table) || ! Migration::where('related_table', $table)->exists()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Returns whether the given table is installed.
+     *
+     * @param  string  $table
+     *
+     * @return boolean
+     */
+    protected function hasTable(string $table): bool {
+        return Schema::hasTable($table) && Migration::where('related_table', $table)->exists();
     }
 }

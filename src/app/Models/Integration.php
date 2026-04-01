@@ -12,7 +12,7 @@ class Integration extends Model {
     protected $fillable = [
         'source',
         'label',
-        'slug',
+        'name',
         'description',
         'api_base_uri',
         'api_version',

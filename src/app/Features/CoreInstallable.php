@@ -4,9 +4,8 @@ namespace MM\Meros\App\Features;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Schema;
-use MM\Meros\App\Models\Migration;
-
 use Illuminate\Support\Facades\Log;
+use MM\Meros\App\Models\Migration;
 
 class CoreInstallable extends Installable {
     /**
@@ -33,8 +32,10 @@ class CoreInstallable extends Installable {
      */
     public function install(string $batchId = ''): bool {
         if (! $this->ready) {
-            $this->installationError = "The installable '{$this->handle}' is not ready for installation.";
+            Log::error($this->error);
             return false;
+            // $this->installationError = "The installable '{$this->handle}' is not ready for installation.";
+            // return false;
         }
 
         $canInstall = $this->canRunInstall();
@@ -49,22 +50,10 @@ class CoreInstallable extends Installable {
             return false;
         }
 
+        $this->currentBatchId = $batchId === '' ? Str::ulid() : $batchId;
+
         try {
-            $this->runner->up();
-
-            $record = Migration::create([
-                'source'         => $this->source->handle,
-                'type'           => $this->type,
-                'subtype'        => $this->subtype,
-                'label'          => $this->label,
-                'handle'         => $this->handle,
-                'path_reference' => $this->path,
-                'batch_id'       => $batchId === '' ? Str::ulid() : $batchId
-            ]);
-
-            $this->installedTime = $record->created_at->format('d-m-Y H:i:s');
-            $this->isInstalled   = true;
-
+            $this->runner->up($this->handle);
         } catch (\Exception $e) {
             $this->installationError = "An error occurred while installing '{$this->handle}': " . $e->getMessage();
             return false;
@@ -99,7 +88,7 @@ class CoreInstallable extends Installable {
         }
 
         try {
-            $this->runner->down();
+            $this->runner->down($this->handle);
 
             Migration::where('handle', $this->handle)->delete();
         } catch (\Exception $e) {

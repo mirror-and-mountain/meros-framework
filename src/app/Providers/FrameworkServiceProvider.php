@@ -4,11 +4,13 @@ namespace MM\Meros\App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Event;
 
 use MM\Meros\App\Framework;
-use MM\Meros\App\FeatureRegistry;
 use MM\Meros\App\Context;
 use MM\Meros\App\Support\ClassInfo;
+
+use MM\Meros\App\Listeners\MigrationEventSubscriber;
 
 use MM\Meros\Scripts\MakeCommands;
 use MM\Meros\Scripts\EnvironmentCommands;
@@ -30,7 +32,7 @@ class FrameworkServiceProvider extends ServiceProvider {
 
         // Register the Framework class as a singleton in the service container
         $this->app->singleton(Framework::class, function ($app) {
-            return new Framework($app->make(FeatureRegistry::class));
+            return new Framework($app->make('meros.registry'));
         });
         
         // Alias the Framework class (used in Framework Facade)
@@ -38,6 +40,9 @@ class FrameworkServiceProvider extends ServiceProvider {
     }
 
     final public function boot(): void {
+        // Register event subscribers
+        Event::subscribe(MigrationEventSubscriber::class);
+
         // Set context
         $this->app->make(Context::class);
 
@@ -50,7 +55,7 @@ class FrameworkServiceProvider extends ServiceProvider {
         // Register packages
         $this->registerPackages();
 
-        // dd($this->app->make(FeatureRegistry::class));
+        // dd($this->app->make('meros.registry'));
 
         // Enable wp meros cli if appropriate
         if ($this->app->runningInConsole()) {

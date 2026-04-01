@@ -63,20 +63,6 @@ class EnvironmentManager {
     private string $themeClass;
 
     /** 
-     * The theme's features namespace.
-     * 
-     * @var string
-     */
-    private string $featuresNamespace;
-    
-    /** 
-     * The theme's extensions namespace.
-     * 
-     * @var string
-     */
-    private string $extensionsNamespace;
-
-    /** 
      * Whether the environment is local.
      * 
      * @var bool
@@ -91,13 +77,6 @@ class EnvironmentManager {
     private array $config = [];
 
     /** 
-     * The theme's features configuration.
-     * 
-     * @var array
-     */
-    private array $featuresConfig = [];
-
-    /** 
      * The available scripts.
      * 
      * @var array
@@ -105,18 +84,11 @@ class EnvironmentManager {
     private array $scripts = [];
 
     /** 
-     * The theme's features.
+     * The theme's packages.
      * 
      * @var array
      */
-    private array $features = [];
-
-    /** 
-     * The theme's extensions.
-     * 
-     * @var array
-     */
-    private array $extensions = [];
+    private array $packages = [];
 
     /** 
      * The last error message.
@@ -131,7 +103,7 @@ class EnvironmentManager {
         $separator = DIRECTORY_SEPARATOR;
         $this->themePath = realpath( $themePath );
         $this->themeSlug = basename( $this->themePath );
-        $this->isLocal = $this->name === 'local_dev';
+        $this->isLocal   = $this->name === 'local_dev';
         
         $initialised = $this->initFrameworkPath( $separator );
         if ( $initialised !== true ) {
@@ -199,7 +171,7 @@ class EnvironmentManager {
         $configPath = $this->themePath . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'environments.php';
         if (file_exists($configPath)) {
             $config = require $configPath;
-            $options = $config['environment_default_options'] ?? [];
+            $options = $config['local_options'] ?? [];
         }
 
         $configCommand = sprintf(
@@ -276,80 +248,35 @@ class EnvironmentManager {
     }
 
     /**
-     * Installs an extension in the environment's theme.
+     * Installs a package in the environment's theme.
      * 
-     * @param string $namespace The extension's namespace.
-     * @param string $loader The extension's loader class name.
-     * @param bool $allowOverrides Whether to allow overrides in the theme.
-     * @return bool True on success, false on failure.
+     * @param string $serviceProvider The package's service provider class.
+     * 
+     * @return bool  True on success, false on failure.
      */
-    public function installExtension(string $namespace, string $loader, bool $allowOverrides = false): bool {
+    public function installPackage(string $serviceProvider): bool {
         if ($this->error !== '') {
             return false;
         }
 
         if (! $this->isLocal) {
-            $this->error = 'Extensions can only be installed on local environment.';
+            $this->error = 'Packages can only be installed in a local environment.';
             return false;
         }
 
-        if ( $namespace === '' || $loader === '' ) {
-            $this->error = 'Invalid extension configuration.';
+        $themeConfigInitialised = $this->initThemeConfig( DIRECTORY_SEPARATOR );
+        if (! $themeConfigInitialised ) {
+            $this->error = 'Failed to initialise theme configuration.';
             return false;
         }
 
-        $featuresInitialised = $this->initFeatures( DIRECTORY_SEPARATOR );
-        if (! $featuresInitialised ) {
-            $this->error = 'Failed to initialise features configuration.';
+        if (in_array($serviceProvider, $this->packages)) {
+            $this->error = 'Package already installed.';
             return false;
         }
 
-        if ($allowOverrides) {
-            $stubsPath     = $this->frameworkPath . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR;
-            $stub          = $stubsPath . 'Extension.stub';
-            $overrideDef   = $this->themePath . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Extensions' . DIRECTORY_SEPARATOR . $loader . '.php';
-            $fqOverrideDef = $this->extensionsNamespace . '\\' . $loader;
-            $installed     = file_exists($overrideDef && in_array($fqOverrideDef, $this->extensions));
-
-            if ($installed) {
-                $this->error = 'Extension already installed.';
-                return false;
-            }
-
-            if (file_exists($stub) && ! file_exists($overrideDef)) {
-                $stubContent = file_get_contents($stub);
-                $replacements = [
-                    '{{namespace}}' => $this->extensionsNamespace,
-                    '{{extension}}' => $fqOverrideDef,
-                    '{{class}}'     => $loader,
-                ];
-
-                $rendered = str_replace(
-                    array_keys($replacements),
-                    array_values($replacements),
-                    $stubContent
-                );
-
-                if (! is_dir(dirname($overrideDef))) {
-                    mkdir(dirname($overrideDef), 0755, true);
-                }
-                file_put_contents($overrideDef, $rendered);
-
-                $this->extensions[] = $fqOverrideDef;
-                return $this->regenerateFeaturesConfig();
-            } else {
-                $this->error = 'Extension stub not found or override file already exists.';
-                return false;
-            }
-        } else {
-            $fqDef = $namespace . '\\' . $loader;
-            if (in_array($fqDef, $this->extensions)) {
-                $this->error = 'Extension already installed.';
-                return false;
-            }
-            $this->extensions[] = $fqDef;
-            return $this->regenerateFeaturesConfig();
-        }
+        $this->packages[] = $serviceProvider;
+        return $this->regenerateThemeConfig();
     }
 
     /**
@@ -381,52 +308,6 @@ class EnvironmentManager {
         }
 
         return true;
-    }
-
-    /**
-     * Adds a new feature to the environment's theme.
-     * 
-     * @param string $name The feature name.
-     * @return bool True on success, false on failure.
-     */
-    public function addFeature(string $name): bool {
-        if ($this->error !== '') {
-            return false;
-        }
-
-        if (! $this->isLocal) {
-            $this->error = 'Features can only be added on local environment.';
-            return false;
-        }
-
-        $featuresInitialised = $this->initFeatures( DIRECTORY_SEPARATOR );
-        if (! $featuresInitialised ) {
-            $this->error = 'Failed to initialise features configuration.';
-            return false;
-        }
-
-        $formattedName = Str::studly($name);
-        $fqFeature = $this->featuresNamespace . '\\' . $formattedName;
-        if (in_array($fqFeature, $this->features)) {
-            $this->error = 'Feature already added.';
-            return false;
-        }
-
-        $script = $this->scripts['create-feature'] ?? '';
-        if ($script === '') {
-            $this->error = 'Create feature script not found.';
-            return false;
-        }
-
-        $command = 'bash ' . escapeshellarg($script) . ' ' . escapeshellarg($formattedName) . ' ' . escapeshellarg($fqFeature);
-        passthru($command, $return_var);
-        if ($return_var !== 0) {
-            $this->error = 'Failed to create feature.';
-            return false;
-        } else {
-            $this->features[] = $fqFeature . '\\FeatureDefinition';
-            return $this->regenerateFeaturesConfig();
-        }
     }
 
     /**
@@ -842,57 +723,42 @@ class EnvironmentManager {
     }
 
     /**
-     * Initialises the features configuration
-     * from the theme's config/features.php file.
+     * Initialises the theme's configuration from the config/theme.php file.
      * 
      * @param string $separator The directory separator.
-     * @return bool True on success, false on failure.
+     * @return bool  True on success, false on failure.
      */
-    private function initFeatures(string $separator): bool {
-        $configPath = $this->themePath . $separator . 'config' . $separator . 'features.php';
+    private function initThemeConfig(string $separator): bool {
+        $configPath = $this->themePath . $separator . 'config' . $separator . 'theme.php';
         if (file_exists($configPath)) {
             $config = require $configPath;
-            $this->featuresConfig = $config;
             $this->themeClass = $config['theme_class'] ?? 'App\\Theme';
-            $this->featuresNamespace = $config['features_namespace'] ?? 'App\\Features';
-            $this->extensionsNamespace = $config['extensions_namespace'] ?? 'App\\Extensions';
-            $this->features = $config['features'] ?? [];
-            $this->extensions = $config['extensions'] ?? [];
+            $this->packages   = $config['packages'] ?? [];
             return true;
         } else {
-            $this->featuresConfig = [];
             $this->themeClass = '';
-            $this->featuresNamespace = '';
-            $this->extensionsNamespace = '';
-            $this->features = [];
-            $this->extensions = [];
+            $this->packages   = [];
             return false;
         }
     }
  
     /**
-     * Regenerates the features configuration file
-     * in the theme's config/features.php file.
+     * Regenerates the theme configuration file.
      * 
      * @return bool True on success, false on failure.
      */
-    private function regenerateFeaturesConfig(): bool {
+    private function regenerateThemeConfig(): bool {
         $stubsPath = $this->frameworkPath . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR;
-        $stub = $stubsPath . 'Features.stub';
+        $stub      = $stubsPath . 'Theme.stub';
 
         if (file_exists($stub)) {
-            $formatArray = function(array $config, array $array, string $type, int $indentLevel = 2): string {
+            $formatArray = function(array $array, int $indentLevel = 2): string {
                 $indent = str_repeat('    ', $indentLevel);
                 $lines = ['['];
 
-                $array = array_unique(array_merge(
-                    array_values($config[$type] ?? []),
-                    array_values($array)
-                ));
-
                 foreach ($array as $item) {
-                    $formattedValye = var_export($item, true);
-                    $lines[] = "{$indent}{$formattedValye},";
+                    $formattedValue = var_export($item, true);
+                    $lines[] = "{$indent}{$formattedValue},";
                 }
 
                 $lines[] = str_repeat('    ', $indentLevel - 1) . ']';
@@ -903,34 +769,28 @@ class EnvironmentManager {
             $rendered = str_replace(
                 [
                     '{{theme_class}}',
-                    '{{features_namespace}}',
-                    '{{extensions_namespace}}',
-                    '{{features}}',
-                    '{{extensions}}',
+                    '{{packages}}',
                 ],
                 [
                     var_export($this->themeClass, true),
-                    var_export($this->featuresNamespace, true),
-                    var_export($this->extensionsNamespace, true),
-                    $formatArray($this->featuresConfig, $this->features, 'features'),
-                    $formatArray($this->featuresConfig, $this->extensions, 'extensions'),
+                    $formatArray($this->packages),
                 ],
                 $stubContent
             );
 
-            $featuresConfigFilePath = $this->themePath . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'features.php';
-            if (! is_dir(dirname($featuresConfigFilePath))) {
-                mkdir(dirname($featuresConfigFilePath), 0755, true);
+            $themeConfigFilePath = $this->themePath . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'theme.php';
+            if (! is_dir(dirname($themeConfigFilePath))) {
+                mkdir(dirname($themeConfigFilePath), 0755, true);
             }
 
-            if (file_put_contents($featuresConfigFilePath, $rendered) !== false) {
+            if (file_put_contents($themeConfigFilePath, $rendered) !== false) {
                 return true;
             }
 
-            $this->error = 'Failed to write features configuration file.';
+            $this->error = 'Failed to write theme configuration file.';
             return false;
         } else {
-            $this->error = 'Features stub file not found.';
+            $this->error = 'Theme stub file not found.';
             return false;
         }
     }

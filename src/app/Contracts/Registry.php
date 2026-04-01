@@ -4,7 +4,7 @@ namespace MM\Meros\App\Contracts;
 
 use Illuminate\Support\Collection;
 
-interface FeatureRegistry {
+interface Registry {
     /**
      * Generic method to add an item to one of this object's collections.
      * Specific methods will be added for individual collections e.g. addPackage(), addSettingPage() etc.

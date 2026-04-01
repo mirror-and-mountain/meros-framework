@@ -3,8 +3,6 @@
 namespace MM\Meros\App\Features;
 
 use MM\Meros\App\Contracts\InstallablesRegistrar;
-use MM\Meros\App\Features\Abstracts\TableInstaller;
-use MM\Meros\App\Features\Abstracts\DataInstaller;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
@@ -14,6 +12,7 @@ use MM\Meros\App\Facades\Registry;
 use MM\Meros\App\Facades\Framework;
 
 use MM\Meros\App\Models\Migration;
+use MM\Meros\App\Support\Admin\Migration as Runner;
 
 class Installable extends Feature {
     /**
@@ -58,6 +57,13 @@ class Installable extends Feature {
      * @var boolean
      */
     public bool $isThemeInstallable;
+
+    /**
+     * The current batch ID if the item is in the process of being installed or uninstalled.
+     *
+     * @var string
+     */
+    public string $currentBatchId = '';
 
     /**
      * Indicates whether the item is installed.
@@ -159,10 +165,9 @@ class Installable extends Feature {
         }
 
         $runner = include $path;
-        $type   = $runner instanceof TableInstaller ? 'table' : ($runner instanceof DataInstaller ? 'data' : '');
 
-        if ($type === '') {
-            $this->error = "The file at '{$path}' does not return a valid Laravel Migration instance.";
+        if (! $runner instanceof Runner) {
+            $this->error = "The file at '{$path}' does not return a valid Migration instance.";
             return false;
         }
 
@@ -176,14 +181,9 @@ class Installable extends Feature {
             return false;
         }
 
-        if (!method_exists($runner, 'up') || !method_exists($runner, 'down')) {
-            $this->error = "The migration class in '{$path}' must have both 'up' and 'down' methods.";
-            return false;
-        }
-
         $config = [
             'handle'  => $handle,
-            'type'    => $type,
+            'type'    => 'migration',
             'subtype' => $subtype,
             'label'   => Str::title(str_replace('_', ' ', $withoutTimestamp)),
             'path'    => $path,
@@ -228,22 +228,10 @@ class Installable extends Feature {
             return false;
         }
 
+        $this->currentBatchId = $batchId === '' ? Str::ulid() : $batchId;
+
         try {
-            $this->runner->up();
-
-            $record = Migration::create([
-                'source'         => $this->source->handle,
-                'type'           => $this->type,
-                'subtype'        => $this->subtype,
-                'label'          => $this->label,
-                'handle'         => $this->handle,
-                'path_reference' => $this->path,
-                'batch_id'       => $batchId === '' ? Str::ulid() : $batchId
-            ]);
-
-            $this->installedTime = $record->created_at->format('d-m-Y H:i:s');
-            $this->isInstalled   = true;
-
+            $this->runner->up($this->handle);
         } catch (\Exception $e) {
             $this->installationError = "An error occurred while installing '{$this->handle}': " . $e->getMessage();
             return false;
@@ -276,7 +264,7 @@ class Installable extends Feature {
         }
 
         try {
-            $this->runner->down();
+            $this->runner->down($this->handle);
 
             Migration::where('handle', $this->handle)->delete();
         } catch (\Exception $e) {

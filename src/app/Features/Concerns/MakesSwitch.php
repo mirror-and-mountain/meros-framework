@@ -147,7 +147,7 @@ trait MakesSwitch {
         $isByPackage = $this->source instanceof \MM\Meros\App\Package;
 
         if ($isByPackage) {
-            $featureURL  = admin_url('options-general.php?page=meros_features&tab=packages#' . $handle . '_enable_label');
+            $featureURL  = admin_url('options-general.php?page=meros_features&tab=packages#' . $this->source->handle . '_enable_label');
             $html .= " | <a style=\"font-weight:400;\" href=\"{$featureURL}\">View Feature</a></label>";
         } else {
             $html .= '</label>';

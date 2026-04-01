@@ -2,14 +2,15 @@
 
 namespace MM\Meros\App;
 
-use MM\Meros\App\Contracts\FeatureRegistry as Contract;
+use MM\Meros\App\Contracts\Registry as Contract;
 use MM\Meros\App\Contracts\FeatureDefinition;
 
 use Illuminate\Support\Collection;
 
-class FeatureRegistry implements Contract {
+class Registry implements Contract {
     public Collection $packages;
     public Collection $installables;
+    public Collection $integrations;
 
     public Collection $settingsPages;
     public Collection $settingsSections;
@@ -23,6 +24,7 @@ class FeatureRegistry implements Contract {
     public function __construct() {
         $this->packages         = collect([]);
         $this->installables     = collect([]);
+        $this->integrations     = collect([]);
 
         $this->settingsPages    = collect([]);
         $this->settingsSections = collect([]);

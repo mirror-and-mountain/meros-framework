@@ -66,13 +66,20 @@ class Composer {
                 continue;
             }
 
-            // Install extension
-            elseif (isset($extra['meros'], $extra['meros']['loader'], $extra['meros']['namespace'])) {
-                $environmentManager->installExtension(
-                    $extra['meros']['namespace'], 
-                    $extra['meros']['loader'], 
-                    $extra['meros']['allow_overrides'] ?? false
+            // Install package
+            elseif (isset($extra['meros'], $extra['meros']['provider'])) {
+                $result = $environmentManager->installPackage(
+                    $extra['meros']['provider']
                 );
+
+                if ($result !== true) {
+                    $error = $environmentManager->getError();
+                    if ($error === 'Package already installed.') {
+                        $io->write("<info>Package {$packageName} is already installed. Skipping.</info>");
+                    } else {
+                        $io->write("<error>Failed to install package {$packageName}: {$error}</error>");
+                    }
+                }
             }
 
             // Update livewire assets

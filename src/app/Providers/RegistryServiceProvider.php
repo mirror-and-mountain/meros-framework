@@ -3,14 +3,13 @@
 namespace MM\Meros\App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-
-use MM\Meros\App\FeatureRegistry;
+use MM\Meros\App\Registry;
 
 class RegistryServiceProvider extends ServiceProvider {
     
     final public function register(): void {
-        $this->app->singleton(FeatureRegistry::class, function () {
-            return new FeatureRegistry();
+        $this->app->singleton('meros.registry', function () {
+            return new Registry();
         });
     }   
 

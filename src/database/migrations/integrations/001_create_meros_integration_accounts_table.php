@@ -1,0 +1,27 @@
+<?php
+
+namespace MM\Meros\Database\Migrations;
+
+use Illuminate\Database\Schema\Blueprint;
+
+use MM\Meros\App\Support\Admin\Migration;
+use MM\Meros\App\Support\Admin\SchemaManager;
+
+return new class extends Migration {
+
+    public function up(string $installable): void {
+        SchemaManager::create('meros_integration_accounts', $installable, function (Blueprint $table) {
+            $table->id();
+            $table->string('handle'); // 'salesforce', 'stripe'
+            $table->string('label');
+
+            $table->json('credentials_json'); // encrypted
+            $table->timestamps();
+        });
+    }
+
+
+    public function down(string $installable): void {
+        SchemaManager::dropIfExists('meros_integration_accounts', $installable);
+    }
+};

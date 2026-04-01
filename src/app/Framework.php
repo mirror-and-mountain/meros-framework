@@ -5,6 +5,7 @@ namespace MM\Meros\App;
 use Illuminate\Support\Facades\Schema;
 
 use MM\Meros\App\Models\Migration;
+
 use MM\Meros\App\Facades\Registry;
 use MM\Meros\App\Facades\Context;
 use MM\Meros\App\Facades\Theme;
@@ -65,7 +66,7 @@ final class Framework extends FeatureProvider {
     private function isCoreInstalled(bool $tryToInstall): bool {
         $installed = false;
 
-        if (! Schema::hasTable('meros_migrations')) {
+        if (! Schema::hasTable('meros_migrations') || ! Migration::where('handle', '001_create_meros_migrations_table')->exists()) {
             $installed = $tryToInstall ? $this->installFramework() : false;
         } else {
             $installed = true;
@@ -91,17 +92,17 @@ final class Framework extends FeatureProvider {
      */
     private function isIntegrationsInstalled(bool $tryToInstall): bool {
         $tables = [
-            'meros_integrations',
-            'meros_integration_endpoints',
-            'meros_integration_connections',
-            'meros_integration_credentials',
-            'meros_integration_tokens'
+            'meros_integration_accounts',
+            'meros_integration_connections'
         ];
 
-        $installed = false;
+        $installed = true;
 
         foreach ($tables as $table) {
-            if (! Schema::hasTable($table)) {
+            if (! Schema::hasTable($table) || 
+                ! Migration::where('related_table', $table)->exists()
+            ) {
+                $installed = false;
                 break;
             }
         }
@@ -109,6 +110,11 @@ final class Framework extends FeatureProvider {
         return $installed ? true : ($tryToInstall ? $this->installIntegrations() : false);
     }
 
+    /**
+     * Installs integration tables for the integrations service.
+     *
+     * @return boolean
+     */
     private function installIntegrations(): bool {
         return $this->install() === true;
     }
@@ -165,6 +171,11 @@ final class Framework extends FeatureProvider {
         ]);
     }
 
+    /**
+     * Handles installing, updating and uninstalling packages and theme installables.
+     *
+     * @return void
+     */
     public function handleInstaller(): void {
         $action = sanitize_key($_POST['action'] ?? '');
         $item   = sanitize_key($_POST['installable'] ?? '');

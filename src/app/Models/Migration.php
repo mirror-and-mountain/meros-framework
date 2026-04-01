@@ -14,7 +14,8 @@ class Migration extends Model {
         'subtype',
         'label',
         'handle',
-        'path_reference',
+        'related_table',
+        'path',
         'batch_id'
     ];
 }
