@@ -42,7 +42,7 @@ class Composer {
         self::initialise($composer, $io);
         $environmentManager = EnvironmentManager::get('local_dev', self::$projectRoot);
 
-        $runningInMeros = getenv('MEROS_ENVIRONMENT') === 'true';
+        $runningInMeros     = getenv('MEROS_ENVIRONMENT') === 'true';
         $wordpressInstalled =
             is_dir(self::$wordpressRoot) &&
             is_file(self::$wordpressRoot . DIRECTORY_SEPARATOR . 'wp-config.php');
@@ -55,7 +55,7 @@ class Composer {
         // Handle package installations
         foreach ($composer->getRepositoryManager()->getLocalRepository()->getPackages() as $package) {
             $packageName = $package->getName();
-            $extra = $package->getExtra();
+            $extra       = $package->getExtra();
             $installPath = $installationManager->getInstallPath($package);
 
             // Resolve the real path
@@ -68,6 +68,8 @@ class Composer {
 
             // Install package
             elseif (isset($extra['meros'], $extra['meros']['provider'])) {
+                $io->write("<info>Installing package {$packageName} from provider {$extra['meros']['provider']}...</info>");
+
                 $result = $environmentManager->installPackage(
                     $extra['meros']['provider']
                 );
@@ -79,6 +81,8 @@ class Composer {
                     } else {
                         $io->write("<error>Failed to install package {$packageName}: {$error}</error>");
                     }
+                } else {
+                    $io->write("<info>Package {$packageName} installed successfully.</info>");
                 }
             }
 

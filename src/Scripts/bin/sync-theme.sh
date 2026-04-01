@@ -27,9 +27,6 @@ SOURCE_SSH_HOST="${11:-""}"
 SOURCE_SSH_PORT="${12:-""}"
 SOURCE_SSH_KEY="${13:-""}"
 
-MAKE_DIR="${14:-"false"}"
-ACTIVATE="${15:-"false"}"
-
 # ---------------------------------------------------------------------
 # Sync Operation - From Local to Remote
 # ---------------------------------------------------------------------
@@ -37,17 +34,15 @@ if [ $SOURCE_ENV = 'local_dev' ]; then
     # Ensure theme directory exists on destination
     ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
         "[ -d '${DEST_PATH}/wp-content/themes/${THEME_SLUG}' ] || { \
-            if [ '${MAKE_DIR}' = 'true' ]; then \
-                echo 'Destination theme directory does not exist. Creating...'; \
-                mkdir -p '${DEST_PATH}/wp-content/themes/${THEME_SLUG}' || {
-                    echo 'Error: Failed to create destination theme directory.'; \
-                    exit 1; \
-                }; \
-            else \
-                echo 'Error: Destination theme directory does not exist.'; \
+            echo 'Destination theme directory does not exist. Creating...'; \
+            mkdir -p '${DEST_PATH}/wp-content/themes/${THEME_SLUG}' || { \
+                echo 'Error: Failed to create destination theme directory.'; \
                 exit 1; \
-            fi \
-        }"
+            }; \
+        }" || { \
+        echo "Error: Failed to ensure destination theme directory on ${DEST_ENV}"; \
+        exit 1; \
+    }
 
     # Clear laravel caches
     wp acorn view:clear --path="${SOURCE_PATH}" --quiet || true
@@ -64,34 +59,17 @@ if [ $SOURCE_ENV = 'local_dev' ]; then
             --exclude='/.DS_Store' \
             --exclude='/.gitattributes' \
             --exclude='/.gitignore' \
-            --exclude='/composer.json' \
-            --exclude='/composer.lock' \
             --exclude='/package.json' \
             --exclude='/package-lock.json' \
             --exclude='/webpack.assets.config.js' \
-            --exclude='/storage/logs/laravel.log' \
             --exclude='/config/environments.php' \
-            --exclude='/app/Features/**/assets/src/**' \
-            --exclude='/app/Features/**/blocks/src/**' \
-            --exclude='**/.git/**' \
-            --exclude='**/.vscode/**' \
-            --exclude='**/node_modules/**' \
-            --exclude='**/.DS_Store' \
-            --exclude='**/.gitattributes' \
-            --exclude='**/.gitignore' \
-            --exclude='**/composer.json' \
-            --exclude='**/composer.lock' \
-            --exclude='**/package.json' \
-            --exclude='**/package-lock.json' \
-            --exclude='**/webpack.assets.config.js' \
+            --exclude='/storage/logs/laravel.log' \
             --delete \
             --delete-excluded
 
-    if [ "${ACTIVATE}" = "true" ]; then
-        echo "Activating theme '${THEME_SLUG}' on destination..."
-        ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
-            "wp theme activate '${THEME_SLUG}' --url='${DEST_URL}' --path='${DEST_PATH}' --quiet"
-    fi
+    echo "Activating theme '${THEME_SLUG}' on destination..."
+    ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
+        "wp theme activate '${THEME_SLUG}' --url='${DEST_URL}' --path='${DEST_PATH}' --quiet"
     
 # ---------------------------------------------------------------------
 # Sync Operation - From Remote to Remote (Staged)
@@ -123,9 +101,7 @@ else
         "${DEST_SSH_HOST}:${DEST_PATH}/wp-content/themes/${THEME_SLUG}/" \
         --delete
 
-    if [ "${ACTIVATE}" = "true" ]; then
-        echo "Activating theme '${THEME_SLUG}' on destination..."
-        ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
-            "wp theme activate '${THEME_SLUG}' --url='${DEST_URL}' --path='${DEST_PATH}' --quiet"
-    fi
+    echo "Activating theme '${THEME_SLUG}' on destination..."
+    ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
+        "wp theme activate '${THEME_SLUG}' --url='${DEST_URL}' --path='${DEST_PATH}' --quiet"
 fi

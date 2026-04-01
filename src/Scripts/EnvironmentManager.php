@@ -3,7 +3,6 @@
 namespace MM\Meros\Scripts;
 
 use Dotenv\Dotenv;
-use Illuminate\Support\Str;
 
 class EnvironmentManager {
     /** 
@@ -315,11 +314,10 @@ class EnvironmentManager {
      * destination environment.
      * 
      * @param string $destName The destination environment name.
-     * @param bool $makeDir Whether to create the destination directory if it doesn't exist.
-     * @param bool $activate Whether to activate the theme on the destination environment.
-     * @return bool True on success, false on failure.
+
+     * @return bool  True on success, false on failure.
      */
-    public function syncTheme(string $destName, bool $makeDir = true, bool $activate = true): bool {
+    public function syncTheme(string $destName): bool {
         if ($this->error !== '') {
             return false;
         }
@@ -355,16 +353,9 @@ class EnvironmentManager {
         $command .= $dest->getSSHCommand() . ' ';
         $command .= escapeshellarg($this->name) . ' ';
         $command .= escapeshellarg($this->config['url']) . ' ';
-        $command .= $this->getSSHCommand() . ' ';
-        $command .= escapeshellarg($makeDir ? 'true' : 'false') . ' ';
-        $command .= escapeshellarg($activate ? 'true' : 'false');
+        $command .= $this->getSSHCommand();
 
         passthru($command, $return_var);
-
-        if ($return_var === 2) {
-            $this->error = 'Sync theme operation cancelled by user.';
-            return false;
-        }
 
         if ($return_var !== 0) {
             $this->error = 'Failed to sync theme from ' . $this->name . ' to ' . $destName . '.';
@@ -374,12 +365,24 @@ class EnvironmentManager {
         return true;
     }
 
-    public function syncTables(
+    /**
+     * Syncs the database from this environment to the specified
+     * destination environment.
+     * 
+     * @param string $destName The destination environment name.
+     * @param array  $tables The tables to sync.
+     * @param array  $options Additional options for syncing.
+     * @param array  $maintainOptions Options to maintain on the destination environment.
+     * @param bool   $dropTables Whether to drop tables on the destination before syncing.
+     * @param bool   $searchReplace Whether to perform search and replace on URLs in the database.
+     * 
+     * @return bool  True on success, false on failure.
+     */
+    public function syncDatabase(
         string $destName, 
-        array  $tables = [], 
-        array  $excludedTables = [],
-        bool   $skipGlobalExcludes = false,
-        bool   $themeOptions = false,
+        array  $tables, 
+        array  $options = [],
+        array  $maintainOptions = [],
         bool   $dropTables = false,
         bool   $searchReplace = true
     ): bool {
@@ -401,35 +404,14 @@ class EnvironmentManager {
             return false;
         }
 
-        if (! $skipGlobalExcludes) {
-            $excludedTables = array_merge($excludedTables, [
-                'users',
-                'usermeta',
-                'options',
-                'comments',
-                'commentmeta'
-            ]);
-        }
-
         $prefixedTables = [];
-        if ($tables !== ['all']) {
-            foreach ($tables as $table) {
-                if (! in_array($table, $excludedTables)) {
-                    $prefixedTables[] = $this->config['db']['prefix'] . $table;
-                }
-            }
-        } else {
-            $prefixedTables = 'all';
+        foreach ($tables as $table) {
+            $prefixedTables[] = $this->config['db']['prefix'] . $table;
         }
 
-        $prefixedExcludedTables = [];
-        foreach ($excludedTables as $table) {
-            $prefixedExcludedTables[] = $this->config['db']['prefix'] . $table;
-        }
-
-        $script = $this->scripts['sync-tables'] ?? '';
+        $script = $this->scripts['sync-db'] ?? '';
         if ($script === '') {
-            $this->error = 'Sync tables script not found.';
+            $this->error = 'Sync database script not found.';
             return false;
         }
 
@@ -442,28 +424,127 @@ class EnvironmentManager {
         $command .= $this->getSSHCommand() . ' ';
         $command .= escapeshellarg($this->config['db']['prefix']) . ' ';
         $command .= escapeshellarg($destConfig['db']['prefix']) . ' '; 
-        $command .= escapeshellarg(is_array($prefixedTables) ? implode(',', $prefixedTables) : $prefixedTables) . ' ';
-        $command .= escapeshellarg(implode(',', $prefixedExcludedTables)) . ' ';
+        $command .= escapeshellarg($prefixedTables !== [] ? implode(',', $prefixedTables) : '') . ' ';
+        $command .= escapeshellarg($options !== [] ? implode(',', $options) : '') . ' ';
+        $command .= escapeshellarg($maintainOptions !== [] ? json_encode($maintainOptions) : '') . ' ';
         $command .= escapeshellarg($dropTables ? 'true' : 'false') . ' ';
-        
-        if ($themeOptions) {
-            $theme = app()->make('meros.theme_manager');
-            $options = $theme->getRegisteredSettingKeys();
-            $command .= escapeshellarg(implode(',', $options));
-        } else {
-            $command .= escapeshellarg('');
-        }
-
-        $command .= ' ' . escapeshellarg($searchReplace ? 'true' : 'false');
+        $command .= escapeshellarg($searchReplace ? 'true' : 'false');
 
         passthru($command, $return_var);
-        if ($return_var === 2) {
-            $this->error = 'Sync tables operation cancelled by user.';
-            return false;
-        }
 
         if ($return_var !== 0) {
             $this->error = 'Failed to sync tables from ' . $this->name . ' to ' . $destName . '.';
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Syncs the plugins from this environment to the specified
+     * destination environment.
+     * 
+     * @param string        $destName The destination environment name.
+     * @param array|string  $plugins The plugins to sync. If empty or 'all', all plugins will be synced.
+     * @param bool          $activate Whether to activate the plugins on the destination environment after syncing.
+     * 
+     * @return bool True on success, false on failure.
+     */
+    public function syncPlugins(string $destName, array|string $plugins, bool $activate = true): bool {
+        if ($this->error !== '') {
+            return false;
+        }
+
+        $destName = $destName === 'local' ? 'local_dev' : $destName;
+
+        if ($destName === $this->name) {
+            $this->error = 'Source and destination environments cannot be the same.';
+            return false;
+        }
+
+        if (! is_array($plugins) && $plugins !== 'all') {
+            $this->error = 'Plugins must be an array of plugin slugs or "all".';
+            return false;
+        }
+
+        $dest = EnvironmentManager::get($destName, $this->themePath);
+        $destConfig = $dest->getConfig();
+        if (is_string($destConfig)) {
+            $this->error = $destConfig;
+            return false;
+        }
+
+        $script = $this->scripts['sync-plugins'] ?? '';
+        if ($script === '') {
+            $this->error = 'Sync plugins script not found.';
+            return false;
+        }
+
+        $command = 'bash ' . escapeshellarg($script) . ' ' ;
+        $command .= escapeshellarg($destName) . ' ';
+        $command .= escapeshellarg($destConfig['url']) . ' ';
+        $command .= $dest->getSSHCommand() . ' ';
+        $command .= escapeshellarg(is_array($plugins) ? implode(',', $plugins) : 'all') . ' ';
+        $command .= escapeshellarg($this->name) . ' ';
+        $command .= escapeshellarg($this->config['url']) . ' ';
+        $command .= $this->getSSHCommand() . ' ';
+        $command .= escapeshellarg($activate ? 'true' : 'false');
+
+        passthru($command, $return_var);
+
+        if ($return_var !== 0) {
+            $this->error = 'Failed to sync plugins from ' . $this->name . ' to ' . $destName . '.';
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Syncs the uploads directory from this environment to the specified
+     * destination environment.
+     * 
+     * @param string $destName The destination environment name.
+     * 
+     * @return bool True on success, false on failure.
+     */
+    public function syncUploads(string $destName): bool {
+        if ($this->error !== '') {
+            return false;
+        }
+
+        $destName = $destName === 'local' ? 'local_dev' : $destName;
+
+        if ($destName === $this->name) {
+            $this->error = 'Source and destination environments cannot be the same.';
+            return false;
+        }
+
+        $dest = EnvironmentManager::get($destName, $this->themePath);
+        $destConfig = $dest->getConfig();
+        if (is_string($destConfig)) {
+            $this->error = $destConfig;
+            return false;
+        }
+
+        $script = $this->scripts['sync-uploads'] ?? '';
+        if ($script === '') {
+            $this->error = 'Sync uploads script not found.';
+            return false;
+        }
+
+        $command = 'bash ' . escapeshellarg($script) . ' ' ;
+        $command .= escapeshellarg($destName) . ' ';
+        $command .= escapeshellarg($destConfig['url']) . ' ';
+        $command .= $dest->getSSHCommand() . ' ';
+        $command .= escapeshellarg($this->name) . ' ';
+        $command .= escapeshellarg($this->config['url']) . ' ';
+        $command .= $this->getSSHCommand();
+
+        passthru($command, $return_var);
+
+        if ($return_var !== 0) {
+            $this->error = 'Failed to sync uploads from ' . $this->name . ' to ' . $destName . '.';
             return false;
         }
 
@@ -523,7 +604,7 @@ class EnvironmentManager {
 
         if (is_dir($frameworkPath)) {
             $this->frameworkPath = realpath($frameworkPath);
-            $this->scriptsPath = $this->frameworkPath . $separator . 'Scripts' . $separator . 'sh';
+            $this->scriptsPath = $this->frameworkPath . $separator . 'scripts' . $separator . 'bin';
             return true;
         } else {
             return 'Meros framework path not found.';
@@ -560,7 +641,7 @@ class EnvironmentManager {
      * @return string|bool True on success, error message on failure.
      */
     private function initLocalConfig(string $separator): string|bool {
-        $containerEnv = $this->devContainerPath . $separator . '.env';
+        $containerEnv  = $this->devContainerPath . $separator . '.env';
         $wordpressPath = realpath( dirname( $this->themePath, 3 ) );
 
         if (! is_dir($wordpressPath) || ! is_file($containerEnv)) {
@@ -580,8 +661,8 @@ class EnvironmentManager {
 
         $this->config = [
             'site_title' => $_ENV['SITE_TITLE'] ?? 'Meros WP',
-            'url'  => $url,
-            'path' => $wordpressPath,
+            'url'        => $url,
+            'path'       => $wordpressPath,
             'admin'  => [
                 'user'     => $_ENV['ADMIN_USER'] ?? 'admin',
                 'password' => $_ENV['ADMIN_PASSWORD'] ?? 'password',
@@ -610,9 +691,10 @@ class EnvironmentManager {
      */
     private function initRemoteConfig(string $separator): string|bool {
         $configPath = $this->themePath . $separator . 'config' . $separator . 'environments.php';
+
         if (file_exists($configPath)) {
             $environments = require $configPath;
-            $config = $environments['remote_environments'][$this->name] ?? [];
+            $config       = $environments['remote_environments'][$this->name] ?? [];
         }
 
         if ($config !== []) {
@@ -710,7 +792,7 @@ class EnvironmentManager {
      * @return void
      */
     private function initScripts(string $separator): void {
-        $scripts = ['create-feature', 'connect-env', 'clone-content', 'sync-theme', 'sync-tables'];
+        $scripts = ['connect-env', 'sync-db', 'sync-plugins', 'sync-uploads', 'sync-theme'];
         foreach ($scripts as $script) {
             $path = $this->scriptsPath . $separator . $script . '.sh';
             if (file_exists($path)) {
@@ -749,7 +831,7 @@ class EnvironmentManager {
      */
     private function regenerateThemeConfig(): bool {
         $stubsPath = $this->frameworkPath . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR;
-        $stub      = $stubsPath . 'Theme.stub';
+        $stub      = $stubsPath . 'config' . DIRECTORY_SEPARATOR . 'theme.php.stub';
 
         if (file_exists($stub)) {
             $formatArray = function(array $array, int $indentLevel = 2): string {

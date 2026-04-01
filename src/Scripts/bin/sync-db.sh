@@ -29,9 +29,9 @@ SOURCE_SSH_KEY="${12:-""}"
 SOURCE_PREFIX="${13:-""}"
 DEST_PREFIX="${14:-""}"
 TABLES="${15:-""}"
-EXCLUDE_TABLES="${16:-""}"
-ADD_DROP_TABLE="${17:-"false"}"
-THEME_OPTIONS="${18:-""}"
+OPTIONS="${16:-""}"
+MAINTAIN_OPTIONS="${17:-""}"
+ADD_DROP_TABLE="${18:-"false"}"
 SEARCH_REPLACE="${19:-"true"}"
 
 # ---------------------------------------------------------------------
@@ -41,13 +41,6 @@ TMP_DIR=$(mktemp -d)
 trap cleanup EXIT
 trap on_error ERR
 TMP_DB="$TMP_DIR/source-db.sql"
-
-# Prepare exclude tables parameter
-if [ -n "$EXCLUDE_TABLES" ]; then
-    EXCLUDE_TABLES_PARAM="--exclude_tables=$EXCLUDE_TABLES"
-else 
-    EXCLUDE_TABLES_PARAM=""
-fi
 
 # Prepare drop table flag
 if [ "$ADD_DROP_TABLE" = "true" ]; then
@@ -62,40 +55,22 @@ fi
 if [ "$SOURCE_ENV" = "local_dev" ]; then    
     # Export local database
     echo "Exporting source database from local host..."
-    if [ "$TABLES" = "all" ]; then
-        wp db export "$TMP_DB" \
-            --path="$SOURCE_PATH" \
-            --skip-themes \
-            $EXCLUDE_TABLES_PARAM \
-            $ADD_DROP_TABLE_FLAG
-    else
-        wp db export "$TMP_DB" \
-            --path="$SOURCE_PATH" \
-            --skip-themes \
-            --tables="$TABLES" \
-            $ADD_DROP_TABLE_FLAG
-    fi
+    wp db export "$TMP_DB" \
+    --path="$SOURCE_PATH" \
+    --skip-themes \
+    --tables="$TABLES" \
+    $ADD_DROP_TABLE_FLAG
 else
     # Export remote database
     echo "Exporting source database from remote host..."
-    if [ "$TABLES" = "all" ]; then
-        ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" -o StrictHostKeyChecking=no \
-        "wp db export - \
-            --path='${SOURCE_PATH}' \
-            --skip-themes \
-            --defaults=true \
-            $EXCLUDE_TABLES_PARAM \
-            $ADD_DROP_TABLE_FLAG" \
-        > "$TMP_DB"
-    else
-        ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" -o StrictHostKeyChecking=no \
-        "wp db export - \
-            --path='${SOURCE_PATH}' \
-            --skip-themes \
-            --tables='${TABLES}' \
-            $ADD_DROP_TABLE_FLAG" \
-        > "$TMP_DB"
-    fi
+    ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" -o StrictHostKeyChecking=no \
+    "wp db export - \
+        --path='${SOURCE_PATH}' \
+        --skip-themes \
+        --defaults=true \
+        --tables="$TABLES" \
+        $ADD_DROP_TABLE_FLAG" \
+    > "$TMP_DB"
 fi
 
 # Configure table prefix replacement if needed
@@ -127,12 +102,12 @@ else
 fi
 
 # ---------------------------------------------------------------------
-# Update theme options
+# Update options if specified
 # ---------------------------------------------------------------------
-if [ -n "$THEME_OPTIONS" ]; then
+if [ -n "$OPTIONS" ]; then
     echo "Updating theme options..."
     if [ "$DEST_ENV" = "local_dev" ]; then
-        IFS=',' read -ra OPTIONS <<< "$THEME_OPTIONS"
+        IFS=',' read -ra OPTIONS <<< "$OPTIONS"
         for opt in "${OPTIONS[@]}"; do
             VALUE=$(ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" -o StrictHostKeyChecking=no \
                 "wp option get '$opt' --path='${SOURCE_PATH}'" 2>/dev/null || true)
@@ -142,7 +117,7 @@ if [ -n "$THEME_OPTIONS" ]; then
             fi
         done
     elif [ "$SOURCE_ENV" = "local_dev" ]; then
-        IFS=',' read -ra OPTIONS <<< "$THEME_OPTIONS"
+        IFS=',' read -ra OPTIONS <<< "$OPTIONS"
         for opt in "${OPTIONS[@]}"; do
             VALUE=$(wp option get "$opt" --path="$SOURCE_PATH" 2>/dev/null || true)
 
@@ -152,7 +127,7 @@ if [ -n "$THEME_OPTIONS" ]; then
             fi
         done
     else
-        IFS=',' read -ra OPTIONS <<< "$THEME_OPTIONS"
+        IFS=',' read -ra OPTIONS <<< "$OPTIONS"
         for opt in "${OPTIONS[@]}"; do
             VALUE=$(ssh -i "${SOURCE_SSH_KEY}" -p "${SOURCE_SSH_PORT}" "${SOURCE_SSH_HOST}" -o StrictHostKeyChecking=no \
                 "wp option get '$opt' --path='${SOURCE_PATH}'" 2>/dev/null || true)
@@ -161,6 +136,26 @@ if [ -n "$THEME_OPTIONS" ]; then
                 ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
                     "wp option update '$opt' '$VALUE' --path='${DEST_PATH}'"
             fi
+        done
+    fi
+fi
+
+# ---------------------------------------------------------------------
+# Maintain options on the destination if specified
+# ---------------------------------------------------------------------
+if [ -n "$MAINTAIN_OPTIONS" ]; then
+    echo "Maintaining specified options on destination..."
+    
+    if [ "$DEST_ENV" = "local_dev" ]; then
+        echo "$MAINTAIN_OPTIONS" | jq -r 'to_entries[] | "\(.key)|\(.value)"' | while IFS='|' read -r opt value; do
+            echo "Maintaining option '$opt' with value '$value' on local destination"
+            wp option update "$opt" "$value" --path="$DEST_PATH"
+        done
+    else
+        echo "$MAINTAIN_OPTIONS" | jq -r 'to_entries[] | "\(.key)|\(.value)"' | while IFS='|' read -r opt value; do
+            echo "Maintaining option '$opt' with value '$value' on remote destination"
+            ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
+                "wp option update '$opt' '$value' --path='${DEST_PATH}'"
         done
     fi
 fi
