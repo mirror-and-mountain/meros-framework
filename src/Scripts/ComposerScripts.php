@@ -2,17 +2,17 @@
 
 namespace MM\Meros\Scripts;
 
-use Composer\Composer as ComposerInstance;
+use Composer\Composer;
 use Composer\IO\IOInterface;
 use Composer\Script\Event;
 
-class Composer {
+class ComposerScripts {
     private static string $wordpressRoot = '';
     private static string $projectRoot = '';
     private static string $vendorRoot = '';
     private static string $frameworkRoot = '';
 
-    private static function initialise(ComposerInstance $composer, IOInterface $io): void {
+    private static function initialise(Composer $composer, IOInterface $io): void {
         self::$vendorRoot = realpath($composer->getConfig()->get('vendor-dir'));
         self::$projectRoot = realpath(dirname(self::$vendorRoot));
         self::$frameworkRoot = realpath(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'src');

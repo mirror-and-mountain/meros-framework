@@ -17,8 +17,13 @@
     },
     "autoload": {
         "psr-4": {
-            "MM\\Meros\\": "src/"
-        }
+            "MM\\Meros\\": "src/",
+            "MM\\Meros\\App\\": "src/app/",
+            "MM\\Meros\\Scripts\\": "src/scripts/"
+        },
+        "files": [
+            "src/scripts/ComposerScripts.php"
+        ]
     },
     "minimum-stability": "stable",
     "prefer-stable": true
