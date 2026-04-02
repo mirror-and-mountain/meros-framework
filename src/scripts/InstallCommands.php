@@ -81,6 +81,12 @@ class InstallCommands {
      * @param  array  $assoc_args  Associative arguments.
      */
     public function package($args, $assoc_args) {
+        // Check user is set
+        if (!current_user_can('manage_options')) {
+            \WP_CLI::error("You must be logged in as a user with the 'manage_options' capability to run this command. Remember to include the --user argument when running the command, e.g. --user=admin");
+            return;
+        }
+        
         // Parse arguments
         $packageHandle     = $args[0] ?? null;
         $installableHandle = $args[1] ?? null;
