@@ -66,6 +66,9 @@ if [ $SOURCE_ENV = 'local_dev' ]; then
             --exclude='/webpack.assets.config.js' \
             --exclude='/config/environments.php' \
             --exclude='/storage/logs/laravel.log' \
+            --exclude='/vendor/mirror-and-mountain/meros-framework/src/scripts/EnvironmentCommands.php' \
+            --exclude='/vendor/mirror-and-mountain/meros-framework/src/scripts/EnvironmentManager.php' \
+            --exclude='/vendor/mirror-and-mountain/meros-framework/src/scripts/bin/' \
             --delete \
             --delete-excluded
 

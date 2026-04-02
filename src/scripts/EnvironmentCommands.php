@@ -141,14 +141,14 @@ class EnvironmentCommands {
         
         \WP_CLI::line('Tables to sync: ' . (empty($tablesToSync) ? 'None' : implode(', ', $tablesToSync)));
         \WP_CLI::line('Plugins to sync: ' . ($syncPlugins === true ? ($pluginsToSync === 'all' ? 'All' : implode(', ', $pluginsToSync)) : 'None'));
-        \WP_CLI::line('Uploads to sync: ' . ($syncUploads ? 'Yes' : 'No'));
+        \WP_CLI::line('Sync Uploads: ' . ($syncUploads ? 'Yes' : 'No'));
         \WP_CLI::line('Options to sync: ' . (empty($optionsToSync) ? 'None' : implode(', ', $optionsToSync)));
         \WP_CLI::line('Options to maintain on destination: ' . (empty($optionsToMaintain) ? 'None' : implode(', ', array_keys($optionsToMaintain))));
         \WP_CLI::line('Add DROP TABLE statements: ' . ($addDropTable ? 'Yes' : 'No'));
         \WP_CLI::line('Perform search and replace: ' . ($searchReplace ? 'Yes' : 'No'));
         \WP_CLI::line('Activate plugins after sync: ' . ($activatePlugins ? 'Yes' : 'No'));
-        
-        \WP_CLI::line('It is highly recommended to back up your theme files and database before proceeding. Note that this operation will also synchronise the theme files from the source environment to the destination environment, which may result in changes to the destination environment\'s theme. If you have made customisations to the destination environment\'s theme, please ensure you have a backup before proceeding.');
+        \WP_CLI::line(' ');
+        \WP_CLI::line('It is highly recommended to back up your theme files and database on the destination environment before proceeding. This action cannot be undone.');
         
         \WP_CLI::confirm('Are you sure you want to proceed?');
 
