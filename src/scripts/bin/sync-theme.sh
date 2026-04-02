@@ -66,6 +66,7 @@ if [ $SOURCE_ENV = 'local_dev' ]; then
             --exclude='/webpack.assets.config.js' \
             --exclude='/config/environments.php' \
             --exclude='/storage/logs/laravel.log' \
+            --exclude='/vendor/mirror-and-mountain/.DS_Store' \
             --exclude='/vendor/mirror-and-mountain/**/.DS_Store' \
             --exclude='/vendor/mirror-and-mountain/**/.git/' \
             --exclude='/vendor/mirror-and-mountain/**/.gitattributes' \
