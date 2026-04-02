@@ -85,12 +85,12 @@ class EnvironmentCommands {
 
         // Validate environments
         $isLocal = $from === 'local' || $to === 'local';
-        if (! isset($environmentsConfig['remote_environments'][$from]) && ! $isLocal) {
+        if (! isset($environmentsConfig['remote_environments'][$from]) && $from !== 'local') {
             \WP_CLI::error(sprintf('Source environment "%s" is not defined in the configuration.', $from));
             return;
         }
 
-        if (! isset($environmentsConfig['remote_environments'][$to]) && ! $isLocal) {
+        if (! isset($environmentsConfig['remote_environments'][$to]) && $to !== 'local') {
             \WP_CLI::error(sprintf('Destination environment "%s" is not defined in the configuration.', $to));
             return;
         }
@@ -155,14 +155,16 @@ class EnvironmentCommands {
         // Get Environment Manager
         $manager = EnvironmentManager::get($from);
 
-        // Sync theme
-        $themeResult = $manager->syncTheme($to);
-        if ($themeResult === false) {
-            $error = $manager->getError();
-            \WP_CLI::error($error);
-            return;
-        } else {
-            \WP_CLI::success(sprintf('Theme sync from "%s" to "%s" completed successfully.', $from, $to));
+        // Sync theme - not to local environment
+        if ($to !== 'local') {
+            $themeResult = $manager->syncTheme($to);
+            if ($themeResult === false) {
+                $error = $manager->getError();
+                \WP_CLI::error($error);
+                return;
+            } else {
+                \WP_CLI::success(sprintf('Theme sync from "%s" to "%s" completed successfully.', $from, $to));
+            }
         }
 
         // Sync database
