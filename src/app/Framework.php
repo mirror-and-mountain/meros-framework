@@ -24,7 +24,7 @@ final class Framework extends FeatureProvider {
      * 
      * @return void
      */
-    public function initialiseFramework(): void {   
+    public function initialiseFramework(): self {   
         $currentPage = Context::currentPage();
         $initAjax    = Context::isAdmin();
 
@@ -35,6 +35,8 @@ final class Framework extends FeatureProvider {
         $this->discoverInstallables();
         $this->discoverSettings();
         $this->discoverAssets();
+
+        return $this;
     }
 
     /**

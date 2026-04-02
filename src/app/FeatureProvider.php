@@ -8,14 +8,12 @@ use MM\Meros\App\Features\CoreInstallable;
 use MM\Meros\App\Contracts\AssetsRegistrar;
 use MM\Meros\App\Contracts\BlocksRegistrar;
 use MM\Meros\App\Contracts\SettingsRegistrar;
-use MM\Meros\App\Contracts\ComponentsRegistrar;
 use MM\Meros\App\Contracts\InstallablesRegistrar;
 
 use MM\Meros\App\Concerns\HasIdentity;
 use MM\Meros\App\Concerns\HasPreferences;
 use MM\Meros\App\Concerns\HasAssets;
 use MM\Meros\App\Concerns\HasBlocks;
-use MM\Meros\App\Concerns\HasComponents;
 use MM\Meros\App\Concerns\HasInstallables;
 use MM\Meros\App\Concerns\HasSettings;
 
@@ -23,7 +21,6 @@ abstract class FeatureProvider implements
     AssetsRegistrar, 
     BlocksRegistrar, 
     SettingsRegistrar, 
-    // ComponentsRegistrar, 
     InstallablesRegistrar 
 {
     private array $requiredServices = ['core'];
@@ -32,7 +29,6 @@ abstract class FeatureProvider implements
         HasPreferences,
         HasAssets,
         HasBlocks,
-        // HasComponents,
         HasInstallables,
         HasSettings;
 

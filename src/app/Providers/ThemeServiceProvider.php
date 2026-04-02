@@ -4,6 +4,7 @@ namespace MM\Meros\App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\File;
 
 use MM\Meros\App\Theme as MerosTheme;
 use MM\Meros\App\Support\ClassInfo;
@@ -29,6 +30,19 @@ class ThemeServiceProvider extends ServiceProvider {
     }
 
     final public function boot(): void {
-        // Nothing to do...
+        // Load views from the theme's views directory
+        $theme = $this->app->make(MerosTheme::class);
+        $this->loadViewsFrom($theme->getPreference('views_path'), 'theme');
+
+        // Load routes from the theme's routes directory
+        $routesPath = $theme->getPreference('routes_path');
+        if (File::exists($routesPath) && File::isDirectory($routesPath)) {
+            $routeFiles = File::files($routesPath);
+            foreach ($routeFiles as $file) {
+                if ($file->getExtension() === 'php') {
+                    $this->loadRoutesFrom($file->getPathname());
+                }
+            }
+        }
     }
 }

@@ -5,6 +5,7 @@ namespace MM\Meros\App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\File;
 
 use MM\Meros\App\Framework;
 use MM\Meros\App\Context;
@@ -46,7 +47,21 @@ class FrameworkServiceProvider extends ServiceProvider {
         $this->app->make(Context::class);
 
         // Init the Framework class to trigger the constructor and set up the framework
-        $this->app->make(Framework::class)->initialiseFramework();
+        $framework = $this->app->make(Framework::class)->initialiseFramework();
+        
+        // Load views from the framework's views directory
+        $this->loadViewsFrom($framework->getPreference('views_path'), 'meros');
+
+        // Load routes from the framework's routes directory
+        $routesPath = $framework->getPreference('routes_path');
+        if (File::exists($routesPath) && File::isDirectory($routesPath)) {
+            $routeFiles = File::files($routesPath);
+            foreach ($routeFiles as $file) {
+                if ($file->getExtension() === 'php') {
+                    $this->loadRoutesFrom($file->getPathname());
+                }
+            }
+        }
 
         // Call the Theme Service Provider
         $this->app->register(ThemeServiceProvider::class);

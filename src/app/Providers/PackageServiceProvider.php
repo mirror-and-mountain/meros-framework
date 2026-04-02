@@ -3,6 +3,7 @@
 namespace MM\Meros\App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 use MM\Meros\App\Package;
@@ -36,6 +37,19 @@ abstract class PackageServiceProvider extends ServiceProvider {
     }
 
     final public function boot(): void {
-        // Do nothing...
+        // Load views from the package's views directory
+        $package = $this->app->make($this->serviceClass);
+        $this->loadViewsFrom($package->getPreference('views_path'), $package->getHandle());
+
+        // Load routes from the package's routes directory
+        $routesPath = $package->getPreference('routes_path');
+        if (File::exists($routesPath) && File::isDirectory($routesPath)) {
+            $routeFiles = File::files($routesPath);
+            foreach ($routeFiles as $file) {
+                if ($file->getExtension() === 'php') {
+                    $this->loadRoutesFrom($file->getPathname());
+                }
+            }
+        }
     }
 }

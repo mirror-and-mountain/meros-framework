@@ -23,6 +23,7 @@ trait HasPreferences {
         'blocks_are_switchable_by_default' => true, // Whether to allow enabling/disabling blocks in WP Admin by default.
         'components_path'                  => 'components', // No leading or trailing slashes
         'views_path'                       => 'views', // No leading or trailing slashes
+        'routes_path'                      => 'routes', // No leading or trailing slashes
         'migrations_path'                  => 'database/migrations', // No leading or trailing slashes
         'settings_path'                    => 'config/settings.php', // No leading or trailing slashes
     ];
