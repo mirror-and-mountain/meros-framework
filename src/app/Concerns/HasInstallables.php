@@ -96,6 +96,10 @@ trait HasInstallables {
       */
     protected function hasUpdates(): bool {
         $notInstalledItems = $this->getInstallables()->where('isInstalled', false)->count();
+
+        if ($this->handle === 'meros_crm') {
+            dd($notInstalledItems);
+        }
         
         return $this->isInstalled() && $notInstalledItems > 0;
     }

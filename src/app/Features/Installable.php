@@ -126,8 +126,10 @@ class Installable extends Feature {
             }
         }
 
-        // Set a default handle for installation errors.
-        $this->handle = $config['handle'] ?? $this->source->handle . '_undefined_installable_' . Str::random(5);
+        else {
+            // Set a default handle for installation errors.
+            $this->handle = $config['handle'] ?? $this->source->handle . '_undefined_installable_' . Str::random(5);
+        }
     
         Registry::add('installables', $this);
 
