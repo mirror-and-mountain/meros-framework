@@ -4,7 +4,7 @@ namespace MM\Meros\App\Features;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Log;
+
 use MM\Meros\App\Models\Migration;
 
 class CoreInstallable extends Installable {
@@ -32,10 +32,8 @@ class CoreInstallable extends Installable {
      */
     public function install(string $batchId = ''): bool {
         if (! $this->ready) {
-            Log::error($this->error);
+            $this->installationError = "The installable '{$this->handle}' is not ready for installation.";
             return false;
-            // $this->installationError = "The installable '{$this->handle}' is not ready for installation.";
-            // return false;
         }
 
         $canInstall = $this->canRunInstall();
@@ -89,8 +87,6 @@ class CoreInstallable extends Installable {
 
         try {
             $this->runner->down($this->handle);
-
-            Migration::where('handle', $this->handle)->delete();
         } catch (\Exception $e) {
             $this->uninstallationError = "An error occurred while uninstalling '{$this->handle}': " . $e->getMessage();
             return false;

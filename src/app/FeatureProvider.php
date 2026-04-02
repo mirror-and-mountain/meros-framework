@@ -19,8 +19,6 @@ use MM\Meros\App\Concerns\HasComponents;
 use MM\Meros\App\Concerns\HasInstallables;
 use MM\Meros\App\Concerns\HasSettings;
 
-use Illuminate\Support\Facades\Log;
-
 abstract class FeatureProvider implements 
     AssetsRegistrar, 
     BlocksRegistrar, 
@@ -147,7 +145,6 @@ abstract class FeatureProvider implements
         $installed = $installable->install();
 
         if ($installed !== true) {
-            Log::notice("Failed to install core Meros service: {$installable->installationError}");
             return false;
         }
 
