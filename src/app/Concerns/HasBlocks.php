@@ -26,7 +26,7 @@ trait HasBlocks {
             return;
         }
 
-        $blocksPath = $this->path . $this->getPreference('blocks_path');
+        $blocksPath = $this->getPreference('blocks_path');
 
         if (!File::exists($blocksPath) || !File::isDirectory($blocksPath)) {
             return;

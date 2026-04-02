@@ -43,7 +43,7 @@ trait HasInstallables {
             return;
         }
         
-        $migrationsPath  = $this->path . $this->getPreference('migrations_path');
+        $migrationsPath  = $this->getPreference('migrations_path');
         $migrationsExist = File::exists($migrationsPath) && File::isDirectory($migrationsPath);
         $migrations      = $migrationsExist 
             ? collect(File::files($migrationsPath))->filter(fn($file) => $file->getExtension() === 'php')->toArray()
@@ -108,8 +108,8 @@ trait HasInstallables {
      */
     final public function getMigrationsDir(bool $full = true): string {
         return $full 
-            ? $this->path . $this->getPreference('migrations_path')
-            : $this->getPreference('migrations_path');
+            ? $this->getPreference('migrations_path')
+            : $this->getPreference('migrations_path', false);
     }
 
     /**
@@ -146,17 +146,17 @@ trait HasInstallables {
         $installables = $this->getInstallables(true);
 
         if ($installables->isEmpty()) {
-            return true; // No installables to run, consider it a successful installation.
+            return 'There is nothing to install.'; // No installables to run
         }
 
         $batchId = Str::ulid();
 
-        $installables->each(function($installable) use ($batchId) {
+        foreach ($installables as $installable) {
             $result = $installable->install($batchId);
             if ($result !== true) {
                 return $installable->installationError; // Return the error message if installation fails.
             }
-        });
+        }
 
         return true;
     }
@@ -186,15 +186,15 @@ trait HasInstallables {
         $installables = $this->getInstallables(true)->reverse();
 
         if ($installables->isEmpty()) {
-            return true; // No installables to run, consider it a successful uninstallation.
+            return 'There is nothing to uninstall.'; // No installables to run
         }
 
-        $installables->each(function($installable) {
+        foreach ($installables as $installable) {
             $result = $installable->uninstall();
             if ($result !== true) {
                 return $installable->uninstallationError; // Return the error message if uninstallation fails.
             }
-    });
+        }
 
         return true;
     }

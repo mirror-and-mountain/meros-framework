@@ -12,9 +12,9 @@ use MM\Meros\App\Support\ClassInfo;
 
 use MM\Meros\App\Listeners\MigrationEventSubscriber;
 
-use MM\Meros\Scripts\MakeCommands;
 use MM\Meros\Scripts\EnvironmentCommands;
-use MM\Meros\Scripts\MigrationCommands;
+use MM\Meros\Scripts\InstallCommands;
+use MM\Meros\Scripts\UninstallCommands;
 
 class FrameworkServiceProvider extends ServiceProvider {
     
@@ -60,13 +60,13 @@ class FrameworkServiceProvider extends ServiceProvider {
         // Enable wp meros cli if appropriate
         if ($this->app->runningInConsole()) {
             if (defined('WP_CLI') && \WP_CLI) {
-                $makeCli         = new MakeCommands();
                 $environmentsCli = new EnvironmentCommands();
-                $migrationsCli   = new MigrationCommands();
+                $installCli      = new InstallCommands();
+                $uninstallCli    = new UninstallCommands();
                 
                 \WP_CLI::add_command('meros:env', $environmentsCli);
-                \WP_CLI::add_command('meros:migration', $migrationsCli);
-                \WP_CLI::add_command('meros:make', $makeCli);
+                \WP_CLI::add_command('meros:install', $installCli);
+                \WP_CLI::add_command('meros:uninstall', $uninstallCli);
             }
         }
     }

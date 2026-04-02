@@ -48,7 +48,7 @@ class EnvironmentCommands {
      * <to>
      * : The environment to sync the theme to.
      * 
-     * [--add-drop-table]
+     * [--drop-table]
      * : Whether to add a DROP TABLE statement before each CREATE TABLE statement in the generated SQL. (default: false)
      * 
      * [--search-replace]
@@ -76,7 +76,7 @@ class EnvironmentCommands {
         $to   = $args[1];
 
         // Determine flags
-        $addDropTable    = isset($assoc_args['add-drop-table']) && $assoc_args['add-drop-table'] === true ? true : false;
+        $addDropTable    = isset($assoc_args['drop-table']) && $assoc_args['drop-table'] === true ? true : false;
         $activatePlugins = isset($assoc_args['activate-plugins']) && $assoc_args['activate-plugins'] === false ? false : true;
         $searchReplace   = isset($assoc_args['search-replace']) && $assoc_args['search-replace'] === false ? false : true;
 
@@ -87,10 +87,12 @@ class EnvironmentCommands {
         $isLocal = $from === 'local' || $to === 'local';
         if (! isset($environmentsConfig['remote_environments'][$from]) && ! $isLocal) {
             \WP_CLI::error(sprintf('Source environment "%s" is not defined in the configuration.', $from));
+            return;
         }
 
         if (! isset($environmentsConfig['remote_environments'][$to]) && ! $isLocal) {
             \WP_CLI::error(sprintf('Destination environment "%s" is not defined in the configuration.', $to));
+            return;
         }
 
         // Set the environments
@@ -103,6 +105,7 @@ class EnvironmentCommands {
 
         if ($syncConfig === null) {
             \WP_CLI::error('No sync configuration found for the specified environments, and no default configuration is set.');
+            return;
         }
 
         // Determine the tables to sync
@@ -146,7 +149,8 @@ class EnvironmentCommands {
         \WP_CLI::line('Activate plugins after sync: ' . ($activatePlugins ? 'Yes' : 'No'));
         
         \WP_CLI::line('It is highly recommended to back up your theme files and database before proceeding. Note that this operation will also synchronise the theme files from the source environment to the destination environment, which may result in changes to the destination environment\'s theme. If you have made customisations to the destination environment\'s theme, please ensure you have a backup before proceeding.');
-        \WP_CLI::confirm('Are you sure you want to proceed?', $assoc_args = []);
+        
+        \WP_CLI::confirm('Are you sure you want to proceed?');
 
         // Get Environment Manager
         $manager = EnvironmentManager::get($from);
@@ -156,6 +160,7 @@ class EnvironmentCommands {
         if ($themeResult === false) {
             $error = $manager->getError();
             \WP_CLI::error($error);
+            return;
         } else {
             \WP_CLI::success(sprintf('Theme sync from "%s" to "%s" completed successfully.', $from, $to));
         }
@@ -165,6 +170,7 @@ class EnvironmentCommands {
         if ($dbResult === false) {
             $error = $manager->getError();
             \WP_CLI::error($error);
+            return;
         } else {
             \WP_CLI::success(sprintf('Database sync from "%s" to "%s" completed successfully.', $from, $to));
         }
@@ -175,6 +181,7 @@ class EnvironmentCommands {
             if ($pluginsResult === false) {
                 $error = $manager->getError();
                 \WP_CLI::error($error);
+                return;
             } else {
                 \WP_CLI::success(sprintf('Plugins sync from "%s" to "%s" completed successfully.', $from, $to));
             }
@@ -186,10 +193,12 @@ class EnvironmentCommands {
             if ($uploadsResult === false) {
                 $error = $manager->getError();
                 \WP_CLI::error($error);
+                return;
             } else {
                 \WP_CLI::success(sprintf('Uploads sync from "%s" to "%s" completed successfully.', $from, $to));
             }
         }
 
+        \WP_CLI::success('Environment synchronisation completed successfully.');
     }
 }

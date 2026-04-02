@@ -2,8 +2,8 @@
 
 namespace MM\Meros\App\Listeners;
 
+use Illuminate\Support\Str;
 use Illuminate\Events\Dispatcher;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 use MM\Meros\App\Events\Migrations\TableCreated;
@@ -11,6 +11,8 @@ use MM\Meros\App\Events\Migrations\TableUpdated;
 use MM\Meros\App\Events\Migrations\TableDropped;
 
 use MM\Meros\App\Models\Migration;
+
+use MM\Meros\App\Facades\Theme;
 use MM\Meros\App\Facades\Registry;
 
 class MigrationEventSubscriber {
@@ -104,6 +106,8 @@ class MigrationEventSubscriber {
             return;
         }
 
+        $trimmedPath = Str::replace(Theme::getPath(), '', $installable->path);
+
         $record = Migration::create([
             'source'        => $installable->source->handle,
             'type'          => $installable->type,
@@ -111,7 +115,7 @@ class MigrationEventSubscriber {
             'label'         => $installable->label,
             'handle'        => $installable->handle,
             'related_table' => $table,
-            'path'          => $installable->path,
+            'path'          => $trimmedPath,
             'batch_id'      => $installable->currentBatchId
         ]);
 

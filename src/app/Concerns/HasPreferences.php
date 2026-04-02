@@ -2,6 +2,8 @@
 
 namespace MM\Meros\App\Concerns;
 
+use Illuminate\Support\Str;
+
 use MM\Meros\App\Theme;
 use MM\Meros\App\Package;
 
@@ -76,10 +78,20 @@ trait HasPreferences {
      * Returns the value of a specific preference.
      *
      * @param  string $key
+     * @param  bool   $fullPath Whether to return the full path (including the default path) or just the custom value set by the developer (only relavant for path preferences).
      *
      * @return mixed
      */
-    final public function getPreference(string $key): mixed {
+    final public function getPreference(string $key, bool $fullPath = true): mixed {
+        if (Str::endsWith($key, '_path') && $fullPath) {
+            if (isset($this->preferences[$key])) {
+                return trailingslashit( $this->path ) . $this->preferences[$key];
+            } else if (isset($this->defaultPreferences[$key])) {
+                return trailingslashit( $this->path ) . $this->defaultPreferences[$key];
+            } else {
+                return null;
+            }
+        }
         return $this->preferences[$key] ?? $this->defaultPreferences[$key] ?? null;
     }
 }

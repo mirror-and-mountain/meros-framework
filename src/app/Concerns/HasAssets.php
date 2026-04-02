@@ -33,7 +33,7 @@ trait HasAssets {
             return;
         }
 
-        $assetsPath = $this->path . $this->getPreference('assets_path');
+        $assetsPath = $this->getPreference('assets_path');
 
         if (!File::exists($assetsPath) || !File::isDirectory($assetsPath)) {
             return;

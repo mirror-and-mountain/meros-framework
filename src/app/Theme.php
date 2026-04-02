@@ -128,4 +128,13 @@ abstract class Theme extends FeatureProvider {
             );
         });
     }
+
+    /**
+     * Gets the instance of the theme.
+     *
+     * @return Theme
+     */
+    final public function getInstance(): Theme {
+        return $this;
+    }
 }

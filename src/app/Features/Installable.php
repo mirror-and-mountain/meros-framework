@@ -265,8 +265,6 @@ class Installable extends Feature {
 
         try {
             $this->runner->down($this->handle);
-
-            Migration::where('handle', $this->handle)->delete();
         } catch (\Exception $e) {
             $this->uninstallationError = "An error occurred while uninstalling '{$this->handle}': " . $e->getMessage();
             return false;

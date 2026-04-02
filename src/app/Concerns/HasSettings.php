@@ -28,7 +28,7 @@ trait HasSettings {
             return;
         }
 
-        $settingsPath = $this->path . $this->getPreference('settings_path');
+        $settingsPath = $this->getPreference('settings_path');
 
         if (File::exists($settingsPath) && File::isFile($settingsPath)) {
             $pathInfo  = pathinfo($settingsPath);
