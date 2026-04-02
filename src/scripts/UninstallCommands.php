@@ -46,7 +46,7 @@ class UninstallCommands {
         $refresh           = isset($assoc_args['refresh']) && $assoc_args['refresh'] === true ? true : false;
 
         // Prep the install action
-        $installable = $this->prep('uninstall', Theme::getInstance(), $installableHandle, $refresh);
+        $installable = $this->prep('uninstall', Theme::instance(), $installableHandle, $refresh);
 
         // Run the uninstall action
         if ($installable !== false) {

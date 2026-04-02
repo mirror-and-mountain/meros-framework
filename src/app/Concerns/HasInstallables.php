@@ -49,7 +49,6 @@ trait HasInstallables {
             ? collect(File::files($migrationsPath))->filter(fn($file) => $file->getExtension() === 'php')->toArray()
             : [];
 
-
         // Register installables for each migration file.
         foreach ($migrations as $migration) {
             $this->makeInstallable([

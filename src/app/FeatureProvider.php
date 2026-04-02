@@ -51,13 +51,12 @@ abstract class FeatureProvider implements
         // Init preferences
         $this->initPreferences();
 
-        if ($isFramework) {
-            $this->initFramework();
-            return;
-        }
-
         // Configure
         $this->configure();
+
+        if ($isFramework) {
+            return;
+        }
 
         // Initialise
         $this->initialise();
@@ -101,68 +100,5 @@ abstract class FeatureProvider implements
       */
     protected function getRequirements(): array {
         return $this->requiredServices;
-    }
-
-    /**
-     * If theme has just been activated, this method hooks the installMeros()
-     * method to setup the core migrations table.
-     *
-     * @return void
-     */
-    protected function initFramework(): void {
-        if (!$this instanceof Framework ) {
-            return;
-        }
-
-        add_action('after_switch_theme', function() {
-            $this->installFramework(); // Setup action to run core installable on theme activation.
-        });
-    }
-
-    /**
-     * Installs the core Meros migrations table so that other feature providers
-     * can run installables.
-     *
-     * @return bool Returns true on success, false on failure.
-     */
-    protected function installFramework(): bool {
-        if (!$this instanceof Framework) {
-            return false;
-        }
-
-        $migrationPath = \trailingslashit(
-            \trailingslashit($this->getPreference('migrations_path')) . 'core' . DIRECTORY_SEPARATOR
-        );
-
-        $installable = $this->makeCoreInstallable([
-            'path'   => $migrationPath . '001_create_meros_migrations_table.php',
-        ]);
-
-        $installed = $installable->install();
-
-        if ($installed !== true) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Creates the core installable instance for the Meros framework.
-     *
-     * @param array $config The configuration array for the core installable.
-     * 
-     * @return CoreInstallable|null The created core installable instance, or null if it cannot be created.
-     */
-    private function makeCoreInstallable(array $config): CoreInstallable|null {
-        if (! $this instanceof Framework) {
-            return null;
-        }
-
-        return app(
-            CoreInstallable::class, [
-                'source' => $this,
-            ]
-        )->make($config);
     }
 }

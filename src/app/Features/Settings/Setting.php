@@ -341,7 +341,7 @@ class Setting extends Feature {
 
             case 'boolean':
             case 'checkbox':
-                $value = (bool) $value;
+                $value = (bool) $value ? '1' : '0';
                 break;
         }
 

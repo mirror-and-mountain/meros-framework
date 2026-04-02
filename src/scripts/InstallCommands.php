@@ -46,7 +46,7 @@ class InstallCommands {
         $refresh           = isset($assoc_args['refresh']) && $assoc_args['refresh'] === true ? true : false;
 
         // Prep the install action
-        $installable = $this->prep('install', Theme::getInstance(), $installableHandle, $refresh);
+        $installable = $this->prep('install', Theme::instance(), $installableHandle, $refresh);
 
         // Run the install action
         if ($installable !== false) {

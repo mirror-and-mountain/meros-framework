@@ -47,7 +47,7 @@ class FrameworkServiceProvider extends ServiceProvider {
         $this->app->make(Context::class);
 
         // Init the Framework class to trigger the constructor and set up the framework
-        $framework = $this->app->make(Framework::class)->initialiseFramework();
+        $framework = $this->app->make(Framework::class)->_initialise();
         
         // Load views from the framework's views directory
         $this->loadViewsFrom($framework->getPreference('views_path'), 'meros');

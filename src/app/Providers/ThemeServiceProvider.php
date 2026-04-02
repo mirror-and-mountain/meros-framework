@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\File;
 use MM\Meros\App\Theme as MerosTheme;
 use MM\Meros\App\Support\ClassInfo;
 
+use MM\Meros\App\Facades\Theme;
+
 class ThemeServiceProvider extends ServiceProvider {
 
     final public function register(): void {
@@ -31,7 +33,7 @@ class ThemeServiceProvider extends ServiceProvider {
 
     final public function boot(): void {
         // Load views from the theme's views directory
-        $theme = $this->app->make(MerosTheme::class);
+        $theme = Theme::instance();
         $this->loadViewsFrom($theme->getPreference('views_path'), 'theme');
 
         // Load routes from the theme's routes directory

@@ -15,18 +15,31 @@ final class Framework extends FeatureProvider {
     protected bool $discoverSettings = true;
     protected bool $discoverAssets = true;
 
-    protected function initialise(): void {
-        // Do nothing...
+    protected function configure(): void {
+        // Run theme activation tasks
+        add_action('after_switch_theme', [$this, 'runActivationTasks']);
+
+        // Set migrations path preference
+        $this->setPreference('migrations_path', 'database/migrations/integrations');
     }
 
     /**
-     * Intialises the Meros framework.
-     * 
+     * Called from the FrameworkServiceProvider on boot
+     *
+     * @return self
+     */
+    public function _initialise(): self {
+        $this->initialise();
+        return $this;
+    }
+
+    /**
+     * Initialises the framework's features
+     *
      * @return void
      */
-    public function initialiseFramework(): self {   
-        $currentPage = Context::currentPage();
-        $initAjax    = Context::isAdmin();
+    protected function initialise(): void {
+        $initAjax = Context::isAdmin();
 
         if ($initAjax) {
             $this->initAdminAjaxHandlers();
@@ -35,8 +48,6 @@ final class Framework extends FeatureProvider {
         $this->discoverInstallables();
         $this->discoverSettings();
         $this->discoverAssets();
-
-        return $this;
     }
 
     /**
@@ -113,6 +124,53 @@ final class Framework extends FeatureProvider {
     }
 
     /**
+     * Installs the core Meros migrations table so that other feature providers
+     * can run installables.
+     *
+     * @return bool Returns true on success, false on failure.
+     */
+    private function installFramework(): bool {
+        if (!$this instanceof Framework) {
+            return false;
+        }
+
+        $migrationPath = \trailingslashit(
+            \trailingslashit($this->getPreference('migrations_path')) . 'core' . DIRECTORY_SEPARATOR
+        );
+
+        $installable = $this->makeCoreInstallable([
+            'path'   => $migrationPath . '001_create_meros_migrations_table.php',
+        ]);
+
+        $installed = $installable->install();
+
+        if ($installed !== true) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Creates the core installable instance for the Meros framework.
+     *
+     * @param array $config The configuration array for the core installable.
+     * 
+     * @return CoreInstallable|null The created core installable instance, or null if it cannot be created.
+     */
+    private function makeCoreInstallable(array $config): CoreInstallable|null {
+        if (! $this instanceof Framework) {
+            return null;
+        }
+
+        return app(
+            CoreInstallable::class, [
+                'source' => $this,
+            ]
+        )->make($config);
+    }
+
+    /**
      * Installs integration tables for the integrations service.
      *
      * @return boolean
@@ -120,12 +178,13 @@ final class Framework extends FeatureProvider {
     private function installIntegrations(): bool {
         return $this->install() === true;
     }
+
+    /***************************************************************
+     * 
+     * The following methods are used for AJAX calls from WP Admin
+     * 
+     ***************************************************************/
  
-    /**
-     * Sets up AJAX handlers for the admin pages.
-     *
-     * @return void
-     */
     private function initAdminAjaxHandlers(): void {
         add_action('wp_ajax_meros_toggle_package', [$this, 'handlePackageToggle']);
         add_action('wp_ajax_meros_install_feature', [$this, 'handleInstaller']);
@@ -210,5 +269,83 @@ final class Framework extends FeatureProvider {
         }
 
         wp_send_json_success();
+    }
+
+    /**
+     * Gets the instance of the framework.
+     *
+     * @return Framework
+     */
+    final public function instance(): Framework {
+        return $this;
+    }
+
+    /*************************************************************
+     * 
+     * The following methods are called on theme activation....
+     * 
+     *************************************************************/
+
+    public function runActivationTasks(): void {
+        $this->ensureAppKey();
+        $this->ensurePrettyPermalinks();
+        $this->clearSessionFiles();
+    }
+
+    /**
+     * Ensures that an APP_KEY exists in the theme's .env file.
+     *
+     * @return void
+     */
+    private function ensureAppKey(): void {
+        $envPath = base_path('.env');
+        $key     = 'base64:' . base64_encode(random_bytes(32));
+        $comment = "# An App Key is required for some Meros functionality. It is automatically generated on theme activation.";
+
+        if (!file_exists($envPath)) {
+            $envContent = "{$comment}\nAPP_KEY={$key}\n";
+            file_put_contents($envPath, $envContent);
+            return;
+        }
+
+        $envContent = file_get_contents($envPath);
+
+        if (!preg_match('/^APP_KEY=.*$/m', $envContent)) {
+            $envContent = rtrim($envContent) . "\n\n{$comment}\nAPP_KEY={$key}\n";
+            file_put_contents($envPath, $envContent);
+        }
+    }
+
+    /**
+     * Ensures that pretty permalinks are enabled.
+     * 
+     * @return void
+     */
+    private function ensurePrettyPermalinks(): void {
+        global $wp_rewrite;
+        $permalinkStructure = get_option('permalink_structure');
+        if (empty($permalinkStructure) || $permalinkStructure === '/') {
+            $wp_rewrite->set_permalink_structure('/%postname%/');
+            $wp_rewrite->flush_rules();
+        }
+    }
+
+    /**
+     * Clears session files from the theme's storage directory.
+     * 
+     * @return void
+     */
+    private function clearSessionFiles(): void {
+        $sessionDir = get_theme_file_path('storage/framework/sessions');
+
+        if (is_dir($sessionDir)) {
+            $files = glob($sessionDir . '/*');
+
+            foreach ($files as $file) {
+                if (is_file($file)) {
+                    unlink($file);
+                }
+            }
+        }
     }
 }
