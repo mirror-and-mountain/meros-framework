@@ -5,6 +5,7 @@ namespace MM\Meros\App;
 use Illuminate\Support\Facades\Schema;
 
 use MM\Meros\App\Models\Migration;
+use MM\Meros\App\Features\CoreInstallable;
 
 use MM\Meros\App\Facades\Registry;
 use MM\Meros\App\Facades\Context;
@@ -79,19 +80,14 @@ final class Framework extends FeatureProvider {
     private function isCoreInstalled(bool $tryToInstall): bool {
         $installed = false;
 
-        if (! Schema::hasTable('meros_migrations') || ! Migration::where('handle', '001_create_meros_migrations_table')->exists()) {
+        if (
+            ! Schema::hasTable('meros_migrations') || 
+            ! Migration::where('handle', '001_create_meros_migrations_table')->exists()
+        ) {
             $installed = $tryToInstall ? $this->installFramework() : false;
         } else {
             $installed = true;
         }
-
-        if ($installed) {
-            $coreMigrationRecord = Migration::where(
-                'handle', 'like', '%create_meros_migrations_table%'
-            )->first();
-
-            $installed = $coreMigrationRecord !== null;
-        } 
         
         return $installed;
     }
@@ -104,23 +100,24 @@ final class Framework extends FeatureProvider {
      * @return boolean Returns true if the integrations service is installed, false if it isn't or if installation fails.
      */
     private function isIntegrationsInstalled(bool $tryToInstall): bool {
+        $installed = $this->isInstalled();
+
+        return $installed ? true : ($tryToInstall ? $this->install() : false);
+    }
+
+    /**
+     * Returns whether the framework is installed.
+     * Only includes the Integration service tables as the 'core' migrations table is handled separately.
+     *
+     * @return boolean
+     */
+    protected function isInstalled(): bool {
         $tables = [
             'meros_integration_accounts',
             'meros_integration_connections'
         ];
 
-        $installed = true;
-
-        foreach ($tables as $table) {
-            if (! Schema::hasTable($table) || 
-                ! Migration::where('related_table', $table)->exists()
-            ) {
-                $installed = false;
-                break;
-            }
-        }
-
-        return $installed ? true : ($tryToInstall ? $this->installIntegrations() : false);
+        return $this->hasTables($tables);
     }
 
     /**
@@ -168,15 +165,6 @@ final class Framework extends FeatureProvider {
                 'source' => $this,
             ]
         )->make($config);
-    }
-
-    /**
-     * Installs integration tables for the integrations service.
-     *
-     * @return boolean
-     */
-    private function installIntegrations(): bool {
-        return $this->install() === true;
     }
 
     /***************************************************************

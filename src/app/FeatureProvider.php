@@ -3,7 +3,6 @@
 namespace MM\Meros\App;
 
 use MM\Meros\App\Framework;
-use MM\Meros\App\Features\CoreInstallable;
 
 use MM\Meros\App\Contracts\AssetsRegistrar;
 use MM\Meros\App\Contracts\BlocksRegistrar;
