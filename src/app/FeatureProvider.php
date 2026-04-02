@@ -135,7 +135,7 @@ abstract class FeatureProvider implements
         }
 
         $migrationPath = \trailingslashit(
-            $this->path . $this->getPreference('migrations_path') . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR
+            \trailingslashit($this->getPreference('migrations_path')) . 'core' . DIRECTORY_SEPARATOR
         );
 
         $installable = $this->makeCoreInstallable([
