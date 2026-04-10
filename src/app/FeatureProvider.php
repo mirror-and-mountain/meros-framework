@@ -4,31 +4,16 @@ namespace MM\Meros\App;
 
 use MM\Meros\App\Framework;
 
-use MM\Meros\App\Contracts\AssetsRegistrar;
-use MM\Meros\App\Contracts\BlocksRegistrar;
-use MM\Meros\App\Contracts\SettingsRegistrar;
-use MM\Meros\App\Contracts\InstallablesRegistrar;
-
 use MM\Meros\App\Concerns\HasIdentity;
-use MM\Meros\App\Concerns\HasPreferences;
-use MM\Meros\App\Concerns\HasAssets;
-use MM\Meros\App\Concerns\HasBlocks;
-use MM\Meros\App\Concerns\HasInstallables;
 use MM\Meros\App\Concerns\HasSettings;
+use MM\Meros\App\Concerns\HasPreferences;
 
-abstract class FeatureProvider implements 
-    AssetsRegistrar, 
-    BlocksRegistrar, 
-    SettingsRegistrar, 
-    InstallablesRegistrar 
-{
+abstract class FeatureProvider {
     private array $requiredServices = ['core'];
 
+    // Additional concerns may be added by child classes as needed.
     use HasIdentity,
         HasPreferences,
-        HasAssets,
-        HasBlocks,
-        HasInstallables,
         HasSettings;
 
     public function __construct(
@@ -56,16 +41,11 @@ abstract class FeatureProvider implements
         if ($isFramework) {
             return;
         }
-
-        // Initialise
-        $this->initialise();
     }
 
     protected function configure(): void {
         // Intentionally left blank for child classes to override.
     }
-
-    abstract protected function initialise(): void;
 
     /**
      * Adds a required service to the feature provider's requirements.

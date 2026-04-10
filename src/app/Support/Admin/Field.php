@@ -3,6 +3,7 @@
 namespace MM\Meros\App\Support\Admin;
 
 use Illuminate\Support\Str;
+use Illuminate\View\ComponentAttributeBag;
 
 /**
  * A utility to generate fields of varying types for use
@@ -44,7 +45,11 @@ class Field {
         switch ($type) {
             case 'boolean':
             case 'checkbox':
-                $html .= self::makeCheckbox($name, $id, $value, $disabled, $ajaxAction, $attributes, $nonce);
+                $html .= self::makeCheckbox($name, $id, $value, $disabled);
+                break;
+
+            case 'toggle':
+                $html .= self::makeToggleSwitch($name, $id, $value, $disabled, $ajaxAction, $attributes, $nonce);
                 break;
 
             case 'text':
@@ -117,6 +122,40 @@ class Field {
         );
     }
 
+    private static function makeToggleSwitch(
+        string $name,
+        string $id = '',
+        mixed  $value = null,
+        bool   $disabled = false,
+        string $ajaxAction = '',
+        array  $attributes = [],
+        string $nonce = ''
+    ): string {
+        $checked = checked($value, true, false);
+        $nonce   = $nonce !== '' ? wp_create_nonce($nonce) : wp_create_nonce($ajaxAction . '_' . $name);
+
+        $viewAttributes = [
+            'type'         => 'button',
+            'name'         => $name,
+            'id'           => $id !== '' ? $id : $name,
+            'class'        => $checked ? 'checked' : 'not-checked',
+            'role'         => 'switch',
+            'disabled'     => $disabled,
+            'aria-checked' => $checked ? 'true' : 'false',
+            'data-action'  => $ajaxAction,
+            'data-nonce'   => $nonce,
+        ];
+
+        foreach ($attributes as $key => $val) {
+            $viewAttributes['data-' . $key] = esc_attr($val);
+        }
+
+        $attributes = new ComponentAttributeBag($viewAttributes);
+        $label      = $checked ? 'Enabled' : 'Disabled';
+
+        return view('meros::components.admin.fields.toggle', compact('attributes', 'disabled', 'label'));
+    }
+
     /**
      * Formats an array of data attributes into a string for inclusion in an HTML tag.
      * 
@@ -134,59 +173,22 @@ class Field {
     }
 
     /**
-     * Makes a checkbox / toggle switch field.
+     * Makes a checkbox.
      * 
      * @param string  $name The name of the field.
      * @param string  $id An optional ID for the field.
      * @param mixed   $value The value to compare for checked state.
      * @param bool    $disabled Whether the checkbox should be disabled.
-     * @param string  $ajaxAction An ajax action for handling a toggle switch.
-     * @param array   $attributes Additional data attributes for the checkbox.
-     * @param string  $nonce An optional nonce for the checkbox. If not provided, a nonce will be generated using the ajax action and name.
      * 
-     * @return string The generated HTML for the checkbox / toggle switch.
+     * @return string The generated HTML for the checkbox.
      */
     private static function makeCheckbox(
         string $name,
         string $id = '',
         mixed  $value = null,
-        bool   $disabled = false,
-        string $ajaxAction = '',
-        array  $attributes = [],
-        string $nonce = ''
-    ): string {
+        bool   $disabled = false
+    ) {
         $checked = checked($value, true, false);
-
-        if ($ajaxAction !== '') {
-            $nonce = $nonce !== '' ? wp_create_nonce($nonce) : wp_create_nonce($ajaxAction . '_' . $name);
-
-            return sprintf(
-                '<button
-                    type="button"
-                    id="%s"
-                    class="meros-toggle-switch meros-settings-field %s"
-                    role="switch"
-                    %s
-                    aria-checked="%s"
-                    data-action="%s"
-                    data-nonce="%s"
-                    %s
-                >
-                    <span class="meros-toggle-track">
-                        <span class="meros-toggle-thumb"></span>
-                    </span>
-                    <span class="meros-toggle-label">%s</span>
-                </button>',
-                esc_attr($id !== '' ? $id : $name),
-                $checked ? 'checked' : 'not-checked',
-                $disabled ? 'disabled' : '',
-                $checked ? 'true' : 'false',
-                esc_attr($ajaxAction),
-                esc_attr($nonce),
-                self::formatDataAttributes($attributes),
-                esc_html($checked ? 'Enabled' : 'Disabled') // Label
-            );
-        }
 
         $html = '<input type="hidden" class="meros-settings-field" name="' . esc_attr($name) . '" value="0" />';
         $html .= '<input type="checkbox" class="meros-settings-field" id="' . esc_attr($id) . '" name="' . esc_attr($name) . '" value="1" ' . $checked . ($disabled ? ' disabled' : '') . ' />';

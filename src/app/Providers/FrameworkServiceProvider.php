@@ -47,13 +47,14 @@ class FrameworkServiceProvider extends ServiceProvider {
         $this->app->make(Context::class);
 
         // Init the Framework class to trigger the constructor and set up the framework
-        $framework = $this->app->make(Framework::class)->_initialise();
+        $framework = $this->app->make(Framework::class)->__initialise();
         
         // Load views from the framework's views directory
         $this->loadViewsFrom($framework->getPreference('views_path'), 'meros');
 
         // Load routes from the framework's routes directory
         $routesPath = $framework->getPreference('routes_path');
+
         if (File::exists($routesPath) && File::isDirectory($routesPath)) {
             $routeFiles = File::files($routesPath);
             foreach ($routeFiles as $file) {
@@ -95,7 +96,8 @@ class FrameworkServiceProvider extends ServiceProvider {
      * @return void
      */
     private function registerPackages(): void {
-        $packages = Config::get("theme.packages") ?? [];;
+        $packages = Config::get("theme.packages") ?? [];
+        
         foreach ($packages as $serviceProvider) {
             $providerClass = ClassInfo::get($serviceProvider);
             if ($providerClass->extends(PackageServiceProvider::class)) {

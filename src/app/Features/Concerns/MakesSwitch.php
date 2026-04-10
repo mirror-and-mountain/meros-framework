@@ -20,11 +20,43 @@ trait MakesSwitch {
     public bool $isSwitchable;
 
     /**
+     * Indicates whether the item is enabled or disabled. This will be
+     * determined by the value of the switch setting if the item is switchable.
+     *
+     * @var boolean
+     */
+    public bool $enabled = true;
+
+    /**
      * The setting instance for the switch if the item is switchable.
      *
      * @var Setting
      */
     public Setting $switchSetting;
+
+    /**
+     * Chainable method to make the item switchable in WP Admin.
+     *
+     * @param  boolean $isSwitchable
+     *
+     * @return self
+     */
+    public function switchable(bool $isSwitchable = true): self {
+        if (isset($this->label) && isset($this->description)) {
+            $this->isSwitchable = $isSwitchable;
+        } else {
+            $this->error = "The 'label' and 'description' fields must be set before making the asset switchable.";
+        }
+
+        $this->setReady();
+        return $this;
+    }
+
+    public function withSwitch(): self {
+        if (!$this->isSwitchable || !$this->ready) {
+            return $this;
+        }
+    }
     
     /**
      * Makes a switch for the switchable item so it can be toggled on and off in WP Admin.
@@ -53,7 +85,7 @@ trait MakesSwitch {
         } 
         
         else if ($isAsset) {
-            $optionName = $this->source->handle . '_' . $this->group . '_asset_enable';
+            $optionName = $this->source->handle . '_' . ($this->group ?? '') . '_asset_enable';
         }
 
         if (Registry::get('settings')->where('handle', $optionName)->count() > 0) {
@@ -104,6 +136,9 @@ trait MakesSwitch {
 
         // Make the setting
         $this->switchSetting = $this->makeSetting($setting, $field);
+
+        // Recheck enabled state
+        $this->enabled = (bool) get_option($optionName, $this->enabled);
     }
 
     /**

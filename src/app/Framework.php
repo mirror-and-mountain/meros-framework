@@ -7,14 +7,15 @@ use Illuminate\Support\Facades\Schema;
 use MM\Meros\App\Models\Migration;
 use MM\Meros\App\Features\CoreInstallable;
 
+use MM\Meros\App\Concerns\HasAssets;
+use MM\Meros\App\Concerns\HasInstallables;
+
 use MM\Meros\App\Facades\Registry;
 use MM\Meros\App\Facades\Context;
 use MM\Meros\App\Facades\Theme;
 
 final class Framework extends FeatureProvider {
-    protected bool $discoverInstallables = true;
-    protected bool $discoverSettings = true;
-    protected bool $discoverAssets = true;
+    use HasAssets, HasInstallables;
 
     protected function configure(): void {
         // Run theme activation tasks
@@ -29,7 +30,7 @@ final class Framework extends FeatureProvider {
      *
      * @return self
      */
-    public function _initialise(): self {
+    public function __initialise(): self {
         $this->initialise();
         return $this;
     }
@@ -46,9 +47,8 @@ final class Framework extends FeatureProvider {
             $this->initAdminAjaxHandlers();
         }    
 
-        $this->discoverInstallables();
-        $this->discoverSettings();
-        $this->discoverAssets();
+        // $this->discoverInstallables();
+        // $this->discoverAssets();
     }
 
     /**

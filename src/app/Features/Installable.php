@@ -109,14 +109,7 @@ class Installable extends Feature {
     public function make(array $config): self {
         $sanitizedConfig = $this->sanitizeConfig($config);
         if ($sanitizedConfig !== false) {
-            $this->handle  = $sanitizedConfig['handle'];
-            $this->type    = $sanitizedConfig['type'];
-            $this->subtype = $sanitizedConfig['subtype'];
-            $this->label   = $sanitizedConfig['label'];
-            $this->path    = $sanitizedConfig['path'];
-            $this->runner  = $sanitizedConfig['runner'];
-            
-            $this->isThemeInstallable = $sanitizedConfig['is_theme_installable'];
+            $this->setPropertiesFromConfig($sanitizedConfig);
 
             $this->ready = true;
             

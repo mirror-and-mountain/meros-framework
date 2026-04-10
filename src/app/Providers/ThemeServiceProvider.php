@@ -32,12 +32,14 @@ class ThemeServiceProvider extends ServiceProvider {
     }
 
     final public function boot(): void {
-        // Load views from the theme's views directory
-        $theme = Theme::instance();
-        $this->loadViewsFrom($theme->getPreference('views_path'), 'theme');
+        $theme = Theme::instance(); // Get the theme instance
+
+        $theme->initialiseStyleSheet(); // Ensure the theme's stylesheet is enqueued
+        $this->loadViewsFrom($theme->getPreference('views_path'), 'theme'); // Load views from the theme's views directory
 
         // Load routes from the theme's routes directory
         $routesPath = $theme->getPreference('routes_path');
+        
         if (File::exists($routesPath) && File::isDirectory($routesPath)) {
             $routeFiles = File::files($routesPath);
             foreach ($routeFiles as $file) {

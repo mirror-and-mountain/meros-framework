@@ -17,47 +17,6 @@ abstract class Package extends FeatureProvider {
     use HasInstaller;
 
     /**
-     * Intialises the package.
-     * 
-     * @return void
-     */
-    protected function initialise(): void {
-        // Discover installables if enabled
-        if ($this->discoverInstallables) {
-            $this->discoverInstallables();
-        }
-
-        // Create a switch for the package if enabled
-        $switchable = $this->getPreference('is_switchable');
-
-        // Determine the enabled status of the package
-        $this->determineEnabledStatus();
-
-        if ($switchable) {
-            $this->makePackageSwitch();
-        }
-
-        if (! $this->enabled) {
-            return; // If the package is not enabled, skip the rest of the initialisation.
-        }
-
-        // Discover settings if enabled
-        if ($this->discoverSettings) {
-            $this->discoverSettings();
-        }
-
-        // Discover assets if enabled
-        if ($this->discoverAssets) {
-            $this->discoverAssets();
-        }
-
-        // Discover blocks if enabled
-        if ($this->discoverBlocks) {
-            $this->discoverBlocks();
-        }
-    }
-
-    /**
      * Determines the enabled status of the package based on its preferences and installable status.
      *
      * @return void
@@ -146,7 +105,7 @@ abstract class Package extends FeatureProvider {
         $field = [
             'page'            => $optionGroup,
             'section'         => $settingsSectionID,
-            'type'            => 'checkbox',
+            'type'            => 'toggle',
             'title'           => $this->getPackageSwitchTitleHTML(),
             'disabled'        => $disabled,
             'ajax_action'     => 'meros_toggle_package',

@@ -3,398 +3,502 @@
 namespace MM\Meros\App\Features\Settings;
 
 use Closure;
-
+use Exception;
 use Illuminate\Support\Str;
 
+use MM\Meros\App\Contracts\FieldRegistrar;
+use MM\Meros\App\Contracts\ObjectRegistrar;
+
 use MM\Meros\App\Features\Feature;
-use MM\Meros\App\Contracts\SettingsRegistrar;
+use MM\Meros\App\Features\Field;
+use MM\Meros\App\FeatureProvider;
 
-use MM\Meros\App\Facades\Registry;
-use MM\Meros\App\Support\Admin\Field;
+use MM\Meros\App\Features\Concerns\HasSanitizer;
+use MM\Meros\App\Features\Concerns\HasObjectBuilder;
 
-class Setting extends Feature {
-    /**
-     * The option group this setting belongs to.
-     *
-     * @var string
-     */
+final class Setting extends Feature implements ObjectRegistrar, FieldRegistrar {
+    // Used in the HasObjectBuilder trait to know what type of sub-items to create.
+    protected string $featureClass = self::class;
+
+    // Indicates whether the setting has been registered via the register() method.
+    protected bool $registered = false;
+
+    // The field instance associated with this setting if the withField() method is used.
+    public ?Field $field = null;
+
     public string $optionGroup;
+    public string $optionName;
+    public array  $args = [
+        'type'              => '',
+        'label'             => '',
+        'description'       => '',
+        'default'           => null,
+        'show_in_rest'      => false,
+        'sanitize_callback' => null, // To be set to the default sanitizer method in the constructor
+    ];
 
-    /**
-     * The type of value for the setting e.g. 'text,'boolean' etc.
-     *
-     * @var string
-     */
-    public string $type;
+    protected array $types = ['string', 'boolean', 'integer', 'number', 'array', 'object'];
 
-    /**
-     * The human-readable label for the setting.
-     *
-     * @var string
-     */
-    public string $label;
+    protected const FIELD_TYPES = [
+        'text',
+        'email',
+        'tel',
+        'url',
+        'password',
+        'textarea',
+        'checkbox',
+        'number',
+        'select',
+        'repeater'
+    ];
 
-    /**
-     * A description of the setting.
-     *
-     * @var string
-     */
-    public string $description;
-
-    /**
-     * The default value for the setting.
-     *
-     * @var mixed
-     */
-    public mixed $defaultValue;
-
-    /**
-     * Whether to show this setting in the REST API. Accepts a boolean or an array for REST Schema.
-     *
-     * @var bool|array
-     */
-    public bool|array $showInRest;
-
-    /**
-     * A callable or method reference for sanitizing the setting's value.
-     *
-     * @var Closure
-     */
-    public Closure $sanitizeCallback;
-
-    /**
-     * Configuration for a settings field to be generated for this setting.
-     * Can be set to false to not generate a field.
-     * 
-     * @var array|false
-     */
-    public array|false $fieldConfig;
-
-    /**
-     * The settings field associated with this setting, if any.
-     * 
-     * @var SettingField
-     */
-    public SettingField $field;
+    use HasObjectBuilder, HasSanitizer;
 
     public function __construct(
-        public SettingsRegistrar $source
+        public FeatureProvider $source,
+        string $type = '',
+        string $optionGroup = '',
+        string $optionName = ''
     ) {
-        $this->setSchema();
+
+        if (in_array($type, $this->types)) {
+            $this->$type($optionGroup, $optionName);
+        }
+
+        else {
+            $this->setGroupAndName($optionGroup, $optionName);
+        }
+
+
+        $this->args['sanitize_callback'] = [$this, 'sanitizeValue'];
+        
+        add_action('admin_init', [$this, 'register']);
+
+        $this->setReady();
+        $this->addToRegistry();
     }
 
     /**
-     * Creates a Setting instance from a config array and registers it.
+     * Sets the setting as ready (or not) based on the setting's current configuration.
      *
-     * @param  array $config Configuration array for the setting.
-     * 
-     * @return self  An instance of the Setting feature.
+     * @return void
      */
-    public function make(array $config): self {
-        $sanitizedConfig = $this->sanitizeConfig($config);
-        if ($sanitizedConfig !== false) {
-            $this->handle      = $sanitizedConfig['option_name'];
-            $this->optionGroup = $sanitizedConfig['option_group'];
-
-            $this->type         = $sanitizedConfig['type'];
-            $this->label        = $sanitizedConfig['label'];
-            $this->description  = $sanitizedConfig['description'];
-            $this->defaultValue = $sanitizedConfig['default'];
-
-            $this->showInRest        = $sanitizedConfig['show_in_rest'];
-            $this->sanitizeCallback  = $this->convertToClosure($sanitizedConfig['sanitize_callback']);
-
-            $this->ready = true;
-
-            // Hook the load method to the admin_init action to register the setting
-            add_action('admin_init', [$this, 'load']);
+    protected function setReady(): void {
+        if (empty($this->optionGroup) || empty($this->optionName)) {
+            $this->ready = false;
+            return;
         }
 
-        Registry::add('settings', $this);
+        $this->ready = true;
+    }
 
+    /**
+     * Registers the setting with WordPress. If a field is associated with the setting,
+     * it will also register the field. This method is hooked into the 'admin_init' action.
+     *
+     * @return void
+     */
+    protected function load(Feature $instance): void {
+        if (!$instance->ready || !$this->isRoot()) {
+            return;
+        }
+
+        if (
+            in_array($instance->args['type'], ['array', 'object']) && 
+            $instance->args['show_in_rest'] ?? false === true
+        ) {
+            $instance->args['show_in_rest'] = ['schema' => $instance->toSchema()];
+        } // If the setting is an array or object and is set to show in the REST API, convert it to a schema for registration.
+
+        register_setting(
+            $instance->optionGroup,
+            $instance->optionName,
+            $instance->args
+        );
+
+        // Register the field if it exists and is ready
+        $field = $instance->field;
+
+        if ($field !== null && $field->ready) {
+            $field->register();
+        }
+
+        $instance->loaded = true;
+    }
+
+    /***************************
+     * Public Chainable methods
+     ***************************/
+
+    /**
+     * Sets the option group for the setting.
+     *
+     * @param  string $group The option group name.
+     * 
+     * @return self
+     */
+    public function group(string $group): self {
+        $this->optionGroup = Str::snake($group);
+
+        $this->setReady();
         return $this;
     }
 
     /**
-     * Chainable method to create a SettingField instance associated with this setting.
+     * Sets the option name for the setting.
+     *
+     * @param  string $name The option name.
      * 
-     * @param  array $fieldConfig Configuration array for the field
-     * @param  bool  $returnField Whether to return the field instance instead of the setting instance
-     * 
-     * @return self|SettingField
+     * @return self
      */
-    public function withField(array $fieldConfig, bool $returnField = false): self|SettingField {
-        // Check the field hasn't already been made
-        if (isset($this->field)) {
-            $this->error = "A field has already been associated with the setting '{$this->handle}'.";
-            return $this->field; // Field already exists, so return the instance with error set
-        }
-       
-        // Sanitize the field config
-        $fieldConfig = $this->sanitizeFieldConfig($fieldConfig);
+    public function name(string $name): self {
+        $this->optionName = Str::snake($name);
 
-        if ($fieldConfig === false) {
-            return $this; // Invalid field config, so just return the setting instance with error set
-        }
-
-        // Set the default callback if set
-        if ($fieldConfig['callback'] === 'default') {
-            $fieldConfig['callback'] = function() use ($fieldConfig) {
-               echo Field::make(
-                    name: $fieldConfig['name'],
-                    type: $fieldConfig['type'],
-                    value: $this->getValue(),
-                    id: $fieldConfig['id'],
-                    required: $fieldConfig['required'],
-                    disabled: $fieldConfig['disabled'],
-                    options: $fieldConfig['options'],
-                    ajaxAction: $fieldConfig['ajax_action'],
-                    attributes: $fieldConfig['data_attributes'],
-                    nonce: $fieldConfig['nonce']
-                );
-            };
-        }
-
-        // Get the section instance to associate with the field, if it exists
-        $section = Registry::get('settingsSections')->where('handle', $fieldConfig['section'])->first();
-
-        $this->fieldConfig = $fieldConfig;
-
-        // Create the associated field instance
-        $this->field = app(SettingField::class, [
-            'source'           => $this->source,
-            'setting'          => $this,
-            'sectionInstance'  => $section
-        ])->make($fieldConfig);
-
-        return $returnField ? $this->field : $this;
+        $this->setReady();
+        return $this;
     }
 
     /**
-     * Set the configuration schema for the setting.
+     * Shorthand method to set the option name and type for a string setting.
      *
+     * @param  string $group Optional option group name.
+     * @param  string $name Optional option name.
+     * @param  mixed  $default Optional default value for the setting.
+     * @param  array  $args Optional additional arguments for the setting (e.g. 'show_in_rest' => true).
+     * 
+     * @return self
+     */
+    public function string(string $group = '', string $name = '', mixed $default = null, array $args = []): self {
+        $this->setGroupAndName($group, $name);
+        $this->args = array_merge($this->args, $args);
+
+        return $this->type('string')->default($default);
+    }
+
+    /**
+     * Shorthand method to set the option name and type for a boolean setting.
+     *
+     * @param  string $group Optional option group name.
+     * @param  string $name Optional option name.
+     * @param  mixed  $default Optional default value for the setting.
+     * @param  array  $args Optional additional arguments for the setting (e.g. 'show_in_rest' => true).
+     * 
+     * @return self
+     */
+    public function boolean(string $group = '', string $name = '', mixed $default = null, array $args = []): self {
+        $this->setGroupAndName($group, $name);
+        $this->args = array_merge($this->args, $args);
+
+        return $this->type('boolean')->default($default);
+    }
+
+    /**
+     * Shorthand method to set the option name and type for an integer setting.
+     *
+     * @param  string $group Optional option group name.
+     * @param  string $name Optional option name.
+     * @param  mixed  $default Optional default value for the setting.
+     * @param  array  $args Optional additional arguments for the setting (e.g. 'show_in_rest' => true).
+     * 
+     * @return self
+     */
+    public function integer(string $group = '', string $name = '', mixed $default = null, array $args = []): self {
+        $this->setGroupAndName($group, $name);
+        $this->args = array_merge($this->args, $args);
+
+        return $this->type('integer')->default($default);
+    }
+
+    /**
+     * Shorthand method to set the option name and type for a number setting.
+     *
+     * @param  string $group Optional option group name.
+     * @param  string $name Optional option name.
+     * @param  mixed  $default Optional default value for the setting.
+     * @param  array  $args Optional additional arguments for the setting (e.g. 'show_in_rest' => true).
+     * 
+     * @return self
+     */
+    public function number(string $group = '', string $name = '', mixed $default = null, array $args = []): self {
+        $this->setGroupAndName($group, $name);
+        $this->args = array_merge($this->args, $args);
+
+        return $this->type('number')->default($default);
+    }
+
+    /**
+     * Shorthand method to set the option name and type for an array setting.
+     *
+     * @param  string $group Optional option group name.
+     * @param  string $name Optional option name.
+     * @param  mixed  $default Optional default value for the setting.
+     * @param  array  $args Optional additional arguments for the setting (e.g. 'show_in_rest' => true).
+     * 
+     * @return self
+     */
+    public function array(string $group = '', string $name = '', mixed $default = null, array $args = []): self {
+        $this->setGroupAndName($group, $name);
+        $this->args = array_merge($this->args, $args);
+
+        return $this->type('array')->default($default);
+    }
+
+    /**
+     * Shorthand method to set the option name and type for an object setting.
+     *
+     * @param  string $group Optional option group name.
+     * @param  string $name Optional option name.
+     * @param  mixed  $default Optional default value for the setting.
+     * @param  array  $args Optional additional arguments for the setting (e.g. 'show_in_rest' => true).
+     * 
+     * @return self
+     */
+    public function object(string $group = '', string $name = '', array $args = []): self {
+        $this->setGroupAndName($group, $name);
+        $this->args = array_merge($this->args, $args);
+
+        return $this->type('object')->default(null);
+    }
+
+    /**
+     * Adds a sub-item to the setting. Sub-items are used for array and object settings to define the structure of the array or object.
+     *
+     * @param  string $path The dot-notated path for the sub-item (e.g. 'address.street' for an object setting or '*.street' for an array of objects).
+     * @param  string $optionName The option name for the sub-item.
+     * @param  string $type The type of the sub-item (e.g. 'string', 'integer', 'object', etc.).
+     * @param  mixed  $default Optional default value for the sub-item.
+     * @param  array  $args Optional additional arguments for the sub-item (e.g. 'label' => 'Street Address').
+     * 
+     * @return Setting The created sub-item as a Setting instance.
+     */
+    public function addSubItem(
+        string $path,
+        string $optionName,
+        string $type = '',
+        mixed  $default = null,
+        array  $args = []
+    ): Setting {
+
+        if (!in_array($this->args['type'], ['array', 'object'])) {
+            throw new Exception("Cannot add sub-item to non-object/array setting '{$this->optionName}'.");
+        }
+
+        $formattedName = Str::snake($optionName);
+        $fullPath      = trim($path, '.');
+
+        // Prevent adding sub-items to non-object children
+        if ($this->parent !== null && !in_array($this->args['type'], ['object', 'array'])) {
+            throw new Exception("Cannot add sub-items to non-object child '{$this->optionName}'.");
+        }
+
+        // Prevent duplicates
+        foreach ($this->subItems as $item) {
+            if ($item->path === $fullPath) {
+                return $item;
+            }
+        }
+
+        $item = app(self::class, [
+            'source'      => $this->source,
+            'type'        => $type,
+            'optionGroup' => $this->optionGroup,
+            'optionName'  => $formattedName,
+        ])->args($args)->parent($this)->path($fullPath);
+
+        if (!is_null($default)) {
+            $item->default($default);
+        }
+
+        $parent = $this->findParentForPath($fullPath);
+        
+        $item->parent($parent);
+        $parent->subItems[] = $item;
+
+        return $item;
+    }
+
+    public function path(?string $path): self {
+        $this->path = $path;
+        return $this;
+    }
+
+    /**
+     * Sets the type of value for the setting.
+     *
+     * @param  string $type The value type (e.g. 'string', 'boolean', etc.).
+     * 
+     * @return self
+     */
+    public function type(string $type): self {
+        if (!in_array($type, $this->types)) {
+            $this->error = "Invalid type '{$type}' specified for setting '{$this->optionName}'.";
+            return $this;
+        }
+
+        $this->args['type'] = $type;
+
+        $this->setReady();
+        return $this;
+    }
+
+    /**
+     * Merges the provided arguments with the existing arguments for the setting.
+     *
+     * @param  array $args An associative array of arguments to merge with the existing setting arguments.
+     * 
+     * @return self
+     */
+    public function args(array $args): self {
+        $this->args = array_merge($this->args, $args);
+
+        $this->setReady();
+        return $this;
+    }
+
+    /**
+     * Sets the label for the setting.
+     *
+     * @param  string $label The human-readable label for the setting.
+     * 
+     * @return self
+     */
+    public function label(string $label): self {
+        $this->args['label'] = $label;
+
+        $this->setReady();
+        return $this;
+    }
+
+    /**
+     * Sets the description for the setting.
+     *
+     * @param  string $description A description of the setting.
+     * 
+     * @return self
+     */
+    public function description(string $description): self {
+        $this->args['description'] = $description;
+
+        $this->setReady();
+        return $this;
+    }
+
+    /**
+     * Sets the default value for the setting.
+     *
+     * @param  mixed $value The default value for the setting.
+     * 
+     * @return self
+     */
+    public function default(mixed $value): self {
+        $this->args['default'] = $value;
+
+        $this->setReady();
+        return $this;
+    }
+
+    /**
+     * Sets whether the setting should be exposed in the REST API.
+     *
+     * @param  bool $show Whether to show the setting in the REST API.
+     * 
+     * @return self
+     */
+    public function showInRest(bool $show = true): self {
+        $this->args['show_in_rest'] = $show;
+
+        $this->setReady();
+        return $this;
+    }
+
+    /**
+     * Adds a field to the setting. The field will be used to render the setting's input in the settings page.
+     *
+     * @param  string $type The type of field to add (e.g. 'text', 'checkbox', etc.).
+     * @param  array  $config Optional configuration for the field (e.g. 'label' => 'My Field').
+     * 
+     * @return SettingField The created SettingField instance.
+     */
+    public function withField(string $type = '', ?Closure $callback = null, array $args = []): SettingField {
+        if ($this->field !== null) {
+            $this->error = "Setting '{$this->optionName}' already has a field associated with it.";
+            throw new \Exception($this->error);
+        }
+
+        if (!$this->compatibleWithField()) {
+            $this->error = "Setting '{$this->optionName}' is not compatible with fields. Please ensure the setting has a compatible type (string, boolean, integer, or number) before adding a field.";
+            throw new \Exception($this->error);
+        }
+
+        $validFieldTypes = self::FIELD_TYPES;
+
+        if ($type === '') {
+            $type = $this->getDefaultFieldType();
+        }
+
+        if (!in_array($type, $validFieldTypes)) {
+            $this->error = "Invalid field type '{$type}' specified for setting '{$this->optionName}'.";
+            throw new \Exception($this->error);
+        }
+
+        $field = (new SettingField(
+            source:    $this->source,
+            registrar: $this,
+            callback:  $callback
+        ))->type($type, $args);
+
+        $this->field = $field;
+        return $field;
+    }
+
+    /***************************
+     * Helpers
+     ***************************/
+
+    /**
+     * Sets the option group and name for the setting based on the provided group and name.
+     * If the option group and name are already set, this method will not override them.
+     *
+     * @param  string $group The option group name.
+     * @param  string $name The option name.
+     * 
      * @return void
      */
-    protected function setSchema(): void {
-        $allowedTypes = [
-            'string',
-            'boolean',
-            'integer',
-            'number',
-            'array',
-            'object'
-        ];
+    protected function setGroupAndName(string $group, string $name): void {
+        if (empty($this->optionGroup)) {
+            $this->optionGroup = Str::snake($group);
+        }
 
-        $this->configSchema = [
-            'option_name'       => ['type' => 'string', 'required' => true],
-            'option_group'      => ['type' => 'string', 'required' => true],
-            'type'              => ['type' => 'string', 'required' => true, 'allowed_values' => $allowedTypes],
-            'label'             => ['type' => 'string|null', 'required' => false, 'default' => null],
-            'description'       => ['type' => 'string|null', 'required' => false, 'default' => null],
-            'default'           => ['type' => 'mixed|null', 'required'  => false, 'default' => null],
-            'show_in_rest'      => ['type' => 'boolean|array', 'required' => false, 'default' => false],
-            'sanitize_callback' => ['type' => 'callable|closure', 'required' => false, 'default' => [$this, 'sanitizeValue']],
-        ];
+        if (empty($this->optionName)) {
+            $this->optionName  = Str::snake($name);
+        }
     }
 
     /**
-     * Sanitizes/generates field config if provided via the withField() method
+     * Checks if the setting is compatible with having a field added to it.
      *
-     * @param  array       $fieldConfig
-     *
-     * @return array|false Sanitized field config array if valid, or false if invalid with error message set.
+     * @return boolean
      */
-    private function sanitizeFieldConfig(array $fieldConfig): array|false {
-        $page     = $fieldConfig['page'] ?? null;
-        $callback = $fieldConfig['callback'] ?? null;
+    protected function compatibleWithField(): bool {
+        $compatibleTypes = ['string', 'boolean', 'integer', 'number', 'array'];
 
-        if ($page === null || $callback === null) {
-            $this->error = "Field configuration for setting '{$this->handle}' is missing the required 'page' or 'callback' parameter.";
-            return false;
-        }
-
-        // Set up additional config for use with the Field::make() method if using the default callback
-        if ($callback === 'default') {
-            $allowedFieldTypes = [
-                'text',
-                'url',
-                'email',
-                'tel',
-                'password',
-                'date',
-                'textarea',
-                'number',
-                'checkbox',
-                'select',
-                'multi_select',
-                'color',
-                'custom_html'
-            ];
-
-            $defaultFieldType = $this->getDefaultFieldType($this->type);
-
-            $schema = [
-                'page'           => ['type' => 'string', 'required' => true],
-                'callback'       => ['type' => 'string', 'required' => true],
-                'id'             => ['type' => 'string', 'required' => false, 'default' => Str::snake($this->handle) . '_field'],
-                'title'          => ['type' => 'string', 'required' => false, 'default' => $this->label],
-                'section'        => ['type' => 'string', 'required' => false, 'default' => 'default'],
-                'args'           => ['type' => 'array',  'required' => false, 'default' => []],
-
-                'type'            => ['type' => 'string',  'required' => false, 'allowed_values' => $allowedFieldTypes, 'default' => $defaultFieldType],
-                'name'            => ['type' => 'string',  'required' => false, 'default' => $this->handle],
-                'description'     => ['type' => 'string',  'required' => false, 'default' => $this->description],
-                'default'         => ['type' => 'mixed',   'required' => false, 'default' => $this->defaultValue],
-                'required'        => ['type' => 'boolean', 'required' => false, 'default' => false],
-                'disabled'        => ['type' => 'boolean', 'required' => false, 'default' => false],
-                'options'         => ['type' => 'array',   'required' => false, 'default' => []],
-                'data_attributes' => ['type' => 'array',   'required' => false, 'default' => []],
-                'nonce'           => ['type' => 'string',  'required' => false, 'default' => ''],
-
-                'ajax_action'    => ['type' => 'string', 'required' => false, 'default' => ''],
-                'ajax_callback'  => ['type' => 'callable|closure|null', 'required' => false, 'default' => null],
-            ];
-
-            $fieldConfig = $this->sanitizeConfig($fieldConfig, $schema);
-        }
-
-        else {
-            $schema = [
-                'page'           => ['type' => 'string', 'required' => true],
-                'callback'       => ['type' => 'callable|closure', 'required'  => true],
-                'id'             => ['type' => 'string', 'required' => false, 'default' => Str::snake($this->handle) . '_field'],
-                'title'          => ['type' => 'string', 'required' => false, 'default' => $this->label],
-                'section'        => ['type' => 'string', 'required' => false, 'default' => 'default'],
-                'args'           => ['type' => 'array',  'required' => false, 'default' => []]
-            ];
-
-            $fieldConfig = $this->sanitizeConfig($fieldConfig, $schema);
-        }
-
-
-        return $fieldConfig;
+        return in_array($this->args['type'] ?? '', $compatibleTypes);
     }
 
     /**
      * Returns a default field type using this Setting's value type.
      * To be extended for arrays and objects (repeater fields) in the future.
      *
-     * @param  string $settingType
-     *
      * @return string
      */
-    private function getDefaultFieldType(string $settingType): string {
-        return match ($settingType) {
+    public function getDefaultFieldType(): string {
+        return match ($this->args['type'] ?? 'string') {
             'string'            => 'text',
             'boolean'           => 'checkbox',
             'integer', 'number' => 'number',
+            'array'             => 'repeater',
             default => 'text',
         };
-    }
-
-    /**
-     * Default sanitizer for settings values.
-     *
-     * @param  mixed $value
-     *
-     * @return mixed
-     */
-    final public function sanitizeValue(mixed $value): mixed {
-        if (isset($this->field)) {
-            $requiredType = $this->field->type;
-        } else {
-            $requiredType = $this->type;
-        }
-
-        $type = gettype($value);
-
-        switch ($requiredType) {
-            case 'string':
-            case 'text':
-            case 'tel':
-            case 'password':
-            case 'date':
-            case 'textarea':
-            case 'select':
-                $value = $this->sanitizeTextValue($value, $type, $requiredType);
-                break;
-
-            case 'color':
-                $value = sanitize_hex_color($value);
-                break;
-
-            case 'url':
-                $value = sanitize_url($value);
-                break;
-
-            case 'email':
-                $value = sanitize_email($value);
-                break;
-
-            case 'integer':
-                $value = (int) $value;
-                break;
-
-            case 'number':
-                $value = (float) $value;
-                break;
-
-            case 'boolean':
-            case 'checkbox':
-                $value = (bool) $value ? '1' : '0';
-                break;
-        }
-
-        return $value;
-    }
-
-    /**
-     * Helper to sanitize text values. Called by the sanitizeValue method.
-     *
-     * @param mixed  $value
-     * @param string $type
-     * @param string $requiredType
-     * @return string
-     */
-    private function sanitizeTextValue(mixed $value, string $type, string $requiredType): string {
-        if ($type === 'string') {
-            if (in_array($requiredType, ['text', 'select'])) {
-                $value = sanitize_text_field($value);
-            } elseif ($requiredType === 'textarea') {
-                $value = sanitize_textarea_field($value);
-            }
-        } elseif (in_array($type, ['integer', 'boolean', 'double'])) {
-            $value = (string) $value;
-        }
-
-        return $value;
-    }
-
-    /**
-     * Registers the setting with WordPress.
-     *
-     * @return void
-     */
-    final public function load(): void {
-        register_setting(
-            $this->optionGroup, // Used for option_group
-            $this->handle,
-            [
-                'type'              => $this->type,
-                'label'             => $this->label,
-                'description'       => $this->description,
-                'sanitize_callback' => $this->sanitizeCallback,
-                'show_in_rest'      => $this->showInRest,
-                'default'           => $this->defaultValue
-            ]
-        );
-
-        // Load the associated field if it exists
-        if (isset($this->field)) {
-            $this->field->load();
-        }
-
-        $this->loaded = true;
     }
 
     /**
@@ -402,8 +506,8 @@ class Setting extends Feature {
      *
      * @return void
      */
-    final public function unload(): void {
-        unregister_setting($this->optionGroup, $this->handle);
+    public function unload(): void {
+        unregister_setting($this->optionGroup, $this->optionName);
     }
 
     /**
@@ -411,7 +515,49 @@ class Setting extends Feature {
      *
      * @return mixed
      */
-    final public function getValue(): mixed {
-        return get_option($this->handle, $this->defaultValue);
+    public function getValue(): mixed {
+        return get_option($this->optionName, $this->args['default'] ?? null);
+    }
+
+    /**
+     * Returns the option name (handle) for the setting.
+     *
+     * @return string
+     */
+    public function getID(): string {
+        return $this->optionName ?? '';
+    }
+
+    public function getName(): string {
+        return $this->getID();
+    }
+
+    /**
+     * Returns the settings label if available or generates a label using the provided option_name (stored in $this->optionName)
+     *
+     * @return string
+     */
+    public function getLabel(): string {
+        $label = $this->args['label'] ?? '';
+        
+        if ($label !== '') {
+            return $label;
+        }
+
+        return Str::title(Str::replace('_', ' ', $this->optionName));
+    }
+
+    /**
+     * Returns the description for the setting if available.
+     * Otherwise, returns an empty string.
+     * 
+     * @return string
+     */
+    public function getDescription(): string {
+        return $this->args['description'] ?? '';
+    }
+
+    public function register(): void {
+        $this->load($this);
     }
 }

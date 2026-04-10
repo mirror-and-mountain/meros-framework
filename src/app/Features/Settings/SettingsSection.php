@@ -3,88 +3,54 @@
 namespace MM\Meros\App\Features\Settings;
 
 use Closure;
+use Illuminate\Support\Str;
 
+use MM\Meros\App\FeatureProvider;
 use MM\Meros\App\Features\Feature;
-use MM\Meros\App\Contracts\SettingsRegistrar;
 
-use MM\Meros\App\Facades\Registry;
+final class SettingsSection extends Feature {
 
-class SettingsSection extends Feature {
-    /**
-     * The human-readable title of the settings section.
-     *
-     * @var string
-     */
+    public string $id;
     public string $title;
+    public string $pageSlug;
+    public array  $args = [];
 
-    /**
-     * The handle of the settings page this section belongs to.
-     *
-     * @var string
-     */
-    public string $page;
-
-    /**
-     * An array of additional arguments compatible with the args parameter of add_settings_section.
-     *
-     * @var array
-     */
-    public array $args;
-
-    /**
-     * The callback used to render the settings section.
-     *
-     * @var Closure
-     */
     public Closure $callback;
 
+    // The admin page instance that this section belongs to.
+    protected ?AdminPage $page = null;
+
     public function __construct(
-        public SettingsRegistrar $source
+        public FeatureProvider $source,
+        string $id
     ) {
-        $this->setSchema();
+        $this->id    = Str::slug($id);
+        $this->title = Str::title(Str::replace(['-', '_'], ' ', $id));
+
+        add_action('admin_init', function() {
+            $this->load($this);
+        });
+
+        $this->addToRegistry();
     }
 
     /**
-     * Creates a SettingsSection instance from a config array and registers it.
-     *
-     * @param  array $config Configuration array for the settings section.
+     * Sets the setting section as ready (or not) based on the state of the setting section's properties.
      * 
-     * @return self  An instance of the SettingsSection feature.
-     */
-    public function make(array $config): self {
-        $sanitizedConfig = $this->sanitizeConfig($config);
-        if ($sanitizedConfig !== false) {
-            $this->handle = $sanitizedConfig['id'];
-            $this->title  = $sanitizedConfig['title'];
-            $this->page   = $sanitizedConfig['page'];
-            $this->args   = $sanitizedConfig['args'];
-
-            $this->callback = $this->convertToClosure($sanitizedConfig['callback']);
-
-            $this->ready = true;
-
-            // Hook the load method to the admin_init action to register the settings section
-            add_action('admin_init', [$this, 'load']);
-        }
-
-        Registry::add('settingsSections', $this);
-
-        return $this;
-    }
-
-    /**
-     * Set the configuration schema for the settings section.
-     *
      * @return void
      */
-    protected function setSchema(): void {
-        $this->configSchema = [
-            'id'         => ['type' => 'string', 'required' => true],
-            'title'      => ['type' => 'string', 'required' => false, 'default' => ''],
-            'page'       => ['type' => 'string', 'required' => true],
-            'callback'   => ['type' => 'callable|closure', 'required' => true],
-            'args'       => ['type' => 'array', 'required' => false, 'default' => []],
-        ];
+    protected function setReady(): void {
+        if (!isset(
+            $this->id,
+            $this->title,
+            $this->pageSlug,
+            $this->callback
+        )) {
+            $this->ready = false;
+            return;
+        }
+
+        $this->ready = true;
     }
 
     /**
@@ -92,15 +58,55 @@ class SettingsSection extends Feature {
      *
      * @return void
      */
-    final public function load(): void {
+    protected function load(Feature $instance): void {
+        if (!$instance->ready) {
+            return;
+        }
+
         add_settings_section(
-            $this->handle,
-            $this->title,
-            $this->callback,
-            $this->page,
-            $this->args
+            $instance->id,
+            $instance->title,
+            $instance->callback,
+            $instance->pageSlug,
+            $instance->args
         );
 
         $this->loaded = true;
+    }
+    /***************************
+     * Public Chainable methods
+     ***************************/
+
+    public function onPage(AdminPage|string $page): self {
+        if ($page instanceof AdminPage) {
+            $this->page     = $page;
+            $this->pageSlug = $page->slug;
+        } else {
+            $this->pageSlug = Str::slug($page);
+        }
+
+        $this->setReady();
+        return $this;
+    }
+
+    public function title(string $title): self {
+        $this->title = $title;
+
+        $this->setReady();
+        return $this;
+    }
+
+    public function withCallback(callable|Closure $callback): self {
+        $this->callback = $this->convertToClosure($callback);
+
+        $this->setReady();
+        return $this;
+    }
+
+    public function args(array $args): self {
+        $this->args = $args;
+
+        $this->setReady();
+        return $this;
     }
 }

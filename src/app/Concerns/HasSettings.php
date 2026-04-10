@@ -6,28 +6,24 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 
 use MM\Meros\App\Features\Settings\Setting;
-use MM\Meros\App\Features\Settings\SettingsPage;
+use MM\Meros\App\Features\Settings\AdminPage;
 use MM\Meros\App\Features\Settings\SettingsSection;
 
 trait HasSettings {
     /**
-     * Whether this item should automatically discover settings configurations.
+     * The item's consolidated setting instance.
      *
-     * @var bool
+     * @var Setting
      */
-    protected bool $discoverSettings = false;
+    private ?Setting $itemSetting = null;
 
     /**
-     * Discovers settings pages, settings sections, and settings to be registered using 
+     * Discovers settings to be registered using 
      * the item's settings config file if available.
      *
      * @return void
      */
     protected function discoverSettings():void {
-        if (! $this->discoverSettings) {
-            return;
-        }
-
         $settingsPath = $this->getPreference('settings_path');
 
         if (File::exists($settingsPath) && File::isFile($settingsPath)) {
@@ -42,66 +38,82 @@ trait HasSettings {
 
             if (!is_array($settingsDefs)) {
                 return;
-            }
+            }  
 
-            $pages    = $settingsDefs['pages'] ?? null;
-            $sections = $settingsDefs['sections'] ?? null;
-            $settings = $settingsDefs['settings'] ?? null;
+            foreach ($settingsDefs as $setting) {
+                $optionName  = $setting['option_name'] ?? null;
+                $type        = $setting['type'] ?? null;
+                $fieldType   = $setting['field_type'] ?? null;
+                $args        = $setting['args'] ?? [];
 
-            if (is_array($pages)) {
-                foreach ($pages as $page) {
-                    $this->makeSettingsPage($page);
+                if (!$optionName || !$type) {
+                    continue;
                 }
-            }
 
-            if (is_array($sections)) {
-                foreach ($sections as $section) {
-                    $this->makeSettingsSection($section);
-                }
-            }
-            
-
-            if (is_array($settings)) {
-                foreach ($settings as $setting) {
-                    $field = $setting['field'] ?? null;
-                    $this->makeSetting($setting, $field);
-                }
+                $this->addItemSetting($optionName, $type, $fieldType, $args);
             }
         }
     }
 
+    private function getItemSettingObject(): Setting {
+        if ($this->itemSetting !== null) {
+            return $this->itemSetting;
+        }
+
+        $name  = $this->handle . '_settings';
+        $group = $this->handle . '_settings';
+
+        $this->itemSetting = $this->makeSetting()->object($group, $name);
+        return $this->itemSetting;
+    }
+
+    private function addItemSetting(
+        string       $optionName,
+        string       $type,
+        string|false $fieldType = false,
+        array        $args = []
+    ): void {
+        $setting = $this->getItemSettingObject();
+        $subSetting = $setting->addSubItem('settings', $optionName, $type, $args);
+
+        if ($fieldType !== false) {
+            $subSetting->withField($fieldType);
+        }
+
+    }
+
     /**
-     * Creates a SettingsPage instance for the item and registers it.
+     * Creates an AdminPage instance for the item and registers it.
      * 
-     * @param  array $config Config for the settings page.
+     * @param  string $slug The slug of the admin page.
      * 
-     * @return SettingsPage The created SettingsPage instance.
+     * @return AdminPage The created AdminPage instance.
      */
-    protected function makeSettingsPage(array $config): SettingsPage {
-        $existing = $this->getSettingsPage($config['menu_slug'] ?? '');
+    protected function makeAdminPage(string $slug): AdminPage {
+        $existing = $this->getAdminPage($slug);
 
         if ($existing !== null) {
             return $existing;
         }
 
-        return app(SettingsPage::class, ['source' => $this])->make($config);
+        return app(AdminPage::class, ['source' => $this, 'slug'  => $slug]);
     }
 
     /**
      * Creates a SettingsSection instance for the item and registers it.
      * 
-     * @param  array $config Config for the settings section.
+     * @param  string $id The ID of the settings section.
      * 
      * @return SettingsSection The created SettingsSection instance.
      */
-    protected function makeSettingsSection(array $config): SettingsSection {
-        $existing = $this->getSettingsSection($config['id'] ?? '');
+    protected function makeSettingsSection(string $id): SettingsSection {
+        $existing = $this->getSettingsSection($id);
         
         if ($existing !== null) {
             return $existing;
         }
 
-        return app(SettingsSection::class, ['source' => $this])->make($config);
+        return app(SettingsSection::class, ['source' => $this, 'id' => $id]);
     }
 
     /**
@@ -112,19 +124,26 @@ trait HasSettings {
      * 
      * @return Setting The created Setting instance.
      */
-    protected function makeSetting(array $config, array|null $field = null): Setting {
-        $existing  = $this->getSetting($config['option_name'] ?? '');
-        $withField = is_array($field);
+    protected function makeSetting(string $type = '', string $optionGroup = '', string $optionName = ''): Setting {
+        
+        if ($optionName !== '') {
+            $existing = $this->getSetting($optionName);
+        } else {
+            $existing = null;
+        }
 
         if ($existing !== null) {
-            return $withField ? $existing->withField($field, true) : $existing;
+            return $existing;
         }
 
-        if ($withField) {
-            return app(Setting::class, ['source' => $this])->make($config)->withField($field);
-        }
-
-        return app(Setting::class, ['source' => $this])->make($config);
+        return app(
+            Setting::class, [
+                'source'      => $this,
+                'type'        => $type,
+                'optionGroup' => $optionGroup,
+                'optionName'  => $optionName
+            ]
+        );
     }
 
     /**
@@ -186,14 +205,14 @@ trait HasSettings {
     }
 
     /**
-     * Returns a specific settings page object registered by the item.
+     * Returns a specific admin page object registered by the item.
      *
-     * @param  string $handle The handle of the settings page to return.
+     * @param  string $slug The slug of the admin page to return.
      * 
-     * @return SettingsPage|null
+     * @return AdminPage|null
      */
-    final public function getSettingsPage(string $handle): SettingsPage|null {
-        $page = $this->getSettingsPages()->firstWhere('handle', $handle);
+    final public function getAdminPage(string $slug): AdminPage|null {
+        $page = $this->getSettingsPages()->firstWhere('slug', $slug);
 
         return $page ?: null;
     }
@@ -214,12 +233,12 @@ trait HasSettings {
     /**
      * Returns a specific setting object registered by the item.
      *
-     * @param  string $handle The handle of the setting to return.
+     * @param  string $optionName The option name of the setting to return.
      * 
      * @return Setting|null
      */
-    final public function getSetting(string $handle): Setting|null {
-        $setting = $this->getSettings()->firstWhere('handle', $handle);
+    final public function getSetting(string $optionName): Setting|null {
+        $setting = $this->getSettings()->firstWhere('optionName', $optionName);
 
         return $setting ?: null;
     }
@@ -227,13 +246,13 @@ trait HasSettings {
     /**
      * Returns the value of a specific setting registered by the item.
      *
-     * @param  string $handle The handle of the setting to return the value of.
+     * @param  string $optionName The option name of the setting to return the value of.
      * @param  mixed  $default The default value to return if the setting isn't found or doesn't have a value.
      * 
      * @return mixed
      */
-    final public function getSettingValue(string $handle): mixed {
-        $setting = $this->getSetting($handle);
+    final public function getSettingValue(string $optionName): mixed {
+        $setting = $this->getSetting($optionName);
         return $setting ? $setting->getValue() : null;
     }
 }

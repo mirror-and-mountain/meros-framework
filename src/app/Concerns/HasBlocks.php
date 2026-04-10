@@ -72,11 +72,8 @@ trait HasBlocks {
         $isSwitchableByDefault = $this->getPreference('blocks_are_switchable_by_default');
         $isSwitchable          = apply_filters($handle . '_block_is_switchable', $isSwitchableByDefault);
 
-        if ($isSwitchable && $label !== '' && $description !== '') {
-            $enabled      = (bool) get_option($handle . '_block_enable', $enabled); // User preference for this block's enabled state.
-        } else {
+        if ($isSwitchable && ($label === '' || $description === '')) {
             $isSwitchable = false;
-            $enabled      = apply_filters($handle . '_block_is_enabled', $enabled);
         }
 
         return [
@@ -108,16 +105,16 @@ trait HasBlocks {
     /**
      * Creates a block instance from the given config and registers it.
      *
-     * @param  array $config The block configuration array.
+     * @param  array|string $configOrHandle The block configuration array or a handle string.
      * 
      * @return Block The created block instance.
      */
-    protected function makeBlock(array $config): Block {
+    protected function makeBlock(array|string $configOrHandle): Block {
         return app(
             Block::class, [
                 'source' => $this,
             ]
-        )->make($config);
+        )->make($configOrHandle);
     }
 
     /**

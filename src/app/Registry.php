@@ -5,6 +5,7 @@ namespace MM\Meros\App;
 use MM\Meros\App\Contracts\Registry as Contract;
 use MM\Meros\App\Contracts\FeatureDefinition;
 
+use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
 class Registry implements Contract {
@@ -58,7 +59,18 @@ class Registry implements Contract {
      */
     public function add(string $type, FeatureDefinition $item): void {
         if (property_exists($this, $type)) {
-            $this->{$type}->push($item);
+            if (!$this->{$type}->contains($item)) {
+                $this->{$type}->push($item);
+                return;
+            }
+        }
+
+        $plural = Str::plural($type);
+        if (property_exists($this, $plural)) {
+            if (!$this->{$plural}->contains($item)) {
+                $this->{$plural}->push($item);
+                return;
+            }
         }
     }
 

@@ -20,41 +20,6 @@ abstract class Theme extends FeatureProvider {
     }
 
     /**
-     * Initialises the theme.
-     *
-     * @return void
-     */
-    protected function initialise(): void {
-        // Discover installables if enabled
-        if ($this->discoverInstallables) {
-            $this->discoverInstallables();
-        }
-
-        // Create an installer for the theme if it has installables
-        if ($this->hasInstallables) {
-            $this->makeThemeInstaller();
-        }
-
-        // Discover settings if enabled
-        if ($this->discoverSettings) {
-            $this->discoverSettings();
-        }
-
-        // Discover assets if enabled
-        if ($this->discoverAssets) {
-            $this->discoverAssets();
-        }
-
-        // Discover blocks if enabled
-        if ($this->discoverBlocks) {
-            $this->discoverBlocks();
-        }
-
-        // Initialise the theme's style sheet
-        $this->initialiseStyleSheet();
-    }
-
-    /**
      * Creates an installer for the theme.
      *
      * @return void
@@ -117,7 +82,7 @@ abstract class Theme extends FeatureProvider {
      * 
      * @return void
      */
-    private function initialiseStyleSheet(): void {
+    public function initialiseStyleSheet(): void {
         add_action('wp_enqueue_scripts', function () {
             $handle = $this->handle . '_style'; // e.g. meros_style.
             wp_enqueue_style(

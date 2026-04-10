@@ -2,210 +2,56 @@
 
 namespace MM\Meros\App\Features\Settings;
 
-use Closure;
-
+use MM\Meros\App\Features\Field;
 use MM\Meros\App\Features\Feature;
-use MM\Meros\App\Contracts\SettingsRegistrar;
 
-use MM\Meros\App\Facades\Registry;
+class SettingField extends Field {
+    protected string $hook = 'admin_init';
 
-class SettingField extends Feature {
+    // The settings section instance that this field belongs to.
+    protected ?SettingsSection $section = null;
 
-    /**
-     * The slug of the menu page this field belongs to
-     *
-     * @var string
-     */
-    public string $page;
+    // The settings section id that this field belongs to.
+    protected string $sectionId = 'default';
 
-    /**
-     * The ID of the settings section this field belongs to
-     *
-     * @var string
-     */
-    public string $section;
+    // The admin page instance that this field belongs to.
+    protected ?AdminPage $page = null;
+
+    // The settings page slug that this field belongs to.
+    protected string $pageSlug = '';
 
     /**
-     * The title of the field
-     *
-     * @var string
-     */
-    public string $title;
-
-    /**
-     * Additional args compatible with the args parameter of add_settings_field
-     *
-     * @var array
-     */
-    public array $args;
-
-    /**
-     * The type of the field (e.g. 'text', 'checkbox', etc.)
-     * Used only for reference when the field is registered by a Setting instance
-     *
-     * @var string
-     */
-    public string $type;
-
-    /**
-     * The name attribute for the field, used in form submissions.
-     * Used only for reference when the field is registered by a Setting instance
-     *
-     * @var string
-     */
-    public string $name;
-
-    /**
-     * A description for the field.
-     * Used only for reference when the field is registered by a Setting instance
-     *
-     * @var string
-     */
-    public string $description;
-
-    /**
-     * The default value for the field.
-     * Used only for reference when the field is registered by a Setting instance
-     *
-     * @var mixed
-     */
-    public mixed $defaultValue;
-
-    /**
-     * Whether the field is required.
-     * Used only for reference when the field is registered by a Setting instance
-     *
-     * @var boolean
-     */
-    public bool $required;
-
-    /**
-     * Whether the field is disabled.
-     * Used only for reference when the field is registered by a Setting instance
-     *
-     * @var boolean
-     */
-    public bool $disabled;
-
-    /**
-     * An array of options for the field, used for select fields.
-     * Used only for reference when the field is registered by a Setting instance
-     *
-     * @var array
-     */
-    public array $options;
-
-    /**
-     * Additional data attributes to be passed to the field
-     * Used only for reference when the field is registered by a Setting instance
-     *
-     * @var array
-     */
-    public array $dataAttributes;
-
-    /**
-     * The callback used to render the field.
-     *
-     * @var Closure
-     */
-    public Closure $callback;
-
-
-    /**
-     * The AJAX action name for the field, if it supports AJAX.
-     * Used only for reference when the field is registered by a Setting instance
-     *
-     * @var string
-     */
-    public string $ajaxAction;
-
-    /**
-     * The callback used to handle AJAX requests for the field.
-     * Used only for reference when the field is registered by a Setting instance
-     *
-     * @var Closure|null
-     */
-    public Closure|null $ajaxCallback;
-
-    public function __construct(
-        public  SettingsRegistrar    $source,
-        public  Setting|null         $setting = null,
-        public  SettingsSection|null $sectionInstance = null,
-    ) {
-        $this->setSchema();
-    }
-
-    /**
-     * Creates a SettingField instance from a config array and registers it.
-     *
-     * @param  array $config Configuration array for the setting field.
-     * 
-     * @return self  An instance of the SettingField feature.
-     */
-    public function make(array $config): self {
-        if ($this->setting !== null) {
-            $this->handle   = $config['id'];
-            $this->title    = $config['title'];
-            $this->page     = $config['page'];
-            $this->section  = $config['section'];
-            $this->callback = $this->convertToClosure($config['callback']);
-            $this->args     = $config['args'];
-
-            $this->type           = $config['type'];
-            $this->name           = $config['name'] ?? $this->setting->handle;
-            $this->description    = $config['description'] ?? $this->setting->description;
-            $this->defaultValue   = $config['default'] ?? $this->setting->defaultValue;
-            $this->required       = $config['required'] ?? false;
-            $this->disabled       = $config['disabled'] ?? false;
-            $this->options        = $config['options'] ?? [];
-            $this->dataAttributes = $config['data_attributes'] ?? [];
-
-            $this->ajaxAction   = $config['ajax_action'] ?? '';
-            $this->ajaxCallback = isset($config['ajax_callback']) ? $this->convertToClosure($config['ajax_callback']) : null;
-
-            $this->ready = true;
-
-            // We'll call the loader from the parent Setting instance so no hook here...
-        }
-
-        else {
-            $sanitizedConfig = $this->sanitizeConfig($config);
-            if ($sanitizedConfig !== false) {
-
-                $this->handle         = $sanitizedConfig['id'];
-                $this->title          = $sanitizedConfig['title'];
-                $this->page           = $sanitizedConfig['page'];
-                $this->section        = $this->sectionInstance ? $this->sectionInstance->handle : $sanitizedConfig['section'];
-
-                $this->callback       = $this->convertToClosure($sanitizedConfig['callback']);
-                $this->args           = $sanitizedConfig['args'];
-
-                $this->ready = true;
-
-                // Hook the load method to the admin_init action to register the settings field
-                add_action('admin_init', [$this, 'load']);
-            }
-        }
-
-        Registry::add('settingsFields', $this);
-
-        return $this;
-    }
-
-    /**
-     * Set the configuration schema for the setting field.
+     * Sets the field as ready (or not) based on the field's current configuration.
      *
      * @return void
      */
-    protected function setSchema(): void {
-        $this->configSchema = [
-            'id'       => ['type' => 'string', 'required' => true],
-            'title'    => ['type' => 'string', 'required' => true],
-            'callback' => ['type' => 'callable|closure', 'required' => true],
-            'page'     => ['type' => 'string', 'required' => true],
-            'section'  => ['type' => 'string', 'required' => false, 'default' => 'default'],
-            'args'     => ['type' => 'array', 'required' => false, 'default' => []],
-        ];
+    protected function setReady(): void {
+        if ($this->type === '') {
+            $this->ready = false;
+            return;
+        }
+
+        if ($this->id === '') {
+            $this->ready = false;
+            return;
+        }
+
+        if ($this->pageSlug === '') {
+            $this->ready = false;
+            return;
+        }
+
+        if ($this->label === '') {
+            $this->ready = false;
+            return;
+        }
+
+        if ($this->callback === null) {
+            $this->ready = false;
+            return;
+        }
+
+        $this->ready = true;
     }
 
     /**
@@ -213,16 +59,110 @@ class SettingField extends Feature {
      *
      * @return void
      */
-    final public function load(): void {
+    protected function load(Feature $instance): void {
         add_settings_field(
-            $this->handle,
-            $this->title,
-            $this->callback,
-            $this->page,
-            $this->section,
-            $this->args
+            $instance->id,
+            $instance->label,
+            $instance->callback,
+            $instance->pageSlug,
+            $instance->sectionId,
+            $instance->args
         );
 
-        $this->loaded = true;
+        $instance->loaded = true;
+    }
+
+    /***************************
+     * Public Chainable methods
+     ***************************/
+
+    /**
+     * Associates the field with a specific settings section.
+     *
+     * @param  SettingsSection|string $section The section instance or id that this field belongs to.
+     *
+     * @return self
+     */
+    public function inSection(SettingsSection|string $section): self {
+        if ($section instanceof SettingsSection) {
+            $this->section   = $section;
+            $this->sectionId = $section->id;
+        } 
+        
+        elseif (is_string($section)) {
+            $this->sectionId = $section;
+        }
+
+        $this->setReady();
+        return $this;
+    }
+
+    /**
+     * Associates the field with a specific admin page.
+     *
+     * @param  AdminPage|string $page The page instance or slug that this field belongs to.
+     *
+     * @return self
+     */
+    public function onPage(AdminPage|string $page): self {
+        if ($page instanceof AdminPage) {
+            $this->page     = $page;
+            $this->pageSlug = $page->slug;
+        }
+
+        elseif (is_string($page)) {
+            $this->pageSlug = $page;
+        }
+
+        $this->setReady();
+        return $this;
+    }
+
+    /**
+     * Sets additional arguments for the field, such as label_for and class.
+     *
+     * @param  array $args An associative array of arguments to set for the field.
+     *
+     * @return self
+     */
+    public function args(array $args): self {
+        $labelFor = $args['label_for'] ?? null;
+        $class    = $args['class'] ?? null;
+
+        if (is_string($labelFor)) {
+            $this->args['label_for'] = $labelFor;
+        }
+
+        if (is_string($class)) {
+            $this->args['class'] = $class;
+        }
+
+        $this->setReady();
+        return $this;
+    }
+
+    /***************************
+     * Helpers
+     ***************************/
+
+    /**
+     * Generates HTML for the field title, which includes the label and description.
+     *
+     * @return string
+     */
+    protected function getFieldTitleHTML(): string {
+        $option      = $this->registrar->getName();
+        $label       = $this->registrar->getLabel();
+        $description = $this->registrar->getDescription();
+
+        // Generate HTML for the label
+        $html = '<label id="' . esc_attr($option) . '_field_label" for="' . esc_attr($option) . '_field" class="meros-settings-label">' . esc_html($label) . '</label>';
+        
+        // Generate HTML for the description
+        $html .= $description !== ''
+            ? '<p class="description">' . esc_html($description) . '</p>'
+            : '';
+        
+        return $html;
     }
 }
