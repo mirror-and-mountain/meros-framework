@@ -223,7 +223,7 @@ class DataBuilder {
                 $this->current->{$method}(...$arguments);
             } catch (\Throwable $e) {
                 throw new Exception(
-                    "Error calling '{$method}' on setting '{$this->current->optionName}': " . $e->getMessage(),
+                    "Error calling '{$method}' on setting '{$this->current->name}': " . $e->getMessage(),
                     0,
                     $e
                 );

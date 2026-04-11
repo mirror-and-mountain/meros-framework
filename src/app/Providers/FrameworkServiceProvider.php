@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Blade;
 
 use MM\Meros\App\Framework;
 use MM\Meros\App\Context;
@@ -50,7 +51,11 @@ class FrameworkServiceProvider extends ServiceProvider {
         $framework = $this->app->make(Framework::class)->__initialise();
         
         // Load views from the framework's views directory
-        $this->loadViewsFrom($framework->getPreference('views_path'), 'meros');
+        $viewsPath = $framework->getPreference('views_path');
+        $this->loadViewsFrom($viewsPath, 'meros');
+        
+        // Register the framework's components directory for anonymous components
+        Blade::anonymousComponentPath($viewsPath . '/components');
 
         // Load routes from the framework's routes directory
         $routesPath = $framework->getPreference('routes_path');

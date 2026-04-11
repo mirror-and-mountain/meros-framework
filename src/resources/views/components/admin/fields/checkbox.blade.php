@@ -1,10 +1,9 @@
-<input type="hidden" name="{{ $name }}" value="0">
+<input type="hidden" name="{{ $field->name }}" value="0">
 
-<input
+<input 
     type="checkbox"
-    id="{{ $id }}"
-    name="{{ $name }}"
+    name="{{ $field->name }}"
+    id="{{ $field->id }}"
     value="1"
-    class="meros-settings-field"
-    @checked($isChecked())
+    {{ $field->value ? 'checked' : '' }}
 >

@@ -7,6 +7,8 @@ use Closure;
 use MM\Meros\App\FeatureProvider;
 use MM\Meros\App\Contracts\FieldRegistrar;
 
+use MM\Meros\App\Support\RepeaterRow;
+
 abstract class Field extends Feature {
     // Should be defined in concrete classes to specify the WP hook to use when registering via the load() method.
     protected string $hook;
@@ -54,9 +56,11 @@ abstract class Field extends Feature {
             $this->callback = $this->convertToClosure([$this, 'render']);
         }
 
-        add_action($this->hook, function() {
-            $this->load($this);
-        });
+        if (!$this->isInRepeater()) {
+            add_action($this->hook, function() {
+                $this->load($this);
+            });
+        }
 
         $this->addToRegistry();
     }
@@ -103,7 +107,7 @@ abstract class Field extends Feature {
         return $this->type('select', $args);
     }
 
-    public function multiSelect(array $options, array $args = []): self {
+    public function multiselect(array $options, array $args = []): self {
         $this->options = $options;
         $this->multiSelect = true;
 
@@ -143,8 +147,24 @@ abstract class Field extends Feature {
         return $this;   
     }
 
-    public function get(): FieldRegistrar {
-        return $this->registrar;
+    /**
+     * Configures the field based on the provided configuration array. This method can be used to set things like options for select fields or other arguments.
+     *
+     * @param  mixed $config The configuration for the field, which can be an array of arguments or a callback for specific field types.
+     * 
+     * @return self Returns the current instance for method chaining.
+     */
+    public function configure(mixed $config): self {
+        if (is_array($config)) {
+            if (method_exists($this, $this->type)) {
+                // e.g. select(), radio(), etc.
+                $this->{$this->type}($config);
+            } else {
+                $this->args = array_merge($this->args, $config);
+            }
+        }
+
+        return $this;
     }
 
     /***************************
@@ -165,14 +185,9 @@ abstract class Field extends Feature {
             return;
         }
 
-        echo view('meros::admin.setting-field', [
+        echo view('meros::admin.field', [
             'component' => $this->getFieldComponent(),
-            'props'     => [
-                'id'       => $this->id,
-                'name'     => $this->name,
-                'value'    => $this->value,
-                'options'  => $this->options
-            ]
+            'field'     => $this
         ]);
     }
 
@@ -180,34 +195,37 @@ abstract class Field extends Feature {
      * Repeater Rendering
      ***************************/
     protected function renderRepeater(): void {
-        $items = is_array($this->value) ? $this->value : [];
+        $items = is_array($this->value) && !empty($this->value)
+            ? $this->value
+            : [[]]; // ensures at least one row
+
+        echo '<div class="meros-repeater">';
 
         foreach ($items as $index => $row) {
-            foreach ($this->registrar->subItems as $subItem) {
-                $field = $subItem->field;
+            $rowInstance = new RepeaterRow($this, $index, $row);
 
-                if (!$field || !$field->ready) {
-                    continue;
-                }
+            // Always wrap in a row for consistent structure
+            $rowInstance->row(function ($r) {
 
-                $instance = clone $field;
-
-                $instance->id    = "{$field->id}_{$index}";
-                $instance->name  = $field->getFieldName($index);
-                $instance->value = is_array($row)
-                    ? data_get($row, $subItem->optionName)
+                // Custom layout
+                $layout = method_exists($this->registrar, 'getLayout')
+                    ? $this->registrar->getLayout()
                     : null;
 
-                echo view('meros::admin.setting-field', [
-                    'component' => $instance->getFieldComponent(),
-                    'props' => [
-                        'id'    => $instance->id,
-                        'name'  => $instance->name,
-                        'value' => $instance->value,
-                    ]
-                ]);
-            }
+                if ($layout) {
+                    $layout($r);
+                    return;
+                }
+
+                // Default fallback layout
+                $names = $this->registrar->getFieldNames();
+                $r->fields($names);
+            });
         }
+
+        // Add button for new rows
+        $this->renderAddButton();
+        echo '</div>';
     }
 
     /***************************
@@ -215,12 +233,21 @@ abstract class Field extends Feature {
      ***************************/
 
     /**
+     * Renders the "Add Row" button for repeater fields.
+     *
+     * @return void
+     */
+    protected function renderAddButton(): void {
+        echo '<button type="button" class="button button-primary meros-add-row">Add Row</button>';
+    }
+
+    /**
      * Determines the field component to render based on the field type.
      *
      * @return string
      */
-    protected function getFieldComponent(): string {
-        return "meros::components.admin.fields.{$this->type}";
+    public function getFieldComponent(): string {
+        return "admin.fields.{$this->type}";
     }
 
     /**
@@ -281,5 +308,14 @@ abstract class Field extends Feature {
             'integer', 'number' => 'number',
             default   => 'text',
         };
+    }
+
+    /**
+     * Determines if the field is being rendered within a repeater context.
+     *
+     * @return bool
+     */
+    protected function isInRepeater(): bool {
+        return str_contains($this->registrar->path, '*');
     }
 }

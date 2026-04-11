@@ -6,7 +6,15 @@ use Closure;
 use MM\Meros\App\Support\Field;
 
 interface FieldRegistrar {
-    public function withField(string $type = '', ?Closure $callback = null): Field;
+    public function field(
+        ?string  $type = null,
+        mixed    $config = null,
+        ?Closure $callback = null,
+        array    $args = []
+    ): Field;
+    
+    public function getType(): ?string;
+    public function getItemType(): ?string;
     public function getID(): string;
     public function getName(): string;
     public function getLabel(): string;

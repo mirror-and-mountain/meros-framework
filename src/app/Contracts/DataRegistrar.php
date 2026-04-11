@@ -13,11 +13,6 @@ interface DataRegistrar {
     public function define(): DataBuilder;
 
     /**
-     * @return self
-     */
-    public function object(string $name, array $args = []): self;
-
-    /**
      * Adds a sub-item to the current object definition at the specified path.
      *
      * @param  string $path The dot-notated path for the sub-item relative to the current builder's path (e.g. 'blocks.my-block').
@@ -42,4 +37,18 @@ interface DataRegistrar {
      * @return array
      */
     public function toSchema(): array;
+
+    /**
+     * Retrieves an array of field names defined in the current object definition.
+     *
+     * @return array An array of field names.
+     */
+    public function getFieldNames(): array;
+
+    /**
+     * Retrieves an array of input names for the fields defined in the current object definition, formatted for use in form inputs.
+     *
+     * @return array An array of input names corresponding to the defined fields.
+     */
+    public function getInputNames(): array;
 }

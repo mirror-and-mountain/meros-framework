@@ -24,15 +24,15 @@ trait HasSettings {
      *
      * @param callable|null $callback Optional callback to define settings.
      *
-     * @return void
+     * @return Setting The root setting instance for the item.
      */
-    protected function settings(callable|\Closure|null $callback = null): void {
+    protected function settings(callable|\Closure|null $callback = null): Setting {
         // If already defined, just reuse it
         if ($this->settingDefinition instanceof Setting) {
             if ($callback) {
                 $callback($this->settingDefinition->define());
             }
-            return;
+            return $this->settingDefinition;
         }
 
         $optionGroup = $this->handle . '_settings';
@@ -48,6 +48,8 @@ trait HasSettings {
         if ($callback) {
             $callback($setting->define());
         }
+
+        return $this->settingDefinition;
     }
 
 
