@@ -4,6 +4,9 @@ namespace MM\Meros\App\Support;
 
 use Closure;
 
+/**
+ * Generates the HTML for a single row within a repeater field.
+ */
 class RepeaterRow {
     public function __construct(
         protected Field $repeater,
