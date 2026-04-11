@@ -1,9 +1,9 @@
 <?php
 
-namespace MM\Meros\App\Features\Settings;
+namespace MM\Meros\App\Settings;
 
-use MM\Meros\App\Features\Field;
-use MM\Meros\App\Features\Feature;
+use MM\Meros\App\Support\Field;
+use MM\Meros\App\Support\Feature;
 
 class SettingField extends Field {
     protected string $hook = 'admin_init';

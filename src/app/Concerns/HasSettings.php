@@ -3,11 +3,10 @@
 namespace MM\Meros\App\Concerns;
 
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\File;
 
-use MM\Meros\App\Features\Settings\Setting;
-use MM\Meros\App\Features\Settings\AdminPage;
-use MM\Meros\App\Features\Settings\SettingsSection;
+use MM\Meros\App\Settings\Setting;
+use MM\Meros\App\Settings\AdminPage;
+use MM\Meros\App\Settings\SettingsSection;
 
 trait HasSettings {
     /**
@@ -15,72 +14,42 @@ trait HasSettings {
      *
      * @var Setting
      */
-    private ?Setting $itemSetting = null;
+    private ?Setting $settingDefinition = null;
 
     /**
-     * Discovers settings to be registered using 
-     * the item's settings config file if available.
+     * Creates (or retrieves) a root settings object for the item and returns a builder.
+     *
+     * This enforces a single root object like:
+     *   theme_settings or package_settings
+     *
+     * @param callable|null $callback Optional callback to define settings.
      *
      * @return void
      */
-    protected function discoverSettings():void {
-        $settingsPath = $this->getPreference('settings_path');
-
-        if (File::exists($settingsPath) && File::isFile($settingsPath)) {
-            $pathInfo  = pathinfo($settingsPath);
-            $extension = $pathInfo['extension'] ?? '';
-            
-            if ($extension !== 'php') {
-                return;
+    protected function settings(callable|\Closure|null $callback = null): void {
+        // If already defined, just reuse it
+        if ($this->settingDefinition instanceof Setting) {
+            if ($callback) {
+                $callback($this->settingDefinition->define());
             }
+            return;
+        }
 
-            $settingsDefs = include $settingsPath;
+        $optionGroup = $this->handle . '_settings';
+        $optionName  = $this->handle . '_settings';
 
-            if (!is_array($settingsDefs)) {
-                return;
-            }  
+        $setting = app(Setting::class, [
+            'source'      => $this,
+            'optionGroup' => $optionGroup,
+        ])->object($optionName);
 
-            foreach ($settingsDefs as $setting) {
-                $optionName  = $setting['option_name'] ?? null;
-                $type        = $setting['type'] ?? null;
-                $fieldType   = $setting['field_type'] ?? null;
-                $args        = $setting['args'] ?? [];
+        $this->settingDefinition = $setting;
 
-                if (!$optionName || !$type) {
-                    continue;
-                }
-
-                $this->addItemSetting($optionName, $type, $fieldType, $args);
-            }
+        if ($callback) {
+            $callback($setting->define());
         }
     }
 
-    private function getItemSettingObject(): Setting {
-        if ($this->itemSetting !== null) {
-            return $this->itemSetting;
-        }
-
-        $name  = $this->handle . '_settings';
-        $group = $this->handle . '_settings';
-
-        $this->itemSetting = $this->makeSetting()->object($group, $name);
-        return $this->itemSetting;
-    }
-
-    private function addItemSetting(
-        string       $optionName,
-        string       $type,
-        string|false $fieldType = false,
-        array        $args = []
-    ): void {
-        $setting = $this->getItemSettingObject();
-        $subSetting = $setting->addSubItem('settings', $optionName, $type, $args);
-
-        if ($fieldType !== false) {
-            $subSetting->withField($fieldType);
-        }
-
-    }
 
     /**
      * Creates an AdminPage instance for the item and registers it.
@@ -114,36 +83,6 @@ trait HasSettings {
         }
 
         return app(SettingsSection::class, ['source' => $this, 'id' => $id]);
-    }
-
-    /**
-     * Creates a Setting instance for the item and registers it.
-     * 
-     * @param  array $config Config for the setting.
-     * @param  array|null $fieldConfig Optional config for the setting's associated field.
-     * 
-     * @return Setting The created Setting instance.
-     */
-    protected function makeSetting(string $type = '', string $optionGroup = '', string $optionName = ''): Setting {
-        
-        if ($optionName !== '') {
-            $existing = $this->getSetting($optionName);
-        } else {
-            $existing = null;
-        }
-
-        if ($existing !== null) {
-            return $existing;
-        }
-
-        return app(
-            Setting::class, [
-                'source'      => $this,
-                'type'        => $type,
-                'optionGroup' => $optionGroup,
-                'optionName'  => $optionName
-            ]
-        );
     }
 
     /**
@@ -196,12 +135,8 @@ trait HasSettings {
      *
      * @return Collection
      */
-    final public function getSettings(bool $readyOnly = false): Collection {
-        if ($readyOnly) {
-            return $this->getSettingsObjects('settings')->where('ready', true);
-        } else {
-            return $this->getSettingsObjects('settings');
-        }
+    final public function getSettings(bool $readyOnly = false) {
+        return $this->settingDefinition;
     }
 
     /**

@@ -2,4 +2,4 @@
 
 namespace MM\Meros\App\Contracts;
 
-interface FeatureDefinition {}
+interface FeatureBuilder {}

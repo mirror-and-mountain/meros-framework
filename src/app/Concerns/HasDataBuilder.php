@@ -1,29 +1,38 @@
 <?php 
 
-namespace MM\Meros\App\Features\Concerns;
+namespace MM\Meros\App\Concerns;
 
 use Exception;
 
-use MM\Meros\App\Features\ObjectBuilder;
-use MM\Meros\App\Contracts\ObjectRegistrar;
+use MM\Meros\App\Support\DataBuilder;
+use MM\Meros\App\Contracts\DataRegistrar;
 
-trait HasObjectBuilder {
-    public ?ObjectRegistrar $parent = null;
+trait HasDataBuilder {
+    public ?DataRegistrar $parent = null;
 
     public ?string $path = null;
     public array   $subItems = [];
 
     /**
-     * Returns a new ObjectBuilder instance scoped to the current feature and optional path.
+     * Public alias for builder().
      *
-     * @return ObjectBuilder A new ObjectBuilder instance for building nested settings or schema.
+     * @return DataBuilder
+     */
+    public function define(): DataBuilder {
+        return $this->builder();
+    }
+
+    /**
+     * Returns a new DataBuilder instance scoped to the current feature and optional path.
+     *
+     * @return DataBuilder A new DataBuilder instance for building nested settings or schema.
      * @throws Exception If the builder is used on a feature that is not of type 'object' or 'array', or is not root.
      */
-    public function builder(): ObjectBuilder {
+    protected function builder(): DataBuilder {
         $type = $this->args['type'] ?? null;
 
         // Must be root
-        if ($this->parent !== null) {
+        if (!$this->isRoot()) {
             throw new Exception('Builder can only be used on root settings.');
         }
 
@@ -50,9 +59,10 @@ trait HasObjectBuilder {
             $this->args['item_type'] = $this->args['item_type'] ?? 'object';
         }
 
-        return app(ObjectBuilder::class, [
-            'root' => $this,
-            'path' => $builderPath
+        return app(DataBuilder::class, [
+            'root'    => $this,
+            'path'    => $builderPath,
+            'isArray' => $type === 'array',
         ]);
     }
 
@@ -77,13 +87,12 @@ trait HasObjectBuilder {
     /**
      * Sets the parent object definition for the current feature.
      *
-     * @param  ObjectRegistrar $parent The parent object definition to set.
-     * 
+     * @param  DataRegistrar $parent The parent object definition to set.
+     *
      * @return self Returns the current instance for method chaining.
      */
-    public function parent(ObjectRegistrar $parent): self {
+    public function parent(DataRegistrar $parent): self {
         $this->parent = $parent;
-
         return $this;
     }
 
@@ -99,29 +108,39 @@ trait HasObjectBuilder {
             'type' => $type,
         ];
 
+        // Add label (JSON Schema "title")
+        if (!empty($this->args['label'])) {
+            $schema['title'] = $this->args['label'];
+        }
+
+        // Add description
+        if (!empty($this->args['description'])) {
+            $schema['description'] = $this->args['description'];
+        }
+
+        // Guard: only object/array types can have subItems
+        if (!empty($this->subItems) && !in_array($type, ['object', 'array'])) {
+            throw new Exception("Setting '{$this->optionName}' has subItems but is not an object or array type.");
+        }
+
         // Only include default if explicitly set AND not null
         if (array_key_exists('default', $this->args) && $this->args['default'] !== null) {
             $schema['default'] = $this->args['default'];
         }
 
-        // Title
-        if (!empty($this->args['label'])) {
-            $schema['title'] = $this->args['label'];
-        }
 
-        // Description
-        if (!empty($this->args['description'])) {
-            $schema['description'] = $this->args['description'];
-        }
+
 
         // OBJECT
         if ($type === 'object') {
-            if (!empty($this->subItems)) {
-                $schema['properties'] = [];
+            $properties = [];
 
-                foreach ($this->subItems as $child) {
-                    $schema['properties'][$child->optionName] = $child->toSchema();
-                }
+            foreach ($this->subItems as $child) {
+                $properties[$child->optionName] = $child->toSchema();
+            }
+
+            if (!empty($properties)) {
+                $schema['properties'] = $properties;
             }
         }
 
@@ -129,19 +148,35 @@ trait HasObjectBuilder {
         if ($type === 'array') {
             $itemType = $this->args['item_type'] ?? 'string';
 
+            if (!in_array($itemType, ['string', 'boolean', 'integer', 'number', 'array', 'object'])) {
+                throw new Exception("Invalid item_type '{$itemType}' for array setting '{$this->optionName}'.");
+            }
+
             $schema['items'] = [
                 'type' => $itemType,
             ];
 
-            // Array of objects (repeatable rows)
-            if ($itemType === 'object') {
-                if (!empty($this->subItems)) {
-                    $schema['items']['properties'] = [];
+            // Guard: subItems require object arrays
+            if (!empty($this->subItems) && $itemType !== 'object') {
+                throw new Exception(
+                    "Array setting '{$this->optionName}' defines subItems but item_type is not 'object'."
+                );
+            }
 
-                    foreach ($this->subItems as $child) {
-                        $schema['items']['properties'][$child->optionName] = $child->toSchema();
-                    }
-                }
+            // If not an object array, nothing more to build
+            if ($itemType !== 'object') {
+                return $schema;
+            }
+
+            // Array of objects (repeatable rows)
+            $properties = [];
+
+            foreach ($this->subItems as $child) {
+                $properties[$child->optionName] = $child->toSchema();
+            }
+
+            if (!empty($properties)) {
+                $schema['items']['properties'] = $properties;
             }
         }
 

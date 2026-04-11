@@ -1,13 +1,10 @@
 <?php 
 
-namespace MM\Meros\App\Features;
+namespace MM\Meros\App\Discoverables;
 
 use Illuminate\Support\Str;
+use MM\Meros\App\Support\Feature;
 
-use MM\Meros\App\Contracts\BlocksRegistrar;
-use MM\Meros\App\Features\Concerns\MakesSwitch;
-
-use MM\Meros\App\Facades\Registry;
 
 class Block extends Feature {
     /**
@@ -44,8 +41,6 @@ class Block extends Feature {
      * @var bool
      */
     public bool $enabled = false;
-
-    use MakesSwitch;
 
     public function __construct(
         public BlocksRegistrar $source

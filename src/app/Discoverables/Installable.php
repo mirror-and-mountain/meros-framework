@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\App\Features;
+namespace MM\Meros\App\Discoverables;
 
 use MM\Meros\App\Contracts\InstallablesRegistrar;
 
@@ -12,7 +12,9 @@ use MM\Meros\App\Facades\Registry;
 use MM\Meros\App\Facades\Framework;
 
 use MM\Meros\App\Models\Migration;
-use MM\Meros\App\Support\Admin\Migration as Runner;
+
+use MM\Meros\App\Support\Feature;
+use MM\Meros\App\Support\Migration as Runner;
 
 class Installable extends Feature {
     /**

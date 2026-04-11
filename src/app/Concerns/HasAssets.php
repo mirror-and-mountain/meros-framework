@@ -2,11 +2,10 @@
 
 namespace MM\Meros\App\Concerns;
 
-use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 
-use MM\Meros\App\Features\Asset;
+use MM\Meros\App\Discoverables\Asset;
 
 trait HasAssets {
     /**

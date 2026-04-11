@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\App\Features;
+namespace MM\Meros\App\Discoverables;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Schema;

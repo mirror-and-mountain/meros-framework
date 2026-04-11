@@ -6,7 +6,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 
-use MM\Meros\App\Features\Block;
+use MM\Meros\App\Discoverables\Block;
 
 trait HasBlocks {
     /**

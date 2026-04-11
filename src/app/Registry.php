@@ -3,7 +3,7 @@
 namespace MM\Meros\App;
 
 use MM\Meros\App\Contracts\Registry as Contract;
-use MM\Meros\App\Contracts\FeatureDefinition;
+use MM\Meros\App\Contracts\FeatureBuilder;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
@@ -53,11 +53,11 @@ class Registry implements Contract {
      * Specific methods will be added for individual collections e.g. addPackage(), addSettingPage() etc.
      *
      * @param  string $type The collection to add to e.g. 'settings', 'packages' etc.
-     * @param  FeatureDefinition $item The item to add.
+     * @param  FeatureBuilder $item The item to add.
      * 
      * @return void
      */
-    public function add(string $type, FeatureDefinition $item): void {
+    public function add(string $type, FeatureBuilder $item): void {
         if (property_exists($this, $type)) {
             if (!$this->{$type}->contains($item)) {
                 $this->{$type}->push($item);

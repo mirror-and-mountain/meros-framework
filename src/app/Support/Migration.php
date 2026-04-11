@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\App\Support\Admin;
+namespace MM\Meros\App\Support;
 
 use Illuminate\Database\Migrations\Migration as LaravelMigration;
 

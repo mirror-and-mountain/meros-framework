@@ -1,11 +1,11 @@
 <?php 
 
-namespace MM\Meros\App\Features;
+namespace MM\Meros\App\Support;
 
 use Closure;
 
-use MM\Meros\App\Contracts\FieldRegistrar;
 use MM\Meros\App\FeatureProvider;
+use MM\Meros\App\Contracts\FieldRegistrar;
 
 abstract class Field extends Feature {
     // Should be defined in concrete classes to specify the WP hook to use when registering via the load() method.

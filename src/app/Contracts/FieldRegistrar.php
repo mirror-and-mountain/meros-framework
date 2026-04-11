@@ -3,7 +3,7 @@
 namespace MM\Meros\App\Contracts;
 
 use Closure;
-use MM\Meros\App\Features\Field;
+use MM\Meros\App\Support\Field;
 
 interface FieldRegistrar {
     public function withField(string $type = '', ?Closure $callback = null): Field;

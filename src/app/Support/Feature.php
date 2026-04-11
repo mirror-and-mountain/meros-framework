@@ -1,13 +1,13 @@
 <?php 
 
-namespace MM\Meros\App\Features;
+namespace MM\Meros\App\Support;
 
 use Closure;
 use MM\Meros\App\Facades\Registry;
 
-use MM\Meros\App\Contracts\FeatureDefinition;
+use MM\Meros\App\Contracts\FeatureBuilder;
 
-abstract class Feature implements FeatureDefinition {
+abstract class Feature implements FeatureBuilder {
     /**
      * Indicates that the feature's configuration is valid and
      * that the feature is ready to be hooked into WordPress.

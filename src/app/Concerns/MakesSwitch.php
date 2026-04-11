@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\App\Features\Concerns;
+namespace MM\Meros\App\Concerns;
 
 use Illuminate\Support\Str;
 

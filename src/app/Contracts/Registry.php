@@ -10,11 +10,11 @@ interface Registry {
      * Specific methods will be added for individual collections e.g. addPackage(), addSettingPage() etc.
      *
      * @param  string $type The collection to add to e.g. 'settings', 'packages' etc.
-     * @param  FeatureDefinition $item The item to add.
+     * @param  FeatureBuilder $item The item to add.
      * 
      * @return void
      */
-    public function add(string $type, FeatureDefinition $item): void;
+    public function add(string $type, FeatureBuilder $item): void;
 
     /**
      * Generic method to get one of this object's collections.

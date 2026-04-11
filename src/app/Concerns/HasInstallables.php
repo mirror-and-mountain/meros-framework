@@ -8,10 +8,8 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 
 use MM\Meros\App\Models\Migration;
-use MM\Meros\App\Features\Installable;
 use MM\Meros\App\Facades\Framework;
-
-use MM\Meros\App\Models\Integration;
+use MM\Meros\App\Discoverables\Installable;
 
 trait HasInstallables {
     /**

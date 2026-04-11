@@ -1,23 +1,23 @@
 <?php 
 
-namespace MM\Meros\App\Features\Settings;
+namespace MM\Meros\App\Settings;
 
 use Closure;
 use Exception;
 use Illuminate\Support\Str;
 
 use MM\Meros\App\Contracts\FieldRegistrar;
-use MM\Meros\App\Contracts\ObjectRegistrar;
+use MM\Meros\App\Contracts\DataRegistrar;
 
-use MM\Meros\App\Features\Feature;
-use MM\Meros\App\Features\Field;
+use MM\Meros\App\Support\Feature;
+use MM\Meros\App\Support\Field;
 use MM\Meros\App\FeatureProvider;
 
-use MM\Meros\App\Features\Concerns\HasSanitizer;
-use MM\Meros\App\Features\Concerns\HasObjectBuilder;
+use MM\Meros\App\Concerns\HasSanitizer;
+use MM\Meros\App\Concerns\HasDataBuilder;
 
-final class Setting extends Feature implements ObjectRegistrar, FieldRegistrar {
-    // Used in the HasObjectBuilder trait to know what type of sub-items to create.
+final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
+    // Used in the HasDataBuilder trait to know what type of sub-items to create.
     protected string $featureClass = self::class;
 
     // Indicates whether the setting has been registered via the register() method.
@@ -26,8 +26,8 @@ final class Setting extends Feature implements ObjectRegistrar, FieldRegistrar {
     // The field instance associated with this setting if the withField() method is used.
     public ?Field $field = null;
 
-    public string $optionGroup;
-    public string $optionName;
+    public string $optionGroup = '';
+    public string $optionName = '';
     public array  $args = [
         'type'              => '',
         'label'             => '',
@@ -36,6 +36,8 @@ final class Setting extends Feature implements ObjectRegistrar, FieldRegistrar {
         'show_in_rest'      => false,
         'sanitize_callback' => null, // To be set to the default sanitizer method in the constructor
     ];
+
+    public string $type;
 
     protected array $types = ['string', 'boolean', 'integer', 'number', 'array', 'object'];
 
@@ -52,24 +54,14 @@ final class Setting extends Feature implements ObjectRegistrar, FieldRegistrar {
         'repeater'
     ];
 
-    use HasObjectBuilder, HasSanitizer;
+    use HasDataBuilder, HasSanitizer;
 
     public function __construct(
         public FeatureProvider $source,
-        string $type = '',
         string $optionGroup = '',
-        string $optionName = ''
     ) {
 
-        if (in_array($type, $this->types)) {
-            $this->$type($optionGroup, $optionName);
-        }
-
-        else {
-            $this->setGroupAndName($optionGroup, $optionName);
-        }
-
-
+        $this->group($optionGroup);
         $this->args['sanitize_callback'] = [$this, 'sanitizeValue'];
         
         add_action('admin_init', [$this, 'register']);
@@ -161,103 +153,88 @@ final class Setting extends Feature implements ObjectRegistrar, FieldRegistrar {
     /**
      * Shorthand method to set the option name and type for a string setting.
      *
-     * @param  string $group Optional option group name.
-     * @param  string $name Optional option name.
-     * @param  mixed  $default Optional default value for the setting.
-     * @param  array  $args Optional additional arguments for the setting (e.g. 'show_in_rest' => true).
+     * @param string $name The option name.
      * 
      * @return self
      */
-    public function string(string $group = '', string $name = '', mixed $default = null, array $args = []): self {
-        $this->setGroupAndName($group, $name);
-        $this->args = array_merge($this->args, $args);
-
-        return $this->type('string')->default($default);
+    public function string(string $name): self {
+        return $this->name($name)->type('string');
     }
 
     /**
      * Shorthand method to set the option name and type for a boolean setting.
      *
-     * @param  string $group Optional option group name.
-     * @param  string $name Optional option name.
-     * @param  mixed  $default Optional default value for the setting.
-     * @param  array  $args Optional additional arguments for the setting (e.g. 'show_in_rest' => true).
+     * @param string $name The option name.
      * 
-     * @return self
+     * @return self 
      */
-    public function boolean(string $group = '', string $name = '', mixed $default = null, array $args = []): self {
-        $this->setGroupAndName($group, $name);
-        $this->args = array_merge($this->args, $args);
-
-        return $this->type('boolean')->default($default);
+    public function boolean(string $name): self {
+        return $this->name($name)->type('boolean');
     }
 
     /**
      * Shorthand method to set the option name and type for an integer setting.
      *
-     * @param  string $group Optional option group name.
-     * @param  string $name Optional option name.
-     * @param  mixed  $default Optional default value for the setting.
-     * @param  array  $args Optional additional arguments for the setting (e.g. 'show_in_rest' => true).
+     * @param  string $name The option name.
      * 
      * @return self
      */
-    public function integer(string $group = '', string $name = '', mixed $default = null, array $args = []): self {
-        $this->setGroupAndName($group, $name);
-        $this->args = array_merge($this->args, $args);
-
-        return $this->type('integer')->default($default);
+    public function integer(string $name): self {
+        return $this->name($name)->type('integer');
     }
 
     /**
      * Shorthand method to set the option name and type for a number setting.
      *
-     * @param  string $group Optional option group name.
-     * @param  string $name Optional option name.
-     * @param  mixed  $default Optional default value for the setting.
-     * @param  array  $args Optional additional arguments for the setting (e.g. 'show_in_rest' => true).
+     * @param  string $name The option name.
      * 
      * @return self
      */
-    public function number(string $group = '', string $name = '', mixed $default = null, array $args = []): self {
-        $this->setGroupAndName($group, $name);
-        $this->args = array_merge($this->args, $args);
-
-        return $this->type('number')->default($default);
+    public function number(string $name): self {
+        return $this->name($name)->type('number');
     }
 
     /**
      * Shorthand method to set the option name and type for an array setting.
      *
-     * @param  string $group Optional option group name.
-     * @param  string $name Optional option name.
-     * @param  mixed  $default Optional default value for the setting.
-     * @param  array  $args Optional additional arguments for the setting (e.g. 'show_in_rest' => true).
+     * @param string $name The option name.
      * 
      * @return self
      */
-    public function array(string $group = '', string $name = '', mixed $default = null, array $args = []): self {
-        $this->setGroupAndName($group, $name);
-        $this->args = array_merge($this->args, $args);
+    public function array(string $name): self {
+        return $this->name($name)->type('array');
+    }
 
-        return $this->type('array')->default($default);
+    /**
+     * Explicitly defines the item type for an array setting.
+     *
+     * @param  string $type The item type (e.g. 'string', 'integer', 'object').
+     * @return self
+     */
+    public function of(string $type): self {
+        if (!in_array($type, $this->types)) {
+            throw new Exception("Invalid item type '{$type}' for array setting '{$this->optionName}'.");
+        }
+
+        $this->args['item_type'] = $type;
+
+        $this->setReady();
+
+        return $this;
     }
 
     /**
      * Shorthand method to set the option name and type for an object setting.
      *
-     * @param  string $group Optional option group name.
-     * @param  string $name Optional option name.
-     * @param  mixed  $default Optional default value for the setting.
+     * @param  string $name The option name.
      * @param  array  $args Optional additional arguments for the setting (e.g. 'show_in_rest' => true).
      * 
      * @return self
      */
-    public function object(string $group = '', string $name = '', array $args = []): self {
-        $this->setGroupAndName($group, $name);
+    public function object(string $name, array $args = []): self {
         $this->args = array_merge($this->args, $args);
 
-        return $this->type('object')->default(null);
+        return $this->name($name)->type('object');
     }
 
     /**
@@ -274,9 +251,7 @@ final class Setting extends Feature implements ObjectRegistrar, FieldRegistrar {
     public function addSubItem(
         string $path,
         string $optionName,
-        string $type = '',
-        mixed  $default = null,
-        array  $args = []
+        string $type = ''
     ): Setting {
 
         if (!in_array($this->args['type'], ['array', 'object'])) {
@@ -291,27 +266,27 @@ final class Setting extends Feature implements ObjectRegistrar, FieldRegistrar {
             throw new Exception("Cannot add sub-items to non-object child '{$this->optionName}'.");
         }
 
+        $parent = $this->findParentForPath($fullPath);
+
         // Prevent duplicates
-        foreach ($this->subItems as $item) {
-            if ($item->path === $fullPath) {
-                return $item;
+        foreach ($parent->subItems as $existing) {
+            if ($existing->optionName === $formattedName) {
+                throw new Exception("Duplicate property '{$formattedName}' in '{$parent->optionName}'");
             }
         }
 
         $item = app(self::class, [
             'source'      => $this->source,
-            'type'        => $type,
             'optionGroup' => $this->optionGroup,
-            'optionName'  => $formattedName,
-        ])->args($args)->parent($this)->path($fullPath);
+        ]);
 
-        if (!is_null($default)) {
-            $item->default($default);
+        $item->name($formattedName);
+
+        if (!empty($type)) {
+            $item->type($type);
         }
 
-        $parent = $this->findParentForPath($fullPath);
-        
-        $item->parent($parent);
+        $item->parent($parent)->path($fullPath);
         $parent->subItems[] = $item;
 
         return $item;
@@ -336,6 +311,7 @@ final class Setting extends Feature implements ObjectRegistrar, FieldRegistrar {
         }
 
         $this->args['type'] = $type;
+        $this->type = $type;
 
         $this->setReady();
         return $this;
@@ -391,9 +367,26 @@ final class Setting extends Feature implements ObjectRegistrar, FieldRegistrar {
      * @return self
      */
     public function default(mixed $value): self {
+        $type = $this->type ?? null;
+
+        if ($type) {
+            $valid = match ($type) {
+                'string'  => is_string($value),
+                'boolean' => is_bool($value),
+                'integer' => is_int($value),
+                'number'  => is_numeric($value),
+                'array'   => is_array($value),
+                'object'  => is_array($value) || is_object($value),
+                default   => true,
+            };
+
+            if (!$valid) {
+                throw new Exception("Invalid default value for type '{$type}' on '{$this->optionName}'");
+            }
+        }
+
         $this->args['default'] = $value;
 
-        $this->setReady();
         return $this;
     }
 

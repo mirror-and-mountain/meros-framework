@@ -1,12 +1,12 @@
 <?php 
 
-namespace MM\Meros\App\Features\Settings;
+namespace MM\Meros\App\Settings;
 
 use Closure;
 use Illuminate\Support\Str;
 
 use MM\Meros\App\FeatureProvider;
-use MM\Meros\App\Features\Feature;
+use MM\Meros\App\Support\Feature;
 
 final class SettingsSection extends Feature {
 

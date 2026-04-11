@@ -1,13 +1,12 @@
 <?php 
 
-namespace MM\Meros\App\Features;
+namespace MM\Meros\App\Discoverables;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
 use MM\Meros\App\FeatureProvider;
-
-use MM\Meros\App\Features\Concerns\MakesSwitch;
+use MM\Meros\App\Support\Feature;
 
 final class Asset extends Feature {
     public string $path = '';
@@ -36,8 +35,6 @@ final class Asset extends Feature {
         'editor' => 'enqueue_block_editor_assets',
         'site'   => 'wp_enqueue_scripts',
     ];
-
-    use MakesSwitch;
 
     public function __construct(public FeatureProvider $source) {
         $this->addToRegistry();
