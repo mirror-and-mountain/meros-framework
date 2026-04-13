@@ -15,9 +15,16 @@ trait HasSanitizer {
     protected ?array $cachedExisting = null;
 
     /**
+     * Path resolver instance for handling nested paths.
+     *
+     * @var PathResolver|null
+     */
+    protected ?PathResolver $pathResolver = null;
+
+    /**
      * Sets the sanitize callback for the setting.
      *
-     * @param  callable|Closure $callback A callable or method reference for sanitizing the setting's value.
+     * @param callable|Closure $callback A callable or method reference for sanitizing the setting's value.
      *
      * @return self
      */
@@ -31,7 +38,7 @@ trait HasSanitizer {
     /**
      * Default sanitizer for settings values.
      *
-     * @param  mixed   $value
+     * @param  mixed $value
      *
      * @return mixed
      */
@@ -48,9 +55,18 @@ trait HasSanitizer {
 
         $requiredType = $type;
 
-        // Only allow field type override for scalar values
-        if (isset($this->field) && !in_array($type, ['array', 'object'])) {
-            $requiredType = $this->field->type;
+        $map = [
+            'text'      => 'string',
+            'textarea'  => 'string',
+            'select'    => 'string',
+            'email'     => 'string',
+            'url'       => 'string',
+            'number'    => 'number',
+            'checkbox'  => 'boolean',
+        ];
+
+        if (isset($this->field) && isset($map[$this->field->type])) {
+            $requiredType = $map[$this->field->type];
         }
 
         return $this->sanitize($value, $requiredType);
@@ -165,15 +181,6 @@ trait HasSanitizer {
     }
 
     /**
-     * Helper to reuse a single PathResolver instance.
-     *
-     * @return PathResolver
-     */
-    protected function resolver(): PathResolver {
-        return new PathResolver($this->optionName);
-    }
-
-    /**
      * Sanitizes a value based on the required type. 
      *
      * @param mixed  $value
@@ -217,7 +224,7 @@ trait HasSanitizer {
 
             case 'boolean':
             case 'checkbox':
-                $value = (bool) $value ? '1' : '0';
+                $value = (bool) $value;
                 break;
         }
 
@@ -237,13 +244,26 @@ trait HasSanitizer {
         if ($type === 'string') {
             if (in_array($requiredType, ['text', 'select'])) {
                 $value = sanitize_text_field($value);
-            } elseif ($requiredType === 'textarea') {
+            } 
+            
+            else if ($requiredType === 'textarea') {
                 $value = sanitize_textarea_field($value);
             }
-        } elseif (in_array($type, ['integer', 'boolean', 'double'])) {
-            $value = (string) $value;
+        } 
+        
+        else {
+            return is_scalar($value) ? (string) $value : '';
         }
 
         return $value;
+    }
+
+    /**
+     * Helper to reuse a single PathResolver instance.
+     *
+     * @return PathResolver
+     */
+    protected function resolver(): PathResolver {
+        return $this->resolverInstance ??= new PathResolver($this->name);
     }
 }
