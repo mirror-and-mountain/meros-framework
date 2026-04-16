@@ -10,8 +10,9 @@ use Illuminate\Support\Facades\Blade;
 
 use MM\Meros\App\Framework;
 use MM\Meros\App\Context;
-use MM\Meros\App\Support\ClassInfo;
+
 use MM\Meros\App\Support\Registry;
+use MM\Meros\App\Support\Helpers\ClassInfo;
 
 use MM\Meros\App\Listeners\MigrationEventSubscriber;
 

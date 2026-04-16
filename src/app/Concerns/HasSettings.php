@@ -5,9 +5,9 @@ namespace MM\Meros\App\Concerns;
 use Closure;
 use Illuminate\Support\Collection;
 
-use MM\Meros\App\Settings\Setting;
-use MM\Meros\App\Settings\AdminPage;
-use MM\Meros\App\Settings\SettingsSection;
+use MM\Meros\App\Support\Settings\Setting;
+use MM\Meros\App\Support\Settings\AdminPage;
+use MM\Meros\App\Support\Settings\SettingsSection;
 
 use MM\Meros\App\Support\DataBuilder;
 

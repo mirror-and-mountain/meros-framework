@@ -3,7 +3,7 @@
 namespace MM\Meros\App\Contracts;
 
 use Closure;
-use MM\Meros\App\Support\DataBuilder;
+use MM\Meros\App\Support\Helpers\DataBuilder;
 
 interface DataRegistrar {
     /**

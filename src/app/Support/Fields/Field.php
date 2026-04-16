@@ -5,7 +5,7 @@ namespace MM\Meros\App\Support\Fields;
 use MM\Meros\App\FeatureProvider;
 use MM\Meros\App\Contracts\FieldRegistrar;
 
-use MM\Meros\App\Settings\Setting;
+use MM\Meros\App\Support\Settings\Setting;
 
 abstract class Field {
     public string $id = '';
@@ -59,10 +59,10 @@ abstract class Field {
 
     // Render the field
     public function render(): void {
-        $view = 'meros::components.admin.fields.field';
+        $view = 'meros::components.fields.wrappers.admin-field';
 
         if ($this->registrar instanceof Setting) {
-            $view = 'meros::components.admin.fields.field-plain';
+            $view = 'meros::components.fields.wrappers.setting-field';
         }
 
         echo view($view, [

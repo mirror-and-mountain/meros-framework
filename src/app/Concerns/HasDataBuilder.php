@@ -5,8 +5,8 @@ namespace MM\Meros\App\Concerns;
 use Closure;
 use Illuminate\Support\Str;
 
-use MM\Meros\App\Support\DataBuilder;
 use MM\Meros\App\Contracts\DataRegistrar;
+use MM\Meros\App\Support\Helpers\DataBuilder;
 
 trait HasDataBuilder {
     // Parent reference for nested builders

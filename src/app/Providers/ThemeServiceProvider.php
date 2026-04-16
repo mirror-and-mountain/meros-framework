@@ -7,8 +7,9 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 
 use MM\Meros\App\Theme as MerosTheme;
-use MM\Meros\App\Support\ClassInfo;
+
 use MM\Meros\App\Support\Registry;
+use MM\Meros\App\Support\Helpers\ClassInfo;
 
 use MM\Meros\App\Facades\Theme;
 

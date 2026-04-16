@@ -1,3 +1,9 @@
+@use 'nice-forms.css/dist/nice-forms.css';
+
+.meros-site-field input {
+    height: auto !important;
+}
+
 tbody:has(.meros-settings-label) {
     th[scope="row"]:has(.meros-settings-label) {
         width: 400px;

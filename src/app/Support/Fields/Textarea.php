@@ -15,6 +15,6 @@ class Textarea extends Field {
      * Rendering
      ***************************/
     public function getFieldComponent(): string {
-        return 'meros::admin.fields.textarea';
+        return 'meros::fields.textarea';
     }
 }

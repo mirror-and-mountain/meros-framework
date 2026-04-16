@@ -39,8 +39,6 @@ class Select extends Field {
         } else {
             $this->classList = array_diff($this->classList, ['allow-add']);
         }
-
-        // dd($this->options, $this->value);
         
         return $this;
     }
@@ -65,6 +63,6 @@ class Select extends Field {
      * Rendering
      ***************************/
     public function getFieldComponent(): string {
-        return 'meros::admin.fields.select';
+        return 'meros::fields.select';
     }
 }

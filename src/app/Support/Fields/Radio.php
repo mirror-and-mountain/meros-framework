@@ -9,6 +9,6 @@ class Radio extends Select {
      * Rendering
      ***************************/
     public function getFieldComponent(): string {
-        return 'meros::admin.fields.radio';
+        return 'meros::fields.radio';
     }
 }

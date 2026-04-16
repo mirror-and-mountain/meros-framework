@@ -186,20 +186,26 @@ final class Framework extends FeatureProvider {
          */
         add_action('rest_api_init', function () {
             register_rest_route('meros/v1', '/get-blade-view', [
-                'methods'             => \WP_REST_Server::READABLE,
+                'methods'             => [\WP_REST_Server::READABLE, \WP_REST_Server::CREATABLE],
                 'permission_callback' => function () {
                     return current_user_can('edit_posts');
                 },
                 'callback' => function (\WP_REST_Request $request) {
                     $view = sanitize_text_field($request->get_param('view'));
                     $data = $request->get_param('data');
+                    
                     $attributes = [];
+                    $viewData   = [];
 
-                    if (! $view) {
+                    if (!$view) {
                         return new \WP_Error('no_view', 'No view specified', ['status' => 400]);
                     }
 
-                    if (is_string($data) && $data !== '') {
+                    if (is_array($data)) {
+                        $attributes = $data;
+                    } 
+                    
+                    elseif (is_string($data) && $data !== '') {
                         $decoded = json_decode(wp_unslash($data), true);
 
                         if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded)) {
@@ -209,11 +215,17 @@ final class Framework extends FeatureProvider {
                         $attributes = $decoded;
                     }
 
+                    $viewData = [
+                        'attributes' => $attributes,
+                        'data'       => $attributes,
+                    ];
+
+                    foreach ($attributes as $key => $value) {
+                        $viewData[$key] = $this->normaliseRestViewData($value);
+                    }
+
                     try {
-                        $rendered = view($view, [
-                            'attributes' => $attributes,
-                            'data'       => $attributes,
-                        ])->render();
+                        $rendered = view($view, $viewData)->render();
                         return rest_ensure_response(['html' => $rendered]);
                     } catch (\Exception $e) {
                         return new \WP_Error('render_error', 'Error rendering view: ' . $e->getMessage(), ['status' => 500]);
@@ -243,6 +255,26 @@ final class Framework extends FeatureProvider {
                 return true;
             }, 10, 4);
         });
+    }
+
+    /**
+     * Normalises REST view payload values for Blade rendering.
+     *
+     * Associative arrays are converted to objects so views can use property
+     * access like $field->label, while list arrays are preserved.
+     *
+     * @param mixed $value
+     * @return mixed
+     */
+    private function normaliseRestViewData($value) {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        $normalised = array_map(fn ($item) => $this->normaliseRestViewData($item), $value);
+        $isList = $normalised === [] || array_keys($normalised) === range(0, count($normalised) - 1);
+
+        return $isList ? $normalised : (object) $normalised;
     }
 
     /***************************************************************

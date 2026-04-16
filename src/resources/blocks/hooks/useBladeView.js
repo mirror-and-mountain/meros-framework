@@ -2,27 +2,40 @@
  * Fetches a a blade.php view from the server and returns its rendered HTML.
  *
  * @param {string} view The name of the Blade view to fetch.
- * @param {string} [serialisedData=''] Optional JSON-encoded data to pass to the view.
+ * @param {string} [serialisedData='{}'] Optional JSON-encoded data payload to pass to the view.
  * @returns {Promise<string>} A promise that resolves with the rendered HTML of the Blade view.
  */
-function fetchBladeView(view, serialisedData = '') {
-    const root = window?.wpApiSettings?.root || '/wp-json/';
-    const nonce = window?.wpApiSettings?.nonce;
-    const params = new URLSearchParams({ view });
+function fetchBladeView(view, serialisedData = '{}') {
+    const root      = window?.wpApiSettings?.root || '/wp-json/';
+    const nonce     = window?.wpApiSettings?.nonce;
+    const endpoint  = `${root.replace(/\/$/, '')}/meros/v1/get-blade-view`;
+    let payloadData = {};
 
     if (serialisedData) {
-        params.set('data', serialisedData);
+        try {
+            payloadData = JSON.parse(serialisedData);
+        } catch (error) {
+            payloadData = {};
+        }
     }
 
-    const endpoint = `${root.replace(/\/$/, '')}/meros/v1/get-blade-view?${params.toString()}`;
+    const payload = {
+        view,
+        data: payloadData,
+    };
 
     return fetch(endpoint, {
-        method: 'GET',
-        headers: nonce ? { 'X-WP-Nonce': nonce } : {},
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...(nonce ? { 'X-WP-Nonce': nonce } : {}),
+        },
         credentials: 'same-origin',
-    }).then(response => {
+        body: JSON.stringify(payload),
+    }).then(async response => {
         if (!response.ok) {
-            throw new Error(`Failed to fetch Blade view (${response.status})`);
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch Blade view (${response.status}): ${errorText}`);
         }
 
         return response.text();
@@ -45,7 +58,9 @@ export function useBladeView(view, data = {}) {
             .then(content => {
                 setBladeViewContent(content);
             })
-            .catch(() => {
+            .catch((error) => {
+                // Keep editor usable while still exposing backend error details in dev tools.
+                console.error(error);
                 setBladeViewContent('');
             });
     }, [view, serialisedData]);

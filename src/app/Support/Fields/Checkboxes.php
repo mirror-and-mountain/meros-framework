@@ -9,6 +9,6 @@ class Checkboxes extends Select {
      * Rendering
      ***************************/
     public function getFieldComponent(): string {
-        return 'meros::admin.fields.checkboxes';
+        return 'meros::fields.checkboxes';
     }
 }

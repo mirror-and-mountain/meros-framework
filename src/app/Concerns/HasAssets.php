@@ -3,7 +3,7 @@
 namespace MM\Meros\App\Concerns;
 
 use Illuminate\Support\Collection;
-use MM\Meros\App\Discoverables\Asset;
+use MM\Meros\App\Support\Asset;
 
 trait HasAssets {
     /**

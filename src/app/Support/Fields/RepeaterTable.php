@@ -2,7 +2,7 @@
 
 namespace MM\Meros\App\Support\Fields;
 
-use MM\Meros\App\Settings\Setting;
+use MM\Meros\App\Support\Settings\Setting;
 
 class RepeaterTable extends Field {
     /**
@@ -11,10 +11,10 @@ class RepeaterTable extends Field {
      * @return void
      */
     public function render(): void {
-        $view = 'meros::components.admin.fields.field-repeater';
+        $view = 'meros::components.fields.wrappers.repeater';
 
         if ($this->registrar instanceof Setting) {
-            $view = 'meros::components.admin.fields.field-repeater-plain';
+            $view = 'meros::components.fields.wrappers.setting-repeater';
         }
 
         echo view($view, [
@@ -74,6 +74,6 @@ class RepeaterTable extends Field {
      * @return string
      */
     public function getFieldComponent(): string {
-        return 'meros::admin.fields.repeater';
+        return 'meros::fields.repeater';
     }
 }

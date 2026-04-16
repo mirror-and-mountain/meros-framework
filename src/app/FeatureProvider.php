@@ -4,7 +4,7 @@ namespace MM\Meros\App;
 
 use MM\Meros\App\Framework;
 
-use MM\Meros\App\Support\Discover;
+use MM\Meros\App\Support\Helpers\Discover;
 
 use MM\Meros\App\Concerns\HasAssets;
 use MM\Meros\App\Concerns\HasBlocks;

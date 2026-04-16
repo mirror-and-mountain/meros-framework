@@ -85,7 +85,7 @@ class Input extends Field {
      */
     public function getFieldComponent(): string {
         return $this->variation === 'checkbox' 
-            ? 'meros::admin.fields.checkbox' 
-            : 'meros::admin.fields.input';
+            ? 'meros::fields.checkbox' 
+            : 'meros::fields.input';
     }
 }

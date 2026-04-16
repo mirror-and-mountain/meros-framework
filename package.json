@@ -8,6 +8,7 @@
     "devDependencies": {
         "@wordpress/i18n": "^5.20.0",
         "@wordpress/scripts": "^30.13.0",
+        "nice-forms.css": "^0.1.7",
         "tom-select": "^2.5.2"
     }
 }
