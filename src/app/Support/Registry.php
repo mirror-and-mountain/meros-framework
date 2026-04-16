@@ -1,77 +1,87 @@
 <?php 
 
-namespace MM\Meros\App;
-
-use MM\Meros\App\Contracts\Registry as Contract;
-use MM\Meros\App\Contracts\FeatureBuilder;
+namespace MM\Meros\App\Support;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
-class Registry implements Contract {
-    public Collection $packages;
+use MM\Meros\App\Contracts\FeatureBuilder;
+
+class Registry {
     public Collection $installables;
     public Collection $integrations;
 
-    public Collection $settingsPages;
+    public Collection $adminPages;
     public Collection $settingsSections;
     public Collection $settings;
     public Collection $settingsFields;
 
     public Collection $assets;
     public Collection $blocks;
-    public Collection $components;
+
+    protected array $itemIDMap = [
+        'assets'           => 'handle',
+        'blocks'           => 'name',
+        'adminPages'       => 'slug',
+        'settingsSections' => 'id',
+        'settings'         => 'name',
+    ];
 
     public function __construct() {
-        $this->packages         = collect([]);
         $this->installables     = collect([]);
         $this->integrations     = collect([]);
 
-        $this->settingsPages    = collect([]);
+        $this->adminPages       = collect([]);
         $this->settingsSections = collect([]);
         $this->settings         = collect([]);
         $this->settingsFields   = collect([]);
 
         $this->assets           = collect([]);
         $this->blocks           = collect([]);
-        $this->components       = collect([]);
-    }
-
-    /**
-     * Adds a package to the registry.
-     *
-     * @param  Package $package The package to add.
-     * 
-     * @return void
-     */
-    public function addPackage(Package $package): void {
-        $this->packages->push($package);
     }
 
     /**
      * Generic method to add an item to one of this object's collections.
      * Specific methods will be added for individual collections e.g. addPackage(), addSettingPage() etc.
      *
-     * @param  string $type The collection to add to e.g. 'settings', 'packages' etc.
+     * @param  string         $type The collection to add to e.g. 'settings', 'packages' etc.
      * @param  FeatureBuilder $item The item to add.
      * 
-     * @return void
+     * @return FeatureBuilder|null       The item that was added or retrieved if it already exists in the collection
+     * @throws \InvalidArgumentException if the specified type does not correspond to a valid collection in the registry.
      */
-    public function add(string $type, FeatureBuilder $item): void {
+    public function add(string $type, FeatureBuilder $item): FeatureBuilder {
         if (property_exists($this, $type)) {
             if (!$this->{$type}->contains($item)) {
                 $this->{$type}->push($item);
-                return;
+                return $item;
+            }
+
+            else {
+                $itemID = $this->itemIDMap[$type];
+                return $this->get($type)
+                        ->where($itemID, $item->{$itemID})
+                        ->first();
             }
         }
 
-        $plural = Str::plural($type);
+        $plural = Str::plural($type); // Convert to plural form to check for collection property
+
         if (property_exists($this, $plural)) {
             if (!$this->{$plural}->contains($item)) {
                 $this->{$plural}->push($item);
-                return;
+                return $item;
+            }
+
+            else {
+                $itemID = $this->itemIDMap[$plural];
+                return $this->get($plural)
+                        ->where($itemID, $item->{$itemID})
+                        ->first();
             }
         }
+
+        throw new \InvalidArgumentException("Invalid registry type: {$type}");
     }
 
     /**
@@ -80,35 +90,15 @@ class Registry implements Contract {
      *
      * @param  string $type The collection to get e.g. 'settings', 'packages' etc.
      * 
-     * @return Collection
+     * @return Collection                The requested collection
+     * @throws \InvalidArgumentException if the specified type does not correspond to a valid collection in the registry.
      */
     public function get(string $type): Collection {
         if (property_exists($this, $type)) {
             return $this->{$type};
         }
 
-        return collect([]);
-    }
-
-    /**
-     * Returns the packages collection.
-     *
-     * @return Collection
-     */
-    public function getPackages(): Collection {
-        return $this->packages;
-    }
-
-    /**
-     * Returns a single package using the given handle if present 
-     * in the collection.
-     *
-     * @param  string $handle
-     *
-     * @return Package|null
-     */
-    public function getPackage(string $handle): Package|null {
-        return $this->packages->firstWhere('handle', $handle);
+        throw new \InvalidArgumentException("Invalid registry type: {$type}");
     }
 
     /**
@@ -121,12 +111,12 @@ class Registry implements Contract {
     }
 
     /**
-     * Returns the settings pages collection.
+     * Returns the admin pages collection.
      *
      * @return Collection
      */
-    public function getSettingsPages(): Collection {
-        return $this->settingsPages;
+    public function getAdminPages(): Collection {
+        return $this->adminPages;
     }
 
     /**
@@ -201,12 +191,12 @@ class Registry implements Contract {
     }
 
     /**
-     * Returns whether the registry contains any settings pages
+     * Returns whether the registry contains any admin pages
      *
      * @return boolean
      */
-    public function hasSettingsPages(): bool {
-        return $this->settingsPages->isNotEmpty();
+    public function hasAdminPages(): bool {
+        return $this->adminPages->isNotEmpty();
     }
 
     /**
@@ -228,29 +218,11 @@ class Registry implements Contract {
     }
 
     /**
-     * Returns whether the registry contains any packages
-     *
-     * @return boolean
-     */
-    public function hasPackages(): bool {
-        return $this->packages->isNotEmpty();
-    }
-
-    /**
      * Returns whether the registry contains any installables
      *
      * @return boolean
      */
     public function hasInstallables(): bool {
         return $this->installables->isNotEmpty();
-    }
-
-    /**
-     * Returns whether the registry contains any components
-     *
-     * @return boolean
-     */
-    public function hasComponents(): bool {
-        return $this->components->isNotEmpty();
     }
 }

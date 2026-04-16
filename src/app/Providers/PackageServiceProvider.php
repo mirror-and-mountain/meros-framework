@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 use MM\Meros\App\Package;
-use MM\Meros\App\Facades\Registry;
+use MM\Meros\App\Support\Registry;
 
 use MM\Meros\App\Support\ClassInfo;
 
@@ -28,11 +28,8 @@ abstract class PackageServiceProvider extends ServiceProvider {
             $uri  = $class->uri;
 
             $this->app->singleton($this->serviceClass, function ($app) use ($name, $path, $uri) {
-                return new $this->serviceClass($app->make('meros.registry'), $name, $path, $uri);
+                return new $this->serviceClass($app->make(Registry::class), $name, $path, $uri);
             });
-
-            // Add package to the registry
-            Registry::addPackage($this->app->make($this->serviceClass));
         }
     }
 

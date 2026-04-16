@@ -2,194 +2,71 @@
 
 namespace MM\Meros\App\Concerns;
 
+use Closure;
 use Illuminate\Support\Collection;
 
 use MM\Meros\App\Settings\Setting;
 use MM\Meros\App\Settings\AdminPage;
 use MM\Meros\App\Settings\SettingsSection;
 
+use MM\Meros\App\Support\DataBuilder;
+
 trait HasSettings {
     /**
-     * The item's consolidated setting instance.
+     * Creates or retrieves the root setting for this feature provider and allows for optional configuration via a callback.
      *
-     * @var Setting
-     */
-    private ?Setting $settingDefinition = null;
-
-    /**
-     * Creates (or retrieves) a root settings object for the item and returns a builder.
-     *
-     * This enforces a single root object like:
-     *   theme_settings or package_settings
-     *
-     * @param callable|null $callback Optional callback to define settings.
+     * @param Closure|string|null $callbackOrSetting Optional callback to configure the root setting or the option name of an existing setting to retrieve.
      *
      * @return Setting The root setting instance for the item.
      */
-    protected function settings(callable|\Closure|null $callback = null): Setting {
-        // If already defined, just reuse it
-        if ($this->settingDefinition instanceof Setting) {
-            if ($callback) {
-                $callback($this->settingDefinition->define());
+    protected function settings(Closure|string|null $callbackOrSetting = null): Setting {
+        if (is_string($callbackOrSetting)) {
+            $setting = $this->registry()->get('settings')->firstWhere('option_name', $callbackOrSetting);
+
+            if ($setting) {
+                return $setting;
             }
-            return $this->settingDefinition;
         }
 
+        else {
+            $callback = $callbackOrSetting;
+        }
+
+        $rootSetting = $this->registry()->get('settings')->firstWhere('isProviderSetting', true);
+
+        if ($rootSetting === null) {
+            return $this->createRootSetting($callback);
+        }
+
+        if ($callback) {
+            $callback($rootSetting->configure());
+            return $rootSetting;
+        }
+
+        return $rootSetting;
+    }
+
+    /**
+     * Creates the root setting for this feature provider and adds it to the registry.
+     *
+     * @param Closure|null $callback Optional callback to configure the root setting.
+     *
+     * @return Setting The newly created root setting instance for the item.
+     */
+    private function createRootSetting(Closure|null $callback = null): Setting {
         $optionGroup = $this->handle . '_settings';
         $optionName  = $this->handle . '_settings';
 
         $setting = app(Setting::class, [
-            'source'      => $this,
-            'optionGroup' => $optionGroup,
+            'source'            => $this,
+            'optionGroup'       => 'general',
+            'isProviderSetting' => true,
         ])->object($optionName);
 
-        $this->settingDefinition = $setting;
-
         if ($callback) {
-            $callback($setting->define());
+            $callback($setting->configure());
         }
 
-        return $this->settingDefinition;
-    }
-
-
-    /**
-     * Creates an AdminPage instance for the item and registers it.
-     * 
-     * @param  string $slug The slug of the admin page.
-     * 
-     * @return AdminPage The created AdminPage instance.
-     */
-    protected function makeAdminPage(string $slug): AdminPage {
-        $existing = $this->getAdminPage($slug);
-
-        if ($existing !== null) {
-            return $existing;
-        }
-
-        return app(AdminPage::class, ['source' => $this, 'slug'  => $slug]);
-    }
-
-    /**
-     * Creates a SettingsSection instance for the item and registers it.
-     * 
-     * @param  string $id The ID of the settings section.
-     * 
-     * @return SettingsSection The created SettingsSection instance.
-     */
-    protected function makeSettingsSection(string $id): SettingsSection {
-        $existing = $this->getSettingsSection($id);
-        
-        if ($existing !== null) {
-            return $existing;
-        }
-
-        return app(SettingsSection::class, ['source' => $this, 'id' => $id]);
-    }
-
-    /**
-     * Retrieves settings objects of the given type for this item.
-     *
-     * @param  string $type The type of settings objects to retrieve (e.g., 'settingsPages', 'settingsSections', 'settings').
-     *
-     * @return Collection A collection of settings objects of the specified type registered by this item.
-     */
-    protected function getSettingsObjects(string $type): Collection {
-        return $this->registry
-                ->get($type)
-                ->where('source', $this) ?? collect([]);
-    }
-
-    /**
-     * Returns array of settings page objects registered by the item.
-     * 
-     * @param  bool $readyOnly Whether to return only settings pages that are ready.
-     *
-     * @return Collection
-     */
-    final public function getSettingsPages(bool $readyOnly = false): Collection {
-        if ($readyOnly) {
-            return $this->getSettingsObjects('settingsPages')->where('ready', true);
-        } else {
-            return $this->getSettingsObjects('settingsPages');
-        }
-    }
-
-    /**
-     * Returns array of settings section objects registered by the item.
-     * 
-     * @param  bool $readyOnly Whether to return only settings sections that are ready.
-     *
-     * @return Collection
-     */
-    final public function getSettingsSections(bool $readyOnly = false): Collection {
-        if ($readyOnly) {
-            return $this->getSettingsObjects('settingsSections')->where('ready', true);
-        } else {
-            return $this->getSettingsObjects('settingsSections');
-        }
-    }
-
-    /**
-     * Returns array of all settings objects registered by the item.
-     * 
-     * @param  bool $readyOnly Whether to return only settings that are ready.
-     *
-     * @return Collection
-     */
-    final public function getSettings(bool $readyOnly = false) {
-        return $this->settingDefinition;
-    }
-
-    /**
-     * Returns a specific admin page object registered by the item.
-     *
-     * @param  string $slug The slug of the admin page to return.
-     * 
-     * @return AdminPage|null
-     */
-    final public function getAdminPage(string $slug): AdminPage|null {
-        $page = $this->getSettingsPages()->firstWhere('slug', $slug);
-
-        return $page ?: null;
-    }
-
-    /**
-     * Returns a specific settings section object registered by the item.
-     *
-     * @param  string $handle The handle of the settings section to return.
-     * 
-     * @return SettingsSection|null
-     */
-    final public function getSettingsSection(string $handle): SettingsSection|null {
-        $section = $this->getSettingsSections()->firstWhere('handle', $handle);
-
-        return $section ?: null;
-    }
-
-    /**
-     * Returns a specific setting object registered by the item.
-     *
-     * @param  string $optionName The option name of the setting to return.
-     * 
-     * @return Setting|null
-     */
-    final public function getSetting(string $optionName): Setting|null {
-        $setting = $this->getSettings()->firstWhere('optionName', $optionName);
-
-        return $setting ?: null;
-    }
-
-    /**
-     * Returns the value of a specific setting registered by the item.
-     *
-     * @param  string $optionName The option name of the setting to return the value of.
-     * @param  mixed  $default The default value to return if the setting isn't found or doesn't have a value.
-     * 
-     * @return mixed
-     */
-    final public function getSettingValue(string $optionName): mixed {
-        $setting = $this->getSetting($optionName);
-        return $setting ? $setting->getValue() : null;
+        return $this->registry()->add('settings', $setting);
     }
 }

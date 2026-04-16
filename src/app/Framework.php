@@ -41,11 +41,13 @@ final class Framework extends FeatureProvider {
      * @return void
      */
     protected function initialise(): void {
-        $initAjax = Context::isAdmin();
+        $this->discover()->assets();
 
-        if ($initAjax) {
-            $this->initAdminAjaxHandlers();
-        }    
+        // $initAjax = Context::isAdmin();
+
+        // if ($initAjax) {
+        //     $this->initAdminAjaxHandlers();
+        // }    
 
         // $this->discoverInstallables();
         // $this->discoverAssets();

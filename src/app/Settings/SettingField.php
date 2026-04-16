@@ -2,51 +2,52 @@
 
 namespace MM\Meros\App\Settings;
 
-use MM\Meros\App\Support\Field;
+use MM\Meros\App\FeatureProvider;
 use MM\Meros\App\Support\Feature;
 
-class SettingField extends Field {
-    protected string $hook = 'admin_init';
-
+class SettingField extends Feature {
     // The settings section instance that this field belongs to.
-    protected ?SettingsSection $section = null;
+    public ?SettingsSection $section = null;
 
     // The settings section id that this field belongs to.
-    protected string $sectionId = 'default';
+    public string $sectionId = 'default';
 
     // The admin page instance that this field belongs to.
-    protected ?AdminPage $page = null;
+    public ?AdminPage $page = null;
 
     // The settings page slug that this field belongs to.
-    protected string $pageSlug = '';
+    public string $pageSlug = '';
 
+    // Optional arguments for the settings field, such as label_for and class.
+    public array $args = [];
+
+    public function __construct(
+        public FeatureProvider $source,
+        public Setting         $setting,
+        array  $args = []
+    ) {
+        $this->args = [
+            'label_for' => $args['label_for'] ?? null,
+            'class'     => $args['class'] ?? null,
+        ];
+
+        add_action('admin_init', function() {
+            $this->load($this);
+        });
+    }
+    
     /**
      * Sets the field as ready (or not) based on the field's current configuration.
      *
      * @return void
      */
     protected function setReady(): void {
-        if ($this->type === '') {
-            $this->ready = false;
-            return;
-        }
-
-        if ($this->id === '') {
-            $this->ready = false;
-            return;
-        }
-
         if ($this->pageSlug === '') {
             $this->ready = false;
             return;
         }
 
-        if ($this->label === '') {
-            $this->ready = false;
-            return;
-        }
-
-        if ($this->callback === null) {
+        if ($this->setting->field === null) {
             $this->ready = false;
             return;
         }
@@ -60,10 +61,17 @@ class SettingField extends Field {
      * @return void
      */
     protected function load(Feature $instance): void {
+        $setting = $instance->setting;
+        $field  = $setting->field;
+
+        if ($field === null) {
+            return;
+        }
+
         add_settings_field(
-            $instance->id,
-            $instance->label,
-            $instance->callback,
+            $field->id,
+            $field->label,
+            [$field, 'render'],
             $instance->pageSlug,
             $instance->sectionId,
             $instance->args
@@ -144,16 +152,15 @@ class SettingField extends Field {
     /***************************
      * Helpers
      ***************************/
-
     /**
      * Generates HTML for the field title, which includes the label and description.
      *
      * @return string
      */
     protected function getFieldTitleHTML(): string {
-        $option      = $this->registrar->getName();
-        $label       = $this->registrar->getLabel();
-        $description = $this->registrar->getDescription();
+        $option      = $this->setting->name;
+        $label       = $this->setting->getFieldLabel();
+        $description = $this->setting->getFieldDescription();
 
         // Generate HTML for the label
         $html = '<label id="' . esc_attr($option) . '_field_label" for="' . esc_attr($option) . '_field" class="meros-settings-label">' . esc_html($label) . '</label>';

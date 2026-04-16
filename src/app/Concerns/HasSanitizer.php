@@ -36,9 +36,9 @@ trait HasSanitizer {
     }
 
     /**
-     * Default sanitizer for settings values.
+     * The default sanitizer for settings values.
      *
-     * @param  mixed $value
+     * @param mixed $value
      *
      * @return mixed
      */
@@ -65,8 +65,9 @@ trait HasSanitizer {
             'checkbox'  => 'boolean',
         ];
 
-        if (isset($this->field) && isset($map[$this->field->type])) {
-            $requiredType = $map[$this->field->type];
+        if (isset($this->field)) {
+            $fieldType    = $this->field?->variation ?? 'text';
+            $requiredType = $map[$fieldType] ?? 'string';
         }
 
         return $this->sanitize($value, $requiredType);
@@ -75,7 +76,7 @@ trait HasSanitizer {
     /**
      * Recursively sanitizes each value in an array using the generic sanitize helper.
      *
-     * @param  array $items The array of values to sanitize.
+     * @param array $items The array of values to sanitize.
      *
      * @return array The sanitized array.
      */
@@ -140,7 +141,7 @@ trait HasSanitizer {
      * Sanitizes the value of an object setting by sanitizing each of its 
      * sub-settings according to their types and the setting's schema.
      *
-     * @param  mixed $input The input value to sanitize, expected to be an array or object.
+     * @param mixed $input The input value to sanitize, expected to be an array or object.
      *
      * @return array The sanitized value as an associative array.
      */
@@ -160,13 +161,18 @@ trait HasSanitizer {
 
             $inputValue  = data_get($input, $relativePath);
             $mergedValue = data_get($merged, $relativePath);
+            $pathExistsInInput = data_get($input, $relativePath, '__missing__') !== '__missing__';
+            $childType = $child->args['type'] ?? null;
 
-            if (($child->args['type'] ?? null) === 'boolean') {
-                $exists = data_get($input, $relativePath, '__missing__') !== '__missing__';
+            if ($childType === 'boolean') {
+                $exists = $pathExistsInInput;
 
                 $value = $exists
                     ? filter_var($inputValue, FILTER_VALIDATE_BOOLEAN)
                     : $mergedValue;
+            } else if ($childType === 'array' || $childType === 'object') {
+                // For structured children, prefer submitted input to avoid retaining removed indices.
+                $value = $child->sanitizeValue($pathExistsInInput ? $inputValue : $mergedValue);
             } else {
                 // Important: always sanitize merged value so defaults persist
                 $value = $child->sanitizeValue($mergedValue);

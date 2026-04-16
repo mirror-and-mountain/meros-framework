@@ -7,19 +7,17 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 /**
  * ------------------------------------------------------------
- * Build entry points from src/assets/src/**
+ * Build entry points from src/resources/assets/src/**
  * ------------------------------------------------------------
  */
 const entries = {};
 
-// src/assets/src/foo/index.js
-glob.sync('./src/assets/src/*/index.js').forEach((file) => {
+glob.sync('./src/resources/assets/src/*/index.js').forEach((file) => {
   const name = path.basename(path.dirname(file));
   entries[name] = path.resolve(__dirname, file);
 });
 
-// src/assets/src/foo/bar/index.js
-glob.sync('./src/assets/src/*/*/index.js').forEach((file) => {
+glob.sync('./src/resources/assets/src/*/*/index.js').forEach((file) => {
   const dir = path.dirname(file);
   const parent = path.basename(path.dirname(dir));
   const name = `${parent}/${path.basename(dir)}`;
@@ -39,7 +37,7 @@ module.exports = {
   /**
    * Scope webpack to assets only
    */
-  context: path.resolve(__dirname, 'src/assets'),
+  context: path.resolve(__dirname, 'src/resources/assets'),
   entry: entries,
 
   /**
@@ -47,7 +45,7 @@ module.exports = {
    */
   output: {
     ...defaultConfig.output,
-    path: path.resolve(__dirname, 'src/assets/build'),
+    path: path.resolve(__dirname, 'src/resources/assets/build'),
     filename: '[name]/index.js',
     clean: true,
   },
@@ -83,15 +81,15 @@ module.exports = {
     new CopyWebpackPlugin({
       patterns: [
         {
-          from: '**/conditions.php',
-          context: path.resolve(__dirname, 'src/assets/src'),
-          to: path.resolve(__dirname, 'src/assets/build'),
+          from: '**/dependencies.php',
+          context: path.resolve(__dirname, 'src/resources/assets/src'),
+          to: path.resolve(__dirname, 'src/resources/assets/build'),
           noErrorOnMissing: true,
         },
         {
           from: '**/config.php',
-          context: path.resolve(__dirname, 'src/assets/src'),
-          to: path.resolve(__dirname, 'src/assets/build'),
+          context: path.resolve(__dirname, 'src/resources/assets/src'),
+          to: path.resolve(__dirname, 'src/resources/assets/build'),
           noErrorOnMissing: true,
         }
       ],

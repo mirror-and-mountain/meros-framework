@@ -3,8 +3,8 @@
 namespace MM\Meros\App\Support;
 
 use Closure;
-use MM\Meros\App\Facades\Registry;
 
+use MM\Meros\App\FeatureProvider;
 use MM\Meros\App\Contracts\FeatureBuilder;
 
 abstract class Feature implements FeatureBuilder {
@@ -45,37 +45,6 @@ abstract class Feature implements FeatureBuilder {
      * @return void
      */
     abstract protected function setReady(): void;
-
-    /**
-     * Add the feature to the registry.
-     *
-     * @return void
-     */
-    protected function addToRegistry(): void {
-        Registry::add(strtolower(class_basename($this)), $this);
-    }
-
-    /**
-     * Verifies that the given handle is unique across all features of the same type.
-     *
-     * @param  string $handle The handle to verify.
-     * 
-     * @return bool   True if the handle is unique, false otherwise.
-     */
-    private function handleIsUnique(string $handle): bool {
-        $type = class_basename($this);
-    
-        $existingHandles = Registry::get(strtolower($type) . 's')
-            ->pluck('handle')
-            ->toArray();
-
-        if (in_array($handle, $existingHandles)) {
-            $this->error = "The handle '{$handle}' is already in use for another " . $type . ". Handles must be unique.";
-            return false;
-        }
-
-        return true;
-    }
 
     /**
      * Converts a callable to a Closure instance.

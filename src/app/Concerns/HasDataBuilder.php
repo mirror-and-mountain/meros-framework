@@ -2,7 +2,6 @@
 
 namespace MM\Meros\App\Concerns;
 
-use Exception;
 use Closure;
 use Illuminate\Support\Str;
 
@@ -17,6 +16,7 @@ trait HasDataBuilder {
     public ?string $path = null;
     public array   $subItems = [];
     public string  $type; // e.g. string, object, array, etc.
+    public string  $itemType; // for arrays, the type of items (e.g. string, object, etc.)
 
     // Valid data types
     protected array $types = [
@@ -28,18 +28,29 @@ trait HasDataBuilder {
         'object'
     ];
 
-    protected ?Closure $layout = null;
+    use HasFields;
 
     /***************************
      * Core Builder Methods
      ***************************/
 
     /**
+     * Returns a new DataBuilder instance scoped to the current feature and optional path.
      * Public alias for builder().
+     * 
+     * @param  Closure|null $callback Optional callback to configure the builder instance.
      *
      * @return DataBuilder
      */
-    public function define(): DataBuilder {
+    public function configure(?Closure $callback = null): DataBuilder {
+        if (isset($this->type) && !in_array($this->type, ['object', 'array'])) {
+            throw new \InvalidArgumentException("Builder can only be used on 'object' or 'array' types. '{$this->type}' given.");
+        }
+
+        if ($callback) {
+            $callback($this->builder());
+        }
+        
         return $this->builder();
     }
 
@@ -47,24 +58,25 @@ trait HasDataBuilder {
      * Returns a new DataBuilder instance scoped to the current feature and optional path.
      *
      * @return DataBuilder A new DataBuilder instance for building nested settings or schema.
-     * @throws Exception If the builder is used on a feature that is not of type 'object' or 'array', or is not root.
+     * @throws \BadMethodCallException if the builder is called on a non-root item or an item with an invalid type.
+     * @throws \InvalidArgumentException if the item has an invalid type or item type (for arrays).
      */
     protected function builder(): DataBuilder {
         $type = $this->args['type'] ?? null;
 
         // Must be root
         if (!$this->isRoot()) {
-            throw new Exception('Builder can only be used on root settings.');
+            throw new \BadMethodCallException('Builder can only be used on root settings.');
         }
 
         // Must be object or array
         if (!in_array($type, ['object', 'array'])) {
-            throw new Exception("Builder can only be used on 'object' or 'array' types. '{$type}' given.");
+            throw new \InvalidArgumentException("Builder can only be used on 'object' or 'array' types. '{$type}' given.");
         }
 
         // Ensure valid name
         if (empty($this->name)) {
-            throw new Exception('Builder requires a valid root setting name.');
+            throw new \InvalidArgumentException('Builder requires a valid root setting name.');
         }
 
         // Always reset path from source of truth (name)
@@ -78,6 +90,7 @@ trait HasDataBuilder {
         // Ensure schema knows this is an object array
         if ($type === 'array') {
             $this->args['item_type'] = $this->args['item_type'] ?? 'object';
+            $this->itemType = $this->args['item_type'];
         }
 
         return app(DataBuilder::class, [
@@ -91,6 +104,7 @@ trait HasDataBuilder {
      * Converts the setting instance to a schema array for use in REST API registration.
      *
      * @return array
+     * @throws \InvalidArgumentException if the setting has an invalid type or item type (for arrays).
      */
     public function toSchema(): array {
         $type = $this->args['type'] ?? 'string';
@@ -111,7 +125,7 @@ trait HasDataBuilder {
 
         // Guard: only object/array types can have subItems
         if (!empty($this->subItems) && !in_array($type, ['object', 'array'])) {
-            throw new Exception("Setting '{$this->name}' has subItems but is not an object or array type.");
+            throw new \InvalidArgumentException("Setting '{$this->name}' has subItems but is not an object or array type.");
         }
 
         // Only include default if explicitly set AND not null
@@ -137,7 +151,7 @@ trait HasDataBuilder {
             $itemType = $this->args['item_type'] ?? 'string';
 
             if (!in_array($itemType, $this->types)) {
-                throw new Exception("Invalid item_type '{$itemType}' for array setting '{$this->name}'.");
+                throw new \InvalidArgumentException("Invalid item_type '{$itemType}' for array setting '{$this->name}'.");
             }
 
             $schema['items'] = [
@@ -146,7 +160,7 @@ trait HasDataBuilder {
 
             // Guard: subItems require object arrays
             if (!empty($this->subItems) && $itemType !== 'object') {
-                throw new Exception(
+                throw new \InvalidArgumentException(
                     "Array setting '{$this->name}' defines subItems but item_type is not 'object'."
                 );
             }
@@ -190,7 +204,7 @@ trait HasDataBuilder {
     /**
      * Sets the name for the item.
      *
-     * @param  string $name The item name.
+     * @param string $name The item name.
      * 
      * @return self
      */
@@ -208,8 +222,12 @@ trait HasDataBuilder {
      * 
      * @return self
      */
-    public function string(string $name): self {
-        return $this->name($name)->type('string');
+    public function string(string $name = ''): self {
+        if (!empty($name)) {
+            $this->name($name);
+        }
+
+        return $this->type('string');
     }
 
     /**
@@ -219,30 +237,42 @@ trait HasDataBuilder {
      * 
      * @return self 
      */
-    public function boolean(string $name): self {
-        return $this->name($name)->type('boolean');
+    public function boolean(string $name = ''): self {
+        if (!empty($name)) {
+            $this->name($name);
+        }
+
+        return $this->type('boolean');
     }
 
     /**
      * Shorthand method to set the name and type for an integer item.
      *
-     * @param  string $name The item name.
+     * @param string $name The item name.
      * 
      * @return self
      */
-    public function integer(string $name): self {
-        return $this->name($name)->type('integer');
+    public function integer(string $name = ''): self {
+        if (!empty($name)) {
+            $this->name($name);
+        }
+
+        return $this->type('integer');
     }
 
     /**
      * Shorthand method to set the name and type for a number item.
      *
-     * @param  string $name The item name.
+     * @param string $name The item name.
      * 
      * @return self
      */
-    public function number(string $name): self {
-        return $this->name($name)->type('number');
+    public function number(string $name = ''): self {
+        if (!empty($name)) {
+            $this->name($name);
+        }
+
+        return $this->type('number');
     }
 
     /**
@@ -252,53 +282,73 @@ trait HasDataBuilder {
      * 
      * @return self
      */
-    public function array(string $name): self {
-        return $this->name($name)->type('array');
+    public function array(string $name = ''): self {
+        if (!empty($name)) {
+            $this->name($name);
+        }
+
+        // Default to 'string' item type. 
+        // Can be overridden later with of() method.
+        $this->itemType('string');
+
+        return $this->type('array');
     }
 
     /**
      * Explicitly defines the item type for an array setting.
      *
-     * @param  string $type The item type (e.g. 'string', 'integer', 'object').
+     * @param string $type The item type (e.g. 'string', 'integer', 'object').
+     * 
      * @return self
+     * @throws \InvalidArgumentException if the item type is not valid or if the current setting is not an array type.
      */
     public function of(string $type): self {
+        $type = Str::singular($type); // Allows for passing plural item types e.g. 'strings'
+
         if (!in_array($type, $this->types)) {
-            throw new Exception("Invalid item type '{$type}' for array setting '{$this->name}'.");
+            throw new \InvalidArgumentException("Invalid item type '{$type}' for array setting '{$this->name}'.");
         }
 
         $this->args['item_type'] = $type;
+        $this->itemType = $type;
 
         $this->setReady();
-
         return $this;
     }
 
     /**
      * Shorthand method to set the name and type for an object item.
      *
-     * @param  string $name The item name.
-     * @param  array  $args Optional additional arguments for the item (e.g. 'show_in_rest' => true).
+     * @param string   $name The item name.
+     * @param ?Closure $callback Optional callback to configure the object item.
      * 
      * @return self
      */
-    public function object(string $name, array $args = []): self {
-        $this->args = array_merge($this->args, $args);
+    public function object(string $name, ?Closure $callback = null): self {
+        $this->name($name)->type('object');
 
-        return $this->name($name)->type('object');
+        if ($callback) {
+            $callback($this->configure());
+        }
+
+        return $this;
     }
 
     /**
      * Sets the type of value for the item.
      *
-     * @param  string $type The value type (e.g. 'string', 'boolean', etc.).
+     * @param string $type The value type (e.g. 'string', 'boolean', etc.).
      * 
      * @return self
+     * @throws \InvalidArgumentException if the type is not valid or if the type is already set for the item.
      */
     public function type(string $type): self {
+        if (isset($this->type)) {
+            throw new \InvalidArgumentException("Type for '{$this->name}' is already set to '{$this->type}'.");
+        }
+
         if (!in_array($type, $this->types)) {
-            $this->error = "Invalid type '{$type}' specified for item '{$this->name}'.";
-            return $this;
+            throw new \InvalidArgumentException("Invalid type '{$type}' for setting '{$this->name}'.");
         }
 
         $this->args['type'] = $type;
@@ -309,9 +359,33 @@ trait HasDataBuilder {
     }
 
     /**
+     * Sets the item type for array items when the current item is an array.    
+     *
+     * @param string $itemType
+     *
+     * @return self
+     * @throws \InvalidArgumentException if the item type is not valid or if the current item is not an array type.
+     */
+    public function itemType(string $itemType): self {
+        if (!in_array($itemType, $this->types)) {
+            throw new \InvalidArgumentException("Invalid item type '{$itemType}' for array setting '{$this->name}'.");
+        }
+
+        if (($this->args['type'] ?? null) !== 'array') {
+            throw new \InvalidArgumentException("Cannot set item type on non-array setting '{$this->name}'.");
+        }
+
+        $this->args['item_type'] = $itemType;
+        $this->itemType = $itemType;
+
+        $this->setReady();
+        return $this;
+    }
+
+    /**
      * Sets the label for the item.
      *
-     * @param  string $label The human-readable label for the item.
+     * @param string $label The human-readable label for the item.
      * 
      * @return self
      */
@@ -339,9 +413,10 @@ trait HasDataBuilder {
     /**
      * Sets the default value for the item.
      *
-     * @param  mixed $value The default value for the item.
+     * @param mixed $value The default value for the item.
      * 
      * @return self
+     * @throws \InvalidArgumentException if the default value does not match the defined type for the item.
      */
     public function default(mixed $value): self {
         $type = $this->type ?? null;
@@ -358,7 +433,7 @@ trait HasDataBuilder {
             };
 
             if (!$valid) {
-                throw new Exception("Invalid default value for type '{$type}' on '{$this->name}'");
+                throw new \InvalidArgumentException("Invalid default value for type '{$type}' on '{$this->name}'");
             }
         }
 
@@ -370,7 +445,7 @@ trait HasDataBuilder {
     /**
      * Sets whether the item should be exposed in the REST API.
      *
-     * @param  bool $show Whether to show the item in the REST API.
+     * @param bool $show Whether to show the item in the REST API.
      * 
      * @return self
      */
@@ -384,7 +459,7 @@ trait HasDataBuilder {
     /**
      * Merges the provided arguments with the existing arguments for the item.
      *
-     * @param  array $args An associative array of arguments to merge with the existing item arguments.
+     * @param array $args An associative array of arguments to merge with the existing item arguments.
      * 
      * @return self
      */
@@ -395,30 +470,26 @@ trait HasDataBuilder {
         return $this;
     }
 
-    /**
-     * Sets the layout callback for the item, which can be used to customize how the item is rendered in the admin UI.
-     *
-     * @param  Closure $callback A closure that defines the layout for the item.
-     * 
-     * @return self
-     */
-    public function layout(Closure $callback): self {
-        $this->layout = $callback;
-        return $this;
-    }
-
-    /**
-     * Retrieves the layout callback for the item, if one is set.
-     *
-     * @return Closure|null The layout callback, or null if none is set.
-     */
-    public function getLayout(): ?Closure {
-        return $this->layout;
-    }
-
     /***************************
      * Helpers
      ***************************/
+
+    /**
+     * Recursively walks through all sub-items and applies the given callback function to each item.
+     *
+     * @param callable $callback The callback function to apply to each item.
+     *
+     * @return void
+     */
+    protected function walk(callable $callback): void {
+        foreach ($this->subItems as $item) {
+            $callback($item);
+
+            if (!empty($item->subItems)) {
+                $item->walk($callback);
+            }
+        }
+    }
 
     /**
      * Returns whether the current item is a 'root' item.
@@ -480,15 +551,20 @@ trait HasDataBuilder {
     }
 
     /**
-     * Retrieves all sub-items that are repeatable children of the specified path.
+     * Retrieves the data type of the item.
      *
-     * @param  string $path The dot-notated path to check for repeatable children (e.g. 'my_array').
-     * 
-     * @return array An array of sub-items that are repeatable children of the specified path.
+     * @return string|null The data type of the item (e.g. 'string', 'integer', 'array', 'object', etc.) or null if not set.
      */
-    public function getRepeatableChildren(string $path): array {
-        return array_filter($this->subItems, function ($item) use ($path) {
-            return str_starts_with($item->path, "{$path}.*.");
-        });
+    public function getDataType(): ?string {
+        return isset($this->type) ? $this->type : ($this->args['type'] ?? null);
+    }
+
+    /**
+     * Retrieves the item data type of the item if the item is an array of items.
+     *
+     * @return string|null The item data type of the item (e.g. 'string', 'integer', 'object', etc.) or null if not set.
+     */
+    public function getItemDataType(): ?string {
+        return isset($this->itemType) ? $this->itemType : ($this->args['item_type'] ?? null);
     }
 }

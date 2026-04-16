@@ -4,12 +4,17 @@ namespace MM\Meros\App;
 
 use MM\Meros\App\Framework;
 
+use MM\Meros\App\Support\Discover;
+
 use MM\Meros\App\Concerns\HasIdentity;
 use MM\Meros\App\Concerns\HasSettings;
 use MM\Meros\App\Concerns\HasPreferences;
 
+use MM\Meros\App\Support\Registry;
+
 abstract class FeatureProvider {
-    private array $requiredServices = ['core'];
+    private array    $requiredServices = ['core'];
+    private Discover $discover;
 
     // Additional concerns may be added by child classes as needed.
     use HasIdentity,
@@ -79,5 +84,26 @@ abstract class FeatureProvider {
       */
     protected function getRequirements(): array {
         return $this->requiredServices;
+    }
+
+    /**
+     * Returns an instance of the Discover class for discovering assets/blocks
+     *
+     * @return Discover
+     */
+    protected function discover(): Discover {
+        if (!isset($this->discover)) {
+            $this->discover = app(Discover::class, ['source' => $this]);
+        }
+        return $this->discover;
+    }
+
+    /**
+     * Returns the item's registry instance.
+     * 
+     * @return Registry
+     */
+    public function registry(): Registry {
+        return $this->registry;
     }
 }

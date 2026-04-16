@@ -2,23 +2,21 @@
 
 namespace MM\Meros\App\Settings;
 
-use Exception;
 use Illuminate\Support\Str;
 
-use MM\Meros\App\Contracts\FieldRegistrar;
 use MM\Meros\App\Contracts\DataRegistrar;
+use MM\Meros\App\Contracts\FieldRegistrar;
 
-use MM\Meros\App\Support\Feature;
 use MM\Meros\App\FeatureProvider;
+use MM\Meros\App\Support\Feature;
 
-use MM\Meros\App\Concerns\HasFields;
 use MM\Meros\App\Concerns\HasSanitizer;
 use MM\Meros\App\Concerns\HasDataBuilder;
 
-final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
-    // Indicates whether the setting has been registered via the register() method.
-    protected bool $registered = false;
+use MM\Meros\App\Support\Fields\Field;
 
+final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
+    public bool   $isProviderSetting;
     public string $optionGroup = '';
     public array  $args = [
         'type'              => '',
@@ -29,14 +27,19 @@ final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
         'sanitize_callback' => null, // To be set to the default sanitizer method in the constructor
     ];
 
-    use HasDataBuilder, HasSanitizer, HasFields;
+    // The setting field instance associated with this setting, if any.
+    public ?SettingField $settingField = null;
+
+    use HasSanitizer, HasDataBuilder {
+        HasDataBuilder::field as protected makeField;
+    }
 
     public function __construct(
         public FeatureProvider $source,
         string $optionGroup = '',
+        bool   $isProviderSetting = false
     ) {
-        // Set the field class for this registar to use when creating fields.
-        $this->fieldClass = SettingField::class;
+        $this->isProviderSetting = $isProviderSetting;
 
         $this->group($optionGroup);
         $this->args['sanitize_callback'] = [$this, 'sanitizeValue'];
@@ -44,8 +47,6 @@ final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
         add_action('admin_init', function() {
             $this->load($this);
         });
-
-        $this->addToRegistry();
     }
 
     /**
@@ -99,11 +100,29 @@ final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
     /***************************
      * Public Chainable methods
      ***************************/
+    /**
+     * Returns a new Setting instance untied to the provider's root setting. 
+     * Use for creating custom settings outside of the provider's root setting.
+     *
+     * @return Setting
+     * @throws \BadMethodCallException if called on a non-provider setting.
+     */
+    public function make(): Setting {
+        if (!$this->isProviderSetting) {
+            throw new \BadMethodCallException("Cannot call make() on a non-provider setting.");
+        }
+        
+        $newSetting = app(Setting::class, [
+            'source' => $this->source
+        ]);
+
+        return $this->source->registry()->add('settings', $newSetting);
+    }
 
     /**
      * Sets the option group for the setting.
      *
-     * @param  string $group The option group name.
+     * @param string $group The option group name.
      * 
      * @return self
      */
@@ -117,13 +136,14 @@ final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
     /**
      * Adds a sub-item to the setting. Sub-items are used for array and object settings to define the structure of the array or object.
      *
-     * @param  string $path The dot-notated path for the sub-item (e.g. 'address.street' for an object setting or '*.street' for an array of objects).
-     * @param  string $name The option name for the sub-item.
-     * @param  string $type The type of the sub-item (e.g. 'string', 'integer', 'object', etc.).
-     * @param  mixed  $default Optional default value for the sub-item.
-     * @param  array  $args Optional additional arguments for the sub-item (e.g. 'label' => 'Street Address').
+     * @param string $path The dot-notated path for the sub-item (e.g. 'address.street' for an object setting or '*.street' for an array of objects).
+     * @param string $name The option name for the sub-item.
+     * @param string $type The type of the sub-item (e.g. 'string', 'integer', 'object', etc.).
+     * @param mixed  $default Optional default value for the sub-item.
+     * @param array  $args Optional additional arguments for the sub-item (e.g. 'label' => 'Street Address').
      * 
      * @return Setting The created sub-item as a Setting instance.
+     * @throws \InvalidArgumentException if the path is invalid or if trying to add sub-items to a non-object/array setting.
      */
     public function addSubItem(
         string $path,
@@ -132,7 +152,7 @@ final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
     ): Setting {
 
         if (!in_array($this->args['type'], ['array', 'object'])) {
-            throw new Exception("Cannot add sub-item to non-object/array setting '{$this->name}'.");
+            throw new \InvalidArgumentException("Cannot add sub-item to non-object/array setting '{$this->name}'.");
         }
 
         $formattedName = Str::snake($name);
@@ -140,7 +160,7 @@ final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
 
         // Prevent adding sub-items to non-object children
         if ($this->parent !== null && !in_array($this->args['type'], ['object', 'array'])) {
-            throw new Exception("Cannot add sub-items to non-object child '{$this->name}'.");
+            throw new \InvalidArgumentException("Cannot add sub-items to non-object child '{$this->name}'.");
         }
 
         $parent = $this->findParentForPath($fullPath);
@@ -148,13 +168,14 @@ final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
         // Prevent duplicates
         foreach ($parent->subItems as $existing) {
             if ($existing->name === $formattedName) {
-                throw new Exception("Duplicate property '{$formattedName}' in '{$parent->name}'");
+                throw new \InvalidArgumentException("Duplicate property '{$formattedName}' in '{$parent->name}'");
             }
         }
 
         $item = app(self::class, [
-            'source'      => $this->source,
-            'optionGroup' => $this->optionGroup,
+            'source'            => $this->source,
+            'optionGroup'       => $this->optionGroup,
+            'isProviderSetting' => $this->isProviderSetting,
         ]);
 
         $item->name($formattedName);
@@ -169,26 +190,133 @@ final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
         return $item;
     }
 
-    /***************************
-     * Helpers
-     ***************************/
-
     /**
-     * Retrieves the type of the setting, which is used for field generation and validation.
+     * Overrides field() method from HasFields to create a settingField instance in addition to the field instance.
      *
-     * @return string|null The type of the setting (e.g. 'string', 'integer', 'array', 'object', etc.) or null if not set.
+     * @param string|null $type
+     * @param array       $config
+     * @param array       $args
+     *
+     * @return Field
+     * @throws \InvalidArgumentException if the setting is not compatible with fields or if a field is already assigned to the setting.
      */
-    public function getType(): ?string {
-        return $this->args['type'] ?? null;
+    public function field(?string $type = null, array $config = [], array $args = []): Field {
+        $this->field = $this->makeField($type, $config, $args);
+
+        $makeSettingField = true;
+
+        if ($this->type === 'object') {
+            $makeSettingField = false;
+        }
+
+        if ($this->parent?->args['item_type'] ?? '' === 'object') {
+            $makeSettingField = false;
+        }
+
+        // Setup the setting field if needed
+        if ($makeSettingField) {
+            $this->settingField = new SettingField(
+                source:  $this->source,
+                setting: $this,
+                args:    $args
+            );
+
+            $this->source->registry()->add('settingsFields', $this->settingField);
+        }
+
+        return $this->field;
     }
 
     /**
-     * Retrieves the item type of the setting, which is used for field generation and validation of array items.
+     * Assigns all fields to a specific admin page.
      *
-     * @return string|null The item type of the setting (e.g. 'string', 'integer', 'object', etc.) or null if not set.
+     * @param AdminPage|string $page The page instance or slug that this field belongs to.
+     *
+     * @return self
      */
-    public function getItemType(): ?string {
-        return $this->args['item_type'] ?? null;
+    public function onPage(AdminPage|string $page): self {
+        if ($this->settingField !== null) {
+            $this->settingField->onPage($page);
+        }
+
+        $this->walkSettingFields(fn ($sf) => $sf->onPage($page));
+
+        return $this;
+    }
+
+    /**
+     * Assign all fields to a specific section.
+     *
+     * @param SettingsSection|string $section The section instance or ID that this field belongs to.
+     *
+     * @return self
+     */
+    public function inSection(SettingsSection|string $section): self {
+        if ($this->settingField !== null) {
+            $this->settingField->inSection($section);
+        }
+
+        $this->walkSettingFields(fn ($sf) => $sf->inSection($section));
+
+        return $this;
+    }
+
+    /***************************
+     * Helpers
+     ***************************/
+    /** Walk through all sub-items and apply a callback to their setting fields if they exist.
+     *
+     * @param callable $callback A callback function that takes a SettingField instance as its parameter.
+     *
+     * @return void
+     */
+    protected function walkSettingFields(callable $callback): void {
+        $this->walk(function ($item) use ($callback) {
+            if ($item->settingField) {
+                $callback($item->settingField);
+            }
+        });
+    }
+
+    /**
+     * Retrieves the current value of the setting.
+     *
+     * @return mixed
+     */
+    public function getValue(): mixed {
+        $root = $this;
+
+        while ($root->parent !== null) {
+            $root = $root->parent;
+        }
+
+        $value = get_option($root->name, $root->args['default'] ?? null);
+
+        // If this is the root, return directly
+        if ($this === $root) {
+            return $value;
+        }
+
+        // Traverse into nested structure using path
+        $segments = explode('.', $this->path);
+
+        // Remove root segment
+        array_shift($segments);
+
+        foreach ($segments as $segment) {
+            if ($segment === '*') {
+                // For repeaters, return full array (handled elsewhere per index)
+                return $value;
+            }
+
+            if (!is_array($value) || !array_key_exists($segment, $value)) {
+                return $this->args['default'] ?? null;
+            }
+
+            $value = $value[$segment];
+        }
+
+        return $value;
     }
 
     /**
@@ -202,56 +330,5 @@ final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
         }
 
         unregister_setting($this->optionGroup, $this->name);
-    }
-
-    /**
-     * Retrieves the current value of the setting.
-     *
-     * @return mixed
-     */
-    public function getValue(): mixed {
-        return get_option($this->name, $this->args['default'] ?? null);
-    }
-
-    /**
-     * Assigns all fields to a specific admin page.
-     *
-     * @param  AdminPage|string $page The page instance or slug that this field belongs to.
-     *
-     * @return self
-     */
-    public function onPage(AdminPage|string $page): self {
-        // Apply to root field if exists
-        if ($this->field !== null) {
-            $this->field->onPage($page);
-        }
-
-        // Apply recursively
-        $this->walkFields(function ($field) use ($page) {
-            $field->onPage($page);
-        });
-
-        return $this;
-    }
-
-    /**
-     * Assign all fields to a specific section.
-     *
-     * @param  SettingsSection|string $section The section instance or ID that this field belongs to.
-     *
-     * @return self
-     */
-    public function inSection(SettingsSection|string $section): self {
-        // Apply to root field if exists
-        if ($this->field !== null) {
-            $this->field->inSection($section);
-        }
-
-        // Apply recursively
-        $this->walkFields(function ($field) use ($section) {
-            $field->inSection($section);
-        });
-
-        return $this;
     }
 }

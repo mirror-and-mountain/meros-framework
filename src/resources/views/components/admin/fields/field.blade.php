@@ -3,7 +3,7 @@
         <label for="{{ $field->id }}">{{ $field->label }}</label>
     @endif
 
-    {{-- Render actual field --}}
+    {{-- Render the field component --}}
     <x-dynamic-component :component="$component" :field="$field" />
 
     @if($field->description)

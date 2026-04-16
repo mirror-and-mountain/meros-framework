@@ -2,22 +2,23 @@
 
 namespace MM\Meros\App\Contracts;
 
-use Closure;
-use MM\Meros\App\Support\Field;
+use MM\Meros\App\Support\Fields\Field;
 
 interface FieldRegistrar {
     public function field(
-        ?string  $type = null,
-        mixed    $config = null,
-        ?Closure $callback = null,
-        array    $args = []
+        ?string  $type   = null,
+        array    $config = [],
+        array    $args   = []
     ): Field;
     
-    public function getType(): ?string;
-    public function getItemType(): ?string;
-    public function getID(): string;
-    public function getName(): string;
-    public function getLabel(): string;
-    public function getDescription(): string;
+    public function getFieldID(): string;
+    public function getFieldName(): string;
+    public function getFieldLabel(): string;
+    public function getFieldDescription(): string;
     public function getValue(): mixed;
+
+    public function getItemNames(): array;
+    public function getFieldNames(): array;
+    public function getItemLabels(): array;
+    public function getItemByName(string $name): ?FieldRegistrar;
 }

@@ -17,6 +17,15 @@ trait HasBlocks {
     protected bool $discoverBlocks = false;
 
     /**
+     * Instantiates a new Block class and returns it for configuration.
+     *
+     * @return Block
+     */
+    protected function blocks(): Block {
+        return app(Block::class, ['source' => $this]);
+    }
+
+    /**
      * Discovers blocks to be registered using the item's blocks path.
      *
      * @return void

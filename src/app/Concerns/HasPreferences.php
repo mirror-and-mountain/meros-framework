@@ -14,8 +14,7 @@ trait HasPreferences {
      * @var array
      */
     protected array $defaultPreferences = [
-        'assets_path'                      => 'assets/build', // No leading or trailing slashes
-        'assets_path_structure'            => '/**/{location}/*.{extension}', 
+        'assets_path'                      => 'resources/assets/build', // No leading or trailing slashes
         'assets_are_enabled_by_default'    => true, // Whether to enable discovered assets by default.
         'assets_are_switchable_by_default' => true, // Whether to allow enabling/disabling assets in WP Admin by default.
         'blocks_path'                      => 'blocks/build', // No leading or trailing slashes

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\File;
 
 use MM\Meros\App\Theme as MerosTheme;
 use MM\Meros\App\Support\ClassInfo;
+use MM\Meros\App\Support\Registry;
 
 use MM\Meros\App\Facades\Theme;
 
@@ -19,7 +20,7 @@ class ThemeServiceProvider extends ServiceProvider {
 
         if ($themeClass->extends(MerosTheme::class)) {
             $this->app->singleton(MerosTheme::class, function ($app) use ($themeClass) {
-                return new $themeClass->name($app->make('meros.registry'));
+                return new $themeClass->name($app->make(Registry::class));
             });
             
             $this->app->alias(MerosTheme::class, 'meros.theme');

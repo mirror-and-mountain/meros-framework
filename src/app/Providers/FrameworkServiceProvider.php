@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Blade;
 use MM\Meros\App\Framework;
 use MM\Meros\App\Context;
 use MM\Meros\App\Support\ClassInfo;
+use MM\Meros\App\Support\Registry;
 
 use MM\Meros\App\Listeners\MigrationEventSubscriber;
 
@@ -20,9 +21,6 @@ use MM\Meros\Scripts\UninstallCommands;
 class FrameworkServiceProvider extends ServiceProvider {
     
     final public function register(): void {
-        // Register the registry service provider
-        $this->app->register(RegistryServiceProvider::class);
-
         // Register the context class
         $this->app->singleton(Context::class, function () {
             return new Context();
@@ -33,7 +31,7 @@ class FrameworkServiceProvider extends ServiceProvider {
 
         // Register the Framework class as a singleton in the service container
         $this->app->singleton(Framework::class, function ($app) {
-            return new Framework($app->make('meros.registry'));
+            return new Framework($app->make(Registry::class));
         });
         
         // Alias the Framework class (used in Framework Facade)

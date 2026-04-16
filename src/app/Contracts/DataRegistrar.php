@@ -2,15 +2,18 @@
 
 namespace MM\Meros\App\Contracts;
 
+use Closure;
 use MM\Meros\App\Support\DataBuilder;
 
 interface DataRegistrar {
     /**
      * Returns a new DataBuilder instance scoped to the current feature and optional path.
+     * 
+     * @param Closure|null $callback Optional callback to configure the builder instance.
      *
      * @return DataBuilder A new DataBuilder instance for building nested settings or schema.
      */
-    public function define(): DataBuilder;
+    public function configure(?Closure $callback = null): DataBuilder;
 
     /**
      * Adds a sub-item to the current object definition at the specified path.
@@ -39,16 +42,18 @@ interface DataRegistrar {
     public function toSchema(): array;
 
     /**
-     * Retrieves an array of field names defined in the current object definition.
+     * Returns the data type of the current item (e.g. 'string', 'boolean' etc...).
      *
-     * @return array An array of field names.
+     * @return string|null
      */
-    public function getFieldNames(): array;
+    public function getDataType(): ?string;
 
     /**
-     * Retrieves an array of input names for the fields defined in the current object definition, formatted for use in form inputs.
+     * Returns the data type of nested items inside an array-type item.
      *
-     * @return array An array of input names corresponding to the defined fields.
+     * @return string|null
      */
-    public function getInputNames(): array;
+    public function getItemDataType(): ?string;
+
+
 }

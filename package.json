@@ -5,6 +5,7 @@
     },
     "devDependencies": {
         "@wordpress/i18n": "^5.20.0",
-        "@wordpress/scripts": "^30.13.0"
+        "@wordpress/scripts": "^30.13.0",
+        "tom-select": "^2.5.2"
     }
 }
