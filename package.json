@@ -1,7 +1,9 @@
 {
     "private": true,
     "scripts": {
-        "build": "wp-scripts build --config webpack.assets.config.js"
+        "build:assets": "wp-scripts build --config webpack.assets.config.js",
+        "build:blocks": "wp-scripts build --webpack-src-dir=src/resources/blocks/src/ --output-path=src/resources/blocks/build/",
+        "build": "npm run build:blocks && npm run build:assets"
     },
     "devDependencies": {
         "@wordpress/i18n": "^5.20.0",
