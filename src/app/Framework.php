@@ -7,15 +7,11 @@ use Illuminate\Support\Facades\Schema;
 use MM\Meros\App\Models\Migration;
 use MM\Meros\App\Features\CoreInstallable;
 
-use MM\Meros\App\Concerns\HasAssets;
-use MM\Meros\App\Concerns\HasInstallables;
-
 use MM\Meros\App\Facades\Registry;
 use MM\Meros\App\Facades\Context;
 use MM\Meros\App\Facades\Theme;
 
 final class Framework extends FeatureProvider {
-    use HasAssets, HasInstallables;
 
     protected function configure(): void {
         // Run theme activation tasks
@@ -41,7 +37,9 @@ final class Framework extends FeatureProvider {
      * @return void
      */
     protected function initialise(): void {
+        $this->registerRestRoutes();
         $this->discover()->assets();
+        $this->discover()->blocks(); 
 
         // $initAjax = Context::isAdmin();
 
@@ -167,6 +165,84 @@ final class Framework extends FeatureProvider {
                 'source' => $this,
             ]
         )->make($config);
+    }
+
+    /***************************************************************
+     * 
+     * The following methods are for Meros API endpoints
+     * 
+     ***************************************************************/
+    /**
+     * Registers REST API routes for the framework.
+     *
+     * @return void
+     */
+    private function registerRestRoutes(): void {
+        /**
+         * Registers a REST API route for rendering Blade views. Accepts a view name and an optional 
+         * data payload, renders the specified view with the provided data, and returns the rendered HTML. 
+         * 
+         * Requires the 'edit_posts' capability to access.
+         */
+        add_action('rest_api_init', function () {
+            register_rest_route('meros/v1', '/get-blade-view', [
+                'methods'             => \WP_REST_Server::READABLE,
+                'permission_callback' => function () {
+                    return current_user_can('edit_posts');
+                },
+                'callback' => function (\WP_REST_Request $request) {
+                    $view = sanitize_text_field($request->get_param('view'));
+                    $data = $request->get_param('data');
+                    $attributes = [];
+
+                    if (! $view) {
+                        return new \WP_Error('no_view', 'No view specified', ['status' => 400]);
+                    }
+
+                    if (is_string($data) && $data !== '') {
+                        $decoded = json_decode(wp_unslash($data), true);
+
+                        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded)) {
+                            return new \WP_Error('invalid_data', 'Invalid data payload', ['status' => 400]);
+                        }
+
+                        $attributes = $decoded;
+                    }
+
+                    try {
+                        $rendered = view($view, [
+                            'attributes' => $attributes,
+                            'data'       => $attributes,
+                        ])->render();
+                        return rest_ensure_response(['html' => $rendered]);
+                    } catch (\Exception $e) {
+                        return new \WP_Error('render_error', 'Error rendering view: ' . $e->getMessage(), ['status' => 500]);
+                    }
+                }
+            ]);
+
+            /** Serve this endpoint as raw HTML so block editor fetch().text() receives renderable markup. */
+            add_filter('rest_pre_serve_request', function ($served, $result, $request, $server) {
+                if ($request->get_route() !== '/meros/v1/get-blade-view') {
+                    return $served;
+                }
+
+                if (is_wp_error($result)) {
+                    return $served;
+                }
+
+                $data = $result instanceof \WP_REST_Response ? $result->get_data() : null;
+
+                if (! is_array($data) || ! isset($data['html'])) {
+                    return $served;
+                }
+
+                $server->send_header('Content-Type', 'text/html; charset=' . get_option('blog_charset'));
+                echo $data['html'];
+
+                return true;
+            }, 10, 4);
+        });
     }
 
     /***************************************************************

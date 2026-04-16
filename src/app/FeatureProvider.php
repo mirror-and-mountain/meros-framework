@@ -6,6 +6,9 @@ use MM\Meros\App\Framework;
 
 use MM\Meros\App\Support\Discover;
 
+use MM\Meros\App\Concerns\HasAssets;
+use MM\Meros\App\Concerns\HasBlocks;
+use MM\Meros\App\Concerns\HasInstallables;
 use MM\Meros\App\Concerns\HasIdentity;
 use MM\Meros\App\Concerns\HasSettings;
 use MM\Meros\App\Concerns\HasPreferences;
@@ -19,7 +22,10 @@ abstract class FeatureProvider {
     // Additional concerns may be added by child classes as needed.
     use HasIdentity,
         HasPreferences,
-        HasSettings;
+        HasSettings,
+        HasAssets,
+        HasBlocks,
+        HasInstallables;
 
     public function __construct(
         protected Registry $registry,

@@ -32,10 +32,10 @@ trait HasPreferences {
     protected array $preferences = [];
 
     /**
-      * Initialises preferences based on the type of the item (theme or package).
-      *
-      * @return void
-      */
+     * Initialises preferences based on the type of the item (theme or package).
+     *
+     * @return void
+     */
     protected function initPreferences(): void {
         if ($this instanceof Theme) {
             $this->defaultPreferences = [

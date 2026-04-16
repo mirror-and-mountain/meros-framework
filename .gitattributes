@@ -1,5 +1,7 @@
 # Exclude development source folders
-src/assets/src/ export-ignore
+src/resources/assets/src/ export-ignore
+src/resources/blocks/src/ export-ignore
+src/resources/blocks/hooks/ export-ignore
 
 # Exclude config and metadata files not needed in production
 .gitattributes export-ignore

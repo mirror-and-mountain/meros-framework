@@ -20,7 +20,9 @@ class Block extends Feature {
     protected string $initError = 'Block\'s make method must be called before using other configuration methods.';
 
     public function __construct(public FeatureProvider $source) {
-        $this->addToRegistry();
+        add_action('init', function () {
+            $this->load($this);
+        });
     }
 
     /**
@@ -52,6 +54,7 @@ class Block extends Feature {
         $blockType = $instance->path !== '' ? $instance->path : $instance->name;
 
         register_block_type($blockType, $instance->args);
+        $this->loaded = true;
     }
 
     /***************************

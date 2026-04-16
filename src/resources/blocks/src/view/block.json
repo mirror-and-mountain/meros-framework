@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json.schemastore.org/block.json",
+    "apiVersion": 3,
+    "name": "meros/view",
+    "version": "0.1.0",
+    "title": "View",
+    "category": "widgets",
+    "icon": "format-gallery",
+    "description": "Renders a blade view.",
+    "textdomain": "meros-theme",
+    "example": {},
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php",
+    "attributes": {
+        "view": {
+            "type": "string",
+            "default": "meros::test"
+        },
+        "data": {
+            "type": "object",
+            "default": {
+                "exampleText": "Hello from the block attributes!"
+            }
+        }
+    }
+}
