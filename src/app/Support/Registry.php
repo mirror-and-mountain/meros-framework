@@ -16,15 +16,21 @@ class Registry {
     public Collection $settings;
     public Collection $settingsFields;
 
+    public Collection $fieldGroups;
+    public Collection $fields;
     public Collection $assets;
     public Collection $blocks;
+    public Collection $blockVariations;
 
     protected array $itemIDMap = [
         'assets'           => 'handle',
         'blocks'           => 'name',
+        'blockVariations'  => 'name',
         'adminPages'       => 'slug',
         'settingsSections' => 'id',
         'settings'         => 'name',
+        'fieldGroups'      => 'slug',
+        'fields'           => 'name',
     ];
 
     public function __construct() {
@@ -36,8 +42,11 @@ class Registry {
         $this->settings         = collect([]);
         $this->settingsFields   = collect([]);
 
+        $this->fieldGroups      = collect([]);
+        $this->fields           = collect([]);
         $this->assets           = collect([]);
         $this->blocks           = collect([]);
+        $this->blockVariations  = collect([]);
     }
 
     /**
@@ -99,130 +108,5 @@ class Registry {
         }
 
         throw new \InvalidArgumentException("Invalid registry type: {$type}");
-    }
-
-    /**
-     * Returns the installables collection.
-     *
-     * @return Collection
-     */
-    public function getInstallables(): Collection {
-        return $this->installables;
-    }
-
-    /**
-     * Returns the admin pages collection.
-     *
-     * @return Collection
-     */
-    public function getAdminPages(): Collection {
-        return $this->adminPages;
-    }
-
-    /**
-     * Returns the settings sections collection.
-     *
-     * @return Collection
-     */
-    public function getSettingsSections(): Collection {
-        return $this->settingsSections;
-    }
-
-    /**
-     * Returns the settings collection.
-     *
-     * @return Collection
-     */
-    public function getSettings(): Collection {
-        return $this->settings;
-    }
-
-    /**
-     * Returns the assets collection.
-     *
-     * @return Collection
-     */
-    public function getAssets(): Collection {
-        return $this->assets;
-    }
-
-    /**
-     * Returns the blocks collection.
-     *
-     * @return Collection
-     */
-    public function getBlocks(): Collection {
-        return $this->blocks;
-    }
-
-    /**
-     * Returns the components collection.
-     *
-     * @return Collection
-     */
-    public function getComponents(): Collection {
-        return $this->components;
-    }
-
-    /**
-     * Returns whether the registry contains any blocks
-     * 
-     * @param bool $switchableOnly If true, only counts blocks that are switchable in WP Admin. Otherwise counts all registered blocks.
-     *
-     * @return boolean
-     */
-    public function hasBlocks(bool $switchableOnly = false): bool {
-        return $switchableOnly 
-            ? $this->blocks->filter->isSwitchable->isNotEmpty() 
-            : $this->blocks->isNotEmpty();
-    }
-
-    /**
-     * Returns whether the registry contains any assets
-     * 
-     * @param bool $switchableOnly If true, only counts assets that are switchable in WP Admin. Otherwise counts all registered assets.
-     *
-     * @return boolean
-     */
-    public function hasAssets(bool $switchableOnly = false): bool {
-        return $switchableOnly 
-            ? $this->assets->filter->isSwitchable->isNotEmpty() 
-            : $this->assets->isNotEmpty();
-    }
-
-    /**
-     * Returns whether the registry contains any admin pages
-     *
-     * @return boolean
-     */
-    public function hasAdminPages(): bool {
-        return $this->adminPages->isNotEmpty();
-    }
-
-    /**
-     * Returns whether the registry contains any settings sections
-     *
-     * @return boolean
-     */
-    public function hasSettingsSections(): bool {
-        return $this->settingsSections->isNotEmpty();
-    }
-
-    /**
-     * Returns whether the registry contains any settings
-     *
-     * @return boolean
-     */
-    public function hasSettings(): bool {
-        return $this->settings->isNotEmpty();
-    }
-
-    /**
-     * Returns whether the registry contains any installables
-     *
-     * @return boolean
-     */
-    public function hasInstallables(): bool {
-        return $this->installables->isNotEmpty();
     }
 }

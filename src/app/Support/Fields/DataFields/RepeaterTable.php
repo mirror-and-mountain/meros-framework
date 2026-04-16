@@ -1,19 +1,11 @@
 <?php 
 
-namespace MM\Meros\App\Support\Fields;
+namespace MM\Meros\App\Support\Fields\DataFields;
 
-class RepeaterTable extends Field {
-    /**
-     * Field definitions for each sub-item within the repeater field.
-     *
-     * @var array<Field>
-     */
-    protected array $subFields = [];
+use MM\Meros\App\Support\Fields\DataField;
+use MM\Meros\App\Support\Settings\Setting;
 
-    public function __construct(array $subFields = []) {
-        $this->subFields = $subFields;
-    }
-
+class RepeaterTable extends DataField {
     /**
      * Renders the repeater table field.
      *
@@ -21,6 +13,10 @@ class RepeaterTable extends Field {
      */
     public function render(): void {
         $view = 'meros::components.fields.wrappers.repeater';
+
+        if ($this->registrar instanceof Setting) {
+            $view = 'meros::components.fields.wrappers.setting-repeater';
+        }
 
         echo view($view, [
             'rows'  => $this->buildRows(),
@@ -40,15 +36,12 @@ class RepeaterTable extends Field {
 
         $rows = [];
 
-        foreach ($items as $rowData) {
-            $rows[] = collect($this->subFields)
-                ->map(function ($field) use ($rowData) {
-                    $fieldInstance = clone $field;
-                    $fieldInstance->value = data_get($rowData, $field->name);
-
-                    return $fieldInstance;
-                })
-                ->toArray();
+        foreach ($items as $index => $rowData) {
+            $rows[] = new RepeaterRow(
+                repeater: $this,
+                index: $index,
+                rowData: $rowData
+            );
         }
 
         return $rows;
@@ -60,9 +53,9 @@ class RepeaterTable extends Field {
      * @return array
      */
     public function getFieldNames(): array {
-        return collect($this->subFields)
-            ->pluck('name')
-            ->toArray();
+        return method_exists($this->registrar, 'getItemNames')
+            ? $this->registrar->getItemNames()
+            : [];
     }
 
     /**
@@ -71,9 +64,9 @@ class RepeaterTable extends Field {
      * @return array
      */
     public function getFieldLabels(): array {
-        return collect($this->subFields)
-            ->pluck('label')
-            ->toArray();
+        return method_exists($this->registrar, 'getItemLabels')
+            ? $this->registrar->getItemLabels()
+            : [];
     }
 
     /**

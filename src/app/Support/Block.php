@@ -6,8 +6,6 @@ use Closure;
 use Illuminate\Support\Facades\File;
 
 use MM\Meros\App\FeatureProvider;
-use MM\Meros\App\Support\Feature;
-
 use MM\Meros\App\Support\BlockVariation;
 
 class Block extends Feature {

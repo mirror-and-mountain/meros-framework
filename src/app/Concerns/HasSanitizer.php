@@ -4,7 +4,7 @@ namespace MM\Meros\App\Concerns;
 
 use Closure;
 
-use MM\Meros\App\Support\PathResolver;
+use MM\Meros\App\Support\Helpers\PathResolver;
 
 trait HasSanitizer {
     /**

@@ -21,9 +21,9 @@ trait HasAssets {
      *
      * @param string|null $handle The handle of the asset to retrieve. If null, returns all assets.
      *
-     * @return Asset|Collection The requested asset or a collection of all assets.
+     * @return Asset|Collection|null The requested asset or a collection of all assets. Null if the requested asset doesn't exist.
      */
-    protected function assets(?string $handle = null): Asset|Collection {
+    protected function assets(?string $handle = null): Asset|Collection|null {
         if ($handle) {
             return $this->registry()->get('assets')->firstWhere('handle', $handle);
         }

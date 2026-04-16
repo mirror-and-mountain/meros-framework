@@ -1,6 +1,8 @@
 <?php 
 
-namespace MM\Meros\App\Support\Fields;
+namespace MM\Meros\App\Support\Fields\DataFields;
+
+use MM\Meros\App\Support\Fields\DataField;
 
 /**
  * Represents a single row within a repeater field.
@@ -18,9 +20,9 @@ class RepeaterRow {
      *
      * @param string $name
      *
-     * @return Field|null
+     * @return DataField|null
      */
-    public function makeField(string $name): ?Field {
+    public function makeField(string $name): ?DataField {
         $subItem = $this->repeater->registrar->getItemByName($name);
 
         if (!$subItem) {
@@ -52,7 +54,7 @@ class RepeaterRow {
      *
      * @param array $names
      *
-     * @return Field[]
+     * @return DataField[]
      */
     public function getFields(array $names): array {
         $fields = [];

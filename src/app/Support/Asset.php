@@ -7,7 +7,6 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
 use MM\Meros\App\FeatureProvider;
-use MM\Meros\App\Support\Feature;
 
 final class Asset extends Feature {
     public bool   $enabled      = true;

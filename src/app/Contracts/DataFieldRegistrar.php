@@ -2,14 +2,14 @@
 
 namespace MM\Meros\App\Contracts;
 
-use MM\Meros\App\Support\Fields\Field;
+use MM\Meros\App\Support\Fields\DataField;
 
-interface FieldRegistrar {
+interface DataFieldRegistrar {
     public function field(
         ?string  $type   = null,
         array    $config = [],
         array    $args   = []
-    ): Field;
+    ): DataField;
     
     public function getFieldID(): string;
     public function getFieldName(): string;
@@ -20,5 +20,5 @@ interface FieldRegistrar {
     public function getItemNames(): array;
     public function getFieldNames(): array;
     public function getItemLabels(): array;
-    public function getItemByName(string $name): ?FieldRegistrar;
+    public function getItemByName(string $name): ?DataFieldRegistrar;
 }

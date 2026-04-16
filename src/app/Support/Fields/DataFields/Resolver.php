@@ -1,26 +1,27 @@
 <?php 
 
-namespace MM\Meros\App\Support\Fields;
+namespace MM\Meros\App\Support\Fields\DataFields;
 
-use MM\Meros\App\Contracts\FieldRegistrar;
 use MM\Meros\App\FeatureProvider;
+use MM\Meros\App\Support\Fields\DataField;
+use MM\Meros\App\Contracts\DataFieldRegistrar;
 
-class FieldResolver {
+class Resolver {
 
     /**
      * Undocumented function
      *
-     * @param string          $type
-     * @param FieldRegistrar  $registrar
-     * @param FeatureProvider $featureProvider
+     * @param string              $type
+     * @param DataFieldRegistrar  $registrar
+     * @param FeatureProvider     $featureProvider
      *
-     * @return Field
+     * @return DataField
      */
     public static function resolve(
-        string          $type, 
-        FieldRegistrar  $registrar, 
-        FeatureProvider $featureProvider
-    ): Field {
+        string              $type, 
+        DataFieldRegistrar  $registrar, 
+        FeatureProvider     $featureProvider
+    ): DataField {
         $map = [
             'text'        => Input::class,
             'email'       => Input::class,

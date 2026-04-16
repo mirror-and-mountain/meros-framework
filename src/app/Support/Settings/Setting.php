@@ -5,7 +5,7 @@ namespace MM\Meros\App\Support\Settings;
 use Illuminate\Support\Str;
 
 use MM\Meros\App\Contracts\DataRegistrar;
-use MM\Meros\App\Contracts\FieldRegistrar;
+use MM\Meros\App\Contracts\DataFieldRegistrar;
 
 use MM\Meros\App\FeatureProvider;
 use MM\Meros\App\Support\Feature;
@@ -13,9 +13,9 @@ use MM\Meros\App\Support\Feature;
 use MM\Meros\App\Concerns\HasSanitizer;
 use MM\Meros\App\Concerns\HasDataBuilder;
 
-use MM\Meros\App\Support\Fields\Field;
+use MM\Meros\App\Support\Fields\DataField;
 
-final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
+final class Setting extends Feature implements DataRegistrar, DataFieldRegistrar {
     public bool   $isProviderSetting;
     public string $optionGroup = '';
     public array  $args = [
@@ -197,10 +197,10 @@ final class Setting extends Feature implements DataRegistrar, FieldRegistrar {
      * @param array       $config
      * @param array       $args
      *
-     * @return Field
+     * @return DataField
      * @throws \InvalidArgumentException if the setting is not compatible with fields or if a field is already assigned to the setting.
      */
-    public function field(?string $type = null, array $config = [], array $args = []): Field {
+    public function field(?string $type = null, array $config = [], array $args = []): DataField {
         $this->field = $this->makeField($type, $config, $args);
 
         $makeSettingField = true;

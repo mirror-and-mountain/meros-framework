@@ -28,7 +28,7 @@ trait HasDataBuilder {
         'object'
     ];
 
-    use HasFields;
+    use HasDataFields;
 
     /***************************
      * Core Builder Methods

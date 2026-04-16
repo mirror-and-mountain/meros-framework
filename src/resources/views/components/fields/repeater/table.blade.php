@@ -15,7 +15,9 @@
                 <td class="meros-repeater-column meros-col-handle meros-drag-handle">☰</td>
                 @foreach ($field->getFieldNames() as $name)
                     <td class="meros-repeater-column meros-col-{{ $name }}">
-                        @php $fieldInstance = $row->makeField($name); @endphp
+                        @php 
+                            $fieldInstance = method_exists($row, 'makeField') ? $row->makeField($name) : $row; 
+                        @endphp
                         @if ($fieldInstance)
                             <x-fields.wrappers.setting-field
                                 :component="$fieldInstance->getFieldComponent()" 
