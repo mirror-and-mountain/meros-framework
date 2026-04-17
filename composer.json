@@ -19,6 +19,8 @@
         "psr-4": {
             "MM\\Meros\\": "src/",
             "MM\\Meros\\App\\": "src/app/",
+            "MM\\Meros\\Services": "src/services/",
+            "MM\\Meros\\Support\\": "src/support/",
             "MM\\Meros\\Scripts\\": "src/scripts/"
         }
     },

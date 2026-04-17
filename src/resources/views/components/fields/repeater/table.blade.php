@@ -1,3 +1,7 @@
+@php
+    $niceFields = $niceFields ?? false;
+@endphp
+
 <table class="widefat striped meros-repeater-table">
     <thead>
         <tr>
@@ -16,13 +20,24 @@
                 @foreach ($field->getFieldNames() as $name)
                     <td class="meros-repeater-column meros-col-{{ $name }}">
                         @php 
-                            $fieldInstance = method_exists($row, 'makeField') ? $row->makeField($name) : $row; 
+                            $fieldInstance = is_object($row) && method_exists($row, 'makeField')
+                                ? $row->makeField($name)
+                                : (is_array($row) ? ($row[$name] ?? null) : $row);
                         @endphp
                         @if ($fieldInstance)
-                            <x-fields.wrappers.setting-field
-                                :component="$fieldInstance->getFieldComponent()" 
-                                :field="$fieldInstance" 
-                            />
+                            @if($niceFields)
+                                <x-fields.wrappers.site-field
+                                    :component="$fieldInstance->getFieldComponent()" 
+                                    :field="$fieldInstance"
+                                    :showLabel="false"
+                                    :showDescription="false"
+                                />
+                            @else
+                                <x-fields.wrappers.setting-field
+                                    :component="$fieldInstance->getFieldComponent()" 
+                                    :field="$fieldInstance" 
+                                />
+                            @endif
                         @endif
                     </td>
                 @endforeach

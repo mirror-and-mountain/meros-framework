@@ -1,5 +1,10 @@
-<div class="meros-field meros-site-field nice-form-group">
-    @if(isset($field->label) && $field->label)
+@php
+    $showLabel = $showLabel ?? true;
+    $showDescription = $showDescription ?? true;
+@endphp
+
+<div class="meros-field meros-site-field nice-form-group" {{ $showLabel === false ? 'style=margin-top:0;' : '' }}>
+    @if($showLabel && isset($field->label) && $field->label)
         <label for="{{ $field->id ?? '' }}">{{ $field->label }}</label>
     @endif
 
@@ -10,7 +15,7 @@
         <x-dynamic-component :component="$component" :field="$field" />
     @endif
 
-    @if(isset($field->description) && $field->description)
+    @if($showDescription && isset($field->description) && $field->description)
         <small class="description">{{ $field->description }}</small>
     @endif
 </div>

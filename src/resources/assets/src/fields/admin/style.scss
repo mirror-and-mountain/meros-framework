@@ -1,7 +1,29 @@
 @use 'nice-forms.css/dist/nice-forms.css';
 
-.meros-site-field input {
+.meros-site-field input[type="text"],
+.meros-site-field input[type="email"],
+.meros-site-field input[type="url"],
+.meros-site-field input[type="number"],
+.meros-site-field input[type="password"] {
     height: auto !important;
+}
+
+.meros-field-group-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 16px;
+}
+
+.meros-field-group-field--full {
+    grid-column: span 6;
+}
+
+.meros-field-group-field--half {
+    grid-column: span 3;
+}
+
+.meros-field-group-field--third {
+    grid-column: span 2;
 }
 
 tbody:has(.meros-settings-label) {

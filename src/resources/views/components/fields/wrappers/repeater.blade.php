@@ -1,4 +1,4 @@
-<div class="meros-repeater" data-field="{{ $field->getFieldName() }}">
+<div class="meros-repeater" data-field="{{ $field->name }}">
 
     @if ($field->label)
         <label class="meros-label">
@@ -13,20 +13,15 @@
     @endif
 
     <div class="meros-repeater-rows">
-        @if ($field->isTableLayout())
-            <x-fields.repeater.table 
-                :rows="$rows" 
-                :field="$field"
-            />
-        @else
-            @foreach ($rows as $row)
-                {!! $field->renderRow($row) !!}
-            @endforeach
-        @endif
+        <x-fields.repeater.table 
+            :rows="$rows" 
+            :field="$field"
+            :niceFields="true"
+        />
     </div>
 
     <div class="meros-repeater-footer">
-        <button type="button" class="button button-secondary meros-add-row">
+        <button type="button" class="button button-secondary meros-add-row" style="margin-top: 10px;">
             Add Row
         </button>
     </div>
