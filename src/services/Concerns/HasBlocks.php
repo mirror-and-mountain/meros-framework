@@ -2,30 +2,29 @@
 
 namespace MM\Meros\Services\Concerns;
 
-use Illuminate\Support\Collection;
-use MM\Meros\App\Support\Block;
+use Closure;
+
+use MM\Meros\Services\Block;
+use MM\Meros\Services\Registers\Blocks as BlocksRegister;
+
+use MM\Meros\Facades\Blocks;
 
 trait HasBlocks {
     /**
-     * Instantiates a new block instance or retrieves an existing one from the registry 
-     * if a name is provided and a block with that name exists.
+     * Retrieves a block by its name or the blocks register.
      *
-     * @param  string|null $name The name of the block to retrieve. If null, a new block instance will be created.
+     * @param  string|null $name Optional. The name of the block to retrieve.
+     * @param  Closure|null $callback Optional. A callback to modify the block before returning it.
      *
-     * @return Block|Collection|null A new block instance or the requested block. Null if the requested block doesn't exist. If * is passed as the name, a collection of all blocks will be returned.
+     * @return Block|BlocksRegister|null A new block instance or the requested block. Null if the requested block doesn't exist. If * is passed as the name, a collection of all blocks will be returned.
      */
-    protected function blocks(?string $name = null): Block|Collection|null {
-        if ($name && $name !== '*') {
-            $block = $this->registry()->get('blocks')->firstWhere('name', $name);
-            if ($block) {
-                return $block;
-            }
+    protected function blocks(string $name = '', ?Closure $callback = null): Block|BlocksRegister|null {
+        if (empty($name)) {
+            return Blocks::checkout($this); // return register instance
         }
 
-        if ($name === '*') {
-            return $this->registry()->get('blocks');
+        else {
+            return Blocks::checkout($this)->get($name, $callback);
         }
-
-        return app(Block::class, ['source' => $this]);
     }
 }

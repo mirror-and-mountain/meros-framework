@@ -3,6 +3,7 @@
 namespace MM\Meros\App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
@@ -11,8 +12,16 @@ use Illuminate\Support\Facades\Blade;
 use MM\Meros\App\Framework;
 use MM\Meros\App\Context;
 
-use MM\Meros\App\Support\Registry;
-use MM\Meros\App\Support\Helpers\ClassInfo;
+use MM\Meros\Support\ClassInfo;
+
+use MM\Meros\Services\Registers\Assets;
+use MM\Meros\Services\Registers\Blocks;
+use MM\Meros\Services\Registers\Fields;
+use MM\Meros\Services\Registers\FieldGroups;
+use MM\Meros\Services\Registers\MenuPages;
+use MM\Meros\Services\Registers\Settings;
+use MM\Meros\Services\Registers\SettingsFields;
+use MM\Meros\Services\Registers\SettingsSections;
 
 use MM\Meros\App\Listeners\MigrationEventSubscriber;
 
@@ -21,22 +30,15 @@ use MM\Meros\Scripts\UninstallCommands;
 
 class FrameworkServiceProvider extends ServiceProvider {
     
+    /**
+     * Registers the framework's services, including helper classes and the Framework class itself.
+     *
+     * @return void
+     */
     final public function register(): void {
-        // Register the context class
-        $this->app->singleton(Context::class, function () {
-            return new Context();
-        });
-
-        // Alias the context class (used in Context Facade)
-        $this->app->alias(Context::class, 'meros.context');
-
-        // Register the Framework class as a singleton in the service container
-        $this->app->singleton(Framework::class, function ($app) {
-            return new Framework($app->make(Registry::class));
-        });
-        
-        // Alias the Framework class (used in Framework Facade)
-        $this->app->alias(Framework::class, 'meros.framework');
+        $this->registerHelpers();
+        $this->registerRegisters();
+        $this->registerFramework();
     }
 
     final public function boot(): void {
@@ -91,6 +93,85 @@ class FrameworkServiceProvider extends ServiceProvider {
                 \WP_CLI::add_command('meros:env', $environmentsCli);
             }
         }
+    }
+
+    /**
+     * Registers the framework's registers as singletons in the service container.
+     * Each register is responsible for managing a specific type of feature (e.g. assets, blocks, fields).
+     *
+     * @return void
+     */
+    private function registerRegisters(): void {
+        $this->app->singleton(Assets::class, function () {
+            return new Assets();
+        });
+
+        $this->app->singleton(Blocks::class, function () {
+            return new Blocks();
+        });
+
+        $this->app->singleton(Fields::class, function () {
+            return new Fields();
+        });
+
+        $this->app->singleton(FieldGroups::class, function () {
+            return new FieldGroups();
+        });
+
+        $this->app->singleton(MenuPages::class, function () {
+            return new MenuPages();
+        });
+
+        $this->app->singleton(Settings::class, function () {
+            return new Settings();
+        });
+
+        $this->app->singleton(SettingsFields::class, function () {
+            return new SettingsFields();
+        });
+
+        $this->app->singleton(SettingsSections::class, function () {
+            return new SettingsSections();
+        });
+
+        $this->app->alias(Assets::class, 'meros.registers.assets');
+        $this->app->alias(Blocks::class, 'meros.registers.blocks');
+        $this->app->alias(Fields::class, 'meros.registers.fields');
+        $this->app->alias(FieldGroups::class, 'meros.registers.field_groups');
+        $this->app->alias(MenuPages::class, 'meros.registers.menu_pages');
+        $this->app->alias(Settings::class, 'meros.registers.settings');
+        $this->app->alias(SettingsFields::class, 'meros.registers.settings_fields');
+        $this->app->alias(SettingsSections::class, 'meros.registers.settings_sections');
+    }
+
+    /**
+     * Registers helper classes as singletons in the service container 
+     * and aliases them for use in Facades.
+     *
+     * @return void
+     */
+    private function registerHelpers(): void {
+        // Register the context class
+        $this->app->singleton(Context::class, function () {
+            return new Context();
+        });
+
+        // Alias the context class (used in Context Facade)
+        $this->app->alias(Context::class, 'meros.context');
+    }
+
+    /**
+     * Registers the Framework class as a singleton in the service container 
+     * and aliases it for use in the Framework Facade.
+     *
+     * @return void
+     */
+    private function registerFramework(): void {
+        $this->app->singleton(Framework::class, function () {
+            return new Framework();
+        });
+
+        $this->app->alias(Framework::class, 'meros.framework');
     }
 
     /**

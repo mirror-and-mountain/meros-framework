@@ -7,57 +7,78 @@ use Illuminate\Support\Str;
 use MM\Meros\Services\Contracts\Field;
 use MM\Meros\Services\Contracts\AdminFieldRegistrant;
 
-use MM\Meros\App\Support\Fields\DataFields\Resolver;
+use MM\Meros\Facades\Fields;
+use MM\Meros\App\Fields\Repeater;
 
 /***************************************************************
  * Should be used in conjuction with the IsDataRegistrant trait.
  ***************************************************************/
 
 trait IsAdminFieldRegistrant {
-    // The field instance associated with this item.
-    protected ?Field $field = null;
+    /**
+     * The field instance associated with this registrant, if any.
+     *
+     * @var Field|string|null
+     */
+    protected Field|string|null $field = null;
 
     /**
-     * Adds a field to the item.
+     * Adds a field to the registrant.
      *
-     * @param  string|null  $type     The type of field to add (e.g. 'text', 'checkbox', etc.).
-     * @param  array        $config   Optional configuration for the field.
-     * @param  array        $args     Additional arguments for the field. Not used by default, but may be used in child overrides of this method.
-     * 
-     * @throws \BadMethodCallException If the item is not compatible with fields.
+     * @param Field|string|null $type    The type of field to add (e.g. 'text', 'checkbox', etc.), a Field instance, a Field class name, or null to infer the field type.
+     * @param array             $props   Optional properties for the field.
+     * @param array             $args    Additional arguments for the field. Not used by default, but may be used in child overrides of this method.
      * 
      * @return Field The created Field instance.
+     * @throws \BadMethodCallException if the registrant is not compatible with fields.
+     * @throws \InvalidArgumentException if the provided field type is not compatible with the registrant's data type.
      */
-    public function field(?string $type = null, array $config = [], array $args = []): Field {
+    public function field(Field|string|null $type = null, array $props = [], array $args = []): Field {
         if ($this->field !== null && $this->field instanceof Field) {
             return $this->field;
         }
 
         if (!$this->compatibleWithField()) {
-            throw new \BadMethodCallException("Item '{$this->name}' is not compatible with fields.");
+            throw new \BadMethodCallException("Registrant '{$this->name}' is not compatible with fields.");
         }
 
-        // Reslove field type
+        // Attach an existing instance
+        if ($type instanceof Field) {
+
+            if (!$type->isCompatibleWith($this->getDataType(true))) {
+                throw new \InvalidArgumentException("Field of type '{$type->handle}' is not compatible with data type '{$this->getDataType(true)}'.");
+            }
+
+            $this->field = $type;
+            return $this->field;
+        }
+
+        // Instantiate a new field from a class name
+        if (Str::contains($type, '\\')) {
+            $this->field = $this->makeFieldFrom($type, $props);
+
+            if (!$this->field->isCompatibleWith($this->getDataType(true))) {
+                throw new \InvalidArgumentException("Field of type '{$type}' is not compatible with data type '{$this->getDataType(true)}'.");
+            }
+
+            $this->addRepeaterFields(); // If it's a repeater, add child fields for any compatible sub-items
+            return $this->field;
+        }
+
+        // Resolve field type
         $fieldKey = $type ?? $this->inferFieldType();
 
-        // Ensure array fields with scalar items are treated as multi-selects
-        if ($fieldKey === 'select' && 
-            $this->getDataType() === 'array' && 
-            $this->getItemDataType() !== 'object'
-        ){
-            $config['multiple'] = true;
-            $config['advanced'] = true;
-            $config['options']  = $this->configureMultiSelectOptions($config['options'] ?? []);
+        // Check register for id e.g. 'text'
+        $this->field = $this->makeFieldFrom($fieldKey, $props);
+
+        if (!$this->field->isCompatibleWith($this->getDataType(true))) {
+            throw new \InvalidArgumentException("Field of type '{$fieldKey}' is not compatible with data type '{$this->getDataType(true)}'.");
         }
 
-        $field = $this->resolveFieldType($fieldKey, $config);
+        // If the field is a repeater, add child fields for any compatible sub-items
+        $this->addRepeaterFields();
 
-        if ($config !== []) {
-            $field->configure($config);
-        }
-
-        $this->field = $field;
-        return $field;
+        return $this->field;
     }
 
     /**
@@ -87,6 +108,57 @@ trait IsAdminFieldRegistrant {
     /***************************
      * Helpers
      ***************************/
+
+    /**
+     * Creates a field instance from a given class name or register ID.
+     *
+     * @param string $classOrId
+     * @param array  $props
+     *
+     * @return Field
+     */
+    protected function makeFieldFrom(string $classOrId, array $props = []): Field {
+        $field = Fields::checkout($this->provider)->makeFrom($classOrId, [
+            'id'        => $this->name . '_field',
+            'name'      => $this->name,
+            'value'     => $this->getValue(),
+            'wrapper'   => 'meros::fields.wrappers.settings-field'
+        ] + $props);
+
+        $field->rootName($this->getRootName());
+        $field->class('meros-admin-field');
+        return $field;
+    }
+
+    /**
+     * Checks if the registrant is currently within a repeater context.
+     *
+     * @return boolean
+     */
+    protected function isInRepeater(): bool {
+        if ($this->parent && $this->parent->getField() instanceof Repeater) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Helper to add child fields to a repeater field for any compatible sub-items.
+     *
+     * @return void
+     */
+    protected function addRepeaterFields(): void {
+        if (!$this->field instanceof Repeater) {
+            return;
+        }
+        
+        $childFields = $this->getChildFields();
+
+        $this->field->attach($childFields);
+        $this->field->fieldWrapper('meros::fields.wrappers.settings-field');
+    }
+
     /**
      * Checks if the item is compatible with having a field added to it.
      *
@@ -99,24 +171,6 @@ trait IsAdminFieldRegistrant {
     }
 
     /**
-     * Applies a callback function to fields that meet a certain condition.
-     *
-     * @param  callable $condition A function that takes a Field instance and returns a boolean indicating whether the callback should be applied to that field.
-     * @param  callable $callback  The function to apply to fields that meet the condition.
-     *
-     * @return self
-     */
-    public function fieldsWhere(callable $condition, callable $callback): self {
-        $this->walkFields(function ($field) use ($condition, $callback) {
-            if ($condition($field)) {
-                $callback($field);
-            }
-        });
-
-        return $this;
-    }
-
-    /**
      * Applies a callback function to all fields associated with the item.
      *
      * @param  callable $callback
@@ -126,8 +180,10 @@ trait IsAdminFieldRegistrant {
     protected function walkFields(callable $callback): void {
         foreach ($this->subItems as $item) {
 
-            if ($item->field !== null) {
-                $callback($item->field);
+            $field = $item->getField();
+
+            if ($field !== null) {
+                $callback($field);
             }
 
             if (!empty($item->subItems)) {
@@ -142,17 +198,11 @@ trait IsAdminFieldRegistrant {
      * @return string
      */
     protected function inferFieldType(): string {
-        $dataType = $this->getDataType() ?? 'string';
-
-        if ($dataType === 'array' && $this->getItemDataType() === 'object') {
-            return 'repeater';
-        }
-
-        if ($dataType === 'array' && $this->getItemDataType() !== null) {
-            return 'select';
-        }
+        $dataType = $this->getDataType(true) ?? 'string';
 
         return match ($dataType) {
+            'array.object'      => 'repeater',
+            'array.scalar'      => 'multi_select',
             'string'            => 'text',
             'boolean'           => 'checkbox',
             'integer', 'number' => 'number',
@@ -161,21 +211,27 @@ trait IsAdminFieldRegistrant {
     }
 
     /**
-     * Returns the resolved Field instance
-     * 
-     * @param string $type The field type to resolve (e.g. 'text', 'checkbox', etc.). If not provided, the default field type will be used.
-     * @param array  $config Optional configuration array to apply to the field.
+     * Returns all field instances associated with the item and its sub-items.
      *
-     * @return Field The resolved Field instance.
+     * @return array
      */
-    public function resolveFieldType(string $type, array $config = []): Field {
-        $field = Resolver::resolve($type, $this, $this->source);
+    protected function getChildFields(): array {
+        $fields = [];
 
-        if (!empty($config)) {
-            $field->configure($config);
-        }
+        $this->walkFields(function(Field $field) use (&$fields) {
+            $fields[] = $field;
+        });
 
-        return $field;
+        return $fields;
+    }
+
+    /**
+     * Returns the field instance directly associated with the item, if any.
+     *
+     * @return Field|null
+     */
+    protected function getField(): ?Field {
+        return $this->field instanceof Field ? $this->field : null;
     }
 
     /**
@@ -193,14 +249,7 @@ trait IsAdminFieldRegistrant {
                 continue;
             }
 
-            $type     = $item->getDataType();
-            $itemType = $item->getItemDataType();
-
-            $resolvedType = match (true) {
-                $type === 'array' && $itemType === 'object' => 'array.object',
-                $type === 'array' && $itemType !== null     => 'array.scalar',
-                default                                     => $type,
-            };
+            $type = $item->getDataType(true);
 
             // OBJECT - recurse only
             if ($type === 'object') {
@@ -208,60 +257,25 @@ trait IsAdminFieldRegistrant {
                 continue;
             }
 
-            // ARRAY
-            if ($type === 'array') {
-                $config    = [];
-                $fieldType = $map[$resolvedType] ?? ($resolvedType === 'array.object' ? 'repeater' : 'select');
-
-                // For arrays of scalars, ensure a multi-select field with advanced mode enabled
-                if ($resolvedType === 'array.scalar') {
-                    $config = [
-                        'multiple' => true,
-                        'advanced' => true,
-                        'options'  => $item->args['default'] ?? []
-                    ];
-                }
-                    
-
-                $item->field($fieldType, $config);
+            // ARRAY - OBJECTS
+            if ($type === 'array.object') {
+                $item->field('repeater');
 
                 // Recurse for array of objects
-                if ($resolvedType === 'array.object') {
-                    $this->applyAutoFields($item, $map);
-                }
+                $this->applyAutoFields($item, $map);
 
                 continue;
             }
 
+            // ARRAY - SCALARS
+            if ($type === 'array.scalar') {
+                $item->field('multi_select');
+                continue;
+            }
+
             // SCALAR
-            $fieldType = $map[$resolvedType] ?? null;
-            $item->field($fieldType);
+            $item->field(); // Will use InferFieldType
         }
-    }
-
-    protected function configureMultiSelectOptions(array $options): array {
-        $options = array_values(array_unique(array_merge(
-            $options,
-            $this->getValue() ?? []
-        )));
-
-        $clean = [];
-
-        foreach ($options as $key => $option) {
-            if (!is_string($option)) {
-                continue; // Skip non-string options
-            }
-
-            if (is_int($key)) {
-                $clean[Str::slug($option)] = Str::title(Str::replace(['-', '_'], ' ', $option));
-            } 
-            
-            else {
-                $clean[Str::slug($key)] = Str::title(Str::replace(['-', '_'], ' ', $option));
-            }
-        }
-        
-        return $clean;
     }
 
     /***************************
@@ -284,6 +298,16 @@ trait IsAdminFieldRegistrant {
      */
     public function getName(): string {
         return $this->name;
+    }
+
+    /**
+     * Returns the root name for the field, used to generate sub-field names for repeaters.
+     * 
+     * @return string
+     */
+    public function getRootName(): string {
+        $segments = explode('.', $this->path);
+        return $segments[0] ?? $this->name;
     }
 
     /**

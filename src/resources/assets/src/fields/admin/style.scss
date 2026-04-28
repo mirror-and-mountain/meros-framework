@@ -1,5 +1,20 @@
 @use 'nice-forms.css/dist/nice-forms.css';
 
+textarea.meros-admin-field,
+select.meros-admin-field,
+input[type="text"].meros-admin-field,
+input[type="email"].meros-admin-field,
+input[type="url"].meros-admin-field,
+input[type="number"].meros-admin-field,
+input[type="password"].meros-admin-field,
+input[type="color"].meros-admin-field,
+input[type="date"].meros-admin-field,
+input[type="datetime-local"].meros-admin-field,
+input[type="time"].meros-admin-field {
+    width: 50% !important;
+    max-width: 50% !important;
+}
+
 .meros-site-field input[type="text"],
 .meros-site-field input[type="email"],
 .meros-site-field input[type="url"],

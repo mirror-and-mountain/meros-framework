@@ -2,11 +2,11 @@ import TomSelect from 'tom-select';
 import './select.scss';
 
 function initTomSelects() {
-    const selects = document.querySelectorAll('.meros-select.advanced-select');
+    const selects = document.querySelectorAll('[data-advanced="true"]');
     selects.forEach(select => {
         if (select.tomselect) return;
         const multiple = select.hasAttribute('multiple');
-        const allowAdd = select.classList.contains('allow-add');
+        const allowAdd = select.hasAttribute('data-allow-add') && select.getAttribute('data-allow-add') === 'true';
 
         new TomSelect(select, {
             plugins: multiple ? {

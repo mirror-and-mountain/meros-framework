@@ -3,74 +3,128 @@
 namespace MM\Meros\Services\Concerns;
 
 use Closure;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
-use MM\Meros\App\Support\Settings\Setting;
-use MM\Meros\App\Support\Registrars\SettingRegistrar;
-use MM\Meros\App\Support\Settings\AdminPage;
-use MM\Meros\App\Support\Settings\SettingsSection;
+use MM\Meros\Services\Admin\Setting;
+use MM\Meros\Services\Admin\MenuPage;
+use MM\Meros\Services\Admin\SettingsSection;
 
-use MM\Meros\App\Support\DataBuilder;
+use MM\Meros\Facades\Settings;
+use MM\Meros\Facades\MenuPages;
+use MM\Meros\Facades\SettingsSections;
+
+use MM\Meros\Services\Registers\MenuPages as MenuPagesRegister;
+use MM\Meros\Services\Registers\SettingsSections as SettingsSectionsRegister;
 
 trait HasSettings {
 
-
+    /**
+     * The handle for the root setting associated with this feature provider.
+     *
+     * @var string
+     */
+    private string $settingsHandle = '';
 
     /**
-     * Creates or retrieves the root setting for this feature provider and allows for optional configuration via a callback.
+     * Retrieves the root setting for this feature provider, or a specific sub-setting if a name is provided.
      *
-     * @param Closure|string|null $callbackOrSetting Optional callback to configure the root setting or the option name of an existing setting to retrieve.
+     * @param string $name
      *
-     * @return Setting The root setting instance for the item.
+     * @return Setting|null
      */
-    protected function settings_old(Closure|string|null $callbackOrSetting = null): Setting {
-        if (is_string($callbackOrSetting)) {
-            $setting = $this->registry()->get('settings')->firstWhere('option_name', $callbackOrSetting);
+    protected function settings(string $name = ''): Setting|null {
+        if (empty($this->settingsHandle)) {
+            $this->settingsHandle = Str::snake($this->name) . '_settings';
+        }
 
-            if ($setting) {
-                return $setting;
-            }
+        $rootSetting = Settings::checkout($this)->get($this->settingsHandle);
+
+        if (!$rootSetting) {
+            $rootSetting = $this->createRootSetting();
+        }
+
+        if (!empty($name)) {
+            return collect($rootSetting->subItems)->firstWhere('name', $name);
+        } 
+        
+        else {
+            return $rootSetting;
+        }
+    }
+
+    /**
+     * Retrieves a menu page or collection of menu pages associated with this feature provider.
+     *
+     * @param string       $slug
+     * @param Closure|null $callback
+     *
+     * @return MenuPage|MenuPagesRegister|null
+     */
+    protected function menuPages(string $slug = '', ?Closure $callback = null): MenuPage|MenuPagesRegister|null {
+        if (empty($slug)) {
+            return MenuPages::checkout($this); // return register instance
         }
 
         else {
-            $callback = $callbackOrSetting;
+            return MenuPages::checkout($this)->get($slug, $callback); // return specific menu page
+        }
+    }
+
+    /**
+     * Retrieves a menu page or collection of menu pages associated with this feature provider.
+     * Alias of menuPages() for users who prefer snake_case method names.
+     *
+     * @param string       $slug
+     * @param Closure|null $callback
+     *
+     * @return MenuPage|MenuPagesRegister|null
+     */
+    protected function menu_pages(string $slug = '', ?Closure $callback = null): MenuPage|MenuPagesRegister|null {
+        return $this->menuPages($slug, $callback);
+    }
+
+    /**
+     * Retrieves a settings section or collection of settings sections associated with this feature provider.
+     *
+     * @param string       $id
+     * @param Closure|null $callback
+     *
+     * @return SettingsSection|SettingsSectionsRegister|null
+     */
+    protected function settingsSections(string $id = '', ?Closure $callback = null): SettingsSection|SettingsSectionsRegister|null {
+        if (empty($id)) {
+            return SettingsSections::checkout($this); // return register instance
         }
 
-        $rootSetting = $this->registry()->get('settings')->firstWhere('isProviderSetting', true);
-
-        if ($rootSetting === null) {
-            return $this->createRootSetting($callback);
+        else {
+            return SettingsSections::checkout($this)->get($id, $callback); // return specific settings section
         }
+    }
 
-        if ($callback) {
-            $callback($rootSetting->configure());
-            return $rootSetting;
-        }
-
-        return $rootSetting;
+    /**
+     * Retrieves a settings section or collection of settings sections associated with this feature provider.
+     * Alias of settingsSections() for users who prefer snake_case method names.
+     *
+     * @param string       $id
+     * @param Closure|null $callback
+     *
+     * @return SettingsSection|SettingsSectionsRegister|null
+     */
+    protected function settings_sections(string $id = '', ?Closure $callback = null): SettingsSection|SettingsSectionsRegister|null {
+        return $this->settingsSections($id, $callback);
     }
 
     /**
      * Creates the root setting for this feature provider and adds it to the registry.
      *
-     * @param Closure|null $callback Optional callback to configure the root setting.
-     *
      * @return Setting The newly created root setting instance for the item.
      */
-    private function createRootSetting(Closure|null $callback = null): Setting {
-        $optionGroup = $this->handle . '_settings';
-        $optionName  = $this->handle . '_settings';
+    private function createRootSetting(): Setting {
+        $setting = Settings::checkout($this)->make([
+            'group' => $this->settingsHandle,
+            'name'  => $this->settingsHandle,
+        ])->type('object')->label($this->name . ' Settings');
 
-        $setting = app(Setting::class, [
-            'source'            => $this,
-            'optionGroup'       => 'general',
-            'isProviderSetting' => true,
-        ])->object($optionName);
-
-        if ($callback) {
-            $callback($setting->configure());
-        }
-
-        return $this->registry()->add('settings', $setting);
+        return $setting;
     }
 }

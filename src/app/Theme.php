@@ -2,10 +2,9 @@
 
 namespace MM\Meros\App;
 
-use MM\Meros\App\Concerns\HasInstaller;
+use MM\Meros\Services\Contracts\FeatureProvider;
 
 abstract class Theme extends FeatureProvider {
-    use HasInstaller;
 
     /**
      * Adds a Wordpress theme support.

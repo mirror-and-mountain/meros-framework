@@ -4,8 +4,6 @@ namespace MM\Meros\Services\Concerns;
 
 use Closure;
 
-use MM\Meros\App\Support\Helpers\PathResolver;
-
 trait HasSanitizer {
     /**
      * Used to cache the existing value of the item during sanitization
@@ -13,13 +11,6 @@ trait HasSanitizer {
      * @var array|null
      */
     protected ?array $cachedExisting = null;
-
-    /**
-     * Path resolver instance for handling nested paths.
-     *
-     * @var PathResolver|null
-     */
-    protected ?PathResolver $pathResolver = null;
 
     /**
      * Sets the sanitize callback for the setting.
@@ -42,18 +33,16 @@ trait HasSanitizer {
      *
      * @return mixed
      */
-    final public function sanitizeValue(mixed $value): mixed {
-        $type = $this->args['type'] ?? 'string';
-
-        if ($type === 'array') {
+    final public function sanitize(mixed $value): mixed {
+        if ($this->type === 'array') {
             return $this->sanitizeArray(is_array($value) ? $value : []);
         }
 
-        if ($type === 'object') {
+        if ($this->type === 'object') {
             return $this->sanitizeObject($value);
         }
 
-        $requiredType = $type;
+        $requiredType = $this->type;
 
         $map = [
             'text'      => 'string',
@@ -61,16 +50,22 @@ trait HasSanitizer {
             'select'    => 'string',
             'email'     => 'string',
             'url'       => 'string',
+            'password'  => 'string',
+            'radio'     => 'string',
+            'color'     => 'string',
+            'date'      => 'string',
+            'time'      => 'string',
+            'datetime'  => 'string',
             'number'    => 'number',
             'checkbox'  => 'boolean',
         ];
 
         if (isset($this->field)) {
-            $fieldType    = $this->field?->variation ?? 'text';
+            $fieldType    = $this->field->getVariation() ?? 'text';
             $requiredType = $map[$fieldType] ?? 'string';
         }
 
-        return $this->sanitize($value, $requiredType);
+        return $this->sanitizeValue($value, $requiredType);
     }
 
     /**
@@ -81,40 +76,34 @@ trait HasSanitizer {
      * @return array The sanitized array.
      */
     protected function sanitizeArray(array $items): array {
-        $itemType = $this->args['item_type'] ?? 'string';
-
         // Repeatable array of objects
-        if ($itemType === 'object') {
+        if ($this->itemType === 'object') {
             $existing = $this->cachedExisting ?? $this->getValue();
             $this->cachedExisting = $existing;
 
-            $resolver = $this->resolver();
             $items = is_array($items) ? $items : [];
 
             $sanitizedItems = [];
 
             foreach ($items as $_index => $row) {
-                $row = is_array($row) ? $row : [];
-
+                $row          = is_array($row) ? $row : [];
                 $sanitizedRow = [];
 
                 foreach ($this->subItems as $child) {
-                    // strip root and array marker (e.g. my_setting.*.foo -> foo)
-                    $relativePath = $resolver->stripArrayRoot($child->path);
+                    $childName  = $child->getName();
+                    $inputValue = data_get($row, $childName);
 
-                    $inputValue = data_get($row, $relativePath);
-
-                    if (($child->args['type'] ?? null) === 'boolean') {
-                        $exists = data_get($row, $relativePath, '__missing__') !== '__missing__';
+                    if (($child->getDataType()) === 'boolean') {
+                        $exists = data_get($row, $childName, '__missing__') !== '__missing__';
 
                         $sanitized = $exists
                             ? filter_var($inputValue, FILTER_VALIDATE_BOOLEAN)
                             : null;
                     } else {
-                        $sanitized = $child->sanitizeValue($inputValue);
+                        $sanitized = $child->sanitize($inputValue);
                     }
 
-                    data_set($sanitizedRow, $relativePath, $sanitized);
+                    data_set($sanitizedRow, $childName, $sanitized);
                 }
 
                 $sanitizedItems[] = $sanitizedRow;
@@ -129,7 +118,7 @@ trait HasSanitizer {
         foreach ($items as $key => $value) {
             $items[$key] = is_array($value)
                 ? $this->sanitizeArray($value)
-                : $this->sanitize($value, $itemType);
+                : $this->sanitizeValue($value, $this->itemType);
         }
 
         $this->cachedExisting = null;
@@ -153,32 +142,35 @@ trait HasSanitizer {
 
         $merged = array_replace_recursive($existing ?? [], $input);
 
-        $resolver = $this->resolver();
         $sanitized = [];
 
         foreach ($this->subItems as $child) {
-            $relativePath = $resolver->stripRoot($child->path);
+            $childName = $child->getName();
 
-            $inputValue  = data_get($input, $relativePath);
-            $mergedValue = data_get($merged, $relativePath);
-            $pathExistsInInput = data_get($input, $relativePath, '__missing__') !== '__missing__';
-            $childType = $child->args['type'] ?? null;
+            $inputValue        = data_get($input, $childName);
+            $mergedValue       = data_get($merged, $childName);
+            $nameExistsInInput = data_get($input, $childName, '__missing__') !== '__missing__';
+            $childType         = $child->getDataType();
 
             if ($childType === 'boolean') {
-                $exists = $pathExistsInInput;
+                $exists = $nameExistsInInput;
 
                 $value = $exists
                     ? filter_var($inputValue, FILTER_VALIDATE_BOOLEAN)
                     : $mergedValue;
-            } else if ($childType === 'array' || $childType === 'object') {
+            } 
+            
+            else if ($childType === 'array' || $childType === 'object') {
                 // For structured children, prefer submitted input to avoid retaining removed indices.
-                $value = $child->sanitizeValue($pathExistsInInput ? $inputValue : $mergedValue);
-            } else {
+                $value = $child->sanitize($nameExistsInInput ? $inputValue : $mergedValue);
+            } 
+            
+            else {
                 // Important: always sanitize merged value so defaults persist
-                $value = $child->sanitizeValue($mergedValue);
+                $value = $child->sanitize($mergedValue);
             }
 
-            data_set($sanitized, $relativePath, $value);
+            data_set($sanitized, $childName, $value);
         }
 
         $this->cachedExisting = null;
@@ -194,7 +186,7 @@ trait HasSanitizer {
      * 
      * @return mixed The sanitized value
      */
-    protected function sanitize(mixed $value, string $requiredType): mixed {
+    protected function sanitizeValue(mixed $value, string $requiredType): mixed {
         $type = gettype($value);
 
         switch ($requiredType) {
@@ -262,14 +254,5 @@ trait HasSanitizer {
         }
 
         return $value;
-    }
-
-    /**
-     * Helper to reuse a single PathResolver instance.
-     *
-     * @return PathResolver
-     */
-    protected function resolver(): PathResolver {
-        return $this->resolverInstance ??= new PathResolver($this->name);
     }
 }

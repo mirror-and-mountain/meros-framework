@@ -6,7 +6,6 @@ use Closure;
 use Illuminate\Support\Str;
 
 use MM\Meros\Services\Contracts\DataRegistrant;
-use MM\Meros\App\Support\Helpers\DataBuilder;
 
 trait IsDataRegistrant {
     /**
@@ -22,35 +21,42 @@ trait IsDataRegistrant {
      *
      * @var string
      */
-    protected string $name = ''; 
+    public string $name = ''; 
+
+    /**
+     * Array of arguments for the item.
+     *
+     * @var array
+     */
+    protected array $args = [];
 
     /**
      * The dot-notated path for the item, used for nested settings (e.g. 'my_array.*.child').
      *
-     * @var string|null
+     * @var string
      */
-    protected ?string $path = null;
+    protected string $path = '';
 
     /**
      * The type of value for the item (e.g. 'string', 'boolean', 'integer', 'number', 'array', 'object').
      *
      * @var string
      */
-    protected string $type;
+    protected string $type = '';
 
     /**
      * The item type for array items when the current item is an array (e.g. 'string', 'integer', 'object', etc.).
      *
      * @var string
      */
-    protected string $itemType; 
+    protected string $itemType = ''; 
 
     /**
      * An array of sub-items for object and array types, used for nested settings and repeaters.
      *
-     * @var array<self>
+     * @var array
      */
-    protected array $subItems = [];
+    public array $subItems = [];
 
     /**
      * Valid types for settings and schema definitions.
@@ -69,74 +75,8 @@ trait IsDataRegistrant {
     use IsAdminFieldRegistrant, HasSanitizer;
 
     /***************************
-     * Core Builder Methods
+     * Public Chainable methods
      ***************************/
-
-    /**
-     * Returns a new DataBuilder instance scoped to the current feature and optional path.
-     * Public alias for builder().
-     * 
-     * @param  Closure|null $callback Optional callback to configure the builder instance.
-     *
-     * @return DataBuilder
-     */
-    public function configure(?Closure $callback = null): DataBuilder {
-        if (isset($this->type) && !in_array($this->type, ['object', 'array'])) {
-            throw new \InvalidArgumentException("Builder can only be used on 'object' or 'array' types. '{$this->type}' given.");
-        }
-
-        if ($callback) {
-            $callback($this->builder());
-        }
-        
-        return $this->builder();
-    }
-
-    /**
-     * Returns a new DataBuilder instance scoped to the current feature and optional path.
-     *
-     * @return DataBuilder A new DataBuilder instance for building nested settings or schema.
-     * @throws \BadMethodCallException if the builder is called on a non-root item or an item with an invalid type.
-     * @throws \InvalidArgumentException if the item has an invalid type or item type (for arrays).
-     */
-    protected function builder(): DataBuilder {
-        $type = $this->args['type'] ?? null;
-
-        // Must be root
-        if (!$this->isRoot()) {
-            throw new \BadMethodCallException('Builder can only be used on root settings.');
-        }
-
-        // Must be object or array
-        if (!in_array($type, ['object', 'array'])) {
-            throw new \InvalidArgumentException("Builder can only be used on 'object' or 'array' types. '{$type}' given.");
-        }
-
-        // Ensure valid name
-        if (empty($this->name)) {
-            throw new \InvalidArgumentException('Builder requires a valid root setting name.');
-        }
-
-        // Always reset path from source of truth (name)
-        $basePath = $this->name;
-
-        // Array = repeatable → append * (but don't mutate original path permanently)
-        $builderPath = $type === 'array'
-            ? "{$basePath}.*"
-            : $basePath;
-
-        // Ensure schema knows this is an object array
-        if ($type === 'array') {
-            $this->args['item_type'] = $this->args['item_type'] ?? 'object';
-            $this->itemType = $this->args['item_type'];
-        }
-
-        return app(DataBuilder::class, [
-            'root'    => $this,
-            'path'    => $builderPath,
-            'isArray' => $type === 'array',
-        ]);
-    }
 
     /**
      * Converts the setting instance to a schema array for use in REST API registration.
@@ -144,20 +84,20 @@ trait IsDataRegistrant {
      * @return array
      * @throws \InvalidArgumentException if the setting has an invalid type or item type (for arrays).
      */
-    public function toSchema(): array {
-        $type = $this->args['type'] ?? 'string';
+    final public function toSchema(): array {
+        $type = !empty($this->type) ? $this->type : 'string';
 
         $schema = [
             'type' => $type,
         ];
 
         // Add label (JSON Schema "title")
-        if (!empty($this->args['label'])) {
+        if (array_key_exists('label', $this->args) && !empty($this->args['label'])) {
             $schema['title'] = $this->args['label'];
         }
 
         // Add description
-        if (!empty($this->args['description'])) {
+        if (array_key_exists('description', $this->args) && !empty($this->args['description'])) {
             $schema['description'] = $this->args['description'];
         }
 
@@ -186,7 +126,7 @@ trait IsDataRegistrant {
 
         // ARRAY
         if ($type === 'array') {
-            $itemType = $this->args['item_type'] ?? 'string';
+            $itemType = !empty($this->itemType) ? $this->itemType : 'string';
 
             if (!in_array($itemType, $this->types)) {
                 throw new \InvalidArgumentException("Invalid item_type '{$itemType}' for array setting '{$this->name}'.");
@@ -223,18 +163,14 @@ trait IsDataRegistrant {
         return $schema;
     }
 
-    /***************************
-     * Public Chainable methods
-     ***************************/
-
     /**
      * Sets the dot-notated path for the item.
      *
-     * @param  string|null $path
+     * @param  string $path The dot-notated path for the item (e.g. 'my_array.*.child').
      *
      * @return self
      */
-    public function path(?string $path): self {
+    final public function path(string $path = ''): self {
         $this->path = $path;
         return $this;
     }
@@ -246,10 +182,14 @@ trait IsDataRegistrant {
      * 
      * @return self
      */
-    public function name(string $name): self {
-        $this->name = Str::snake($name);
+    final public function name(string $name): self {
+        $name = Str::snake($name);
 
-        $this->setReady();
+        $this->updatePaths($this->name, $name);
+
+        $this->name = $name;
+
+        $this->hook();
         return $this;
     }
 
@@ -260,7 +200,7 @@ trait IsDataRegistrant {
      * 
      * @return self
      */
-    public function string(string $name = ''): self {
+    final public function string(string $name = ''): self {
         if (!empty($name)) {
             $this->name($name);
         }
@@ -275,7 +215,7 @@ trait IsDataRegistrant {
      * 
      * @return self 
      */
-    public function boolean(string $name = ''): self {
+    final public function boolean(string $name = ''): self {
         if (!empty($name)) {
             $this->name($name);
         }
@@ -290,7 +230,7 @@ trait IsDataRegistrant {
      * 
      * @return self
      */
-    public function integer(string $name = ''): self {
+    final public function integer(string $name = ''): self {
         if (!empty($name)) {
             $this->name($name);
         }
@@ -305,12 +245,27 @@ trait IsDataRegistrant {
      * 
      * @return self
      */
-    public function number(string $name = ''): self {
+    final public function number(string $name = ''): self {
         if (!empty($name)) {
             $this->name($name);
         }
 
         return $this->type('number');
+    }
+
+    /**
+     * Shorthand method to set the name and type for an object item.
+     *
+     * @param string $name The item name.
+     * 
+     * @return self
+     */
+    final public function object(string $name = ''): self {
+        if (!empty($name)) {
+            $this->name($name);
+        }
+
+        return $this->type('object');
     }
 
     /**
@@ -320,16 +275,13 @@ trait IsDataRegistrant {
      * 
      * @return self
      */
-    public function array(string $name = ''): self {
+    final public function array(string $name = ''): self {
         if (!empty($name)) {
             $this->name($name);
         }
 
-        // Default to 'string' item type. 
-        // Can be overridden later with of() method.
-        $this->itemType('string');
-
-        return $this->type('array');
+        $this->type('array');
+        return $this->itemType('string'); // Default to array of strings unless otherwise specified
     }
 
     /**
@@ -340,35 +292,16 @@ trait IsDataRegistrant {
      * @return self
      * @throws \InvalidArgumentException if the item type is not valid or if the current setting is not an array type.
      */
-    public function of(string $type): self {
+    final public function of(string $type): self {
         $type = Str::singular($type); // Allows for passing plural item types e.g. 'strings'
 
         if (!in_array($type, $this->types)) {
             throw new \InvalidArgumentException("Invalid item type '{$type}' for array setting '{$this->name}'.");
         }
 
-        $this->args['item_type'] = $type;
         $this->itemType = $type;
 
-        $this->setReady();
-        return $this;
-    }
-
-    /**
-     * Shorthand method to set the name and type for an object item.
-     *
-     * @param string   $name The item name.
-     * @param ?Closure $callback Optional callback to configure the object item.
-     * 
-     * @return self
-     */
-    public function object(string $name, ?Closure $callback = null): self {
-        $this->name($name)->type('object');
-
-        if ($callback) {
-            $callback($this->configure());
-        }
-
+        $this->hook();
         return $this;
     }
 
@@ -381,7 +314,7 @@ trait IsDataRegistrant {
      * @throws \InvalidArgumentException if the type is not valid or if the type is already set for the item.
      */
     public function type(string $type): self {
-        if (isset($this->type)) {
+        if (!empty($this->type)) {
             throw new \InvalidArgumentException("Type for '{$this->name}' is already set to '{$this->type}'.");
         }
 
@@ -389,10 +322,10 @@ trait IsDataRegistrant {
             throw new \InvalidArgumentException("Invalid type '{$type}' for setting '{$this->name}'.");
         }
 
-        $this->args['type'] = $type;
         $this->type = $type;
+        $this->args('type', $type);
 
-        $this->setReady();
+        $this->hook();
         return $this;
     }
 
@@ -409,14 +342,13 @@ trait IsDataRegistrant {
             throw new \InvalidArgumentException("Invalid item type '{$itemType}' for array setting '{$this->name}'.");
         }
 
-        if (($this->args['type'] ?? null) !== 'array') {
+        if (($this->type ?? null) !== 'array') {
             throw new \InvalidArgumentException("Cannot set item type on non-array setting '{$this->name}'.");
         }
 
-        $this->args['item_type'] = $itemType;
         $this->itemType = $itemType;
 
-        $this->setReady();
+        $this->hook();
         return $this;
     }
 
@@ -430,7 +362,7 @@ trait IsDataRegistrant {
     public function label(string $label): self {
         $this->args['label'] = $label;
 
-        $this->setReady();
+        $this->hook();
         return $this;
     }
 
@@ -444,7 +376,7 @@ trait IsDataRegistrant {
     public function description(string $description): self {
         $this->args['description'] = $description;
 
-        $this->setReady();
+        $this->hook();
         return $this;
     }
 
@@ -490,28 +422,33 @@ trait IsDataRegistrant {
     public function showInRest(bool $show = true): self {
         $this->args['show_in_rest'] = $show;
 
-        $this->setReady();
+        $this->hook();
         return $this;
     }
 
     /**
      * Merges the provided arguments with the existing arguments for the item.
      *
-     * @param array $args An associative array of arguments to merge with the existing item arguments.
+     * @param array|string $argsOrKey An array of arguments to merge with existing arguments or a single argument key to set.
+     * @param mixed        $value The value to set if a single argument key is provided.
+
      * 
      * @return self
      */
-    public function args(array $args): self {
-        $this->args = array_merge($this->args, $args);
+    public function args(array|string $argsOrKey, mixed $value = null): self {
+        if (is_array($argsOrKey)) {
+            $this->args = array_merge($this->args, $argsOrKey);
+        } else {
+            $this->args[$argsOrKey] = $value;
+        }
 
-        $this->setReady();
+        $this->hook();
         return $this;
     }
 
     /***************************
-     * Helpers
+     * Heirachical Helpers
      ***************************/
-
     /**
      * Recursively walks through all sub-items and applies the given callback function to each item.
      *
@@ -534,8 +471,17 @@ trait IsDataRegistrant {
      *
      * @return bool True if the item is a root item (i.e. has no parent), false otherwise.
      */
-    protected function isRoot(): bool {
+    public function isRoot(): bool {
         return $this->parent === null;
+    }
+
+    /**
+     * Returns whether the current item can have child items (i.e. is an object or array type).
+     *
+     * @return bool True if the item can have child items, false otherwise.
+     */
+    protected function canBeParent(): bool {
+        return in_array($this->type, ['object', 'array']);
     }
 
     /**
@@ -559,50 +505,173 @@ trait IsDataRegistrant {
         return $this;
     }
 
-    /**
-     * Finds the parent object definition for a given dot-notated path.
-     *
-     * @param  string $path The dot-notated path to find the parent for (e.g. 'my_array.*.child').
-     * 
-     * @return self The parent object definition for the specified path, or the current instance if no parent is found.
-     */
-    protected function findParentForPath(string $path): self {
-        $segments = explode('.', $path);
-        array_pop($segments); // remove current item
-
-        if (empty($segments)) {
-            return $this;
+    public function add(Closure|array|null $callback = null, array $props = []): self {
+        // Check we can add subitems to this item
+        if (!$this->canBeParent()) {
+            throw new \InvalidArgumentException("Cannot add item to '{$this->name}' because '{$this->name}' is not an object or array.");
         }
 
-        $current = $this;
+        // Check the current item is named
+        if (empty($this->name) || !isset($this->name)) {
+            throw new \InvalidArgumentException("Cannot add item to unnamed parent. Please set a name for the parent item before adding sub-items.");
+        }
 
-        foreach ($segments as $segment) {
-            foreach ($current->subItems as $child) {
-                if ($child->name === $segment) {
-                    $current = $child;
-                    continue 2;
-                }
+        $params = func_num_args();
+
+        if ($params === 1 && is_array($callback)) {
+            $props    = $callback;
+            $callback = null;
+        }
+
+        $formattedName = isset($props['name']) 
+            ? Str::snake($props['name']) 
+            : 'placeholder_name';
+
+        $props['name'] = $formattedName;
+
+        // Prevent duplicates
+        foreach ($this->subItems as $child) {
+            if ($child->name === $formattedName) {
+                throw new \InvalidArgumentException("Cannot add '{$formattedName}' to '{$this->name}' because an item with the name '{$formattedName}' already exists at this level.");
             }
         }
 
-        return $current;
+        $item = $this->makeSubItem(self::class, $props);
+
+        $item->path($this->makeSubItemPath($formattedName))->parent($this);
+        $this->subItems[] = $item;
+
+        // Ensure array types have itemType set to object if they have sub-items
+        if ($this->type === 'array' && $this->itemType !== 'object') {
+            $this->itemType = 'object';
+        }
+
+        if ($callback && $callback instanceof Closure) {
+            $callback($item);
+        }
+
+        return $item;
+    }
+
+    /**
+     * Instantiates a sub-item class with the necessary constructor arguments.
+     *
+     * @param string $itemClass The fully qualified class name of the sub-item to instantiate.
+     * @param array  $props Optional properties to pass to the sub-item constructor.
+     *
+     * @return DataRegistrant The instantiated sub-item object.
+     */
+    final protected function makeSubItem(string $itemClass, array $props = []): DataRegistrant {
+        return app($itemClass, [
+            'provider' => $this->provider,
+            'props'    => $props
+        ]);
+    }
+
+    /**
+     * Generates the dot-notated path for a new sub-item based on the current item's path and the provided sub-item name.
+     *
+     * @param string $name The name of the sub-item for which to generate the path.
+     * 
+     * @return string The generated dot-notated path for the sub-item.
+      */
+    final protected function makeSubItemPath(string $name): string {
+        $basePath = $this->isRoot() 
+            ? $this->name // Why we require this item is named.
+            : $this->path;
+
+        return $this->type === 'array'
+            ? "{$basePath}.{$name}.*"
+            : "{$basePath}.{$name}";
+    }
+
+    /**
+     * Instantiates any sub-items that are defined as class names, replacing them with their instantiated objects.
+     *
+     * This method should be called in the concrete class's constructor.
+     *
+     * @return void
+     */
+    final protected function instantiateSubItems(): void {
+        if (!$this->canBeParent()) {
+            return;
+        }
+
+        if ($this->subItems === []) {
+            return;
+        }
+
+        foreach ($this->subItems as $index => $itemClass) {
+            if (is_string($itemClass)) {
+                $item = $this->makeSubItem($itemClass);
+
+                if (empty($item->name) || !isset($item->name)) {
+                    $item->name(Str::snake(class_basename($itemClass)));
+                }
+
+                $item->path($this->makeSubItemPath($item->name))->parent($this);
+                $this->subItems[$index] = $item;
+            }
+        }
+    }
+
+    /**
+     * Updates the dot-notated path for the current item and all sub-items.
+     * Should be called when the name of the item changes.
+     *
+     * @param string $oldName The old name of the item.
+     * @param string $newName The new name of the item.
+     *
+     * @return void
+     */
+    final protected function updatePaths($oldName, $newName): void {
+        if (Str::endsWith($this->path, ".*")) {
+            $this->path = Str::replace("{$oldName}.*", "{$newName}.*", $this->path);
+        }
+
+        else {
+            $this->path = Str::replace($oldName, $newName, $this->path);
+        }
+
+        $this->walk(function ($item) use ($oldName, $newName) {
+            $path = $item->getPath();
+            $item->path(Str::replace($oldName, $newName, $path));
+        });
+    }
+
+    /***************************
+     * Helpers
+     ***************************/
+
+    /**
+     * Retrieves the dot-notated path for the item.
+     *
+     * @return string The dot-notated path for the item (e.g. 'my_array.*.child').
+     */
+    public function getPath(): string {
+        return $this->path;
     }
 
     /**
      * Retrieves the data type of the item.
+     * 
+     * @param bool $arrayTypes Whether to the return the type of array items.
      *
-     * @return string|null The data type of the item (e.g. 'string', 'integer', 'array', 'object', etc.) or null if not set.
+     * @return string The data type of the item (e.g. 'string', 'integer', 'array', 'object', etc.).
      */
-    public function getDataType(): ?string {
-        return isset($this->type) ? $this->type : ($this->args['type'] ?? null);
+    public function getDataType(bool $arrayTypes = false): string {
+        if ($arrayTypes && $this->type === 'array') {
+            return 'array.' . ($this->itemType !== 'object' ? 'scalar' : 'object');
+        }
+        return $this->type;
     }
 
     /**
      * Retrieves the item data type of the item if the item is an array of items.
      *
-     * @return string|null The item data type of the item (e.g. 'string', 'integer', 'object', etc.) or null if not set.
+     * @return string The item data type of the item (e.g. 'string', 'integer', 'object', etc.).
      */
-    public function getItemDataType(): ?string {
-        return isset($this->itemType) ? $this->itemType : ($this->args['item_type'] ?? null);
+    public function getItemDataType(): string {
+        return $this->itemType;
     }
 }

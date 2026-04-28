@@ -226,7 +226,7 @@ function initRepeater(repeater) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-	document.querySelectorAll('.meros-repeater').forEach(function (repeater) {
+	document.querySelectorAll('.meros-repeater-field').forEach(function (repeater) {
 		initRepeater(repeater);
 	});
 });

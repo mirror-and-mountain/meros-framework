@@ -6,9 +6,9 @@ use Closure;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
-use MM\Meros\Services\Contracts\Feature;
+use MM\Meros\Services\Contracts\FeatureDefinition;
 
-final class Asset extends Feature {
+final class Asset extends FeatureDefinition {
     public bool   $enabled      = true;
     public string $path         = '';
     public string $src          = '';
@@ -42,8 +42,8 @@ final class Asset extends Feature {
      * 
      * @return void
      */
-    protected function setReady(): void {
-        $requiredConfig = ['handle', 'type', 'location', 'src', 'hook'];
+    protected function hook(): void {
+        $requiredConfig = ['handle', 'type', 'location', 'src'];
         
         foreach ($requiredConfig as $configKey) {
             if (empty($this->$configKey)) {
@@ -54,51 +54,56 @@ final class Asset extends Feature {
 
         $this->ready = true;
 
-        $hook = $this->hook;
+        $hook = $this->hook !== '' 
+            ? $this->hook 
+            : ($this->hookMapping[$this->location] ?? '');
+
+        if (empty($hook)) {
+            $this->ready = false;
+            return;
+        }
 
         // Fix for styles in the block editor.
         if ($this->type === 'style') {
             $hook = $hook === 'enqueue_block_editor_assets' ? 'enqueue_block_assets' : $hook;
         }
 
-        add_action($hook, function() {
-            $this->load($this);
-        });
+        $this->hook = $hook;
+
+        if ($this->enabled) {
+            add_action($hook, function() {
+                $this->load();
+            });
+        }
     }
 
     /**
      * Loads the asset by hooking it into WordPress.
-     * 
-     * @param Feature $instance The instance of the asset to load.
      *
      * @return void
      */
-    protected function load(Feature $instance): void {
-        if (!$instance->ready || !$instance->enabled) {
-            return;
-        }
-
-        if ($instance->type === 'script') {
+    protected function load(): void {
+        if ($this->type === 'script') {
             wp_enqueue_script(
-                $instance->handle,
-                $instance->src,
-                $instance->dependencies ?? [],
-                $instance->version,
-                $instance->inFooter ?? false
+                $this->handle,
+                $this->src,
+                $this->dependencies ?? [],
+                $this->version,
+                $this->inFooter ?? false
             );
 
         } 
         
-        elseif ($instance->type === 'style') {
+        elseif ($this->type === 'style') {
             wp_enqueue_style(
-                $instance->handle,
-                $instance->src,
-                $instance->dependencies ?? [],
-                $instance->version
+                $this->handle,
+                $this->src,
+                $this->dependencies ?? [],
+                $this->version
             );
         }
 
-        $instance->loaded = true; // Mark the asset as loaded after enqueuing.
+        $this->loaded = true; // Mark the asset as loaded after enqueuing.
     }
 
     /***************************
@@ -112,6 +117,7 @@ final class Asset extends Feature {
      * @param  boolean $inFooter
      *
      * @return self
+     * @throws \InvalidArgumentException if the file does not exist at the given path or if the file type is invalid.
      */
     public function script(Closure|string $srcPathOrClosure, bool $inFooter = false): self {
         if ($srcPathOrClosure instanceof Closure) {
@@ -125,23 +131,21 @@ final class Asset extends Feature {
 
         // Convert to path if URL provided
         if (Str::startsWith($srcOrPath, ['http://', 'https://', '//'])) {
-            $path = Str::replace($this->source->uri, $this->source->path, $srcOrPath);
+            $path = Str::replace($this->provider->uri, $this->provider->path, $srcOrPath);
         }
 
         else {
-            $src = Str::replace($this->source->path, $this->source->uri, $srcOrPath);
+            $src = Str::replace($this->provider->path, $this->provider->uri, $srcOrPath);
         }
 
         if (!File::exists($path)) {
-            $this->error = "Asset file not found at path: {$path}";
-            return $this;
+            throw new \InvalidArgumentException("Asset file not found at path: {$path}");
         }
 
         $extension = Str::afterLast($path, '.');
 
         if (!in_array($extension, ['js', 'css'])) {
-            $this->error = "Invalid asset file type '{$extension}' for asset with path: {$path}. Allowed file types are: js, css.";
-            return $this;
+            throw new \InvalidArgumentException("Invalid asset file type '{$extension}' for asset with path: {$path}. Allowed file types are: js, css.");
         }
 
         $this->type = $extension === 'js' ? 'script' : 'style';
@@ -159,6 +163,7 @@ final class Asset extends Feature {
      * @param  Closure|string $srcOrPath
      *
      * @return self
+     * @throws \InvalidArgumentException if the file does not exist at the given path or if the file type is invalid.
      */
     public function style(Closure|string $srcOrPath): self {
         return $this->script($srcOrPath);
@@ -175,19 +180,25 @@ final class Asset extends Feature {
         $handle = Str::slug($handle);
         $this->handle = $handle;
 
-        $this->setReady();
+        $this->hook();
         return $this;
     }
 
+    /**
+     * Sets the path for the asset, which can be used to automatically generate the src and version if not set.
+     *
+     * @param string $path
+     *
+     * @return self
+     * @throws \InvalidArgumentException if the file does not exist at the given path or if the file type is invalid.
+     */
     public function path(string $path): self {
         if (!File::exists($path)) {
-            $this->error = "Asset file not found at path: {$path}";
-            return $this;
+            throw new \InvalidArgumentException("Asset file not found at path: {$path}");
         }
 
         if (!in_array(Str::afterLast($path, '.'), ['js', 'css'])) {
-            $this->error = "Invalid asset file type for asset with path: {$path}. Allowed file types are: js, css.";
-            return $this;
+            throw new \InvalidArgumentException("Invalid asset file type for asset with path: {$path}. Allowed file types are: js, css.");
         }
 
         $this->path = $path;
@@ -197,7 +208,7 @@ final class Asset extends Feature {
         }
         
         if (empty($this->src)) {
-            $this->src = Str::replace($this->source->path, $this->source->uri, $path);
+            $this->src = Str::replace($this->provider->path, $this->provider->uri, $path);
         }
 
         if (empty($this->type)) {
@@ -205,7 +216,7 @@ final class Asset extends Feature {
             $this->setType($extension === 'js' ? 'script' : 'style');
         }
 
-        $this->setReady();
+        $this->hook();
         return $this;
     }
 
@@ -215,17 +226,17 @@ final class Asset extends Feature {
      * @param  string  $src
      *
      * @return self
+     * @throws \InvalidArgumentException if the file does not exist at the given path or if the file type is invalid.
      */
     public function src(string $src): self {
         if (!in_array(Str::afterLast($src, '.'), ['js', 'css'])) {
-            $this->error = "Invalid asset file type for asset with src: {$src}. Allowed file types are: js, css.";
-            return $this;
+            throw new \InvalidArgumentException("Invalid asset file type for asset with src: {$src}. Allowed file types are: js, css.");
         }
 
         $this->src = $src;
 
         if (empty($this->path)) {
-            $this->path = Str::replace($this->source->uri, $this->source->path, $src);
+            $this->path = Str::replace($this->provider->uri, $this->provider->path, $src);
         }
 
         if (empty($this->version) && File::exists($this->path)) {
@@ -237,7 +248,7 @@ final class Asset extends Feature {
             $this->setType($extension === 'js' ? 'script' : 'style');
         }
 
-        $this->setReady();
+        $this->hook();
         return $this;
     }
 
@@ -275,10 +286,11 @@ final class Asset extends Feature {
      * @param  string $location
      *
      * @return self
+     * @throws \InvalidArgumentException if the location is not valid.
      */
     public function location(string $location): self {
         if (!in_array($location, array_keys($this->hookMapping))) {
-            $this->error = "Invalid location '{$location}' for asset. Allowed locations are: " . implode(', ', array_keys($this->hookMapping)) . ".";
+            throw new \InvalidArgumentException("Invalid location '{$location}' for asset. Allowed locations are: " . implode(', ', array_keys($this->hookMapping)) . ".");
         }
 
         else {
@@ -287,7 +299,7 @@ final class Asset extends Feature {
 
         $this->hook = $this->hookMapping[ $location ];
 
-        $this->setReady();
+        $this->hook();
         return $this;
     }
 
@@ -300,7 +312,6 @@ final class Asset extends Feature {
      */
     public function dependencies(array $dependencies): self {
         $this->dependencies = $dependencies;
-        
         return $this;
     }
 
@@ -371,11 +382,11 @@ final class Asset extends Feature {
      * @param  string $type
      * 
      * @return void
+     * @throws \InvalidArgumentException if the type is not valid.
      */
     protected function setType(string $type): void {
         if (!in_array($type, ['script', 'style'])) {
-            $this->error = "Invalid asset type '{$type}'. Allowed types are: script, style.";
-            return;
+            throw new \InvalidArgumentException("Invalid asset type '{$type}'. Allowed types are: script, style.");
         }
 
         $this->type = $type;

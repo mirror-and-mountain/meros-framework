@@ -4,30 +4,36 @@ namespace MM\Meros\App;
 
 use Illuminate\Support\Facades\Schema;
 
+use MM\Meros\Services\Contracts\FeatureProvider;
+
+use MM\Meros\App\Fields\Checkbox;
+use MM\Meros\App\Fields\Checkboxes;
+use MM\Meros\App\Fields\Color;
+use MM\Meros\App\Fields\Date;
+use MM\Meros\App\Fields\MultiSelect;
+use MM\Meros\App\Fields\Number;
+use MM\Meros\App\Fields\Radio;
+use MM\Meros\App\Fields\Repeater;
+use MM\Meros\App\Fields\Select;
+use MM\Meros\App\Fields\Text;
+use MM\Meros\App\Fields\Textarea;
+use MM\Meros\App\Fields\Time;
+use MM\Meros\App\Fields\Url;
+
 use MM\Meros\App\Models\Migration;
 use MM\Meros\App\Features\CoreInstallable;
 
-use MM\Meros\App\Facades\Registry;
-use MM\Meros\App\Facades\Context;
 use MM\Meros\App\Facades\Theme;
 
 final class Framework extends FeatureProvider {
-
-    protected function configure(): void {
-        // Run theme activation tasks
-        add_action('after_switch_theme', [$this, 'runActivationTasks']);
-
-        // Set migrations path preference
-        $this->setPreference('migrations_path', 'database/migrations/integrations');
-    }
-
     /**
      * Called from the FrameworkServiceProvider on boot
      *
      * @return self
      */
     public function __initialise(): self {
-        $this->initialise();
+        $this->load();
+        $this->configure();
         return $this;
     }
 
@@ -36,10 +42,22 @@ final class Framework extends FeatureProvider {
      *
      * @return void
      */
-    protected function initialise(): void {
+    protected function load(): void {
         $this->registerRestRoutes();
-        $this->discover()->assets();
-        $this->discover()->blocks(); 
+
+        $this->fields()->register('checkbox', Checkbox::class);
+        $this->fields()->register('checkboxes', Checkboxes::class);
+        $this->fields()->register('color', Color::class);
+        $this->fields()->register('date', Date::class);
+        $this->fields()->register('multi_select', MultiSelect::class);
+        $this->fields()->register('number', Number::class);
+        $this->fields()->register('radio', Radio::class);
+        $this->fields()->register('repeater', Repeater::class);
+        $this->fields()->register('select', Select::class);
+        $this->fields()->register('text', Text::class);
+        $this->fields()->register('textarea', Textarea::class);
+        $this->fields()->register('time', Time::class);
+        $this->fields()->register('url', Url::class);
 
         // $initAjax = Context::isAdmin();
 
@@ -48,7 +66,23 @@ final class Framework extends FeatureProvider {
         // }    
 
         // $this->discoverInstallables();
-        // $this->discoverAssets();
+    }
+
+    protected function configure(): void {
+        // Run theme activation tasks
+        add_action('after_switch_theme', [$this, 'runActivationTasks']);
+
+        // Set migrations path preference
+        $this->setPreference('migrations_path', 'database/migrations/integrations');
+
+        // Configure settings pages
+        $this->configureSettingsPages();
+
+        // Discover assets
+        $this->assets()->discover();
+
+        // Discover blocks
+        $this->blocks()->discover();
     }
 
     /**
@@ -156,7 +190,7 @@ final class Framework extends FeatureProvider {
      * @return CoreInstallable|null The created core installable instance, or null if it cannot be created.
      */
     private function makeCoreInstallable(array $config): CoreInstallable|null {
-        if (! $this instanceof Framework) {
+        if (!$this instanceof Framework) {
             return null;
         }
 
@@ -165,6 +199,32 @@ final class Framework extends FeatureProvider {
                 'source' => $this,
             ]
         )->make($config);
+    }
+
+    /***************************************************************
+     * 
+     * The following methods are for settings management
+     * 
+     ***************************************************************/
+    /**
+     * Sets up core settings pages provided by the framework.
+     *
+     * @return void
+     */
+    private function configureSettingsPages(): void {
+        $this->menuPages()->make(function ($page) {
+            $page->slug('meros-features');
+            $page->title('Features');
+            $page->menuTitle('Features');
+            $page->template('tabbed-settings', [
+                'tabs'  => [
+                    'theme'    => 'Theme',
+                    'packages' => 'Packages',
+                    'blocks'   => 'Blocks',
+                    'assets'   => 'Scripts & Styles'
+                ]
+            ]);
+        })->in('options');
     }
 
     /***************************************************************

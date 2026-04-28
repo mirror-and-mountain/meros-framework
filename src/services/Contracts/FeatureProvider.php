@@ -4,8 +4,6 @@ namespace MM\Meros\Services\Contracts;
 
 use MM\Meros\App\Framework;
 
-use MM\Meros\App\Support\Helpers\Discover;
-
 use MM\Meros\Services\Concerns\HasAssets;
 use MM\Meros\Services\Concerns\HasBlocks;
 use MM\Meros\Services\Concerns\HasFields;
@@ -14,11 +12,8 @@ use MM\Meros\Services\Concerns\HasIdentity;
 use MM\Meros\Services\Concerns\HasSettings;
 use MM\Meros\Services\Concerns\HasPreferences;
 
-use MM\Meros\App\Support\Registry;
-
 abstract class FeatureProvider {
-    private array    $requiredServices = ['core'];
-    private Discover $discover;
+    private array $requiredServices = ['core'];
 
     // Additional concerns may be added by child classes as needed.
     use HasIdentity,
@@ -30,7 +25,6 @@ abstract class FeatureProvider {
         HasInstallables;
 
     public function __construct(
-        protected Registry $registry,
         string $name = '',
         string $path = '',
         string $uri  = ''
@@ -48,15 +42,29 @@ abstract class FeatureProvider {
         // Init preferences
         $this->initPreferences();
 
-        // Configure
-        $this->configure();
-
         if ($isFramework) {
             return;
         }
+
+        // Load
+        $this->load();
+
+        // Configure
+        $this->configure();
+
+        // After configuration
+        $this->loaded();
+    }
+
+    protected function load(): void {
+        // Intentionally left blank for child classes to override.
     }
 
     protected function configure(): void {
+        // Intentionally left blank for child classes to override.
+    }
+
+    protected function loaded(): void {
         // Intentionally left blank for child classes to override.
     }
 
@@ -92,26 +100,5 @@ abstract class FeatureProvider {
       */
     protected function getRequirements(): array {
         return $this->requiredServices;
-    }
-
-    /**
-     * Returns an instance of the Discover class for discovering assets/blocks
-     *
-     * @return Discover
-     */
-    protected function discover(): Discover {
-        if (!isset($this->discover)) {
-            $this->discover = app(Discover::class, ['source' => $this]);
-        }
-        return $this->discover;
-    }
-
-    /**
-     * Returns the item's registry instance.
-     * 
-     * @return Registry
-     */
-    public function registry(): Registry {
-        return $this->registry;
     }
 }

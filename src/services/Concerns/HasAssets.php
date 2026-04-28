@@ -2,8 +2,12 @@
 
 namespace MM\Meros\Services\Concerns;
 
-use Illuminate\Support\Collection;
-use MM\Meros\App\Support\Asset;
+use Closure;
+
+use MM\Meros\Services\Asset;
+use MM\Meros\Services\Registers\Assets as AssetsRegister;
+
+use MM\Meros\Facades\Assets;
 
 trait HasAssets {
     /**
@@ -17,17 +21,19 @@ trait HasAssets {
     }
 
     /**
-     * Retrieves an asset by its handle or returns a collection of all assets.
+     * Retrieves an asset by its handle or the assets register.
      *
-     * @param string|null $handle The handle of the asset to retrieve. If null, returns all assets.
+     * @param string $handle Optional. The handle of the asset to retrieve.
      *
-     * @return Asset|Collection|null The requested asset or a collection of all assets. Null if the requested asset doesn't exist.
+     * @return Asset|AssetsRegister|null The requested asset or a collection of all assets. Null if the requested asset doesn't exist.
      */
-    protected function assets(?string $handle = null): Asset|Collection|null {
-        if ($handle) {
-            return $this->registry()->get('assets')->firstWhere('handle', $handle);
+    protected function assets(string $handle = '', ?Closure $callback = null): Asset|AssetsRegister|null {
+        if (empty($handle)) {
+            return Assets::checkout($this); // return register instance
         }
 
-        return $this->registry()->get('assets');
+        else {
+            return Assets::checkout($this)->get($handle, $callback);
+        }
     }
 }

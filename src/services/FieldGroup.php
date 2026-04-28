@@ -2,33 +2,28 @@
 
 namespace MM\Meros\Services;
 
-use Closure;
 use Illuminate\Support\Str;
-use Illuminate\Support\Collection;
 
-use MM\Meros\Services\Contracts\Feature;
+use MM\Meros\Services\Contracts\FieldParent;
+use MM\Meros\Services\Contracts\FeatureDefinition;
 use MM\Meros\Services\Contracts\FeatureProvider;
 
-use MM\Meros\App\Support\Fields\Field;
-use MM\Meros\App\Support\Fields\Maker as FieldMaker;
+use MM\Meros\Services\Concerns\CanAttachFields;
 
-class FieldGroup extends Feature {
-    public string $slug = '';
+class FieldGroup extends FeatureDefinition implements FieldParent {
+    public string $handle = '';
     public string $label = '';
     public string $description = '';
 
-    protected bool   $initialised = false;
-    protected string $initError = "FieldGroup must be initialised with make() before setting properties or adding fields.";
-    
-    /**
-     * Field instances that belong to this field group.
-     *
-     * @var Collection
-     */
-    public Collection $fields;
+    use CanAttachFields;
 
-    public function __construct(public FeatureProvider $source) {
-        $this->fields = collect([]);
+    public function __construct(
+        FeatureProvider $provider,
+        array           $props = []
+    ) {
+        $this->provider = $provider;
+        $this->setProps($props);
+        $this->instantiateFields();
     }
 
     /**
@@ -36,7 +31,7 @@ class FieldGroup extends Feature {
      *
      * @return void
      */
-    protected function setReady(): void {
+    protected function hook(): void {
         if (empty($this->slug)) {
             $this->ready = false;
         }
@@ -44,103 +39,24 @@ class FieldGroup extends Feature {
         $this->ready = true;
     }
 
-    protected function load(Feature $instance): void {
-        // No loading for field groups as they are utilised in other hookable features.
+    protected function load(): void {
+        // No loading for field groups as they aren't directly hooked into WP.
     }
 
+    /***************************
+     * Public Chainable methods
+     ***************************/
     /**
-     * Initialises a field group instance with a slug and returns the instance for chaining.
+     * Sets the handle of the field group.
      *
-     * @param Closure|string $callbackOrSlug A closure to configure the field group or a string to set the slug.
+     * @param string $handle
      *
      * @return self
      */
-    public function make(Closure|string $callbackOrSlug = ''): self {
-        if ($callbackOrSlug instanceof Closure) {
-            $callbackOrSlug($this);
-        } 
+    public function handle(string $handle): self {
+        $this->handle = Str::slug($handle);
         
-        elseif (is_string($callbackOrSlug)) {
-            $this->slug = Str::slug($callbackOrSlug);
-        }
-
-        $this->initialised = true;
-        $this->setReady();
-        return $this;
-    }
-
-    /**
-     * Adds a field instance to the group's collection of fields. 
-     *
-     * @param Field|array<Field> $field A single Field instance or an array of Field instances to add to the group.
-     *
-     * @return self
-     * @throws \BadMethodCallException if the field group has not been initialised with make() before adding fields.
-     */
-    public function add(Field|array $field): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
-        if (is_array($field)) {
-            $this->fields = $this->fields->merge($field);
-        } else {
-            $this->fields->push($field);
-        }
-
-        return $this;
-    }
-
-    /**
-     * Creates a new field instance, adds it to the group, and returns it for chaining.
-     *
-     * @param string       $type The type of field to create.
-     * @param Closure|null $callback An optional closure to configure the field instance.
-     * @param array        $config Additional configuration options for the field instance.
-     *
-     * @return Field The created field instance.
-     * @throws \BadMethodCallException if the field group has not been initialised with make() before adding fields.
-     */
-    public function new(string $type, ?Closure $callback = null, array $config = []): Field {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
-        $field = new FieldMaker($this->source);
-        $field = $field->make($type, $config);
-
-        if ($callback) {
-            $callback($field);
-        }
-        
-        $this->add($field);
-        return $field;
-    }
-
-    /**
-     * Retrieves the collection fields in the group.
-     *
-     * @return Collection
-     */
-    public function getFields(): Collection {
-        return $this->fields;
-    }
-
-    /**
-     * Sets the slug of the field group.
-     *
-     * @param string $slug
-     *
-     * @return self
-     * @throws \BadMethodCallException if the field group has not been initialised with make() before setting properties.
-     */
-    public function slug(string $slug): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
-        $this->slug = Str::slug($slug);
-        $this->setReady();
+        $this->hook();
         return $this;
     }
 
@@ -150,13 +66,8 @@ class FieldGroup extends Feature {
      * @param string $label
      *
      * @return self
-     * @throws \BadMethodCallException if the field group has not been initialised with make() before setting properties.
      */
     public function label(string $label): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->label = $label;
         return $this;
     }
@@ -167,20 +78,21 @@ class FieldGroup extends Feature {
      * @param string $description
      *
      * @return self
-     * @throws \BadMethodCallException if the field group has not been initialised with make() before setting properties.
      */
     public function description(string $description): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->description = $description;
         return $this;
     }
 
+    /***************************
+     * Rendering
+     ***************************/
+
     /**
      * Determines layout for each field, placing fields in rows to prevent gaps.
      * Returns an array of ['field' => Field, 'span' => int]
+     * 
+     * @return array An array of fields with their corresponding span values for layout.
      */
     protected function resolveLayout(): array {
         $rows = [];
@@ -236,6 +148,14 @@ class FieldGroup extends Feature {
         return array_merge(...$rows);
     }
 
+    /**
+     * Normalizes a row of fields to ensure it fills the full width by adjusting span values.
+     *
+     * @param array $row The current row of fields with their span values.
+     * @param int $currentWidth The total width currently occupied by the row.
+     *
+     * @return array The normalized row with adjusted span values.
+     */
     protected function normalizeRow(array $row, int $currentWidth): array {
         if ($currentWidth >= 6 || empty($row)) {
             return $row;
@@ -261,8 +181,13 @@ class FieldGroup extends Feature {
         return $row;
     }
 
+    /**
+     * Renders the field group and its fields using a Blade view.
+     *
+     * @return void
+     */
     public function render(): void {
-        echo view('meros::components.fields.wrappers.field-group', [
+        echo view('meros::fields.wrappers.field-group', [
             'label'       => $this->label,
             'description' => $this->description,
             'fields'      => $this->resolveLayout()

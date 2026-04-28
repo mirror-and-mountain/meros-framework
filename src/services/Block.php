@@ -5,49 +5,44 @@ namespace MM\Meros\Services;
 use Closure;
 use Illuminate\Support\Facades\File;
 
-use MM\Meros\Services\Contracts\Feature;
-use MM\Meros\Services\Contracts\FeatureProvider;
+use MM\Meros\Services\Contracts\FeatureDefinition;
 
-use MM\Meros\App\Support\BlockVariation;
-
-class Block extends Feature {
-    public bool   $initialised = false;
-    public bool   $enabled     = true;
-    public string $name        = '';
-    public string $path        = '';
-    public array  $args        = [];
-
-    protected string $initError = 'Block\'s make method must be called before using other configuration methods.';
+class Block extends FeatureDefinition {
+    public bool $enabled = true;
+    public string $name = '';
+    public string $path = '';
+    public array  $args = [];
 
     /**
      * Sets the block as ready (or not) based on the block's current configuration.
      * 
+     * If the block is ready, it will be registered with WordPress via the 'init' hook in the load() method.
      * @return void
      */
-    protected function setReady(): void {
-        if (empty($this->name) || !empty($this->error)) {
+    protected function hook(): void {
+        if (empty($this->name)) {
             $this->ready = false;
             return;
         }
 
         $this->ready = true;
+
+        if ($this->enabled) {
+            add_action('init', function() {
+                $this->load();
+            });
+        }
     }
 
     /**
      * Registers the block with WordPress via the 'init' hook.
      *
-     * @param  Feature $instance
-     *
      * @return void
      */
-    protected function load(Feature $instance): void {
-        if (! $instance->ready) {
-            return;
-        }
+    protected function load(): void { 
+        $blockType = $this->path !== '' ? $this->path : $this->name;
 
-        $blockType = $instance->path !== '' ? $instance->path : $instance->name;
-
-        register_block_type($blockType, $instance->args);
+        register_block_type($blockType, $this->args);
         $this->loaded = true;
     }
 
@@ -56,99 +51,15 @@ class Block extends Feature {
      ***************************/
 
     /**
-     * Configures the block using either a callback or by directly passing the block's name and args.
-     *
-     * @param  Closure|string $callbackOrName
-     * @param  array|string   $argsOrPath
-     *
-     * @return self
-     */
-    public function make(Closure|string $callbackOrName = '', array|string $argsOrPath = []): self {
-        // If a closure is passed, call it with the block instance to allow configuration within the closure.
-        if ($callbackOrName instanceof Closure) {
-            $this->initialised = true; // Allow using configuration methods within the closure.
-            
-            $callbackOrName($this);
-            return $this;
-        }
-
-        $this->name = $callbackOrName;
-        $this->args = is_array($argsOrPath) ? $argsOrPath : [];
-        $this->path = is_string($argsOrPath) ? $argsOrPath : '';
-
-        $this->setReady();
-        $this->initialised = true;
-
-        return $this;
-    }
-
-    /**
-     * Allows for configuring the block using a callback after it has been created.
-     *
-     * @param Closure|null $callback
-     *
-     * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
-     */
-    public function configure(?Closure $callback = null): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
-        if ($callback !== null) {
-            $callback($this);
-        }
-
-        return $this;
-    }
-
-    /**
-     * Returns a new BlockVariation instance for defining a block variation, configured 
-     * using either a callback or by directly passing the variation's name and args.
-     *
-     * @param Closure|string $callbackOrName
-     * @param array          $args
-     *
-     * @return BlockVariation\
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
-     */
-    public function variation(Closure|string $callbackOrName = '', array $args = []): BlockVariation {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
-        $this->initialised = false; // Prevent using further block configuration methods on the variation instance.
-
-        $name = $callbackOrName instanceof Closure ? '' : $callbackOrName;
-        
-        $variation = app(BlockVariation::class, [
-            'source' => $this, 
-            'name'   => $name, 
-            'args'   => $args
-        ]);
-
-        if ($callbackOrName instanceof Closure) {
-            $callbackOrName($variation);
-        }
-
-        return $variation;
-    }
-
-    /**
      * Sets the name of the block. Should be passed in namespace/block-name format.
      *
      * @param string $name
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function name(string $name): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->name = $name;
-        $this->setReady();
+        $this->hook();
         return $this;
     }
 
@@ -159,21 +70,17 @@ class Block extends Feature {
      * @param string $path
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
+     * @throws \InvalidArgumentException if the provided path does not exist or is not a directory.
      */
     public function path(string $path): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
 
         if (!File::exists($path) || !File::isDirectory($path)) {
-            $this->error = "The specified path '{$path}' does not exist.";
-            return $this;
+            throw new \InvalidArgumentException("The specified path '{$path}' does not exist.");
         }
         
         $this->path = $path;
 
-        $this->setReady();
+        $this->hook();
         return $this;
     }
 
@@ -186,13 +93,8 @@ class Block extends Feature {
      * @param string $version
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function apiVersion(string $version): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['api_version'] = $version;
         return $this;
     }
@@ -203,13 +105,8 @@ class Block extends Feature {
      * @param string $title
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function title(string $title): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['title'] = $title;
         return $this;
     }
@@ -220,13 +117,8 @@ class Block extends Feature {
      * @param string $description
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function description(string $description): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['description'] = $description;
         return $this;
     }
@@ -237,13 +129,8 @@ class Block extends Feature {
      * @param string $domain
      * 
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function domain(string $domain): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['text_domain'] = $domain;
         return $this;
     }
@@ -254,13 +141,8 @@ class Block extends Feature {
      * @param string $category
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function category(string $category): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['category'] = $category;
         return $this;
     }
@@ -271,13 +153,8 @@ class Block extends Feature {
      * @param string $icon
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function icon(string $icon): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['icon'] = $icon;
         return $this;
     }
@@ -288,13 +165,8 @@ class Block extends Feature {
      * @param array $keywords
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function keywords(array $keywords): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['keywords'] = $keywords;
         return $this;
     }
@@ -305,13 +177,8 @@ class Block extends Feature {
      * @param array $parentBlocks
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function parent(array $parentBlocks): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['parent'] = $parentBlocks;
         return $this;
     }
@@ -322,13 +189,8 @@ class Block extends Feature {
      * @param array $ancestorBlocks
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function ancestor(array $ancestorBlocks): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['ancestor'] = $ancestorBlocks;
         return $this;
     }
@@ -339,13 +201,8 @@ class Block extends Feature {
      * @param array $allowedBlocks
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function allowedBlocks(array $allowedBlocks): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['allowed_blocks'] = $allowedBlocks;
         return $this;
     }
@@ -356,13 +213,8 @@ class Block extends Feature {
      * @param array $providedContext
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function providesContext(array $providedContext): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['provides_context'] = $providedContext;
         return $this;
     }
@@ -373,13 +225,8 @@ class Block extends Feature {
      * @param array $usedContext
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function usesContext(array $usedContext): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['uses_context'] = $usedContext;
         return $this;
     }
@@ -390,13 +237,8 @@ class Block extends Feature {
      * @param array $supports
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function supports(array $supports): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['supports'] = $supports;
         return $this;
     }
@@ -407,13 +249,8 @@ class Block extends Feature {
      * @param array $attributes
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function attributes(array $attributes): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['attributes'] = $attributes;
         return $this;
     }
@@ -424,13 +261,8 @@ class Block extends Feature {
      * @param array $styleVariations
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function styleVariations(array $styleVariations): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['styles'] = $styleVariations;
         return $this;
     }
@@ -441,13 +273,8 @@ class Block extends Feature {
      * @param array $variations
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function variations(array $variations): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['variations'] = $variations;
         return $this;
     }
@@ -458,13 +285,8 @@ class Block extends Feature {
      * @param array $selectors
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function selectors(array $selectors): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['selectors'] = $selectors;
         return $this;
     }
@@ -475,13 +297,8 @@ class Block extends Feature {
      * @param callable|Closure $callback
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function render(callable|Closure $callback): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['render_callback'] = $this->convertToClosure($callback);
         return $this;
     }
@@ -492,13 +309,8 @@ class Block extends Feature {
      * @param callable|Closure $callback
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function variationsCallback(callable|Closure $callback): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['variations_callback'] = $this->convertToClosure($callback);
         return $this;
     }
@@ -509,13 +321,8 @@ class Block extends Feature {
      * @param array $scriptsHandles
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function scripts(array $scriptsHandles): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['script_handles'] = $scriptsHandles;
         return $this;
     }
@@ -526,13 +333,8 @@ class Block extends Feature {
      * @param array $stylesHandles
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function styles(array $stylesHandles): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['style_handles'] = $stylesHandles;
         return $this;
     }
@@ -543,13 +345,8 @@ class Block extends Feature {
      * @param array $editorScriptsHandles
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function editorScripts(array $editorScriptsHandles): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['editor_script_handles'] = $editorScriptsHandles;
         return $this;
     }
@@ -560,13 +357,8 @@ class Block extends Feature {
      * @param array $editorStylesHandles
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function editorStyles(array $editorStylesHandles): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['editor_style_handles'] = $editorStylesHandles;
         return $this;
     }
@@ -577,13 +369,8 @@ class Block extends Feature {
      * @param array $viewScriptsHandles
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function viewScripts(array $viewScriptsHandles): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['view_script_handles'] = $viewScriptsHandles;
         return $this;
     }
@@ -594,13 +381,8 @@ class Block extends Feature {
      * @param array $viewStylesHandles
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function viewStyles(array $viewStylesHandles): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['view_style_handles'] = $viewStylesHandles;
         return $this;
     }
@@ -611,13 +393,8 @@ class Block extends Feature {
      * @param array $hooks
      *
      * @return self
-     * @throws \BadMethodCallException if the block has not been initialised with the make method.
      */
     public function hooks(array $hooks): self {
-        if (!$this->initialised) {
-            throw new \BadMethodCallException($this->initError);
-        }
-
         $this->args['block_hooks'] = $hooks;
         return $this;
     }

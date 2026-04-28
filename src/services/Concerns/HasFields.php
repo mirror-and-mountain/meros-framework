@@ -3,78 +3,66 @@
 namespace MM\Meros\Services\Concerns;
 
 use Closure;
-use Illuminate\Support\Collection;
 
-use MM\Meros\App\Support\FieldGroup;
-use MM\Meros\App\Support\Fields\Field;
-use MM\Meros\App\Support\Fields\Maker as FieldMaker;
+use MM\Meros\Services\Contracts\Field;
+use MM\Meros\Services\Registers\Fields as FieldsRegister;
+
+use MM\Meros\Services\FieldGroup;
+use MM\Meros\Services\Registers\FieldGroups as FieldGroupsRegister;
+
+use MM\Meros\Facades\Fields;
+use MM\Meros\Facades\FieldGroups;
 
 trait HasFields {
     /**
-     * Instantiates a field of the specified type with the given configuration.
+     * Retrieves a field by handle or returns the fields register if no handle is provided.
      *
-     * @param string       $type     The type of field to create (e.g., 'text', 'select').
-     * @param Closure|null $callback An optional closure to further configure the field instance after creation.
-     * @param array        $config   An optional array of configuration options for the field.
+     * @param string       $handle The handle of the field to retrieve. If empty, the entire fields register is returned.
+     * @param Closure|null $callback An optional callback used in the register's get() method.
      *
-     * @return Field The instantiated Field object.
+     * @return Field|FieldsRegister|null The requested field, the fields register, or null if not found.
      */
-    protected function field(string $type, ?Closure $callback = null, array $config = []): Field {
-        $field = app(FieldMaker::class, ['source' => $this])->make($type, $config);
-
-        if ($callback) {
-            $callback($field);
+    protected function fields(string $handle = '', ?Closure $callback = null): Field|FieldsRegister|null {
+        if (empty($handle)) {
+            return Fields::checkout($this);
         }
-        
-        $this->registry()->add('fields', $field);
-        return $field;
+
+        else {
+            return Fields::checkout($this)->get($handle, $callback);
+        }
     }
 
     /**
-     * Retrieves a field by its name or returns a collection of all fields.
+     * Retrieves a field group by handle or returns the field groups register if no handle is provided.
      *
-     * @param string|null $name The name of the field to retrieve. If null, returns all fields.
+     * @param string       $handle The handle of the field group to retrieve. If empty, the entire field groups register is returned.
+     * @param Closure|null $callback An optional callback used in the register's get() method.
      *
-     * @return Field|Collection|null The requested field or a collection of all fields. Null if the requested field doesn't exist.
+     * @return FieldGroup|FieldGroupsRegister|null The requested field group, the field groups register, or null if not found.
      */
-    protected function fields(?string $name = null): Collection {
-        if ($name) {
-            return $this->registry()->get('fields')->firstWhere('name', $name);
+    protected function fieldGroups(string $handle = '', ?Closure $callback = null): FieldGroup|FieldGroupsRegister|null {
+        if (empty($handle)) {
+            return FieldGroups::checkout($this);
         }
 
-        return $this->registry()->get('fields');
+        else {
+            return FieldGroups::checkout($this)->get($handle, $callback);
+        }
     }
 
-    /**
-     * Creates a field group with the specified configuration.
-     *
-     * @param Closure|string $callbackOrSlug A closure to configure the field group or a string to set the slug.
-     *
-     * @return FieldGroup The created FieldGroup instance.
-     */
-    protected function fieldGroup(string $slug, ?Closure $callback = null): FieldGroup {
-        $fieldGroup = app(FieldGroup::class, ['source' => $this])->make($slug);
-
-        if ($callback) {
-            $callback($fieldGroup);
-        }
-
-        $this->registry()->add('fieldGroups', $fieldGroup);
-        return $fieldGroup;
-    }
+    /*********************
+     * Aliases
+     *********************/
 
     /**
-     * Retrieves a field group by its slug or returns a collection of all field groups.
+     * Alias of the fieldGroups() method for users who prefer the snake_case naming convention.
      *
-     * @param string|null $slug The slug of the field group to retrieve. If null, returns all field groups.
+     * @param string       $handle
+     * @param Closure|null $callback
      *
-     * @return FieldGroup|Collection|null The requested field group or a collection of all field groups. Null if the requested field group doesn't exist.
+     * @return FieldGroup|FieldGroupsRegister|null
      */
-    protected function fieldGroups(?string $slug = null): Collection {
-        if ($slug) {
-            return $this->registry()->get('fieldGroups')->firstWhere('slug', $slug);
-        }
-
-        return $this->registry()->get('fieldGroups');
+    protected function field_groups(string $handle = '', ?Closure $callback = null): FieldGroup|FieldGroupsRegister|null {
+        return $this->fieldGroups($handle, $callback);
     }
 }
