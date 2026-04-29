@@ -2,34 +2,101 @@
 
 namespace MM\Meros\App;
 
+use Illuminate\Http\Request;
+
 final class Context {
+    /**
+     * Indicates whether the current context is in WP Admin.
+     *
+     * @var boolean
+     */
     public bool $isAdmin = false;
+
+    /**
+     * Indicates whether the current context is on the front-end site.
+     *
+     * @var boolean
+     */
     public bool $isSite  = false;
 
-    public string $currentPage = '';
-    public array  $frameworkAdminPages = ['meros_theme_features', 'meros_packages'];
+    /**
+     * The current admin screen ID if in admin context, otherwise empty string.
+     *
+     * @var string
+     */
+    public string $adminScreen = '';
+
+    /**
+     * The current HTTP request instance.
+     *
+     * @var Request
+     */
+    protected Request $request;
+
+    /**
+     * The current URL
+     *
+     * @var string
+     */
+    public string $url = '';
+
+    /**
+     * The full URL including query parameters.
+     *
+     * @var string
+     */
+    public string $fullUrl = '';
+
+    /**
+     * Array of query parameters if applicable.
+     *
+     * @var array
+     */
+    public array $params = [];
+
+    /**
+     * The path of the current request (excluding the domain).
+     *
+     * @var string
+     */
+    public string $path  = '';
+
+    /**
+     * The HTTP method of the current request (e.g., GET, POST).
+     *
+     * @var string
+     */
+    public string $method = '';
 
     public function __construct() {
         $this->isAdmin = \is_admin();
         $this->isSite  = ! $this->isAdmin;
 
-        if ($this->isAdmin) {
-            $this->currentPage = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';
-        } else {
-            $pageSlug          = \get_post_field('post_name', \get_post());
-            $this->currentPage = $pageSlug && $pageSlug !== '' ? sanitize_key($pageSlug) : '';
-        }
+        $this->adminScreen = $this->isAdmin ? (isset($GLOBALS['pagenow']) ? $GLOBALS['pagenow'] : '') : '';
+        
+        $this->request = request();
+        $this->url     = $this->request->url();
+        $this->fullUrl = $this->request->fullUrl();
+        $this->path    = $this->request->path();
+        $this->method  = $this->request->method();
+        $this->params  = $this->request->query();
     }
 
-    public function isAdmin(): bool {
-        return $this->isAdmin;
+    /**
+     * Get the current HTTP request object.
+     *
+     * @return Request
+     */
+    public function request(): Request {
+        return $this->request;
     }
 
-    public function currentPage(): string {
-        return $this->currentPage;
-    }
-
-    public function isFrameworkPage(): bool {
-        return $this->isAdmin && in_array($this->currentPage, $this->frameworkAdminPages);
+    /**
+     * Get the current context instance.
+     *
+     * @return self
+     */
+    public function get(): self {
+        return $this;
     }
 }

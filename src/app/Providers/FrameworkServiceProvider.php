@@ -20,6 +20,7 @@ use MM\Meros\Services\Registers\Forms;
 use MM\Meros\Services\Registers\Fields;
 use MM\Meros\Services\Registers\FieldGroups;
 use MM\Meros\Services\Registers\FieldStyles;
+use MM\Meros\Services\Registers\Tables;
 use MM\Meros\Services\Registers\MenuPages;
 use MM\Meros\Services\Registers\Settings;
 use MM\Meros\Services\Registers\SettingsFields;
@@ -128,6 +129,10 @@ class FrameworkServiceProvider extends ServiceProvider {
             return new FieldStyles();
         });
 
+        $this->app->singleton(Tables::class, function () {
+            return new Tables();
+        });
+
         $this->app->singleton(MenuPages::class, function () {
             return new MenuPages();
         });
@@ -150,6 +155,7 @@ class FrameworkServiceProvider extends ServiceProvider {
         $this->app->alias(Fields::class, 'meros.registers.fields');
         $this->app->alias(FieldGroups::class, 'meros.registers.field_groups');
         $this->app->alias(FieldStyles::class, 'meros.registers.field_styles');
+        $this->app->alias(Tables::class, 'meros.registers.tables');
         $this->app->alias(MenuPages::class, 'meros.registers.menu_pages');
         $this->app->alias(Settings::class, 'meros.registers.settings');
         $this->app->alias(SettingsFields::class, 'meros.registers.settings_fields');

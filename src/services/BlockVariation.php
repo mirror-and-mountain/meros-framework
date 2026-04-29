@@ -8,7 +8,7 @@ use MM\Meros\Services\Contracts\Feature;
 use MM\Meros\Services\Contracts\FeatureProvider;
 
 class BlockVariation extends Feature {
-    public string $name;
+    public string $name = '';
     public string $parentBlock = '';
     public array  $args = [
         'scope'     => ['block', 'inserter'],

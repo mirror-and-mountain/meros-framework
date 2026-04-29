@@ -2,8 +2,6 @@
 
 namespace MM\Meros\App;
 
-use Illuminate\Support\Facades\Schema;
-
 use MM\Meros\Services\Contracts\FeatureProvider;
 
 use MM\Meros\App\Fields\Checkbox;
@@ -23,9 +21,6 @@ use MM\Meros\App\Fields\Url;
 use MM\Meros\App\Fields\Styles\DefaultFieldStyle;
 use MM\Meros\App\Fields\Styles\NiceFieldStyle;
 use MM\Meros\App\Fields\Styles\SettingsFieldStyle;
-
-use MM\Meros\App\Models\Migration;
-use MM\Meros\App\Features\CoreInstallable;
 
 use MM\Meros\App\Facades\Theme;
 
@@ -82,9 +77,6 @@ final class Framework extends FeatureProvider {
         // Run theme activation tasks
         add_action('after_switch_theme', [$this, 'runActivationTasks']);
 
-        // Set migrations path preference
-        $this->setPreference('migrations_path', 'database/migrations/integrations');
-
         // Configure settings pages
         $this->configureSettingsPages();
 
@@ -93,122 +85,6 @@ final class Framework extends FeatureProvider {
 
         // Discover blocks
         $this->blocks()->discover();
-    }
-
-    /**
-     * Returns whether the given framework service has been installed.
-     * 
-     * @param boolean $tryToInstall Whether to attempt to install the service if it hasn't been installed.
-     *
-     * @return bool Returns true if the service is installed, false if it isn't or if installation fails.
-     */
-    public function isServiceInstalled(string $service, bool $tryToInstall = false): bool {
-        if ($service === 'core') {
-            return $this->isCoreInstalled($tryToInstall);
-        }
-
-        if ($service === 'integrations') {
-            return $this->isIntegrationsInstalled($tryToInstall);
-        }
-
-        return false; // Service not recognised
-    }
-
-    /**
-     * Returns whether the core framework is installed.
-     *
-     * @param  boolean $tryToInstall Whether to attempt to install the core service if it isn't installed.
-     *
-     * @return boolean Returns true if the core service is installed, false if it isn't or if installation fails.
-     */
-    private function isCoreInstalled(bool $tryToInstall): bool {
-        $installed = false;
-
-        if (
-            ! Schema::hasTable('meros_migrations') || 
-            ! Migration::where('handle', '001_create_meros_migrations_table')->exists()
-        ) {
-            $installed = $tryToInstall ? $this->installFramework() : false;
-        } else {
-            $installed = true;
-        }
-        
-        return $installed;
-    }
-
-    /**
-     * Returns whether the integrations service is installed.
-     *
-     * @param  boolean $tryToInstall Whether to attempt to install the integrations service if it isn't installed.
-     *
-     * @return boolean Returns true if the integrations service is installed, false if it isn't or if installation fails.
-     */
-    private function isIntegrationsInstalled(bool $tryToInstall): bool {
-        $installed = $this->isInstalled();
-
-        return $installed ? true : ($tryToInstall ? $this->install() : false);
-    }
-
-    /**
-     * Returns whether the framework is installed.
-     * Only includes the Integration service tables as the 'core' migrations table is handled separately.
-     *
-     * @return boolean
-     */
-    protected function isInstalled(): bool {
-        $tables = [
-            'meros_integration_accounts',
-            'meros_integration_connections'
-        ];
-
-        return $this->hasTables($tables);
-    }
-
-    /**
-     * Installs the core Meros migrations table so that other feature providers
-     * can run installables.
-     *
-     * @return bool Returns true on success, false on failure.
-     */
-    private function installFramework(): bool {
-        if (!$this instanceof Framework) {
-            return false;
-        }
-
-        $migrationPath = \trailingslashit(
-            \trailingslashit($this->getPreference('migrations_path')) . 'core' . DIRECTORY_SEPARATOR
-        );
-
-        $installable = $this->makeCoreInstallable([
-            'path'   => $migrationPath . '001_create_meros_migrations_table.php',
-        ]);
-
-        $installed = $installable->install();
-
-        if ($installed !== true) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Creates the core installable instance for the Meros framework.
-     *
-     * @param array $config The configuration array for the core installable.
-     * 
-     * @return CoreInstallable|null The created core installable instance, or null if it cannot be created.
-     */
-    private function makeCoreInstallable(array $config): CoreInstallable|null {
-        if (!$this instanceof Framework) {
-            return null;
-        }
-
-        return app(
-            CoreInstallable::class, [
-                'source' => $this,
-            ]
-        )->make($config);
     }
 
     /***************************************************************

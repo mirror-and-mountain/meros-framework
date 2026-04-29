@@ -7,22 +7,22 @@ use MM\Meros\App\Framework;
 use MM\Meros\Services\Concerns\HasAssets;
 use MM\Meros\Services\Concerns\HasBlocks;
 use MM\Meros\Services\Concerns\HasFields;
-use MM\Meros\Services\Concerns\HasInstallables;
+use MM\Meros\Services\Concerns\HasInstallers;
 use MM\Meros\Services\Concerns\HasIdentity;
 use MM\Meros\Services\Concerns\HasSettings;
 use MM\Meros\Services\Concerns\HasPreferences;
 
-abstract class FeatureProvider {
-    private array $requiredServices = ['core'];
+use MM\Meros\Facades\Context;
 
-    // Additional concerns may be added by child classes as needed.
+abstract class FeatureProvider {
+
     use HasIdentity,
         HasPreferences,
         HasSettings,
         HasAssets,
         HasBlocks,
         HasFields,
-        HasInstallables;
+        HasInstallers;
 
     public function __construct(
         string $name = '',
@@ -35,16 +35,20 @@ abstract class FeatureProvider {
         // Set identity
         $this->setIdentity($name, $path, $uri);
 
-        if (! $this->identitySet) {
+        if (!$this->identitySet) {
             return;
         }
 
         // Init preferences
         $this->initPreferences();
 
-        if ($isFramework) {
-            return;
+        if ($isFramework && $this->isFeaturesAdminPage()) {
+            $this->tables()->discover(); // Discover tables in this context so we can load installers if available.
+            dd($this->tables());
         }
+
+        // Framework is booted from its service provider
+        if ($isFramework) {return;}
 
         // Load
         $this->load();
@@ -69,36 +73,36 @@ abstract class FeatureProvider {
     }
 
     /**
-     * Adds a required service to the feature provider's requirements.
+     * Determines if the current context is the features admin page.
+     * Used to load installers in this context if available.
      *
-     * @param string $service The name of the required service.
-     * @return void
+     * @return boolean
      */
-    protected function require(string $service): void {
-        if (!in_array($service, $this->requiredServices)) {
-            $this->requiredServices[] = $service;
+    private function isFeaturesAdminPage(): bool {
+        $context = Context::get();
+
+        if (!$context->isAdmin) {
+            return false;
         }
-    }
 
-    /**
-     * Removes a required service from the feature provider's requirements.
-     *
-     * @param string $service The name of the service to remove from requirements.
-     * @return void
-     */
-    protected function removeRequirement(string $service): void {
-        $this->requiredServices = array_filter(
-            $this->requiredServices,
-            fn($s) => $s !== $service
-        );
-    }
+        if ($context->adminScreen !== 'options-general.php') {
+            return false;
+        }
 
-    /**
-      * Returns an array of the feature provider's required services.
-      *
-      * @return array An array of required service names.
-      */
-    protected function getRequirements(): array {
-        return $this->requiredServices;
+        $params = $context->params;
+
+        if (!isset($params['page']) || $params['page'] !== 'meros-features') {
+            return false;
+        }
+
+        if (!isset($params['tab'])) {
+            return true;
+        } 
+        
+        else if (in_array($params['tab'], ['theme', 'packages'])) {
+            return true;
+        }
+
+        return false;
     }
 }

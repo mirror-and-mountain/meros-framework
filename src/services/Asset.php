@@ -9,19 +9,95 @@ use Illuminate\Support\Facades\File;
 use MM\Meros\Services\Contracts\FeatureDefinition;
 
 final class Asset extends FeatureDefinition {
-    public bool   $enabled      = true;
-    public string $path         = '';
-    public string $src          = '';
-    public string $handle       = '';
-    public string $label        = '';
-    public string $description  = '';
-    public string $type         = '';
-    public string $group        = '';
-    public string $location     = '';
-    public array  $dependencies = [];
-    public string $version      = '';
-    public bool   $inFooter     = false;
+    /**
+     * The unique handle for the asset, used as the identifier when enqueuing in WordPress.
+     *
+     * @var string
+     */
+    public string $handle = '';
 
+    /**
+     * Whether the asset is enabled and should be enqueued.
+     *
+     * @var boolean
+     */
+    protected bool $enabled = true;
+
+    /**
+     * The file path to the asset on the server, used for versioning and validation.
+     *
+     * @var string
+     */
+    protected string $path = '';
+    
+    /**
+     * The source URL for the asset, which is used when enqueuing in WordPress.
+     *
+     * @var string
+     */
+    protected string $src = '';
+
+    /**
+     * A human-readable label for the asset.
+     *
+     * @var string
+     */
+    protected string $label = '';
+
+    /**
+     * A description for the asset, which can be used in the admin UI or for documentation purposes.
+     *
+     * @var string
+     */
+    protected string $description = '';
+
+    /**
+     * The type of the asset, which determines how it will be enqueued in WordPress.
+     *
+     * @var string
+     */
+    protected string $type = '';
+
+    /**
+     * A group name for the asset, which can be used to group related assets together in the admin UI.
+     *
+     * @var string
+     */
+    protected string $group = '';
+
+    /**
+     * The location where the asset should be enqueued, which determines the WordPress hook it will be attached to.
+     *
+     * @var string
+     */
+    protected string $location = '';
+
+    /**
+     * An array of handles for any dependencies that this asset has, which will be enqueued before this asset.
+     *
+     * @var array
+     */
+    protected array $dependencies = [];
+
+    /**
+     * The version of the asset
+     *
+     * @var string
+     */
+    protected string $version = '';
+
+    /**
+     * Whether to enqueue the asset in the site footer. Only applicable for 'script' type assets.
+     *
+     * @var boolean
+     */
+    protected bool $inFooter = false;
+
+    /**
+     * The WordPress hook that the asset is attached to for enqueuing.
+     *
+     * @var string
+     */
     protected string $hook = '';
 
     /**

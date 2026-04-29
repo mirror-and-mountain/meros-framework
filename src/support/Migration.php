@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\App\Support;
+namespace MM\Meros\Support;
 
 use Illuminate\Database\Migrations\Migration as LaravelMigration;
 
@@ -10,12 +10,12 @@ abstract class Migration extends LaravelMigration {
      *
      * @return void
      */
-    abstract public function up(string $installable): void;
+    abstract public function up(string $installer): void;
 
     /**
      * Reverse the migrations.
      *
      * @return void
      */
-    abstract public function down(string $installable): void;
+    abstract public function down(string $installer): void;
 }

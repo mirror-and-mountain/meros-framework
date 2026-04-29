@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\App\Support;
+namespace MM\Meros\Support;
 
 use Closure;
 use Illuminate\Support\Facades\Schema;
@@ -27,6 +27,13 @@ final class SchemaManager {
         return Schema::connection($connection);
     }
 
+    /**
+     * Get a collection of all tables in the database, along with their provider.
+     *
+     * @param string|null $connection
+     *
+     * @return Collection
+     */
     public static function getTables(?string $connection = null): Collection {
         $schema     = static::schema($connection);
         $collection = collect(Arr::keyBy($schema->getTables(), 'name'));
@@ -39,7 +46,7 @@ final class SchemaManager {
                 'related_table', Str::replace($tablePrefix, '', $table['name'])
             )->first();
 
-            $table['source'] = $record !== null ? $record->source : 'wordpress/plugin';
+            $table['provider'] = $record !== null ? $record->provider : 'wordpress/plugin';
 
             return $table;
         });
@@ -47,69 +54,92 @@ final class SchemaManager {
         return $collection;
     }
 
-    public static function getTableData(string $table, ?string $connection = null): ?Collection {
+    /**
+     * Get the columns, indexes, and foreign keys for a given table, if it exists.
+     *
+     * @param string      $table
+     * @param string|null $connection
+     *
+     * @return array|null
+     */
+    public static function getTableData(string $table, ?string $connection = null): ?array {
         $schema = static::schema($connection);
+        
         global $wpdb;
+
         $tablePrefix = $wpdb->prefix;
-        $table = Str::replace($tablePrefix, '', $table);
+        $table       = Str::replace($tablePrefix, '', $table);
 
         if ($schema->hasTable($table)) {
-            return collect([
+            return [
                 'columns'      => $schema->getColumns($table),
                 'indexes'      => $schema->getIndexes($table),
                 'foreign_keys' => $schema->getForeignKeys($table),
-            ]);
+            ];
         }
 
         return null;
     }
 
     /**
+     * Check if a table exists in the database.
+     *
+     * @param string      $table
+     * @param string|null $connection
+     *
+     * @return boolean
+     */
+    public static function hasTable(string $table, ?string $connection = null): bool {
+        $schema = static::schema($connection);
+        return $schema->hasTable($table);
+    }
+
+    /**
      * @param  string                         $table
-     * @param  string                         $installable
+     * @param  string                         $installerHandle
      * @param  Closure(Blueprint): void       $callback
      * @param  string|null                    $connection
      * 
      * @return void
      */
-    public static function create(string $table, string $installable, Closure $callback, ?string $connection = null): void {
+    public static function create(string $table, string $installerHandle, Closure $callback, ?string $connection = null): void {
         $schema = static::schema($connection);
 
         $schema->create($table, $callback);
 
-        event(new TableCreated($table, $installable, $connection));
+        event(new TableCreated($table, $installerHandle, $connection));
     }
 
     /**
      * @param  string                         $table
-     * @param  string                         $installable
+     * @param  string                         $installerHandle
      * @param  Closure(Blueprint): void       $callback
      * @param  string|null                    $connection
      * 
      * @return void
      */
-    public static function table(string $table, string $installable, Closure $callback, ?string $connection = null): void {
+    public static function table(string $table, string $installerHandle, Closure $callback, ?string $connection = null): void {
         $schema = static::schema($connection);
 
         $schema->table($table, $callback);
 
-        event(new TableUpdated($table, $installable, $connection));
+        event(new TableUpdated($table, $installerHandle, $connection));
     }
 
     /**
      * @param  string      $table
-     * @param  string      $installable
+     * @param  string      $installerHandle
      * @param  string|null $connection
      * 
      * @return void
      */
-    public static function dropIfExists(string $table, string $installable, ?string $connection = null): void {
+    public static function dropIfExists(string $table, string $installerHandle, ?string $connection = null): void {
         $schema = static::schema($connection);
 
         if ($schema->hasTable($table)) {
             $schema->dropIfExists($table);
 
-            event(new TableDropped($table, $installable, $connection));
+            event(new TableDropped($table, $installerHandle, $connection));
         }
     }
 }

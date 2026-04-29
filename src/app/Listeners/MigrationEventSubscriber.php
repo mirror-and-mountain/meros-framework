@@ -12,8 +12,8 @@ use MM\Meros\App\Events\Migrations\TableDropped;
 
 use MM\Meros\App\Models\Migration;
 
-use MM\Meros\App\Facades\Theme;
-use MM\Meros\App\Facades\Registry;
+use MM\Meros\Facades\Theme;
+use MM\Meros\Facades\Tables;
 
 class MigrationEventSubscriber {
     /**
@@ -25,14 +25,14 @@ class MigrationEventSubscriber {
      */
     public function handleTableCreated(TableCreated $event): void {
         $table             = $event->table;
-        $installableHandle = $event->installable;
+        $installerHandle   = $event->installerHandle;
         $connection        = $event->connection;
 
         if (! Schema::connection($connection)->hasTable($table)) {
             return;
         }
 
-        $this->makeMigrationRecord($table, $installableHandle);
+        $this->makeMigrationRecord($table, 'create', $installerHandle);
     }
 
     /**
@@ -44,14 +44,14 @@ class MigrationEventSubscriber {
      */
     public function handleTableUpdated(TableUpdated $event): void {
         $table             = $event->table;
-        $installableHandle = $event->installable;
+        $installerHandle   = $event->installerHandle;
         $connection        = $event->connection;
 
-        if (! Schema::connection($connection)->hasTable($table)) {
+        if (!Schema::connection($connection)->hasTable($table)) {
             return;
         }
 
-        $this->makeMigrationRecord($table, $installableHandle);
+        $this->makeMigrationRecord($table, 'update', $installerHandle);
     }
 
     /**
@@ -95,33 +95,27 @@ class MigrationEventSubscriber {
      * Creates a migration record for the given table and installable handle.
      *
      * @param  string $table
-     * @param  string $installableHandle
+     * @param  string $installerHandle
      *
      * @return void
      */
-    private function makeMigrationRecord(string $table, string $installableHandle): void {
-        $installable = Registry::getInstallables()->firstWhere('handle', $installableHandle);
+    private function makeMigrationRecord(string $table, string $type, string $installerHandle): void {
+        $installer = Tables::get($installerHandle);
 
-        if ($installable === null) {
+        if ($installer === null) {
             return;
         }
 
-        $trimmedPath = Str::replace(Theme::getPath(), '', $installable->path);
+        $trimmedPath = Str::replace(Theme::getPath(), '', $installer->getPath());
 
-        $record = Migration::create([
-            'source'        => $installable->source->handle,
-            'type'          => $installable->type,
-            'subtype'       => $installable->subtype,
-            'label'         => $installable->label,
-            'handle'        => $installable->handle,
+        Migration::create([
+            'source'        => $installer->provider->getHandle(),
+            'type'          => $type,
+            'label'         => $installer->getLabel(),
+            'handle'        => $installer->getHandle(),
             'related_table' => $table,
             'path'          => $trimmedPath,
-            'batch_id'      => $installable->currentBatchId
+            'batch_id'      => $installer->getBatchID()
         ]);
-
-        if ($record !== null) {
-            $installable->installedTime = $record->created_at->format('d-m-Y H:i:s');
-            $installable->isInstalled = true;
-        }
     }
 }

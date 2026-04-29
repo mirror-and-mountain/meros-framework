@@ -21,7 +21,7 @@ trait HasPreferences {
         'components_path'                  => 'src/app/View/Components', // No leading or trailing slashes
         'views_path'                       => 'resources/views', // No leading or trailing slashes
         'routes_path'                      => 'routes', // No leading or trailing slashes
-        'migrations_path'                  => 'database/migrations', // No leading or trailing slashes
+        'tables_path'                      => 'database/tables', // No leading or trailing slashes
     ];
 
     /**
@@ -41,6 +41,9 @@ trait HasPreferences {
             $this->defaultPreferences = [
                 ...$this->defaultPreferences,
                 'allow_installers_in_wp_admin' => true, // Whether to allow installation of packages and themes via WP Admin.
+                'default_site_field_style'     => 'nice', // The default field style for the site.
+                'default_admin_field_style'    => 'admin', // The default field style for the WP Admin.
+                'allow_field_style_override'   => true, // Whether to allow overriding the default field styles on a per-fieldgroup or per-form basis.
             ];
         }
     }

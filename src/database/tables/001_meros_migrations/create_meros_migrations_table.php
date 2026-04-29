@@ -4,17 +4,16 @@ namespace MM\Meros\Database\Migrations;
 
 use Illuminate\Database\Schema\Blueprint;
 
-use MM\Meros\App\Support\Admin\Migration;
-use MM\Meros\App\Support\Admin\SchemaManager;
+use MM\Meros\Support\Migration;
+use MM\Meros\Support\SchemaManager;
 
 return new class extends Migration {
 
-    public function up(string $installable): void {
-        SchemaManager::create('meros_migrations', $installable, function (Blueprint $table) {
+    public function up(string $installer): void {
+        SchemaManager::create('meros_migrations', $installer, function (Blueprint $table) {
             $table->id();
-            $table->string('source');
+            $table->string('provider');
             $table->string('type');
-            $table->string('subtype');
             $table->string('label');
             $table->string('handle')->unique();
             $table->string('related_table')->unique();
@@ -25,7 +24,7 @@ return new class extends Migration {
     }
 
 
-    public function down(string $installable): void {
-        SchemaManager::dropIfExists('meros_migrations', $installable);
+    public function down(string $installer): void {
+        SchemaManager::dropIfExists('meros_migrations', $installer);
     }
 };

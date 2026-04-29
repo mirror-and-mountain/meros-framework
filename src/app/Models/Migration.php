@@ -9,9 +9,8 @@ class Migration extends Model {
     protected $primaryKey = 'id';
 
     protected $fillable = [
-        'source',
+        'provider',
         'type',
-        'subtype',
         'label',
         'handle',
         'related_table',

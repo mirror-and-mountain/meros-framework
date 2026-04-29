@@ -8,10 +8,33 @@ use Illuminate\Support\Facades\File;
 use MM\Meros\Services\Contracts\FeatureDefinition;
 
 class Block extends FeatureDefinition {
-    public bool $enabled = true;
+    /**
+     * The name of the block, in namespace/block-name format. Required for the block to be registered.
+     *
+     * @var string
+     */
     public string $name = '';
-    public string $path = '';
-    public array  $args = [];
+
+    /**
+     * Whether the block is enabled.
+     *
+     * @var boolean
+     */
+    protected bool $enabled = true;
+
+    /**
+     * The path to a directory containing a block.json file.
+     *
+     * @var string
+     */
+    protected string $path = '';
+
+    /**
+     * Arguments for registering the block type. Used when registering a block via PHP.
+     *
+     * @var array
+     */
+    protected array $args = [];
 
     /**
      * Sets the block as ready (or not) based on the block's current configuration.
