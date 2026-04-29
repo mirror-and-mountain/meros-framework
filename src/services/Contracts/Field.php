@@ -389,6 +389,55 @@ abstract class Field extends FeatureDefinition {
         return $this;
     }
 
+    /**
+     * Attaches the field to a parent and sets the parent context on the field.
+     *
+     * @param FieldParent $parent The parent to attach this field to.
+     *
+     * @return self
+     */
+    public function attachTo(FieldParent $parent): self {
+        $this->parent($parent);
+        $parent->attach($this);
+        return $this;
+    }
+
+    /**
+     * Converts the field's properties to an array format suitable for JSON serialization
+     * 
+     * @param boolean $asString Whether to return the JSON as a string or an array.
+     * @param string  ...$flags Optional flags to pass to json_encode if $asString is true.
+     *
+     * @return array|string
+     */
+    public function toJson(bool $asString = false, string ...$flags): array|string {
+        $json = [
+            'type'             => static::class,
+            'handle'           => $this->handle,
+            'id'               => $this->getId(),
+            'name'             => $this->getName(),
+            'label'            => $this->getLabel(),
+            'helpText'         => $this->getHelpText(),
+            'helpTextPosition' => $this->getHelpTextPosition(),
+            'attributes'       => $this->attributes,
+            'classList'        => $this->classList,
+            'default'          => $this->default,
+            'value'            => $this->getValue(),
+            'required'         => $this->isRequired(),
+            'disabled'         => $this->isDisabled(),
+            'component'        => $this->getFieldComponent(),
+            'width'            => $this->width,
+            'style'            => $this->style,
+            'compatibleDataTypes' => $this->compatibleDataTypes,
+        ];
+
+        if ($asString) {
+            return json_encode($json, ...$flags);
+        }
+
+        return $json;
+    }
+
     /***************************
      * Getters
      ***************************/

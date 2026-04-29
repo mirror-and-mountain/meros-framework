@@ -1,6 +1,12 @@
-<div class="meros-field-group" style="margin-right:1rem;">
+<{{ $htmlTag }} 
+    class="meros-field-group" 
+    style="margin-right:1rem;"
+    @if($formID && $htmlTag === 'fieldset') 
+        form="{{ $formID }}"
+    @endif
+>
     <div class="meros-field-group-header">
-        <h3>{{ $label }}</h3>
+        <h3>{{ $title }}</h3>
         @if($description)
             <p class="meros-field-group-description">{{ $description }}</p>
         @endif
@@ -18,4 +24,4 @@
             </div>
         @endforeach
     </div>
-</div>
+</{{ $htmlTag }}>

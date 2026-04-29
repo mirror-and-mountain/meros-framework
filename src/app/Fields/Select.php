@@ -203,6 +203,29 @@ class Select extends Field {
         return ($this->attributes['data-allow-add'] ?? 'false') === 'true';
     }
 
+    /**
+     * Converts the field's properties to an array format suitable for JSON serialization
+     * 
+     * @param boolean $asString Whether to return the JSON as a string or an array.
+     * @param string  ...$flags Optional flags to pass to json_encode if $asString is true.
+     *
+     * @return array|string
+     */
+    public function toJson(bool $asString = false, string ...$flags): array|string {
+        $json = parent::toJson();
+        
+        $json['options']        = $this->getOptions();
+        $json['allowsMultiple'] = $this->allowsMultiple();
+        $json['allowsAdd']      = $this->allowsAdd();
+        $json['advanced']       = ($this->attributes['data-advanced'] ?? 'false') === 'true';
+        
+        if ($asString) {
+            return json_encode($json, ...$flags);
+        }
+
+        return $json;
+    }
+
     /***************************
      * Rendering
      ***************************/

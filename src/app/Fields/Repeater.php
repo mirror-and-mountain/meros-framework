@@ -44,6 +44,28 @@ class Repeater extends Field implements FieldParent {
         style as public fieldStyle;
     }
 
+    /**
+     * Converts the field's properties to an array format suitable for JSON serialization
+     * 
+     * @param boolean $asString Whether to return the JSON as a string or an array.
+     * @param string  ...$flags Optional flags to pass to json_encode if $asString is true.
+     *
+     * @return array|string
+     */
+    public function toJson(bool $asString = false, string ...$flags): array|string {
+        $json = parent::toJson();
+
+        $json['fields'] = array_map(function($field) {
+            return $field->toJson();
+        }, $this->fields);
+        
+        if ($asString) {
+            return json_encode($json, ...$flags);
+        }
+
+        return $json;
+    }
+
     /***************************
      * Rendering
      ***************************/

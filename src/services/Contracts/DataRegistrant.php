@@ -2,8 +2,6 @@
 
 namespace MM\Meros\Services\Contracts;
 
-use Closure;
-
 interface DataRegistrant {
     /**
      * Adds a sub-item to the current object definition at the specified path.

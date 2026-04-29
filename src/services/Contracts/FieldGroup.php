@@ -19,11 +19,11 @@ class FieldGroup extends FeatureDefinition implements FieldParent {
     public string $handle = '';
 
     /**
-     * A human-readable label for the field group, used in the UI to identify the group of fields.
+     * A human-readable title for the field group.
      *
      * @var string
      */
-    protected string $label = '';
+    protected string $title = '';
 
     /**
      * A description providing additional context about the field group, its purpose, or usage instructions.
@@ -31,6 +31,20 @@ class FieldGroup extends FeatureDefinition implements FieldParent {
      * @var string
      */
     protected string $description = '';
+
+    /**
+     * The form that this field group belongs to, if any.
+     *
+     * @var Form|null
+     */
+    protected ?Form $form = null;
+
+    /**
+     * The HTML tag to use when rendering the field group container.
+     *
+     * @var string
+     */
+    protected string $htmlTag = 'div';
 
     use CanAttachFields;
 
@@ -78,14 +92,14 @@ class FieldGroup extends FeatureDefinition implements FieldParent {
     }
 
     /**
-     * Sets the label of the field group.
+     * Sets the title of the field group.
      *
-     * @param string $label
+     * @param string $title
      *
      * @return self
      */
-    public function label(string $label): self {
-        $this->label = $label;
+    public function title(string $title): self {
+        $this->title = $title;
         return $this;
     }
 
@@ -99,6 +113,56 @@ class FieldGroup extends FeatureDefinition implements FieldParent {
     public function description(string $description): self {
         $this->description = $description;
         return $this;
+    }
+
+    /**
+     * Associates the field group with a form.
+     *
+     * @param Form $form
+     *
+     * @return self
+     */
+    public function form(Form $form): self {
+        $this->form = $form;
+        $this->htmlTag = 'fieldset'; // Use fieldset when inside a form for better semantics
+        return $this;
+    }
+
+    /**
+     * Attaches the field group to a form and sets the form context on the group.
+     *
+     * @param Form $form
+     *
+     * @return self
+     */
+    public function attachTo(Form $form): self {
+        $this->form($form);
+        $form->attach($this);
+        return $this;
+    }
+
+    /**
+     * Converts the field group and its fields to an array format suitable for JSON serialization.
+     * 
+     * @param boolean $asString Whether to return the JSON as a string or an array.
+     * @param string  ...$flags Optional flags to pass to json_encode if $asString is true.
+     *
+     * @return array|string
+     */
+    public function toJson(bool $asString = false, string ...$flags): array|string {
+        $json = [
+            'handle'      => $this->handle,
+            'title'       => $this->title,
+            'description' => $this->description,
+            'htmlTag'     => $this->htmlTag,
+            'fields'      => array_map(fn($field) => $field->toJson(), $this->fields),
+        ];
+
+        if ($asString) {
+            return json_encode($json, ...$flags);
+        }
+
+        return $json;
     }
 
     /***************************
@@ -205,9 +269,11 @@ class FieldGroup extends FeatureDefinition implements FieldParent {
      */
     public function render(): void {
         echo view('meros::fields.field-group', [
-            'label'       => $this->label,
+            'title'       => $this->title,
             'description' => $this->description,
-            'fields'      => $this->resolveLayout()
+            'fields'      => $this->resolveLayout(),
+            'htmlTag'     => $this->htmlTag,
+            'formID'      => $this->form ? $this->form->id : null,
         ]);
     }
 }

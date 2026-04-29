@@ -19,7 +19,7 @@ class Forms extends Register {
     protected function parseProperties(array $props): array {
         return [
             'id'          => $props['id'] ?? '',
-            'label'       => $props['label'] ?? '',
+            'title'       => $props['title'] ?? '',
             'description' => $props['description'] ?? '',
             'elements'    => $props['elements'] ?? [],
         ];

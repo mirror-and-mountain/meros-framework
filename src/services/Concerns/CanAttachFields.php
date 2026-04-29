@@ -63,9 +63,7 @@ trait CanAttachFields {
      * @return Field The created field instance.
      */
     public function field(string $fieldIdOrClass, Closure|array|null $callback = null, array $props = []): Field {
-        $params = func_num_args();
-
-        if ($params === 2 && is_array($callback)) {
+        if (is_array($callback)) {
             $props    = $callback;
             $callback = null;
         }

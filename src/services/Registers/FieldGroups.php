@@ -19,9 +19,9 @@ class FieldGroups extends Register {
     protected function parseProperties(array $props): array {
         return [
             'handle'      => $props['handle'] ?? '',
-            'label'       => $props['label'] ?? '',
+            'title'       => $props['title'] ?? '',
             'description' => $props['description'] ?? '',
-            'fields'      => $props['fields'] ?? [],
+            'fields'      => $props['fields'] ?? [], 
         ];
     }
 }

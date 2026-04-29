@@ -16,6 +16,7 @@ use MM\Meros\Support\ClassInfo;
 
 use MM\Meros\Services\Registers\Assets;
 use MM\Meros\Services\Registers\Blocks;
+use MM\Meros\Services\Registers\Forms;
 use MM\Meros\Services\Registers\Fields;
 use MM\Meros\Services\Registers\FieldGroups;
 use MM\Meros\Services\Registers\FieldStyles;
@@ -111,6 +112,10 @@ class FrameworkServiceProvider extends ServiceProvider {
             return new Blocks();
         });
 
+        $this->app->singleton(Forms::class, function () {
+            return new Forms();
+        });
+
         $this->app->singleton(Fields::class, function () {
             return new Fields();
         });
@@ -141,6 +146,7 @@ class FrameworkServiceProvider extends ServiceProvider {
 
         $this->app->alias(Assets::class, 'meros.registers.assets');
         $this->app->alias(Blocks::class, 'meros.registers.blocks');
+        $this->app->alias(Forms::class, 'meros.registers.forms');
         $this->app->alias(Fields::class, 'meros.registers.fields');
         $this->app->alias(FieldGroups::class, 'meros.registers.field_groups');
         $this->app->alias(FieldStyles::class, 'meros.registers.field_styles');

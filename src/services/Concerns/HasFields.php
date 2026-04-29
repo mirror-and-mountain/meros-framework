@@ -4,6 +4,9 @@ namespace MM\Meros\Services\Concerns;
 
 use Closure;
 
+use MM\Meros\Services\Contracts\Form;
+use MM\Meros\Services\Registers\Forms as FormsRegister;
+
 use MM\Meros\Services\Contracts\Field;
 use MM\Meros\Services\Registers\Fields as FieldsRegister;
 
@@ -13,11 +16,30 @@ use MM\Meros\Services\Registers\FieldGroups as FieldGroupsRegister;
 use MM\Meros\Services\Contracts\FieldStyle;
 use MM\Meros\Services\Registers\FieldStyles as FieldStylesRegister;
 
+use MM\Meros\Facades\Forms;
 use MM\Meros\Facades\Fields;
 use MM\Meros\Facades\FieldGroups;
 use MM\Meros\Facades\FieldStyles;
 
 trait HasFields {
+    /**
+     * Retrieves a form by ID or returns the forms register if no ID is provided.
+     *
+     * @param string       $id The ID of the form to retrieve. If empty, the entire forms register is returned.
+     * @param Closure|null $callback An optional callback used in the register's get() method.
+     *
+     * @return Form|FormsRegister|null The requested form, the forms register, or null if not found.
+     */
+    protected function forms(string $id = '', ?Closure $callback = null): Form|FormsRegister|null {
+        if (empty($id)) {
+            return Forms::checkout($this);
+        }
+
+        else {
+            return Forms::checkout($this)->get($id, $callback);
+        }
+    }
+
     /**
      * Retrieves a field by handle or returns the fields register if no handle is provided.
      *
