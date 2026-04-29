@@ -12,6 +12,20 @@ class Blocks extends Register implements Discovery {
     protected string $identifier = 'name';
     protected string $definition = Block::class;
 
+    /**
+     * List of supported operations for this register.
+     *
+     * @var array
+     */
+    protected array $supports = [
+        'register',
+        'make',
+        'makeFrom',
+        'get',
+        'all',
+        'attach'
+    ];
+
     use Concerns\Discovers;
 
     /**

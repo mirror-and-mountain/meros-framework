@@ -7,6 +7,8 @@ use Illuminate\Support\Str;
 use MM\Meros\Services\Contracts\FieldParent;
 use MM\Meros\Services\Contracts\FeatureDefinition;
 
+use MM\Meros\Facades\FieldStyles;
+
 abstract class Field extends FeatureDefinition {
     /**
      * The field's unique slug, should be implemented by concrete field classes 
@@ -74,9 +76,9 @@ abstract class Field extends FeatureDefinition {
     protected string $helpText = '';
 
     /**
-     * The position of the help text, either 'top' or 'bottom'.
+     * Whether to display the field's help text above the field (true) or below it (false).
      *
-     * @var string
+     * @var bool
      */
     protected bool $helpTextTop = false;
 
@@ -116,6 +118,13 @@ abstract class Field extends FeatureDefinition {
     protected array $classList = [];
 
     /**
+     * Whether to force the field to take up the full width of its container, regardless of the width setting.
+     *
+     * @var bool
+     */
+    protected bool $forceFullWidth = false;
+
+    /**
      * The field's width option, which can be 'full', 'half', or 'third'
      * to control its width in a form.
      *
@@ -124,27 +133,28 @@ abstract class Field extends FeatureDefinition {
     protected string $width = 'full';
 
     /**
-     * The name of the Blade component used to render the field's wrapper.
-     * Defaults to 'meros::fields.wrappers.default', but can be overridden by specific field types if needed.
+     * The handle of the FieldStyle used to render the field, which determines the Blade view used for rendering.
      *
      * @var string
      */
-    protected string $wrapper = 'meros::fields.wrappers.default';
+    protected string $style = '';
 
     // These properties are set to true by default as fields don't use the setReady or load methods.
     final public bool $ready = true;
     final public bool $loaded = true;
 
     /**
-     * Renders the field using its designated view component.
+     * Renders the field using its designated FieldStyle.
      * 
-     * @param bool $showLabel Whether to show the field's label in the wrapper.
-     * @param bool $showHelp Whether to show the field's help text in the wrapper.
+     * @param bool $showLabel Whether to show the field's label in the wrapper. Some styles may ignore this and always show the label, or never show the label.
+     * @param bool $showHelp Whether to show the field's help text in the wrapper. Some styles may ignore this and always show the help text, or never show the help text.
      *
      * @return void
      */
     public function render(bool $showLabel = true, bool $showHelp = true): void {
-        echo view($this->wrapper, [
+        $view = $this->resolveStyle();
+
+        echo view($view, [
             'view'       => $this->getFieldComponent(),
             'field'      => $this,
             'showLabel'  => $showLabel,
@@ -327,6 +337,12 @@ abstract class Field extends FeatureDefinition {
      * @return self
      */
     public function width(string $width): self {
+        // If forceFullWidth is enabled, override any width setting to 'full'
+        if ($this->forceFullWidth) {
+            $this->width = 'full';
+            return $this;
+        }
+
         if (in_array($width, ['full', 'half', 'third'])) {
             $this->width = $width;
         }
@@ -335,14 +351,14 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
-     * Sets the name of the Blade component used to render the field's wrapper.
+     * Sets the style used to render the field.
      *
-     * @param string $wrapper The name of the Blade component.
+     * @param string $style The handle of the FieldStyle
      *
      * @return self
      */
-    public function wrapper(string $wrapper): self {
-        $this->wrapper = $wrapper;
+    public function style(string $style): self {
+        $this->style = $style;
         return $this;
     }
 
@@ -376,6 +392,7 @@ abstract class Field extends FeatureDefinition {
     /***************************
      * Getters
      ***************************/
+
     /**
      * Returns whether the field is a sub-field of a repeater or field group.
      *
@@ -574,15 +591,6 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
-     * Retrieves the name of the Blade component used to render the field's wrapper.
-     *
-     * @return string
-     */
-    public function getWrapper(): string {
-        return $this->wrapper;
-    }
-
-    /**
      * Retrieves the field's variation, which is determined by the 'type' attribute if it exists.
      *
      * @return string|null
@@ -606,10 +614,30 @@ abstract class Field extends FeatureDefinition {
         return in_array($dataType, $this->compatibleDataTypes);
     }
 
+    /***************************
+     * Helpers
+     ***************************/
+
     /**
      * Retrieves the name of the Blade component responsible for rendering this field type.
      *
      * @return string
      */
     abstract public function getFieldComponent(): string;
+
+    /**
+     * Retrieves the Blade view path for the field's assigned style.
+     *
+     * @return string
+     * @throws \RuntimeException If the specified FieldStyle is not found in the FieldStyles register.
+     */
+    protected function resolveStyle(): string {
+        // If no style is specified, use the default style view
+        if (empty($this->style)) {
+            return 'meros::fields.styles.default';
+        }
+
+        $style = FieldStyles::checkout($this->provider)->makeFrom($this->style);
+        return $style->getView();
+    }
 }

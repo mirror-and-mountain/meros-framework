@@ -122,7 +122,7 @@ trait IsAdminFieldRegistrant {
             'id'        => $this->name . '_field',
             'name'      => $this->name,
             'value'     => $this->getValue(),
-            'wrapper'   => 'meros::fields.wrappers.settings-field'
+            'style'     => 'settings'
         ] + $props);
 
         $field->rootName($this->getRootName());
@@ -156,7 +156,7 @@ trait IsAdminFieldRegistrant {
         $childFields = $this->getChildFields();
 
         $this->field->attach($childFields);
-        $this->field->fieldWrapper('meros::fields.wrappers.settings-field');
+        $this->field->style('settings');
     }
 
     /**

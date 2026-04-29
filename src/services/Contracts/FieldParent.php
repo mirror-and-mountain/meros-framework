@@ -2,7 +2,7 @@
 
 namespace MM\Meros\Services\Contracts;
 
-use MM\Meros\Services\FieldGroup;
+use MM\Meros\Services\Contracts\FieldGroup;
 use MM\Meros\App\Fields\Repeater;
 
 interface FieldParent {

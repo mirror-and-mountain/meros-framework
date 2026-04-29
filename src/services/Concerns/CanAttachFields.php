@@ -17,7 +17,12 @@ trait CanAttachFields {
      */
     public array $fields = [];
 
-    protected string $fieldWrapper = 'meros::fields.wrappers.site-field';
+    /**
+     * The handle of the FieldStyle to use when rendering fields in this group.
+     *
+     * @var string
+     */
+    protected string $fieldStyle = 'nice';
 
     /***************************
      * Public Chainable methods
@@ -36,11 +41,11 @@ trait CanAttachFields {
 
             $this->walkFields(function(Field $field) {
                 $field->parent($this);
-                $field->wrapper($this->fieldWrapper);
+                $field->style($this->fieldStyle);
             });
 
         } else {
-            $field->wrapper($this->fieldWrapper);
+            $field->style($this->fieldStyle);
             $field->parent($this);
             $this->fields[] = $field;
         }
@@ -134,17 +139,17 @@ trait CanAttachFields {
     }
 
     /**
-     * Sets the Blade view to use as a wrapper when rendering fields in this group.
+     * Sets the handle of the FieldStyle to use when rendering fields in this group.
      *
-     * @param string $view The view name (e.g. 'meros::fields.wrappers.default').
+     * @param string $handle The handle of the FieldStyle (e.g. 'settings').
      *
      * @return self
      */
-    public function fieldWrapper(string $view): self {
-        $this->fieldWrapper = $view;
+    public function style(string $handle): self {
+        $this->fieldStyle = $handle;
 
-        $this->walkFields(function(Field $field) use ($view) {
-            $field->wrapper($view);
+        $this->walkFields(function(Field $field) use ($handle) {
+            $field->style($handle);
         });
 
         return $this;
@@ -164,6 +169,8 @@ trait CanAttachFields {
             if (is_string($field)) {
                 // Instantiate the field if it's a string (class name)
                 $this->fields[$index] = FieldsRegister::checkout($this->provider)->makeFrom($field);
+                $this->fields[$index]->parent($this);
+                $this->fields[$index]->style($this->fieldStyle);
             }
         }
     }

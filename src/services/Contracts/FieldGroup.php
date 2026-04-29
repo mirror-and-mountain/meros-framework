@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\Services;
+namespace MM\Meros\Services\Contracts;
 
 use Illuminate\Support\Str;
 
@@ -11,9 +11,26 @@ use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\Services\Concerns\CanAttachFields;
 
 class FieldGroup extends FeatureDefinition implements FieldParent {
+    /**
+     * A unique handle for the field group, used for identification and referencing.
+     *
+     * @var string
+     */
     public string $handle = '';
-    public string $label = '';
-    public string $description = '';
+
+    /**
+     * A human-readable label for the field group, used in the UI to identify the group of fields.
+     *
+     * @var string
+     */
+    protected string $label = '';
+
+    /**
+     * A description providing additional context about the field group, its purpose, or usage instructions.
+     *
+     * @var string
+     */
+    protected string $description = '';
 
     use CanAttachFields;
 
@@ -32,7 +49,7 @@ class FieldGroup extends FeatureDefinition implements FieldParent {
      * @return void
      */
     protected function hook(): void {
-        if (empty($this->slug)) {
+        if (empty($this->handle)) {
             $this->ready = false;
         }
 
@@ -187,7 +204,7 @@ class FieldGroup extends FeatureDefinition implements FieldParent {
      * @return void
      */
     public function render(): void {
-        echo view('meros::fields.wrappers.field-group', [
+        echo view('meros::fields.field-group', [
             'label'       => $this->label,
             'description' => $this->description,
             'fields'      => $this->resolveLayout()

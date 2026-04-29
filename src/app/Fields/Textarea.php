@@ -30,6 +30,13 @@ class Textarea extends Field {
         'string'
     ];
 
+    /**
+     * Whether to force the field to take up the full width of its container, regardless of the width setting.
+     *
+     * @var bool
+     */
+    protected bool $forceFullWidth = true;
+
 
     /***************************
      * Fluent Setters

@@ -33,7 +33,16 @@ class Repeater extends Field implements FieldParent {
         'array.object'
     ];
 
-    use CanAttachFields;
+    /**
+     * Whether to force the field to take up the full width of its container, regardless of the width setting.
+     *
+     * @var bool
+     */
+    protected bool $forceFullWidth = true;
+
+    use CanAttachFields {
+        style as public fieldStyle;
+    }
 
     /***************************
      * Rendering
@@ -42,13 +51,15 @@ class Repeater extends Field implements FieldParent {
     /**
      * Renders the repeater table field.
      * 
-     * @param bool $showLabel Whether to show the field's label in the wrapper.
-     * @param bool $showHelp Whether to show the field's help text in the wrapper
+     * @param bool $showLabel Whether to show the field's label in the wrapper. Some styles may ignore this and always show the label, or never show the label.
+     * @param bool $showHelp Whether to show the field's help text in the wrapper. Some styles may ignore this and always show the help text, or never show the help text.
      *
      * @return void
      */
     public function render(bool $showLabel = true, bool $showHelp = true): void {
-        echo view($this->wrapper, [
+        $view = $this->resolveStyle();
+
+        echo view($view, [
             'view'      => $this->getFieldComponent(),
             'field'     => $this,
             'rows'      => $this->buildRows(),
@@ -97,6 +108,19 @@ class Repeater extends Field implements FieldParent {
         }
 
         return $rows;
+    }
+
+    /**
+     * Sets the style used to render the field. Overrides the Field method to apply the style to all sub-fields as well.
+     *
+     * @param string $style The handle of the FieldStyle
+     *
+     * @return self
+     */
+    public function style(string $style): self {
+        $this->style = $style;
+        $this->fieldStyle($style);
+        return $this;
     }
 
     /********************

@@ -97,11 +97,21 @@ abstract class FeatureDefinition {
     protected function setProps(array $props): void {
         foreach ($props as $key => $value) {
             if (property_exists($this, $key)) {
+
+                if (isset($this->$key) && !empty($this->$key)) {
+                    continue; // Skip setting the property if it already has a non-empty value
+                }
+
                 $this->$key = $value;
             }
 
             $camel = Str::camel($key);
             if (property_exists($this, $camel)) {
+                
+                if (isset($this->$camel) && !empty($this->$camel)) {
+                    continue; // Skip setting the property if it already has a non-empty value
+                }
+
                 $this->$camel = $value;
             }
         }

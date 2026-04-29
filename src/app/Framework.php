@@ -20,6 +20,10 @@ use MM\Meros\App\Fields\Textarea;
 use MM\Meros\App\Fields\Time;
 use MM\Meros\App\Fields\Url;
 
+use MM\Meros\App\Fields\Styles\DefaultFieldStyle;
+use MM\Meros\App\Fields\Styles\NiceFieldStyle;
+use MM\Meros\App\Fields\Styles\SettingsFieldStyle;
+
 use MM\Meros\App\Models\Migration;
 use MM\Meros\App\Features\CoreInstallable;
 
@@ -45,6 +49,7 @@ final class Framework extends FeatureProvider {
     protected function load(): void {
         $this->registerRestRoutes();
 
+        // Register framework fields
         $this->fields()->register('checkbox', Checkbox::class);
         $this->fields()->register('checkboxes', Checkboxes::class);
         $this->fields()->register('color', Color::class);
@@ -58,6 +63,11 @@ final class Framework extends FeatureProvider {
         $this->fields()->register('textarea', Textarea::class);
         $this->fields()->register('time', Time::class);
         $this->fields()->register('url', Url::class);
+
+        // Register framework field styles
+        $this->fieldStyles()->register('default', DefaultFieldStyle::class);
+        $this->fieldStyles()->register('nice', NiceFieldStyle::class);
+        $this->fieldStyles()->register('settings', SettingsFieldStyle::class);
 
         // $initAjax = Context::isAdmin();
 

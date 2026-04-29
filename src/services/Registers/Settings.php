@@ -10,6 +10,20 @@ class Settings extends Register {
     protected string $definition = Setting::class;
 
     /**
+     * List of supported operations for this register.
+     *
+     * @var array
+     */
+    protected array $supports = [
+        'register',
+        'make',
+        'makeFrom',
+        'get',
+        'all',
+        'attach'
+    ];
+
+    /**
      * Parses properties for the setting's constructor.
      *
      * @param array $props

@@ -10,6 +10,20 @@ class MenuPages extends Register {
     protected string $definition = MenuPage::class;
 
     /**
+     * List of supported operations for this register.
+     *
+     * @var array
+     */
+    protected array $supports = [
+        'register',
+        'make',
+        'makeFrom',
+        'get',
+        'all',
+        'attach'
+    ];
+
+    /**
      * Parses properties for the menu page's constructor.
      *
      * @param array $props

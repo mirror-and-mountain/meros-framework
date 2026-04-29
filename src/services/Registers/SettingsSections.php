@@ -10,6 +10,21 @@ class SettingsSections extends Register {
     protected string $definition = SettingsSection::class;
 
     /**
+     * List of supported operations for this register.
+     *
+     * @var array
+     */
+    protected array $supports = [
+        'register',
+        'make',
+        'makeFrom',
+        'get',
+        'all',
+        'public',
+        'attach'
+    ];
+
+    /**
      * Parses properties for the settings section's constructor.
      *
      * @param array $props

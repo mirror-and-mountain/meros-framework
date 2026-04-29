@@ -10,6 +10,21 @@ class SettingsFields extends Register {
     protected string $itemClass  = SettingsField::class;
 
     /**
+     * List of supported operations for this register.
+     *
+     * @var array
+     */
+    protected array $supports = [
+        'register',
+        'make',
+        'makeFrom',
+        'get',
+        'all',
+        'public',
+        'attach'
+    ];
+
+    /**
      * Parses properties for the setting field's constructor.
      *
      * @param array $props

@@ -51,6 +51,7 @@ abstract class Register {
         'make',
         'makeFrom',
         'get',
+        'public',
         'all',
         'attach'
     ];
@@ -90,7 +91,7 @@ abstract class Register {
      */
     protected function ensureCheckedOut(): void {
         if ($this->provider === null) {
-            throw new \LogicException("The register is not currently checked out to a provider.");
+            throw new \LogicException("The register (" . static::class . ") is not currently checked out to a provider.");
         }
     }
 
@@ -117,8 +118,8 @@ abstract class Register {
     /**
      * Registers a feature class to be available for attachment in this register.
      *
-     * @param string $id    The identifier for the feature class.
-     * @param string $class The fully qualified class name of the feature.
+     * @param string $id           The identifier for the feature class.
+     * @param string $featureClass The fully qualified class name of the feature.
      *
      * @return void
      * @throws \BadMethodCallException If the register does not support registering feature classes.
@@ -126,7 +127,7 @@ abstract class Register {
      */
     public function register(string $id, string $featureClass): void {
         if (!$this->supports('register')) {
-            throw new \BadMethodCallException("This register does not support registering feature classes.");
+            throw new \BadMethodCallException("This register (" . static::class . ") does not support registering feature classes.");
         }
 
         $this->ensureCheckedOut();
@@ -138,7 +139,7 @@ abstract class Register {
         }
 
         if (isset($this->classes[$id])) {
-            throw new \InvalidArgumentException("A class with the ID {$id} is already registered in this register.");
+            throw new \InvalidArgumentException("A class with the ID {$id} is already registered in this register (" . static::class . ").");
         }
 
         $this->classes[$id] = $featureClass;
@@ -156,7 +157,7 @@ abstract class Register {
      */
     public function make(Closure|array|null $callback = null, array $props = []): FeatureDefinition {
         if (!$this->supports('make')) {
-            throw new \BadMethodCallException("This register does not support making features.");
+            throw new \BadMethodCallException("This register (" . static::class . ") does not support making features.");
         }
 
         $this->ensureCheckedOut();
@@ -194,7 +195,7 @@ abstract class Register {
      */
     public function add(Closure|array|null $callback = null, array $props = []): FeatureDefinition {
         if (!$this->supports('make')) {
-            throw new \BadMethodCallException("This register does not support making features.");
+            throw new \BadMethodCallException("This register (" . static::class . ") does not support making features.");
         }
 
         return $this->make($callback, $props);
@@ -211,7 +212,7 @@ abstract class Register {
      */
     public function makeFrom(string $idOrClass, array $props = []): FeatureDefinition {
         if (!$this->supports('makeFrom')) {
-            throw new \BadMethodCallException("This register does not support making features from registered classes.");
+            throw new \BadMethodCallException("This register (" . static::class . ") does not support making features from registered classes.");
         }
 
         $this->ensureCheckedOut();
@@ -244,20 +245,13 @@ abstract class Register {
      * 
      * @return FeatureDefinition The feature that was added.
      * @throws \BadMethodCallException If the register does not support attaching features.
-     * @throws \InvalidArgumentException If a feature with the same identifier already exists in the register.
      */
     public function attach(FeatureDefinition $feature): FeatureDefinition {
         if (!$this->supports('attach')) {
-            throw new \BadMethodCallException("This register does not support attaching features.");
+            throw new \BadMethodCallException("This register (" . static::class . ") does not support attaching features.");
         }
 
         $this->ensureCheckedOut();
-
-        $existing = $this->instances->firstWhere($this->identifier, $feature->{$this->identifier});
-
-        if ($existing) {
-            throw new \InvalidArgumentException("A feature with the same {$this->identifier} already exists in this register.");
-        }
 
         $this->instances->push($feature);
 
@@ -279,9 +273,26 @@ abstract class Register {
             throw new \BadMethodCallException("This register does not support retrieving features.");
         }
 
+        // If the register supports public retrieval, search all instances regardless of provider
+        if ($this->supports('public')) {
+            $item = $this->instances->firstWhere($this->identifier, $id);
+
+            if ($item === null) {
+                $item = $this->instances->firstWhere('nickname', $id);
+            }
+
+            if ($item && $callback) {
+                $callback($item);
+            }
+
+            return $item;
+        }
+
+        // Otherwise, only search instances from the current provider
         $this->ensureCheckedOut();
 
         $item = $this->instances->where('provider', $this->provider)->firstWhere($this->identifier, $id);
+        
         if ($item === null) {
             $item = $this->instances->where('provider', $this->provider)->firstWhere('nickname', $id);
         }
@@ -304,7 +315,7 @@ abstract class Register {
      */
     public function all(bool $currentProvider = true): Collection {
         if (!$this->supports('all')) {
-            throw new \BadMethodCallException("This register does not support retrieving all features.");
+            throw new \BadMethodCallException("This register (" . static::class . ") does not support retrieving all features.");
         }
 
         if ($currentProvider) {
@@ -316,7 +327,13 @@ abstract class Register {
             return $items;
         }
 
-        return $this->instances;
+        else if ($this->supports('public')) {
+            return $this->instances;
+        }
+
+        else {
+            throw new \BadMethodCallException("This register (" . static::class . ") does not support retrieving all features publicly.");
+        }
     }
 
     /**

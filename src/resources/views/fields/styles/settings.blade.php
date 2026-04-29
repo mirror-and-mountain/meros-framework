@@ -1,4 +1,3 @@
-{{-- Renders just the field with no surrounding wrapper --}}
 @php 
     $helpText    = $field->getHelpText();
     $hasHelpText = !empty($helpText);

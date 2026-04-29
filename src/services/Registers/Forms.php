@@ -2,15 +2,15 @@
 
 namespace MM\Meros\Services\Registers;
 
-use MM\Meros\Services\Contracts\FieldGroup;
+use MM\Meros\Services\Contracts\Form;
 use MM\Meros\Services\Contracts\Register;
 
-class FieldGroups extends Register {
-    protected string $identifier = 'handle';
-    protected string $definition = FieldGroup::class;
+class Forms extends Register {
+    protected string $identifier = 'id';
+    protected string $definition = Form::class;
 
     /**
-     * Parses properties for the field group's constructor.
+     * Parses properties for the form's constructor.
      *
      * @param array $props
      *
@@ -18,10 +18,10 @@ class FieldGroups extends Register {
      */
     protected function parseProperties(array $props): array {
         return [
-            'handle'      => $props['handle'] ?? '',
+            'id'          => $props['id'] ?? '',
             'label'       => $props['label'] ?? '',
             'description' => $props['description'] ?? '',
-            'fields'      => $props['fields'] ?? [],
+            'elements'    => $props['elements'] ?? [],
         ];
     }
 }

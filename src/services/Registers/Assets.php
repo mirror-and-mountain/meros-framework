@@ -13,6 +13,20 @@ class Assets extends Register implements Discovery {
     protected string $identifier = 'handle';
     protected string $definition = Asset::class;
 
+    /**
+     * List of supported operations for this register.
+     *
+     * @var array
+     */
+    protected array $supports = [
+        'register',
+        'make',
+        'makeFrom',
+        'get',
+        'all',
+        'attach'
+    ];
+
     use Concerns\Discovers;
 
     /**
