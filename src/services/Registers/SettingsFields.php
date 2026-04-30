@@ -2,8 +2,8 @@
 
 namespace MM\Meros\Services\Registers;
 
-use MM\Meros\Services\Admin\SettingsField;
 use MM\Meros\Services\Contracts\Register;
+use MM\Meros\Services\Contracts\Admin\SettingsField;
 
 class SettingsFields extends Register {
     protected string $identifier = 'id';

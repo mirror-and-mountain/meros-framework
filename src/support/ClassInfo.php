@@ -2,8 +2,8 @@
 
 namespace MM\Meros\Support;
 
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\File;
 
 /**
  * Provides utilities to inspect classes for

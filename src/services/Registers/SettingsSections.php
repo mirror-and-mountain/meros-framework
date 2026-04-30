@@ -2,8 +2,8 @@
 
 namespace MM\Meros\Services\Registers;
 
-use MM\Meros\Services\Admin\SettingsSection;
 use MM\Meros\Services\Contracts\Register;
+use MM\Meros\Services\Contracts\Admin\SettingsSection;
 
 class SettingsSections extends Register {
     protected string $identifier = 'id';

@@ -1,13 +1,13 @@
 <?php
 
-namespace MM\Meros\Services\Admin\Templates;
+namespace MM\Meros\App\Admin;
 
-use MM\Meros\Services\Contracts\MenuPageTemplate;
+use MM\Meros\Services\Contracts\Admin\MenuPageTemplate;
 
 class SimpleSettingsPage extends MenuPageTemplate {
     public function render(): void {
         echo view('meros::admin.templates.simple-settings-page', [
-            'title'    => $this->title,
+            'title'    => $this->pageTitle,
             'pageSlug' => $this->pageSlug
         ]);
     }

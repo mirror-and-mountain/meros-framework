@@ -1,9 +1,10 @@
 <?php 
 
-namespace MM\Meros\Services\Contracts;
+namespace MM\Meros\Services\Contracts\Elements\Interfaces;
 
-use MM\Meros\Services\Contracts\FieldGroup;
 use MM\Meros\App\Fields\Repeater;
+use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Elements\FieldGroup;
 
 interface FieldParent {
     /**

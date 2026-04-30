@@ -2,8 +2,8 @@
 
 namespace MM\Meros\Services\Registers;
 
-use MM\Meros\Services\Admin\MenuPage;
 use MM\Meros\Services\Contracts\Register;
+use MM\Meros\Services\Contracts\Admin\MenuPage;
 
 class MenuPages extends Register {
     protected string $identifier = 'slug';

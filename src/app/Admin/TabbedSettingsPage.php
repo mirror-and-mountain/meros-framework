@@ -1,9 +1,9 @@
 <?php
 
-namespace MM\Meros\Services\Admin\Templates;
+namespace MM\Meros\App\Admin;
 
 use Illuminate\Support\Str;
-use MM\Meros\Services\Contracts\MenuPageTemplate;
+use MM\Meros\Services\Contracts\Admin\MenuPageTemplate;
 
 use MM\Meros\Facades\SettingsFields;
 use MM\Meros\Facades\SettingsSections;
@@ -41,7 +41,7 @@ class TabbedSettingsPage extends MenuPageTemplate {
         }
 
         echo view('meros::admin.templates.tabbed-settings-page', [
-            'title'      => $this->title,
+            'title'      => $this->pageTitle,
             'pageSlug'   => $this->pageSlug,
             'tabs'       => $this->tabs
         ]);

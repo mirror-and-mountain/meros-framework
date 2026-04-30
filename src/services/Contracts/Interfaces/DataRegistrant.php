@@ -1,18 +1,8 @@
 <?php 
 
-namespace MM\Meros\Services\Contracts;
+namespace MM\Meros\Services\Contracts\Interfaces;
 
 interface DataRegistrant {
-    /**
-     * Adds a sub-item to the current object definition at the specified path.
-     *
-     * @param string $name The name of the sub-item.
-     * @param string $type The type of the sub-item (e.g. 'string', 'integer', 'object').
-     * 
-     * @return self
-     */
-    // public function add(string $name, string $type = ''): self;
-
     /** Chainable method to set the dot-notated path for the object definition.
      *
      * @param  string $path The dot-notated path to set for the object definition (e.g. 'blocks.my-block').

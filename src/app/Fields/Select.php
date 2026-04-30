@@ -3,7 +3,7 @@
 namespace MM\Meros\App\Fields;
 
 use Illuminate\Support\Str;
-use MM\Meros\Services\Contracts\Field;
+use MM\Meros\Services\Contracts\Elements\Field;
 
 class Select extends Field {
     /**

@@ -22,21 +22,19 @@ abstract class FeatureDefinition {
     public string $nickname = '';
 
     /**
-     * Indicates that the feature's configuration is valid and
-     * that the feature is ready to be hooked into WordPress.
+     * Indicates that the feature has been queued for loading via a WordPress hook.
      *
      * @var boolean
      */
-    public bool $ready = false;
+    protected bool $queued = false;
 
     /**
-     * Indicates that the feature has been hooked into WordPress via the load() method.
+     * The output of the function used to load the feature, if applicable.
      *
      * @var boolean
      */
-    public bool $loaded = false;
+    protected mixed $WpMessage = null;
     
-
     /**
      * Constructor for the Feature class.
      *
@@ -52,19 +50,13 @@ abstract class FeatureDefinition {
     }
 
     /**
-     * Method to load the feature by hooking it into WordPress.
-     * 
-     * @return void
-     */
-    abstract protected function load(): void;
-
-    /**
-     * Sets the feature as ready (or not) based on the state of the feature's current configuration.
-     * If the feature is ready, it should be hooked into WordPress via the load() method.
+     * Queues the feature to be loaded on a specific WordPress hook. Concrete classess should 
+     * ensure the feature is ready before queuing. They should also set the $queued property 
+     * to true once the feature is successfully queued.
      *
      * @return void
      */
-    abstract protected function hook(): void;
+    abstract protected function queue(): void;
 
     /**
      * Configures the current item using a callback function.
@@ -79,12 +71,21 @@ abstract class FeatureDefinition {
     }
 
     /**
-     * Checks if the feature is ready to be loaded.
+     * Returns whether the feature has been queued for loading.
      *
-     * @return bool True if the feature is ready, false otherwise.
+     * @return bool True if the feature has been queued, false otherwise.
      */
-    final public function isReady(): bool {
-        return $this->ready;
+    final public function isQueued(): bool {
+        return $this->queued;
+    }
+
+    /**
+     * Returns the output of the function used to load the feature, if applicable.
+     *
+     * @return mixed The output of the function used to load the feature, or null if not set.
+     */
+    final public function getWpMessage(): mixed {
+        return $this->WpMessage;
     }
 
     /**
@@ -116,16 +117,7 @@ abstract class FeatureDefinition {
             }
         }
 
-        $this->hook();
-    }
-
-    /**
-     * Checks if the feature has been loaded.
-     *
-     * @return bool True if the feature is loaded, false otherwise.
-     */
-    final public function isLoaded(): bool {
-        return $this->loaded;
+        $this->queue();
     }
 
     /**

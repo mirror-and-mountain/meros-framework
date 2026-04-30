@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\Services\Admin;
+namespace MM\Meros\Services\Contracts\Admin;
 
 use Closure;
 use Illuminate\Support\Str;
@@ -52,11 +52,11 @@ final class SettingsSection extends FeatureDefinition {
     protected ?MenuPage $page = null;
 
     /**
-     * Sets the setting section as ready (or not) based on the state of the setting section's properties.
+     * Queues the settings section to be loaded via a WordPress hook if all the required properties are set.
      * 
      * @return void
      */
-    protected function hook(): void {
+    protected function queue(): void {
         $requiredProps = [
             'id',
             'title',
@@ -78,21 +78,17 @@ final class SettingsSection extends FeatureDefinition {
 
          foreach ($requiredProps as $prop) {
              if (!isset($this->$prop) || (is_string($this->$prop) && empty($this->$prop))) {
-                 $this->ready = false;
                  return;
              }
          }
 
-
-        $this->ready = true;
-
-        if (!$this->loaded) {
+        if (!$this->queued) {
              add_action('admin_init', function() {
                 $this->load();
             });
         }
 
-        $this->loaded = true;
+        $this->queued = true;
     }
 
     /**
@@ -108,8 +104,6 @@ final class SettingsSection extends FeatureDefinition {
             $this->pageSlug,
             $this->args
         );
-
-        $this->loaded = true;
     }
 
     /***************************

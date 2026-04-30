@@ -11,8 +11,7 @@ use MM\Meros\App\Package;
 
 trait HasIdentity {
     /**
-     * Indicates whether the item's identity was
-     * successfully set.
+     * Whether the item's identity was successfully set.
      *
      * @var boolean
      */
@@ -99,7 +98,7 @@ trait HasIdentity {
             $this->author      = $theme->get('Author');
             $this->authorUri   = $theme->get('AuthorURI');
             $this->description = $theme->get('Description');
-            $this->handle      = Str::slug($this->name, '_');
+            $this->handle      = Str::snake($this->name);
             $this->path        = \trailingslashit(get_stylesheet_directory());
             $this->uri         = \trailingslashit(\get_stylesheet_directory_uri());
         } 
@@ -116,8 +115,8 @@ trait HasIdentity {
             
             if (!isset($this->handle)) {
                 $this->handle = Str::startsWith($this->author, 'Meros')
-                    ? Str::slug($this->name, '_')
-                    : Str::slug($this->author, '_') . '_' . Str::slug($this->name, '_');
+                    ? Str::snake($this->name)
+                    : Str::snake($this->author) . '_' . Str::snake($this->name);
             }
         
             $this->path = \trailingslashit($path);
@@ -224,7 +223,7 @@ trait HasIdentity {
             return 'package';
         } 
         
-        return 'meros';
+        return 'framework';
     }
 
     /**

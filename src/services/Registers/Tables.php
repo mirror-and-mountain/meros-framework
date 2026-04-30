@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\File;
 use MM\Meros\Services\Contracts\Table;
 use MM\Meros\Services\Contracts\Register;
 
-use MM\Meros\Services\Contracts\Discovery;
+use MM\Meros\Services\Registers\Interfaces\Discovery;
 
 class Tables extends Register implements Discovery {
     protected string $identifier = 'handle';

@@ -22,6 +22,9 @@ use MM\Meros\App\Fields\Styles\DefaultFieldStyle;
 use MM\Meros\App\Fields\Styles\NiceFieldStyle;
 use MM\Meros\App\Fields\Styles\SettingsFieldStyle;
 
+use MM\Meros\App\Admin\SimpleSettingsPage;
+use MM\Meros\App\Admin\TabbedSettingsPage;
+
 use MM\Meros\App\Facades\Theme;
 
 final class Framework extends FeatureProvider {
@@ -63,6 +66,10 @@ final class Framework extends FeatureProvider {
         $this->fieldStyles()->register('default', DefaultFieldStyle::class);
         $this->fieldStyles()->register('nice', NiceFieldStyle::class);
         $this->fieldStyles()->register('settings', SettingsFieldStyle::class);
+
+        // Register menu page templates
+        $this->menuPageTemplates()->register('simple-settings', SimpleSettingsPage::class);
+        $this->menuPageTemplates()->register('tabbed-settings', TabbedSettingsPage::class);
 
         // $initAjax = Context::isAdmin();
 

@@ -2,8 +2,8 @@
 
 namespace MM\Meros\Services\Registers;
 
-use MM\Meros\Services\Contracts\FieldStyle;
 use MM\Meros\Services\Contracts\Register;
+use MM\Meros\Services\Contracts\Elements\FieldStyle;
 
 class FieldStyles extends Register {
     protected string $identifier = 'handle';

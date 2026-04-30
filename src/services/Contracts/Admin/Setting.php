@@ -1,21 +1,32 @@
 <?php 
 
-namespace MM\Meros\Services\Admin;
+namespace MM\Meros\Services\Contracts\Admin;
 
 use Illuminate\Support\Str;
 
-use MM\Meros\Services\Contracts\Field;
-use MM\Meros\Services\Contracts\FeatureDefinition;
 use MM\Meros\Services\Contracts\FeatureProvider;
-use MM\Meros\Services\Contracts\DataRegistrant;
-use MM\Meros\Services\Contracts\AdminFieldRegistrant;
+use MM\Meros\Services\Contracts\FeatureDefinition;
+
+use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Interfaces\DataRegistrant;
+use MM\Meros\Services\Contracts\Interfaces\AdminFieldRegistrant;
 
 use MM\Meros\Services\Concerns\IsDataRegistrant;
 
 class Setting extends FeatureDefinition implements DataRegistrant, AdminFieldRegistrant {
+    
+    /**
+     * The option group that this setting belongs to.
+     *
+     * @var string
+     */
     protected string $group = '';
 
-    // The setting field instance associated with this setting, if any.
+    /**
+     * The settings field instance associated with this setting, if any.
+     *
+     * @var SettingsField|null
+     */
     protected ?SettingsField $settingsField = null;
 
     use IsDataRegistrant {
@@ -43,7 +54,7 @@ class Setting extends FeatureDefinition implements DataRegistrant, AdminFieldReg
             $this->instantiateSubItems();
         }
 
-        $this->hook();
+        $this->queue();
     }
 
     /**
@@ -63,32 +74,26 @@ class Setting extends FeatureDefinition implements DataRegistrant, AdminFieldReg
     }
 
     /**
-     * Sets the setting as ready (or not) based on the setting's current configuration.
-     * 
-     * If the setting is ready, it should be hooked into WordPress via the load() method, which is hooked into the 'admin_init' action.
+     * Queues the setting to be loaded via a WordPress hook if all the required properties are set.
      *
      * @return void
      */
-    final protected function hook(): void {
+    final protected function queue(): void {
         if (empty($this->group) || empty($this->name)) {
-            $this->ready = false;
             return;
         }
 
         if ($this->name === 'placeholder_name') {
-            $this->ready = false;
             return;
         }
 
-        $this->ready = true;
-
-        if ($this->isRoot() && !$this->loaded) {
+        if ($this->isRoot() && !$this->queued) {
             add_action('admin_init', function() {
-                $this->load();
+                $this->register();
             });
         }
 
-        $this->loaded = true;
+        $this->queued = true;
     }
 
     /**
@@ -97,7 +102,7 @@ class Setting extends FeatureDefinition implements DataRegistrant, AdminFieldReg
      *
      * @return void
      */
-    final protected function load(): void {
+    final protected function register(): void {
         if (
             in_array($this->type, ['array', 'object']) && 
             $this->args['show_in_rest'] ?? false === true
@@ -110,8 +115,6 @@ class Setting extends FeatureDefinition implements DataRegistrant, AdminFieldReg
             $this->name,
             $this->args
         );
-
-        $this->loaded = true;
     }
 
     /***************************
@@ -134,7 +137,7 @@ class Setting extends FeatureDefinition implements DataRegistrant, AdminFieldReg
             }
         }
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 

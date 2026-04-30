@@ -5,16 +5,19 @@ namespace MM\Meros\Services\Concerns;
 use Closure;
 use Illuminate\Support\Str;
 
-use MM\Meros\Services\Admin\Setting;
-use MM\Meros\Services\Admin\MenuPage;
-use MM\Meros\Services\Admin\SettingsSection;
+use MM\Meros\Services\Contracts\Admin\Setting;
+use MM\Meros\Services\Contracts\Admin\MenuPage;
+use MM\Meros\Services\Contracts\Admin\SettingsSection;
+use MM\Meros\Services\Contracts\Admin\MenuPageTemplate;
 
 use MM\Meros\Facades\Settings;
 use MM\Meros\Facades\MenuPages;
 use MM\Meros\Facades\SettingsSections;
+use MM\Meros\Facades\MenuPageTemplates;
 
 use MM\Meros\Services\Registers\MenuPages as MenuPagesRegister;
 use MM\Meros\Services\Registers\SettingsSections as SettingsSectionsRegister;
+use MM\Meros\Services\Registers\MenuPageTemplates as MenuPageTemplatesRegister;
 
 trait HasSettings {
 
@@ -34,7 +37,7 @@ trait HasSettings {
      */
     protected function settings(string $name = ''): Setting|null {
         if (empty($this->settingsHandle)) {
-            $this->settingsHandle = Str::snake($this->name) . '_settings';
+            $this->settingsHandle = Str::snake($this->getHandle()) . '_settings';
         }
 
         $rootSetting = Settings::checkout($this)->get($this->settingsHandle);
@@ -71,6 +74,24 @@ trait HasSettings {
     }
 
     /**
+     * Retrieves a menu page template or collection of menu page templates associated with this feature provider.
+     *
+     * @param string       $handle
+     * @param Closure|null $callback
+     *
+     * @return MenuPageTemplate|MenuPageTemplatesRegister|null
+     */
+    protected function menuPageTemplates(string $handle = '', ?Closure $callback = null): MenuPageTemplate|MenuPageTemplatesRegister|null {
+        if (empty($handle)) {
+            return MenuPageTemplates::checkout($this); // return register instance
+        }
+
+        else {
+            return MenuPageTemplates::checkout($this)->get($handle, $callback); // return specific menu page template
+        }
+    }
+
+    /**
      * Retrieves a menu page or collection of menu pages associated with this feature provider.
      * Alias of menuPages() for users who prefer snake_case method names.
      *
@@ -81,6 +102,19 @@ trait HasSettings {
      */
     protected function menu_pages(string $slug = '', ?Closure $callback = null): MenuPage|MenuPagesRegister|null {
         return $this->menuPages($slug, $callback);
+    }
+
+    /**
+     * Retrieves a menu page template or collection of menu page templates associated with this feature provider.
+     * Alias of menuPageTemplates() for users who prefer snake_case method names.
+     *
+     * @param string       $handle
+     * @param Closure|null $callback
+     *
+     * @return MenuPageTemplate|MenuPageTemplatesRegister|null
+     */
+    protected function menu_page_templates(string $handle = '', ?Closure $callback = null): MenuPageTemplate|MenuPageTemplatesRegister|null {
+        return $this->menuPageTemplates($handle, $callback);
     }
 
     /**
@@ -123,7 +157,7 @@ trait HasSettings {
         $setting = Settings::checkout($this)->make([
             'group' => $this->settingsHandle,
             'name'  => $this->settingsHandle,
-        ])->type('object')->label($this->name . ' Settings');
+        ])->type('object')->label($this->getName() . ' Settings');
 
         return $setting;
     }

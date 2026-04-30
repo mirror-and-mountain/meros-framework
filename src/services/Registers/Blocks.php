@@ -4,9 +4,9 @@ namespace MM\Meros\Services\Registers;
 
 use Illuminate\Support\Facades\File;
 
-use MM\Meros\Services\Block;
+use MM\Meros\Services\Contracts\Block;
 use MM\Meros\Services\Contracts\Register;
-use MM\Meros\Services\Contracts\Discovery;
+use MM\Meros\Services\Registers\Interfaces\Discovery;
 
 class Blocks extends Register implements Discovery {
     protected string $identifier = 'name';

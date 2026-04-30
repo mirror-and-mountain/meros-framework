@@ -2,8 +2,8 @@
 
 namespace MM\Meros\Services\Registers;
 
-use MM\Meros\Services\Contracts\FieldGroup;
 use MM\Meros\Services\Contracts\Register;
+use MM\Meros\Services\Contracts\Elements\FieldGroup;
 
 class FieldGroups extends Register {
     protected string $identifier = 'handle';

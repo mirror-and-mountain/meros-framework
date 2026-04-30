@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\Services;
+namespace MM\Meros\Services\Contracts;
 
 use Closure;
 use Illuminate\Support\Str;
@@ -113,29 +113,24 @@ final class Asset extends FeatureDefinition {
     ];
 
     /**
-     * Sets the asset as ready (or not) based on the asset's current configuration.
-     * Adds the asset to the appropriate WordPress hook for loading when the asset is ready.
+     * Queues the asset with the appropriate WordPress hook for enqueuing when the asset is ready.
      * 
      * @return void
      */
-    protected function hook(): void {
+    protected function queue(): void {
         $requiredConfig = ['handle', 'type', 'location', 'src'];
         
         foreach ($requiredConfig as $configKey) {
             if (empty($this->$configKey)) {
-                $this->ready = false;
                 return;
             }
         }
-
-        $this->ready = true;
 
         $hook = $this->hook !== '' 
             ? $this->hook 
             : ($this->hookMapping[$this->location] ?? '');
 
         if (empty($hook)) {
-            $this->ready = false;
             return;
         }
 
@@ -146,11 +141,13 @@ final class Asset extends FeatureDefinition {
 
         $this->hook = $hook;
 
-        if ($this->enabled) {
+        if (!$this->queued && $this->enabled) {
             add_action($hook, function() {
-                $this->load();
+                $this->enqueue();
             });
         }
+
+        $this->queued = true;
     }
 
     /**
@@ -158,7 +155,7 @@ final class Asset extends FeatureDefinition {
      *
      * @return void
      */
-    protected function load(): void {
+    protected function enqueue(): void {
         if ($this->type === 'script') {
             wp_enqueue_script(
                 $this->handle,
@@ -178,8 +175,6 @@ final class Asset extends FeatureDefinition {
                 $this->version
             );
         }
-
-        $this->loaded = true; // Mark the asset as loaded after enqueuing.
     }
 
     /***************************
@@ -256,7 +251,7 @@ final class Asset extends FeatureDefinition {
         $handle = Str::slug($handle);
         $this->handle = $handle;
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -292,7 +287,7 @@ final class Asset extends FeatureDefinition {
             $this->setType($extension === 'js' ? 'script' : 'style');
         }
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -324,7 +319,7 @@ final class Asset extends FeatureDefinition {
             $this->setType($extension === 'js' ? 'script' : 'style');
         }
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -375,7 +370,7 @@ final class Asset extends FeatureDefinition {
 
         $this->hook = $this->hookMapping[ $location ];
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 

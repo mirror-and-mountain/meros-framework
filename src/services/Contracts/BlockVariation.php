@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\Services;
+namespace MM\Meros\Services\Contracts;
 
 use Illuminate\Support\Str;
 

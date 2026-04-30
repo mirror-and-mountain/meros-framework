@@ -2,8 +2,8 @@
 
 namespace MM\Meros\Services\Registers;
 
-use MM\Meros\Services\Contracts\Form;
 use MM\Meros\Services\Contracts\Register;
+use MM\Meros\Services\Contracts\Elements\Form;
 
 class Forms extends Register {
     protected string $identifier = 'id';

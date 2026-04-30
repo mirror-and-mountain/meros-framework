@@ -4,10 +4,10 @@ namespace MM\Meros\App\Fields;
 
 use Illuminate\Support\Str;
 
-use MM\Meros\Services\Contracts\Field;
-use MM\Meros\Services\Contracts\FieldParent;
+use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Elements\Interfaces\FieldParent;
 
-use MM\Meros\Services\Concerns\CanAttachFields;
+use MM\Meros\Services\Contracts\Elements\Concerns\CanAttachFields;
 
 class Repeater extends Field implements FieldParent {
     /**

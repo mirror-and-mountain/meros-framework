@@ -2,7 +2,7 @@
 
 namespace MM\Meros\App\Fields\Styles;
 
-use MM\Meros\Services\Contracts\FieldStyle;
+use MM\Meros\Services\Contracts\Elements\FieldStyle;
 
 class NiceFieldStyle extends FieldStyle {
     /**

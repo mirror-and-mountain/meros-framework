@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\Services\Contracts;
+namespace MM\Meros\Services\Contracts\Elements;
 
 use Closure;
 use Illuminate\Support\Str;
@@ -8,7 +8,6 @@ use Illuminate\Support\Collection;
 
 use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\Services\Contracts\FeatureDefinition;
-use MM\Meros\Services\Contracts\Field;
 
 use MM\Meros\Facades\Fields as FieldsRegister;
 use MM\Meros\Facades\FieldGroups as FieldGroupsRegister;
@@ -72,21 +71,12 @@ class Form extends FeatureDefinition {
         $this->instantiateElements();
     }
 
-    /**
-     * Sets the form as ready (or not) based on its current configuration.
-     *
-     * @return void
-     */
-    protected function hook(): void {
-        if (empty($this->id)) {
-            $this->ready = false;
-        }
+    /***************************
+     * Feature Contract Methods
+     ***************************/
 
-        $this->ready = true;
-    }
-
-    protected function load(): void {
-        // No loading for forms as they aren't directly hooked into WP.
+    protected function queue(): void {
+        // Forms don't use the queue method.
     }
 
     /***************************

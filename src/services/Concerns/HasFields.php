@@ -4,16 +4,16 @@ namespace MM\Meros\Services\Concerns;
 
 use Closure;
 
-use MM\Meros\Services\Contracts\Form;
+use MM\Meros\Services\Contracts\Elements\Form;
 use MM\Meros\Services\Registers\Forms as FormsRegister;
 
-use MM\Meros\Services\Contracts\Field;
+use MM\Meros\Services\Contracts\Elements\Field;
 use MM\Meros\Services\Registers\Fields as FieldsRegister;
 
-use MM\Meros\Services\Contracts\FieldGroup;
+use MM\Meros\Services\Contracts\Elements\FieldGroup;
 use MM\Meros\Services\Registers\FieldGroups as FieldGroupsRegister;
 
-use MM\Meros\Services\Contracts\FieldStyle;
+use MM\Meros\Services\Contracts\Elements\FieldStyle;
 use MM\Meros\Services\Registers\FieldStyles as FieldStylesRegister;
 
 use MM\Meros\Facades\Forms;

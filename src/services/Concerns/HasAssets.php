@@ -4,22 +4,12 @@ namespace MM\Meros\Services\Concerns;
 
 use Closure;
 
-use MM\Meros\Services\Asset;
+use MM\Meros\Services\Contracts\Asset;
 use MM\Meros\Services\Registers\Assets as AssetsRegister;
 
 use MM\Meros\Facades\Assets;
 
 trait HasAssets {
-    /**
-     * Instantiates a new Asset class and returns it for configuration.
-     *
-     * @return Asset The newly created Asset instance.
-     */
-    protected function enqueue(): Asset {
-        $asset = app(Asset::class, ['source' => $this]);
-        return $this->registry()->add('assets', $asset);
-    }
-
     /**
      * Retrieves an asset by its handle or the assets register.
      *

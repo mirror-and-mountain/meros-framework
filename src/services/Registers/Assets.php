@@ -5,9 +5,9 @@ namespace MM\Meros\Services\Registers;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
-use MM\Meros\Services\Asset;
+use MM\Meros\Services\Contracts\Asset;
 use MM\Meros\Services\Contracts\Register;
-use MM\Meros\Services\Contracts\Discovery;
+use MM\Meros\Services\Registers\Interfaces\Discovery;
 
 class Assets extends Register implements Discovery {
     protected string $identifier = 'handle';

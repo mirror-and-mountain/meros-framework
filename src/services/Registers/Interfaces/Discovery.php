@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\Services\Contracts;
+namespace MM\Meros\Services\Registers\Interfaces;
 
 interface Discovery {
     /**

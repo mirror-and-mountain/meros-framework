@@ -1,14 +1,14 @@
 <?php 
 
-namespace MM\Meros\Services\Contracts;
+namespace MM\Meros\Services\Contracts\Elements;
 
 use Illuminate\Support\Str;
 
-use MM\Meros\Services\Contracts\FieldParent;
-use MM\Meros\Services\Contracts\FeatureDefinition;
 use MM\Meros\Services\Contracts\FeatureProvider;
+use MM\Meros\Services\Contracts\FeatureDefinition;
+use MM\Meros\Services\Contracts\Elements\Interfaces\FieldParent;
 
-use MM\Meros\Services\Concerns\CanAttachFields;
+use MM\Meros\Services\Contracts\Elements\Concerns\CanAttachFields;
 
 class FieldGroup extends FeatureDefinition implements FieldParent {
     /**
@@ -57,21 +57,12 @@ class FieldGroup extends FeatureDefinition implements FieldParent {
         $this->instantiateFields();
     }
 
-    /**
-     * Sets the field group as ready (or not) based on its current configuration.
-     *
-     * @return void
-     */
-    protected function hook(): void {
-        if (empty($this->handle)) {
-            $this->ready = false;
-        }
+    /***************************
+     * Feature Contract Methods
+     ***************************/
 
-        $this->ready = true;
-    }
-
-    protected function load(): void {
-        // No loading for field groups as they aren't directly hooked into WP.
+    protected function queue(): void {
+        // Field groups don't use the queue method.
     }
 
     /***************************
@@ -87,7 +78,6 @@ class FieldGroup extends FeatureDefinition implements FieldParent {
     public function handle(string $handle): self {
         $this->handle = Str::slug($handle);
         
-        $this->hook();
         return $this;
     }
 

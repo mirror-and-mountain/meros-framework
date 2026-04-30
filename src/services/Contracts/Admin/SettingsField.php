@@ -1,9 +1,11 @@
 <?php
 
-namespace MM\Meros\Services\Admin;
+namespace MM\Meros\Services\Contracts\Admin;
 
-use MM\Meros\Services\Contracts\FeatureDefinition;
 use MM\Meros\Services\Contracts\FeatureProvider;
+use MM\Meros\Services\Contracts\FeatureDefinition;
+
+use MM\Meros\Services\Contracts\Elements\Field;
 
 final class SettingsField extends FeatureDefinition {
     /**
@@ -65,27 +67,22 @@ final class SettingsField extends FeatureDefinition {
     }
     
     /**
-     * Sets the field as ready (or not) based on the field's current configuration.
-     * 
-     * If the field is ready, it should be hooked into WordPress via the load() method, which is hooked into the 'admin_init' action.
+     * Queues the settings field to be loaded via a WordPress hook if all the required properties are set.
      *
      * @return void
      */
-    protected function hook(): void {
+    protected function queue(): void {
         if (empty($this->page) || empty($this->section) || $this->setting === null) {
-            $this->ready = false;
             return;
         }
 
-        $this->ready = true;
-
-        if (!$this->loaded) {
+        if (!$this->queued) {
              add_action('admin_init', function() {
                 $this->load();
             });
         }
         
-        $this->loaded = true;
+        $this->queued = true;
     }
 
     /**
@@ -118,8 +115,6 @@ final class SettingsField extends FeatureDefinition {
             'default',
             $this->args
         );
-
-        $this->loaded = true;
     }
 
     /***************************
@@ -143,7 +138,7 @@ final class SettingsField extends FeatureDefinition {
             $this->section = $section;
         }
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -164,7 +159,7 @@ final class SettingsField extends FeatureDefinition {
             $this->page = $page;
         }
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -187,7 +182,7 @@ final class SettingsField extends FeatureDefinition {
             $this->args['class'] = $class;
         }
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 

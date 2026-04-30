@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\Services;
+namespace MM\Meros\Services\Contracts;
 
 use Closure;
 use Illuminate\Support\Facades\File;
@@ -37,24 +37,22 @@ class Block extends FeatureDefinition {
     protected array $args = [];
 
     /**
-     * Sets the block as ready (or not) based on the block's current configuration.
+     * Queues the block for registration by hooking into WordPress' 'init' action.
      * 
-     * If the block is ready, it will be registered with WordPress via the 'init' hook in the load() method.
      * @return void
      */
-    protected function hook(): void {
+    protected function queue(): void {
         if (empty($this->name)) {
-            $this->ready = false;
             return;
         }
 
-        $this->ready = true;
-
-        if ($this->enabled) {
+        if (!$this->queued && $this->enabled) {
             add_action('init', function() {
-                $this->load();
+                $this->register();
             });
         }
+
+        $this->queued = true;
     }
 
     /**
@@ -62,11 +60,10 @@ class Block extends FeatureDefinition {
      *
      * @return void
      */
-    protected function load(): void { 
+    protected function register(): void { 
         $blockType = $this->path !== '' ? $this->path : $this->name;
 
         register_block_type($blockType, $this->args);
-        $this->loaded = true;
     }
 
     /***************************
@@ -82,7 +79,7 @@ class Block extends FeatureDefinition {
      */
     public function name(string $name): self {
         $this->name = $name;
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -103,7 +100,7 @@ class Block extends FeatureDefinition {
         
         $this->path = $path;
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 

@@ -1,19 +1,15 @@
 <?php 
 
-namespace MM\Meros\Services\Admin;
+namespace MM\Meros\Services\Contracts\Admin;
 
 use Closure;
 use Illuminate\Support\Str;
-
-use MM\Meros\Services\Contracts\FeatureDefinition;
-use MM\Meros\Services\Contracts\MenuPageTemplate;
-
-use MM\Meros\Services\Admin\Templates\TabbedSettingsPage;
-use MM\Meros\Services\Admin\Templates\SimpleSettingsPage;
+use MM\Meros\Support\ClassInfo;
 
 use MM\Meros\Facades\SettingsSections;
+use MM\Meros\Services\Contracts\FeatureDefinition;
 
-use MM\Meros\Support\ClassInfo;
+use MM\Meros\Facades\MenuPageTemplates;
 
 class MenuPage extends FeatureDefinition {
     /**
@@ -87,11 +83,11 @@ class MenuPage extends FeatureDefinition {
     protected ?MenuPageTemplate $template  = null;
 
     /**
-     * Sets the menu page as ready (or not) based on the menu page's current configuration.
+     * Queues the menu page to be loaded via a WordPress hook if all the required properties are set.
      *
      * @return void
      */
-    protected function hook(): void {
+    protected function queue(): void {
         $requiredProps = [
             'areaFunc',
             'title',
@@ -101,13 +97,11 @@ class MenuPage extends FeatureDefinition {
         ];
 
         if (is_null($this->callback) && is_null($this->template)) {
-            $this->ready = false;
             return;
         }
 
         foreach ($requiredProps as $prop) {
             if (!isset($this->$prop) || (is_string($this->$prop) && empty($this->$prop))) {
-                $this->ready = false;
                 return;
             }
         }
@@ -120,15 +114,13 @@ class MenuPage extends FeatureDefinition {
             };
         }
 
-        $this->ready = true;
-
-        if (!$this->loaded) {
+        if (!$this->queued) {
              add_action('admin_menu', function() {
                 $this->load();
             });
         }
 
-        $this->loaded = true;
+        $this->queued = true;
     }
 
     /**
@@ -199,7 +191,7 @@ class MenuPage extends FeatureDefinition {
             $this->slug = Str::slug($title);
         }
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -222,7 +214,7 @@ class MenuPage extends FeatureDefinition {
             $this->slug = Str::slug($menuTitle);
         }
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -236,7 +228,7 @@ class MenuPage extends FeatureDefinition {
         $this->area     = $area;
         $this->areaFunc = $this->getAreaFunc($area);
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -249,7 +241,7 @@ class MenuPage extends FeatureDefinition {
     public function capability(string $capability): self {
         $this->capability = $capability;
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -274,7 +266,7 @@ class MenuPage extends FeatureDefinition {
             $this->menuTitle = Str::title(str_replace(['-', '_'], ' ', $slug));
         }
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -288,7 +280,7 @@ class MenuPage extends FeatureDefinition {
     public function icon(string $icon): self {
         $this->icon = $icon;
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -302,7 +294,7 @@ class MenuPage extends FeatureDefinition {
     public function position(int $position): self {
         $this->position = $position;
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -316,7 +308,7 @@ class MenuPage extends FeatureDefinition {
     public function callback(callable|Closure $callback): self {
         $this->callback = $this->convertToClosure($callback);
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -330,22 +322,8 @@ class MenuPage extends FeatureDefinition {
      */
     public function template(string|MenuPageTemplate $template, array $props = []): self {
         if (is_string($template)) {
-            $map = [
-                'simple-settings' => SimpleSettingsPage::class,
-                'tabbed-settings' => TabbedSettingsPage::class
-            ];
-
-            if (in_array($template, array_keys($map))) {
-                $class = $map[$template];
-                $this->template = new $class($props);
-            }
-
-            else {
-                $class = ClassInfo::get($template);
-                if ($class->extends(MenuPageTemplate::class)) {
-                    $this->template = new $template($props);
-                }
-            }
+            $templateInstance = MenuPageTemplates::checkout($this->provider)->makeFrom($template, $props);
+            $this->template = $templateInstance;
         }
 
         else if ($template instanceof MenuPageTemplate) {
@@ -353,7 +331,7 @@ class MenuPage extends FeatureDefinition {
             $this->template->setProps($props);
         }
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 

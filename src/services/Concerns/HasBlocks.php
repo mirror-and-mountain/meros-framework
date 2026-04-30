@@ -4,7 +4,7 @@ namespace MM\Meros\Services\Concerns;
 
 use Closure;
 
-use MM\Meros\Services\Block;
+use MM\Meros\Services\Contracts\Block;
 use MM\Meros\Services\Registers\Blocks as BlocksRegister;
 
 use MM\Meros\Facades\Blocks;

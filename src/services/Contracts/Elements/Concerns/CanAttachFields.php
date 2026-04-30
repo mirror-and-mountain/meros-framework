@@ -1,11 +1,11 @@
 <?php 
 
-namespace MM\Meros\Services\Concerns;
+namespace MM\Meros\Services\Contracts\Elements\Concerns;
 
 use Closure;
 use Illuminate\Support\Collection;
 
-use MM\Meros\Services\Contracts\Field;
+use MM\Meros\Services\Contracts\Elements\Field;
 
 use MM\Meros\Facades\Fields as FieldsRegister;
 

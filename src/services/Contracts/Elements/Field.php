@@ -1,11 +1,11 @@
 <?php 
 
-namespace MM\Meros\Services\Contracts;
+namespace MM\Meros\Services\Contracts\Elements;
 
 use Illuminate\Support\Str;
 
-use MM\Meros\Services\Contracts\FieldParent;
 use MM\Meros\Services\Contracts\FeatureDefinition;
+use MM\Meros\Services\Contracts\Elements\Interfaces\FieldParent;
 
 use MM\Meros\Facades\FieldStyles;
 
@@ -165,12 +165,9 @@ abstract class Field extends FeatureDefinition {
     /***************************
      * Feature Contract Methods
      ***************************/
-    final protected function load(): void {
-        // Field classes don't use the load method
-    }
-
-    final protected function hook(): void {
-        // Field classes don't use the hook method.
+    
+    final protected function queue(): void {
+        // Field classes don't use the queue method
     }
 
     /***************************

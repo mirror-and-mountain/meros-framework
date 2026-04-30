@@ -5,7 +5,7 @@ namespace MM\Meros\Services\Concerns;
 use Closure;
 use Illuminate\Support\Str;
 
-use MM\Meros\Services\Contracts\DataRegistrant;
+use MM\Meros\Services\Contracts\Interfaces\DataRegistrant;
 
 trait IsDataRegistrant {
     /**
@@ -189,7 +189,7 @@ trait IsDataRegistrant {
 
         $this->name = $name;
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -301,7 +301,7 @@ trait IsDataRegistrant {
 
         $this->itemType = $type;
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -325,7 +325,7 @@ trait IsDataRegistrant {
         $this->type = $type;
         $this->args('type', $type);
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -348,7 +348,7 @@ trait IsDataRegistrant {
 
         $this->itemType = $itemType;
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -362,7 +362,7 @@ trait IsDataRegistrant {
     public function label(string $label): self {
         $this->args['label'] = $label;
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -376,7 +376,7 @@ trait IsDataRegistrant {
     public function description(string $description): self {
         $this->args['description'] = $description;
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -422,7 +422,7 @@ trait IsDataRegistrant {
     public function showInRest(bool $show = true): self {
         $this->args['show_in_rest'] = $show;
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -442,7 +442,7 @@ trait IsDataRegistrant {
             $this->args[$argsOrKey] = $value;
         }
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 

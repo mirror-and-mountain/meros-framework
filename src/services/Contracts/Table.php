@@ -57,6 +57,13 @@ final class Table extends FeatureDefinition {
     protected array $updates = [];
 
     /**
+     * Whether the table is ready to undertake operations.
+     *
+     * @var bool
+     */
+    protected bool $ready = false;
+
+    /**
      * The last error message encountered during installation or rollback operations.
      *
      * @var string
@@ -99,23 +106,15 @@ final class Table extends FeatureDefinition {
             ];
         }
 
-        $this->hook();
-    }
-
-    /***************************
-     * Contract methods
-     ***************************/
-
-    protected function load(): void {
-        // Not used
+        $this->setReady();
     }
 
     /**
-     * Check if the table is ready to be installed.
+     * Sets the table's ready status.
      *
      * @return void
      */
-    protected function hook(): void {
+    protected function setReady(): void {
         $requiredProps = [
             'tableName',
             'handle',
@@ -134,24 +133,17 @@ final class Table extends FeatureDefinition {
         $this->ready = true;
     }
 
+    /***************************
+     * Contract methods
+     ***************************/
+
+    protected function queue(): void {
+        // Not used
+    }
 
     /***************************
      * Public Chainable methods
      ***************************/
-
-    /**
-     * Set the name of the table. The name will be converted to snake_case.
-     *
-     * @param string $name
-     *
-     * @return self
-     */
-    public function name(string $name): self {
-        $this->tableName = Str::snake($name);
-
-        $this->hook();
-        return $this;
-    }
 
     /**
      * Install the table by running its migration.
