@@ -1,6 +1,6 @@
 <?php
 
-namespace MM\Meros\App\Admin;
+namespace MM\Meros\App\Admin\Templates;
 
 use MM\Meros\Services\Contracts\Admin\MenuPageTemplate;
 

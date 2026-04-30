@@ -22,8 +22,8 @@ use MM\Meros\App\Fields\Styles\DefaultFieldStyle;
 use MM\Meros\App\Fields\Styles\NiceFieldStyle;
 use MM\Meros\App\Fields\Styles\SettingsFieldStyle;
 
-use MM\Meros\App\Admin\SimpleSettingsPage;
-use MM\Meros\App\Admin\TabbedSettingsPage;
+use MM\Meros\App\Admin\Templates\SimpleSettingsPage;
+use MM\Meros\App\Admin\Templates\TabbedSettingsPage;
 
 use MM\Meros\App\Facades\Theme;
 
