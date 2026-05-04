@@ -20,7 +20,7 @@
             "MM\\Meros\\": "src/",
             "MM\\Meros\\App\\": "src/app/",
             "MM\\Meros\\Facades\\": "src/facades/",
-            "MM\\Meros\\Services": "src/services/",
+            "MM\\Meros\\Services\\": "src/services/",
             "MM\\Meros\\Support\\": "src/support/",
             "MM\\Meros\\Scripts\\": "src/scripts/"
         }
