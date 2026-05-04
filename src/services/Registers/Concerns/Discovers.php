@@ -6,17 +6,6 @@ use Illuminate\Support\Facades\File;
 
 trait Discovers {
     /**
-     * Discovers features in the specified path and registers them.
-     *
-     * @param string|null $path The path to discover features from. If null, the provider's default path will be used.
-     *
-     * @return void
-     */
-    public function discover(?string $path = null): void {
-        // To be implemented by the class using this trait
-    }
-
-    /**
      * Resolves a given path, checking both the provided path and a potential path relative to the provider's base path.
      *
      * @param string|null  $path The path to resolve. If null, the provider's default assets path will be used.

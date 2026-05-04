@@ -2,7 +2,10 @@
 
 namespace MM\Meros\App;
 
+use Illuminate\Support\Collection;
+
 use MM\Meros\Services\Contracts\FeatureProvider;
+use MM\Meros\App\Providers\FrameworkServiceProvider;
 
 use MM\Meros\App\Fields\Checkbox;
 use MM\Meros\App\Fields\Checkboxes;
@@ -22,18 +25,25 @@ use MM\Meros\App\Fields\Styles\DefaultFieldStyle;
 use MM\Meros\App\Fields\Styles\NiceFieldStyle;
 use MM\Meros\App\Fields\Styles\SettingsFieldStyle;
 
+use MM\Meros\App\Admin\SettingsSections\Blocks;
+use MM\Meros\App\Admin\SettingsSections\Packages;
+
 use MM\Meros\App\Admin\Templates\SimpleSettingsPage;
 use MM\Meros\App\Admin\Templates\TabbedSettingsPage;
+use MM\Meros\App\Admin\Templates\MerosFeaturesPage;
 
-use MM\Meros\App\Facades\Theme;
+use MM\Meros\App\Theme as ThemeInstance;
+use MM\Meros\Facades\Theme;
 
 final class Framework extends FeatureProvider {
     /**
      * Called from the FrameworkServiceProvider on boot
+     * 
+     * @param FrameworkServiceProvider $serviceProvider Used to ensure only the FrameworkServiceProvider can call this method.
      *
      * @return self
      */
-    public function __initialise(): self {
+    public function __initialise(FrameworkServiceProvider $serviceProvider): self {
         $this->load();
         $this->configure();
         return $this;
@@ -45,6 +55,7 @@ final class Framework extends FeatureProvider {
      * @return void
      */
     protected function load(): void {
+        // Register REST API routes
         $this->registerRestRoutes();
 
         // Register framework fields
@@ -65,27 +76,33 @@ final class Framework extends FeatureProvider {
         // Register framework field styles
         $this->fieldStyles()->register('default', DefaultFieldStyle::class);
         $this->fieldStyles()->register('nice', NiceFieldStyle::class);
-        $this->fieldStyles()->register('settings', SettingsFieldStyle::class);
 
-        // Register menu page templates
-        $this->menuPageTemplates()->register('simple-settings', SimpleSettingsPage::class);
-        $this->menuPageTemplates()->register('tabbed-settings', TabbedSettingsPage::class);
+        // Only load admin features if we're in the admin context
+        if ($this->context->isAdmin) {
+            // Register the Settings field style for admin settings pages
+            $this->fieldStyles()->register('settings', SettingsFieldStyle::class);
 
-        // $initAjax = Context::isAdmin();
+            // Register framework settings sections
+            $this->settingsSections()->register('meros-features-packages', Packages::class);
+            $this->settingsSections()->register('meros-features-blocks', Blocks::class);
 
-        // if ($initAjax) {
-        //     $this->initAdminAjaxHandlers();
-        // }    
+            // Register menu page templates
+            $this->menuPageTemplates()->register('simple-settings', SimpleSettingsPage::class);
+            $this->menuPageTemplates()->register('tabbed-settings', TabbedSettingsPage::class);
+            $this->menuPageTemplates()->register('meros-features', MerosFeaturesPage::class);
 
-        // $this->discoverInstallables();
+            // Initialise AJAX handlers for admin interactions
+            // $this->initAdminAjaxHandlers();
+        }
     }
 
     protected function configure(): void {
         // Run theme activation tasks
         add_action('after_switch_theme', [$this, 'runActivationTasks']);
 
-        // Configure settings pages
-        $this->configureSettingsPages();
+        // Configure settings and menu pages
+        $this->configureSettings();
+        $this->configureMenuPages();
 
         // Discover assets
         $this->assets()->discover();
@@ -94,30 +111,166 @@ final class Framework extends FeatureProvider {
         $this->blocks()->discover();
     }
 
+    /**
+     * Called by provider installers to ensure the framework's core tables are installed
+     * before they undertake any installer operations.
+     *
+     * @return void
+     */
+    public function require(): void {
+        $installed  = $this->isInstalled();
+
+        if (!$installed) {
+            $this->install();
+        }
+
+        $hasUpdates = $this->hasUpdates();
+
+        if ($hasUpdates) {
+            $this->update();
+        }
+    }
+
     /***************************************************************
      * 
      * The following methods are for settings management
      * 
      ***************************************************************/
     /**
-     * Sets up core settings pages provided by the framework.
+     * Sets up core settings provided by the framework.
      *
      * @return void
      */
-    private function configureSettingsPages(): void {
+    private function configureSettings(): void {
+        $packageSettings = $this->settings()->add(function ($setting) {
+            $setting->object('packages')
+                ->label('Packages');
+        });
+
+        $blockSettings = $this->settings()->add(function ($setting) {
+            $setting->object('blocks')
+                ->label('Blocks');
+
+            $setting->add()->boolean('example_block_setting')
+                ->label('Example Block Setting')
+                ->description('This is an example setting for blocks.')
+                ->field()
+                    ->section('meros-features-blocks');
+        });
+
+        add_action('meros_providers_registered', function (ThemeInstance $theme, Collection $packages) use ($packageSettings) {
+            foreach ($packages as $package) {
+                $enabledSetting = $packageSettings->add()->boolean($package->getHandle() . '_enable')
+                    ->label('Enable ' . $package->getName())
+                    ->description($package->getDescription())
+                    ->field()
+                        ->section('meros-features-packages');
+
+                $titleHTML = $this->getProviderSettingHTML($package);
+                $enabledSetting->titleHTML($titleHTML);
+            }
+        }, 10, 2);
+    }
+
+    /**
+     * Configures the framework's menu pages, including the main features page and any subpages.
+     *
+     * @return void
+     */
+    private function configureMenuPages(): void {
         $this->menuPages()->make(function ($page) {
             $page->slug('meros-features');
             $page->title('Features');
             $page->menuTitle('Features');
-            $page->template('tabbed-settings', [
+            $page->position(1);
+            $page->template('meros-features', [
                 'tabs'  => [
-                    'theme'    => 'Theme',
-                    'packages' => 'Packages',
-                    'blocks'   => 'Blocks',
-                    'assets'   => 'Scripts & Styles'
+                    'theme' => [
+                        'label'    => 'Theme',
+                        'callback' => function () {
+                            echo 'This is the theme tab';
+                        }
+                    ],
+                    'packages' => [
+                        'label'    => 'Packages',
+                        'callback' => function () {
+                            settings_fields('meros_framework_settings_group');
+                            do_settings_sections('meros-features-packages');
+                            submit_button();
+                        }
+                    ],
+                    'blocks' => [
+                        'label'    => 'Blocks',
+                        'callback' => function () {
+                            settings_fields('meros_framework_settings_group');
+                            do_settings_sections('meros-features-blocks');
+                            submit_button();
+                        }
+                    ],
+                    'assets' => [
+                        'label'    => 'Scripts & Styles',
+                        'callback' => function () {
+                            echo 'This is the assets tab';
+                        }
+                    ]
                 ]
             ]);
         })->in('options');
+    }
+
+    /**
+     * Generates the HTML for a provider's setting on the features page, including action links and status info.
+     *
+     * @param FeatureProvider $provider
+     * @return string
+     */
+    private function getProviderSettingHTML(FeatureProvider $provider): string {
+        $html        = '';
+        $enabled     = $provider->isEnabled();
+        $installed   = $provider->isInstalled();
+        $installedAt = null;
+
+        if ($enabled) {
+            $html .=  
+                '<div class="meros-provider-links>
+                    <a href="' . $this->context->appendQueryArgs(['provider' => $provider->getHandle()]) .'">Settings</a>
+                </div>';
+        }
+
+        $html .= '<div class="meros-provider-tasks"><div class="meros-installer-info">';
+
+        if ($installed) {
+            $installedAt = $provider->installedAt() ?? 'Unknown time';
+        }
+
+        if (!$enabled && $installed) {
+            $html .= '<p style="margin-top:8px;">Installed: ' . esc_html($installedAt) . '</p>';
+            $html .= '<a href="#" class="meros-installer-button button button-primary" style="margin-top:8px;">Uninstall</a>';
+            $html .= '</div></div>';
+            return $html;
+        }
+
+        if ($installed) {
+            $html .= '<p style="margin-top:8px;">Installed: ' . esc_html($installedAt);
+
+            $lastUpdated = $provider->lastUpdated();
+
+            if ($lastUpdated !== $installedAt) {
+                $html .= '<span> | Last updated: ' . esc_html($lastUpdated) . '</span>';
+            }
+
+            $html .= '</p>';
+             
+            if ($provider->hasUpdates()) {
+                $html .= '<a href="#" class="meros-installer-button button button-primary" style="margin-top:8px;">Update</a>';
+            }
+
+        } else {
+            return '<a href="#" class="meros-installer-button button button-primary" style="margin-top:8px;">Install</a>';
+        }
+
+        $html .= '</div></div>';
+        return $html;
     }
 
     /***************************************************************
@@ -320,15 +473,6 @@ final class Framework extends FeatureProvider {
         }
 
         wp_send_json_success();
-    }
-
-    /**
-     * Gets the instance of the framework.
-     *
-     * @return Framework
-     */
-    final public function instance(): Framework {
-        return $this;
     }
 
     /*************************************************************

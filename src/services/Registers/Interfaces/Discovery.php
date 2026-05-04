@@ -6,7 +6,7 @@ interface Discovery {
     /**
      * Discovers and registers features based on the provider's configuration.
      *
-     * @return void
+     * @return self
      */
-    public function discover(?string $path = null): void;
+    public function discover(?string $path = null): self;
 }

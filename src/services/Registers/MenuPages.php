@@ -8,6 +8,8 @@ use MM\Meros\Services\Contracts\Admin\MenuPage;
 class MenuPages extends Register {
     protected string $identifier = 'slug';
     protected string $definition = MenuPage::class;
+    protected array  $rejects    = ['multiple', 'public'];
+    
 
     /**
      * List of supported operations for this register.

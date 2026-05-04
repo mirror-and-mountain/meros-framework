@@ -26,7 +26,7 @@ final class Table extends FeatureDefinition {
      *
      * @var string
      */
-    protected string $handle = '';
+    public string $handle = '';
 
     /**
      * The migration label for the table.
@@ -269,6 +269,10 @@ final class Table extends FeatureDefinition {
      * @return self 
      */
     public function uninstall(): self {
+        if ($this->tableName === 'meros_migrations') {
+            return $this; // Prevent uninstalling the migrations table through this method to avoid potential issues with tracking migrations. Uninstalling this table should be done manually with caution if needed.
+        }
+
         $canUninstall = $this->canRollback();
 
         if ($canUninstall !== true) {
@@ -344,14 +348,8 @@ final class Table extends FeatureDefinition {
             ];
         }
 
-        $installedAt = MigrationModel::where('related_table', $this->tableName)
-            ->where('type', 'create')
-            ->value('created_at');
-            
-        $lastUpdated = MigrationModel::where('related_table', $this->tableName)
-            ->where('type', 'update')
-            ->orderBy('created_at', 'desc')
-            ->value('created_at');
+        $installedAt = $this->getInstalledAt();
+        $lastUpdated = $this->getLastUpdated();
 
         return [
             'provider'     => $this->provider->getHandle(),
@@ -360,6 +358,38 @@ final class Table extends FeatureDefinition {
             'installed_at' => $installedAt,
             'last_updated' => $lastUpdated,
         ] + SchemaManager::getTableData($this->tableName);
+    }
+
+    /**
+     * Get the timestamp of when the table was installed.
+     *
+     * @return string|null The installation timestamp, or null if not available.
+     */
+    public function getInstalledAt(): ?string {
+        return MigrationModel::where('related_table', $this->tableName)
+            ->where('type', 'create')
+            ->value('created_at');
+    }
+
+    /**
+     * Get the timestamp of when the table was last updated.
+     *
+     * @return string|null The last update timestamp, or null if not available.
+     */
+    public function getLastUpdated(): ?string {
+        return MigrationModel::where('related_table', $this->tableName)
+            ->where('type', 'update')
+            ->orderBy('created_at', 'desc')
+            ->value('created_at');
+    }
+
+    /**
+     * Get the last error message encountered during installation or rollback operations.
+     *
+     * @return string The last error message.
+     */
+    public function getLastError(): string {
+        return $this->lastError;
     }
 
     /***************************

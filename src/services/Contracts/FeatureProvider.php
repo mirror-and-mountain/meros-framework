@@ -12,9 +12,18 @@ use MM\Meros\Services\Concerns\HasIdentity;
 use MM\Meros\Services\Concerns\HasSettings;
 use MM\Meros\Services\Concerns\HasPreferences;
 
-use MM\Meros\Facades\Context;
+use MM\Meros\App\Context;
+use MM\Meros\Facades\Context as ContextAccessor;
 
 abstract class FeatureProvider {
+
+    /**
+     * An object containing several properties and methods that the feature provider
+     * can utilise throughout its lifecycle.
+     *
+     * @var Context
+     */
+    final protected Context $context;
 
     use HasIdentity,
         HasPreferences,
@@ -29,7 +38,10 @@ abstract class FeatureProvider {
         string $path = '',
         string $uri  = ''
     ) {
-        // Check if the child class is the Framework class;
+        // Set context
+        $this->context = ContextAccessor::get();
+        
+        // Check if the child class is the Framework class
         $isFramework = $this instanceof Framework;
 
         // Set identity
@@ -42,10 +54,13 @@ abstract class FeatureProvider {
         // Init preferences
         $this->initPreferences();
 
-        if ($isFramework && $this->isFeaturesAdminPage()) {
-            $this->tables()->discover(); // Discover tables in this context so we can load installers if available.
-            dd($this->tables());
-        }
+        // Init root setting
+        $this->setRootSetting();
+
+        // if ($isFramework && $this->isFeaturesAdminPage()) {
+        //     $this->tables()->discover(); // Discover tables in this context so we can load installers if available.
+        //     dd($this->tables());
+        // }
 
         // Framework is booted from its service provider
         if ($isFramework) {return;}
@@ -55,9 +70,6 @@ abstract class FeatureProvider {
 
         // Configure
         $this->configure();
-
-        // After configuration
-        $this->loaded();
     }
 
     protected function load(): void {

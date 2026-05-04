@@ -142,35 +142,16 @@ class Setting extends FeatureDefinition implements DataRegistrant, AdminFieldReg
     }
 
     /**
-     * Assigns all fields to a specific admin page.
+     * Assigns the setting's field to a specific settings section.
      *
-     * @param MenuPage|string $page The page instance or slug that this field belongs to.
-     *
-     * @return self
-     */
-    final public function onPage(MenuPage|string $page): self {
-        if ($this->settingsField !== null) {
-            $this->settingsField->onPage($page);
-        }
-
-        $this->walkSettingFields(fn ($sf) => $sf->onPage($page));
-
-        return $this;
-    }
-
-    /**
-     * Assign all fields to a specific section.
-     *
-     * @param SettingsSection|string $section The section instance or ID that this field belongs to.
+     * @param SettingsSection|string $section The section instance or a fully-qualified class name or ID.
      *
      * @return self
      */
-    final public function inSection(SettingsSection|string $section): self {
+    final public function section(SettingsSection|string $section): self {
         if ($this->settingsField !== null) {
-            $this->settingsField->inSection($section);
+            $this->settingsField->section($section);
         }
-
-        $this->walkSettingFields(fn ($sf) => $sf->inSection($section));
 
         return $this;
     }
@@ -244,6 +225,8 @@ class Setting extends FeatureDefinition implements DataRegistrant, AdminFieldReg
             setting:  $this,
             args:     $args
         );
+
+        $this->field->attachTo($this->settingsField);
     }
 
     /** Walk through all sub-items and apply a callback to their setting fields if they exist.

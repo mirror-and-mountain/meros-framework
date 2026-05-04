@@ -26,6 +26,13 @@ abstract class MenuPageTemplate extends FeatureDefinition {
      */
     protected string $pageTitle = '';
 
+    /**
+     * The fully-qualified view path for the template's view file.
+     *
+     * @var string
+     */
+    protected string $view = '';
+
     /***************************
      * Feature Contract Methods
      ***************************/

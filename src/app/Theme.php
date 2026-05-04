@@ -98,7 +98,7 @@ abstract class Theme extends FeatureProvider {
      *
      * @return Theme
      */
-    final public function instance(): Theme {
+    final public function get(): Theme {
         return $this;
     }
 }

@@ -2,12 +2,14 @@
 
 namespace MM\Meros\Services\Contracts\Admin;
 
+use MM\Meros\Services\Contracts\Elements\Field;
 use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\Services\Contracts\FeatureDefinition;
+use MM\Meros\Services\Contracts\Elements\Interfaces\FieldParent;
 
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Facades\SettingsSections;
 
-final class SettingsField extends FeatureDefinition {
+final class SettingsField extends FeatureDefinition implements FieldParent {
     /**
      * The MenuPage instance that this field belongs to, if set.
      *
@@ -28,6 +30,13 @@ final class SettingsField extends FeatureDefinition {
      * @var Setting|null
      */
     protected ?Setting $setting = null;
+
+    /**
+     * The Field instance that represents the actual form field to be rendered on the settings page.
+     *
+     * @var Field|null
+     */
+    protected ?Field $field = null;
 
     /**
      * The section ID that this field belongs to. Defaults to 'default' if not set.
@@ -51,6 +60,13 @@ final class SettingsField extends FeatureDefinition {
     protected array $args = [];
 
     /**
+     * HTML to be used as the field's title.
+     *
+     * @var string
+     */
+    protected string $titleHTML = '';
+
+    /**
      * SettingsField constructor.
      *
      * @param FeatureProvider $provider
@@ -62,8 +78,11 @@ final class SettingsField extends FeatureDefinition {
         Setting         $setting,
         array           $args = []
     ) {
-        parent::__construct($provider, $args);
-        $this->setting = $setting;
+        $this->provider = $provider;
+        $this->setting  = $setting;
+        $this->page     = $this->provider->getSettingsPageSlug();
+        $this->args($args);
+        $this->queue();
     }
     
     /**
@@ -72,8 +91,16 @@ final class SettingsField extends FeatureDefinition {
      * @return void
      */
     protected function queue(): void {
-        if (empty($this->page) || empty($this->section) || $this->setting === null) {
-            return;
+        $requiredProps = [
+            'field',
+            'setting',
+            'page',
+        ];
+
+        foreach ($requiredProps as $prop) {
+            if ($this->$prop === null || (is_string($this->$prop) && empty($this->$prop))) {
+                return;
+            }
         }
 
         if (!$this->queued) {
@@ -91,8 +118,7 @@ final class SettingsField extends FeatureDefinition {
      * @return void
      */
     protected function load(): void {
-        $setting = $this->setting;
-        $field   = $setting->field();
+        $field = $this->field;
 
         if ($this->section === 'default') {
             add_settings_section(
@@ -100,8 +126,8 @@ final class SettingsField extends FeatureDefinition {
                 '',
                 '__return_null',
                 $this->page
-            );
-        } // If no section is specified, register a default section for the field to be added to.
+            ); // Ensure the default section exists
+        }
 
         $render = function() use ($field) {
             $field->render();
@@ -109,10 +135,10 @@ final class SettingsField extends FeatureDefinition {
 
         add_settings_field(
             $field->getID(),
-            $this->getFieldTitleHTML(),
+            $this->titleHTML === '' ? $this->getFieldTitleHTML() : $this->titleHTML,
             $render,
             $this->page,
-            'default',
+            $this->section,
             $this->args
         );
     }
@@ -124,39 +150,21 @@ final class SettingsField extends FeatureDefinition {
     /**
      * Associates the field with a specific settings section.
      *
-     * @param  SettingsSection|string $section The section instance or id that this field belongs to.
+     * @param  SettingsSection|string $section The section instance, a fully-qualified class name, or ID.
      *
      * @return self
      */
-    public function inSection(SettingsSection|string $section): self {
+    public function section(SettingsSection|string $section, array $props = []): self {
         if ($section instanceof SettingsSection) {
             $this->sectionInstance = $section;
             $this->section = $section->getID();
+            $this->page    = $section->getPageSlug();
         } 
         
-        elseif (is_string($section)) {
-            $this->section = $section;
-        }
-
-        $this->queue();
-        return $this;
-    }
-
-    /**
-     * Associates the field with a specific menu page.
-     *
-     * @param  MenuPage|string $page The page instance or slug that this field belongs to.
-     *
-     * @return self
-     */
-    public function onPage(MenuPage|string $page): self {
-        if ($page instanceof MenuPage) {
-            $this->pageInstance = $page;
-            $this->page = $page->getSlug();
-        }
-
-        elseif (is_string($page)) {
-            $this->page = $page;
+        else if (is_string($section)) {
+            $this->sectionInstance = SettingsSections::checkout($this->provider)->makeFrom($section, $props);
+            $this->section = $this->sectionInstance->getID();
+            $this->page    = $this->sectionInstance->getPageSlug();
         }
 
         $this->queue();
@@ -186,9 +194,42 @@ final class SettingsField extends FeatureDefinition {
         return $this;
     }
 
+    /**
+     * Attaches a field instance to this settings field for rendering.
+     *
+     * @param Field|array $field A field instance. Note that settings fields will not accept an array of fields.
+     *
+     * @return self
+     * @throws \InvalidArgumentException if an array of fields is passed instead of a single Field instance.
+     */
+    public function attach(Field|array $field): self {
+        if (is_array($field)) {
+            throw new \InvalidArgumentException('Only a single Field instance can be attached to a SettingsField.');
+        }
+
+        $this->field = $field;
+        $this->field->class('meros-settings-field');
+        $this->queue();
+        return $this;
+    }
+
+    /**
+     * Adds extra HTML to be used in the field's title.
+     *
+     * @param string $html The HTML string to use in the field's title.
+     *
+     * @return self
+     */
+    public function titleHTML(string $html): self {
+        $html = wp_kses_post( $html );
+        $this->titleHTML = $this->getFieldTitleHTML($html);
+        return $this;
+    }
+
     /***************************
      * Helpers
      ***************************/
+
     /**
      * Gets the slug of the admin page that this field belongs to.
      *
@@ -203,7 +244,7 @@ final class SettingsField extends FeatureDefinition {
      *
      * @return string
      */
-    protected function getFieldTitleHTML(): string {
+    protected function getFieldTitleHTML(string $extra = ''): string {
         $option      = $this->setting->name;
         $label       = $this->setting->getLabel();
         $description = $this->setting->getDescription();
@@ -215,6 +256,8 @@ final class SettingsField extends FeatureDefinition {
         $html .= $description !== ''
             ? '<p class="description">' . esc_html($description) . '</p>'
             : '';
+
+        $html .= $extra;
         
         return $html;
     }

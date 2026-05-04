@@ -8,20 +8,7 @@ use MM\Meros\Services\Contracts\Elements\Field;
 class Fields extends Register {
     protected string $identifier = 'handle';
     protected string $definition = Field::class;
-
-    /**
-     * List of supported operations for this register.
-     *
-     * @var array
-     */
-    protected array  $supports = [
-        'register',
-        'makeFrom',
-        'attach',
-        'public',
-        'get',
-        'all',
-    ];
+    protected array  $rejects    = ['make'];
 
     /**
      * Parses properties for the asset's constructor.

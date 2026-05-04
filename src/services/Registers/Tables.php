@@ -33,12 +33,13 @@ class Tables extends Register implements Discovery {
      *
      * @param string|null $path The path to discover tables from. If null, the provider's default tables path will be used.
      *
-     * @return void
+     * @return self
      */ 
-    public function discover(?string $path = null): void {
+    public function discover(?string $path = null): self {
         $this->ensureCheckedOut();
         $this->discoverTables($path);;
         $this->checkin(); // Check the register back in after discovery
+        return $this;
     }
 
     /**

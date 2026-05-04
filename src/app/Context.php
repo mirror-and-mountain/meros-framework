@@ -83,6 +83,65 @@ final class Context {
     }
 
     /**
+     * Adds query arguments to the current URL and returns the modified URL.
+     *
+     * @param array $args An associative array of query parameters to add (e.g., ['foo' => 'bar']).
+     *
+     * @return string The modified URL with the added query parameters.
+     */
+    public function addQueryArgs(array $args): string {
+        return add_query_arg($args, $this->url);
+    }
+
+    /**
+     * Adds query arguments to the current full URL (including existing query parameters) and returns the modified URL.
+     *
+     * @param array $args An associative array of query parameters to add (e.g., ['foo' => 'bar']).
+     *
+     * @return string The modified full URL with the added query parameters.
+     */
+    public function appendQueryArgs(array $args): string {
+        return add_query_arg($args, $this->fullUrl);
+    }
+
+    /**
+     * Determines if the current context is a specific admin screen based on the provided parameters.
+     *
+     * @param string $page     The page slug to check for (e.g., 'options-general.php').
+     * @param string $tab      Optional tab parameter to check for within the page.
+     * @param string $provider Optional provider parameter to check for within the page.
+     *
+     * @return boolean True if the current context matches the specified admin screen, false otherwise.
+     */
+    public function isFrameworkScreen(string $page, string $tab = '', string $provider = ''): bool {
+        if (!$this->isAdmin) {
+            return false;
+        }
+
+        if ($this->adminScreen !== 'options-general.php') {
+            return false;
+        }
+
+        if (!isset($this->params['page']) || $this->params['page'] !== $page) {
+            return false;
+        }
+
+        if ($tab) {
+            if (!isset($this->params['tab']) || $this->params['tab'] !== $tab) {
+                return false;
+            }
+        }
+
+        if ($provider) {
+            if (!isset($this->params['provider']) || $this->params['provider'] !== $provider) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Get the current HTTP request object.
      *
      * @return Request

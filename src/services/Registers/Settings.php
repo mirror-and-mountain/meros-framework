@@ -8,20 +8,7 @@ use MM\Meros\Services\Contracts\Admin\Setting;
 class Settings extends Register {
     protected string $identifier = 'name';
     protected string $definition = Setting::class;
-
-    /**
-     * List of supported operations for this register.
-     *
-     * @var array
-     */
-    protected array $supports = [
-        'register',
-        'make',
-        'makeFrom',
-        'get',
-        'all',
-        'attach'
-    ];
+    protected array  $rejects    = ['multiple', 'public'];
 
     /**
      * Parses properties for the setting's constructor.

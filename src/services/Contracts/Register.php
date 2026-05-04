@@ -50,11 +50,19 @@ abstract class Register {
         'register',
         'make',
         'makeFrom',
+        'attach',
         'get',
-        'public',
         'all',
-        'attach'
+        'public',
+        'multiple'
     ];
+
+    /**
+     * List of operations that are not supported by this register.
+     *
+     * @var array<string>
+     */
+    protected array $rejects = [];
 
     /**
      * The collection of features registered in this register.
@@ -112,6 +120,10 @@ abstract class Register {
      * @return bool True if the operation is supported, false otherwise.
      */
     protected function supports(string $operation): bool {
+        if (in_array($operation, $this->rejects)) {
+            return false;
+        }
+
         return in_array($operation, $this->supports);
     }
 
@@ -130,16 +142,20 @@ abstract class Register {
             throw new \BadMethodCallException("This register (" . static::class . ") does not support registering feature classes.");
         }
 
+        if (in_array($id, array_keys($this->classes))) {
+            throw new \InvalidArgumentException("A class with the ID {$id} is already registered in this register (" . static::class . ").");
+        }
+
+        if (in_array($featureClass, $this->classes)) {
+            throw new \InvalidArgumentException("The class {$featureClass} is already registered in this register (" . static::class . ").");
+        }
+
         $this->ensureCheckedOut();
 
         $class = ClassInfo::get($featureClass);
 
         if (!$class->extends($this->definition)) {
             throw new \InvalidArgumentException("Class {$featureClass} must extend {$this->definition} to be added to this register.");
-        }
-
-        if (isset($this->classes[$id])) {
-            throw new \InvalidArgumentException("A class with the ID {$id} is already registered in this register (" . static::class . ").");
         }
 
         $this->classes[$id] = $featureClass;
@@ -171,15 +187,16 @@ abstract class Register {
 
         $parsedProperties = $this->parseProperties($props);
 
-        $item = $this->attach(new $this->definition(
+        $item = new $this->definition(
             $this->provider,
             $parsedProperties
-        ));
+        );
 
         if ($callback && $callback instanceof Closure) {
             $callback($item);
         }
 
+        $this->attach($item);
         $this->checkin();
         return $item;
     }
@@ -216,6 +233,7 @@ abstract class Register {
         }
 
         $this->ensureCheckedOut();
+        $provider = $this->provider;
 
         if (isset($this->classes[$idOrClass])) {
             $class = $this->classes[$idOrClass];
@@ -224,6 +242,7 @@ abstract class Register {
         else if (!in_array($idOrClass, $this->classes)) {
             $class = $idOrClass;
             $this->register(strtolower(class_basename($class)), $class);
+            $this->checkout($provider); // Re-checkout to ensure the provider is set after registration
         }
 
         else {
@@ -252,6 +271,16 @@ abstract class Register {
         }
 
         $this->ensureCheckedOut();
+
+        if (!$this->supports('multiple')) {
+            $identifier = $feature->{$this->identifier};
+            $existing = $this->getExistingInstance($identifier);
+
+            if ($existing !== false) {
+                $this->checkin();
+                return $existing;
+            }
+        }
 
         $this->instances->push($feature);
 
@@ -344,4 +373,23 @@ abstract class Register {
      * @return array The parsed properties ready for the feature's constructor.
      */
     abstract protected function parseProperties(array $props): array;
+
+    /**
+     * Checks if a feature with the given identifier already exists in the register.
+     *
+     * @param string $id The identifier to check for.
+     *
+     * @return FeatureDefinition|false The existing feature instance if found, false otherwise.
+     */
+    private function getExistingInstance(string $id): FeatureDefinition|false {
+        $provider = $this->provider;
+        $instance = $this->get($id);
+        $this->checkout($provider); // Re-checkout to ensure the provider is set after retrieval
+
+        if ($instance) {
+            return $instance;
+        }
+
+        return false;
+    }
 }

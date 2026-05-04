@@ -157,6 +157,15 @@ trait HasIdentity {
     }
 
     /**
+     * Returns the description.
+     * 
+     * @return string
+     */
+    final public function getDescription(): string {
+        return $this->description;
+    }
+
+    /**
      * Returns the path.
      *
      * @return string
@@ -209,6 +218,15 @@ trait HasIdentity {
      */
     final public function getAuthorSupportUri(): string {
         return $this->authorSupportUri;
+    }
+
+    /**
+     * Returns the slug of the settings page for this item.
+     *
+     * @return string
+     */
+    final public function getSettingsPageSlug(): string {
+        return 'meros-features-' . Str::kebab($this->getHandle());
     }
 
     /**

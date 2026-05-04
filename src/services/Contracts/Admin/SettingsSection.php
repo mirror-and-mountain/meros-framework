@@ -5,10 +5,10 @@ namespace MM\Meros\Services\Contracts\Admin;
 use Closure;
 use Illuminate\Support\Str;
 
+use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\Services\Contracts\FeatureDefinition;
 
-final class SettingsSection extends FeatureDefinition {
-
+class SettingsSection extends FeatureDefinition {
     /**
      * The section's id.
      *
@@ -28,7 +28,7 @@ final class SettingsSection extends FeatureDefinition {
      *
      * @var string
      */
-    protected string $pageSlug = '';
+    protected string $page = '';
 
     /**
      * An array of additional arguments to pass to the settings section callback.
@@ -40,16 +40,30 @@ final class SettingsSection extends FeatureDefinition {
     /**
      * The callback function that renders the content of the settings section.
      *
-     * @var Closure|null
+     * @var Closure|string|array|null
      */
-    protected ?Closure $callback = null;
+    protected Closure|string|array|null $callback = null;
 
     /**
-     * The menu page that the settings section belongs to.
+     * SettingsSection constructor.
      *
-     * @var MenuPage|null
+     * @param FeatureProvider $provider
+     * @param array           $props
      */
-    protected ?MenuPage $page = null;
+    final public function __construct(
+        FeatureProvider $provider,
+        array           $props = []
+    ) {
+        $this->provider = $provider;
+        
+        if (empty($this->page)) {
+            $this->page = $this->provider->getSettingsPageSlug();
+        }
+
+        $this->setProps($props);
+
+        $this->queue();
+    }
 
     /**
      * Queues the settings section to be loaded via a WordPress hook if all the required properties are set.
@@ -60,26 +74,18 @@ final class SettingsSection extends FeatureDefinition {
         $requiredProps = [
             'id',
             'title',
-            'pageSlug',
+            'page',
             'callback'
          ];
 
-         if (is_null($this->callback)) {
-            $this->callback = function() {
-                echo view('meros::admin.templates.provider-settings-section', [
-                    'id'               => $this->id,
-                    'title'            => $this->title,
-                    'author'           => $this->provider->getAuthor(),
-                    'authorUri'        => $this->provider->getAuthorUri(),
-                    'authorSupportUri' => $this->provider->getAuthorSupportUri(),
-                ]);
-            };
-         }
-
          foreach ($requiredProps as $prop) {
-             if (!isset($this->$prop) || (is_string($this->$prop) && empty($this->$prop))) {
+            if ($prop === 'callback' && $this->$prop === null) {
+                $this->callback = [$this, 'render'];
+            }
+
+            else if (empty($this->$prop)) {
                  return;
-             }
+            }
          }
 
         if (!$this->queued) {
@@ -101,34 +107,27 @@ final class SettingsSection extends FeatureDefinition {
             $this->id,
             $this->title,
             $this->callback,
-            $this->pageSlug,
+            $this->page,
             $this->args
         );
     }
 
     /***************************
-     * Public Chainable methods
+     * Rendering
      ***************************/
 
     /**
-     * Associates the settings section with a menu page. Can accept either an instance of MenuPage or a string representing the title of the menu page to associate with.
+     * Default render method for the settings section. This will be used if no callback is provided.
      *
-     * @param MenuPage|string $page The menu page to associate the settings section with. Can be an instance of MenuPage or a string representing the title of the menu page.
-     *
-     * @return self
+     * @return void
      */
-    public function onPage(MenuPage|string $page): self {
-        if ($page instanceof MenuPage) {
-            $this->page     = $page;
-            $this->pageSlug = $page->getSlug();
-        } else {
-            $this->pageSlug = Str::slug($page);
-        }
-
-        $this->hook();
-        return $this;
+    public function render(): void {
+        echo '';
     }
 
+    /***************************
+     * Public Chainable methods
+     ***************************/
     /**
      * Sets the ID of the settings section.
      *
@@ -143,7 +142,7 @@ final class SettingsSection extends FeatureDefinition {
             $this->title = Str::title(str_replace(['-', '_'], ' ', $id));
         }
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -161,7 +160,7 @@ final class SettingsSection extends FeatureDefinition {
             $this->id = Str::slug($title);
         }
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -173,9 +172,9 @@ final class SettingsSection extends FeatureDefinition {
      * @return self
      */
     public function callback(callable|Closure $callback): self {
-        $this->callback = $this->convertToClosure($callback);
+        $this->callback = $callback;
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -189,7 +188,7 @@ final class SettingsSection extends FeatureDefinition {
     public function args(array $args): self {
         $this->args = $args;
 
-        $this->hook();
+        $this->queue();
         return $this;
     }
 
@@ -202,7 +201,7 @@ final class SettingsSection extends FeatureDefinition {
      * @return string The slug of the settings page.
      */
     public function getPageSlug(): string {
-        return $this->pageSlug;
+        return $this->page;
     }
 
     /**

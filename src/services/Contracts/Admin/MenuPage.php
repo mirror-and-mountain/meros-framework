@@ -4,7 +4,6 @@ namespace MM\Meros\Services\Contracts\Admin;
 
 use Closure;
 use Illuminate\Support\Str;
-use MM\Meros\Support\ClassInfo;
 
 use MM\Meros\Facades\SettingsSections;
 use MM\Meros\Services\Contracts\FeatureDefinition;
@@ -324,11 +323,15 @@ class MenuPage extends FeatureDefinition {
         if (is_string($template)) {
             $templateInstance = MenuPageTemplates::checkout($this->provider)->makeFrom($template, $props);
             $this->template = $templateInstance;
+            $this->template->setSlug($this->slug);
+            $this->template->setTitle($this->title);
         }
 
         else if ($template instanceof MenuPageTemplate) {
             $this->template = $template;
             $this->template->setProps($props);
+            $this->template->setSlug($this->slug);
+            $this->template->setTitle($this->title);
         }
 
         $this->queue();

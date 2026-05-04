@@ -8,21 +8,7 @@ use MM\Meros\Services\Contracts\Admin\SettingsSection;
 class SettingsSections extends Register {
     protected string $identifier = 'id';
     protected string $definition = SettingsSection::class;
-
-    /**
-     * List of supported operations for this register.
-     *
-     * @var array
-     */
-    protected array $supports = [
-        'register',
-        'make',
-        'makeFrom',
-        'get',
-        'all',
-        'public',
-        'attach'
-    ];
+    protected array  $rejects    = ['multiple', 'public'];
 
     /**
      * Parses properties for the settings section's constructor.
@@ -35,7 +21,6 @@ class SettingsSections extends Register {
         return [
             'id'       => $props['id'] ?? '',
             'title'    => $props['title'] ?? '',
-            'pageSlug' => $props['page_slug'] ?? '',
             'args'     => $props['args'] ?? [],
             'callback' => $props['callback'] ?? null
         ];

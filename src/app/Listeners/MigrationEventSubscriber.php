@@ -57,7 +57,7 @@ class MigrationEventSubscriber {
     /**
      * Handles table drop events.
      *
-     * @param  TableDropped $event
+     * @param TableDropped $event
      *
      * @return void
      */
@@ -106,10 +106,10 @@ class MigrationEventSubscriber {
             return;
         }
 
-        $trimmedPath = Str::replace(Theme::getPath(), '', $installer->getPath());
+        $trimmedPath = ltrim(Str::replace(get_stylesheet_directory(), '', $installer->getPath()), '/');
 
         Migration::create([
-            'source'        => $installer->provider->getHandle(),
+            'provider'      => $installer->provider->getHandle(),
             'type'          => $type,
             'label'         => $installer->getLabel(),
             'handle'        => $installer->getHandle(),

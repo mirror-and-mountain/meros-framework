@@ -131,7 +131,7 @@ abstract class FeatureDefinition {
         $this->nickname = $nickname;
         return $this;
     }
-
+    
     /**
      * Helper to convert a callable to a Closure instance.
      *

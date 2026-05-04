@@ -5,6 +5,7 @@ namespace MM\Meros\Services\Contracts\Elements;
 use Illuminate\Support\Str;
 
 use MM\Meros\Services\Contracts\FeatureDefinition;
+use MM\Meros\Services\Contracts\Admin\SettingsField;
 use MM\Meros\Services\Contracts\Elements\Interfaces\FieldParent;
 
 use MM\Meros\Facades\FieldStyles;
@@ -38,6 +39,13 @@ abstract class Field extends FeatureDefinition {
      * @var FieldParent|null
      */
     protected ?FieldParent $parent = null;
+
+    /**
+     * The SettingsField instance associated with this field, if any.
+     *
+     * @var SettingsField|null
+     */
+    protected ?SettingsField $settingsField = null;
 
     /**
      * The field's name, which can be used for form submission and as a fallback for generating the label.
@@ -387,15 +395,21 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
-     * Attaches the field to a parent and sets the parent context on the field.
+     * Attaches the field to a parent field group, repeater or settings field and sets the parent context on the field.
      *
-     * @param FieldParent $parent The parent to attach this field to.
+     * @param FieldParent|SettingsField $item The parent or settings field to attach this field to.
      *
      * @return self
      */
-    public function attachTo(FieldParent $parent): self {
-        $this->parent($parent);
-        $parent->attach($this);
+    public function attachTo(FieldParent|SettingsField $item): self {
+        if ($item instanceof SettingsField) {
+            $this->settingsField = $item;
+            $this->settingsField->attach($this);
+            return $this;
+        }
+
+        $this->parent($item);
+        $item->attach($this);
         return $this;
     }
 
@@ -685,5 +699,29 @@ abstract class Field extends FeatureDefinition {
 
         $style = FieldStyles::checkout($this->provider)->makeFrom($this->style);
         return $style->getView();
+    }
+
+    /**
+     * Magic method to handle dynamic method calls for chaining, such as setting the section on the associated SettingsField.
+     *
+     * @param string $method The name of the method being called.
+     * @param array  $arguments The arguments passed to the method.
+     *
+     * @return mixed
+     * @throws \BadMethodCallException If the method does not exist on the Field class or the associated SettingsField.
+     */
+    public function __call(string $method, mixed $arguments) {
+        // Allow dynamic getters for properties
+        if ($method === 'section' && $this->settingsField !== null) {
+            $this->settingsField->section(...$arguments);
+            return $this;
+        }
+
+        if ($method === 'titleHTML' && $this->settingsField !== null) {
+            $this->settingsField->titleHTML(...$arguments);
+            return $this;
+        }
+
+        throw new \BadMethodCallException("Method {$method} does not exist on " . static::class);
     }
 }

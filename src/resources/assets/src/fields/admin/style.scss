@@ -41,20 +41,6 @@ input[type="time"].meros-admin-field {
     grid-column: span 2;
 }
 
-tbody:has(.meros-settings-label) {
-    th[scope="row"]:has(.meros-settings-label) {
-        width: 400px;
-    }
-}
-
-tbody:has(.meros-package-tasks),
-tbody:has(.meros-action-btn-wrapper) {
-    td:has(.meros-settings-field) {
-        vertical-align: top !important;
-        padding-top: 2.5rem !important;
-    }
-}
-
 .structure-selection {
     .row:has(#permalink-input-plain) {
         display: none !important;

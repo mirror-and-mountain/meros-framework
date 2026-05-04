@@ -85,6 +85,7 @@ class Select extends Field {
                     $this->options[$value] = Str::title(str_replace(['-', '_'], ' ', $value));
                 }
 
+                $this->default = [];
                 $this->default[] = $value;
             }
 

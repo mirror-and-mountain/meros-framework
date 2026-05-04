@@ -8,21 +8,7 @@ use MM\Meros\Services\Contracts\Admin\SettingsField;
 class SettingsFields extends Register {
     protected string $identifier = 'id';
     protected string $itemClass  = SettingsField::class;
-
-    /**
-     * List of supported operations for this register.
-     *
-     * @var array
-     */
-    protected array $supports = [
-        'register',
-        'make',
-        'makeFrom',
-        'get',
-        'all',
-        'public',
-        'attach'
-    ];
+    protected array  $rejects    = ['multiple'];
 
     /**
      * Parses properties for the setting field's constructor.

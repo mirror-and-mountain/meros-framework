@@ -23,6 +23,7 @@ use MM\Meros\Services\Registers\FieldStyles;
 use MM\Meros\Services\Registers\Tables;
 use MM\Meros\Services\Registers\MenuPages;
 use MM\Meros\Services\Registers\MenuPageTemplates;
+use MM\Meros\Services\Registers\Packages as PackagesRegister;
 use MM\Meros\Services\Registers\Settings;
 use MM\Meros\Services\Registers\SettingsFields;
 use MM\Meros\Services\Registers\SettingsSections;
@@ -31,6 +32,9 @@ use MM\Meros\App\Listeners\MigrationEventSubscriber;
 
 use MM\Meros\Scripts\InstallCommands;
 use MM\Meros\Scripts\UninstallCommands;
+
+use MM\Meros\Facades\Theme;
+use MM\Meros\Facades\Packages;
 
 class FrameworkServiceProvider extends ServiceProvider {
     
@@ -53,7 +57,7 @@ class FrameworkServiceProvider extends ServiceProvider {
         $this->app->make(Context::class);
 
         // Init the Framework class to trigger the constructor and set up the framework
-        $framework = $this->app->make(Framework::class)->__initialise();
+        $framework = $this->app->make(Framework::class)->__initialise($this);
         
         // Load views from the framework's views directory
         $viewsPath = $framework->getPreference('views_path');
@@ -79,6 +83,9 @@ class FrameworkServiceProvider extends ServiceProvider {
 
         // Register packages
         $this->registerPackages();
+
+        // Trigger an action after all providers have been registered
+        do_action('meros_providers_registered', Theme::get(), Packages::all());
 
         // Enable wp meros cli if appropriate
         if ($this->app->runningInConsole()) {
@@ -140,6 +147,10 @@ class FrameworkServiceProvider extends ServiceProvider {
             return new MenuPageTemplates();
         });
 
+        $this->app->singleton(PackagesRegister::class, function () {
+            return new PackagesRegister();
+        });
+
         $this->app->singleton(Settings::class, function () {
             return new Settings();
         });
@@ -161,6 +172,7 @@ class FrameworkServiceProvider extends ServiceProvider {
         $this->app->alias(Tables::class, 'meros.registers.tables');
         $this->app->alias(MenuPages::class, 'meros.registers.menu_pages');
         $this->app->alias(MenuPageTemplates::class, 'meros.registers.menu_page_templates');
+        $this->app->alias(PackagesRegister::class, 'meros.registers.packages');
         $this->app->alias(Settings::class, 'meros.registers.settings');
         $this->app->alias(SettingsFields::class, 'meros.registers.settings_fields');
         $this->app->alias(SettingsSections::class, 'meros.registers.settings_sections');

@@ -50,49 +50,57 @@
 }
 
 /* Action button styles for Meros Admin */
-.meros-package-tasks {
-
+.meros-provider-tasks {
     .meros-installer-info {
         font-size: 12px;
         color: #7f8c8d;
-        margin-bottom: -0.5rem;
+
+        p {
+            margin-bottom: -2px;
+        }
     }
 
-    .meros-action-btn-wrapper {
-        margin-top: 1rem;
+    .meros-installer-button {
+        transition: opacity 0.3s ease;
+    }
 
-        &:has(.meros-action-btn) {
-            min-height: 30px;
-        }
+    .meros-installer-button.is-busy {
+        position: relative;
+        overflow: hidden;
+        pointer-events: none;
+    }
 
-        .meros-action-btn {
-            transition: opacity 0.3s ease;
-        }
+    .meros-installer-button.is-busy::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(
+            90deg,
+            transparent,
+            rgba(255,255,255,0.25),
+            transparent
+        );
+        animation: meros-shimmer 1.2s infinite;
+    }
 
-        .meros-action-btn.is-busy {
-            position: relative;
-            overflow: hidden;
-            pointer-events: none;
+    @keyframes meros-shimmer {
+        100% {
+            transform: translateX(100%);
         }
+    }
+}
 
-        .meros-action-btn.is-busy::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            transform: translateX(-100%);
-            background: linear-gradient(
-                90deg,
-                transparent,
-                rgba(255,255,255,0.25),
-                transparent
-            );
-            animation: meros-shimmer 1.2s infinite;
-        }
+tbody:has(.meros-settings-label) {
+    th[scope="row"]:has(.meros-settings-label) {
+        width: 400px;
+    }
+}
 
-        @keyframes meros-shimmer {
-            100% {
-                transform: translateX(100%);
-            }
-        }
+tbody:has(.meros-provider-tasks),
+tbody:has(.meros-installer-button) {
+    td:has(.meros-settings-field) {
+        vertical-align: top !important;
+        padding-top: 2.5rem !important;
     }
 }

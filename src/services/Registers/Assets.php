@@ -12,20 +12,7 @@ use MM\Meros\Services\Registers\Interfaces\Discovery;
 class Assets extends Register implements Discovery {
     protected string $identifier = 'handle';
     protected string $definition = Asset::class;
-
-    /**
-     * List of supported operations for this register.
-     *
-     * @var array
-     */
-    protected array $supports = [
-        'register',
-        'make',
-        'makeFrom',
-        'get',
-        'all',
-        'attach'
-    ];
+    protected array  $rejects    = ['public'];
 
     use Concerns\Discovers;
 
@@ -34,12 +21,13 @@ class Assets extends Register implements Discovery {
      *
      * @param string|null $path The path to discover assets from. If null, the provider's default assets path will be used.
      *
-     * @return void
+     * @return self
      */ 
-    public function discover(?string $path = null): void {
+    public function discover(?string $path = null): self {
         $this->ensureCheckedOut();
         $this->discoverAssets($path);
         $this->checkin(); // Check the register back in after discovery
+        return $this;
     }
 
     /**

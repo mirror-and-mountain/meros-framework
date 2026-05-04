@@ -3,7 +3,6 @@
 namespace MM\Meros\Services\Concerns;
 
 use Closure;
-use Illuminate\Support\Str;
 
 use MM\Meros\Services\Contracts\Admin\Setting;
 use MM\Meros\Services\Contracts\Admin\MenuPage;
@@ -29,6 +28,13 @@ trait HasSettings {
     private string $settingsHandle = '';
 
     /**
+     * The root setting instance for this feature provider.
+     *
+     * @var Setting|null
+     */
+    private ?Setting $rootSetting = null;
+
+    /**
      * Retrieves the root setting for this feature provider, or a specific sub-setting if a name is provided.
      *
      * @param string $name
@@ -36,22 +42,18 @@ trait HasSettings {
      * @return Setting|null
      */
     protected function settings(string $name = ''): Setting|null {
-        if (empty($this->settingsHandle)) {
-            $this->settingsHandle = Str::snake($this->getHandle()) . '_settings';
-        }
-
-        $rootSetting = Settings::checkout($this)->get($this->settingsHandle);
+        $rootSetting = $this->rootSetting;
 
         if (!$rootSetting) {
-            $rootSetting = $this->createRootSetting();
+            $this->setRootSetting();
         }
 
         if (!empty($name)) {
-            return collect($rootSetting->subItems)->firstWhere('name', $name);
+            return collect($this->rootSetting->subItems)->firstWhere('name', $name);
         } 
         
         else {
-            return $rootSetting;
+            return $this->rootSetting;
         }
     }
 
@@ -149,15 +151,36 @@ trait HasSettings {
     }
 
     /**
+     * Sets the root setting for this feature provider if it doesn't already exist. The root setting is automatically created when the 
+     * feature provider is instantiated, so this method should never need to be called manually.
+     *
+     * @return void
+     */
+    private function setRootSetting(): void {
+        if (empty($this->settingsHandle)) {
+            $this->settingsHandle = $this->getHandle() . '_settings';
+        }
+
+        $rootSetting = $this->rootSetting;
+
+        if (!$rootSetting) {
+            $rootSetting = $this->createRootSetting();
+            $this->rootSetting = $rootSetting;
+        }
+    }
+
+    /**
      * Creates the root setting for this feature provider and adds it to the registry.
      *
      * @return Setting The newly created root setting instance for the item.
      */
     private function createRootSetting(): Setting {
         $setting = Settings::checkout($this)->make([
-            'group' => $this->settingsHandle,
+            'group' => $this->settingsHandle . '_group',
             'name'  => $this->settingsHandle,
-        ])->type('object')->label($this->getName() . ' Settings');
+        ])
+            ->type('object')
+            ->label($this->getName() . ' Settings');
 
         return $setting;
     }

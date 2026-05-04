@@ -122,6 +122,7 @@ trait IsAdminFieldRegistrant {
             'id'        => $this->name . '_field',
             'name'      => $this->name,
             'value'     => $this->getValue(),
+            'default'   => $this->getDefault(),
             'style'     => 'settings'
         ] + $props);
 
@@ -301,13 +302,27 @@ trait IsAdminFieldRegistrant {
     }
 
     /**
-     * Returns the root name for the field, used to generate sub-field names for repeaters.
+     * Returns the root name for the field
      * 
      * @return string
      */
     public function getRootName(): string {
         $segments = explode('.', $this->path);
-        return $segments[0] ?? $this->name;
+        $name     = '';
+
+        foreach ($segments as $segment) {
+            if ($segment === array_first($segments)) {
+                $name .= $segment;
+            } else if ($segment !== $this->name) {
+                $name .= '[' . $segment . ']';
+            }
+
+            if ($segment === $this->name) {
+                break;
+            }
+        }
+
+        return $name;
     }
 
     /**

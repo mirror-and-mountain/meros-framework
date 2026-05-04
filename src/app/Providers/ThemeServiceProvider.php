@@ -33,7 +33,7 @@ class ThemeServiceProvider extends ServiceProvider {
     }
 
     final public function boot(): void {
-        $theme = Theme::instance(); // Get the theme instance
+        $theme = Theme::get(); // Get the theme instance
 
         $theme->initialiseStyleSheet(); // Ensure the theme's stylesheet is enqueued
         $this->loadViewsFrom($theme->getPreference('views_path'), 'theme'); // Load views from the theme's views directory
