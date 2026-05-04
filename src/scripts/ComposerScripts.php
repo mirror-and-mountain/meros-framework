@@ -108,7 +108,7 @@ class ComposerScripts {
 
         $io->write("<info>Updating Livewire Assets in the theme directory: {$projectRoot}/assets/livewire</info>");
 
-        $testCommand = "cd {$projectRoot} && wp acorn";
+        $testCommand = "cd {$projectRoot} && wp acorn --allow-root";
         exec($testCommand, $testOutput, $testStatus);
 
         if ($testStatus !== 0) {
@@ -116,7 +116,7 @@ class ComposerScripts {
             return;
         }
 
-        $command = "cd {$projectRoot} && wp acorn livewire:publish --assets";
+        $command = "cd {$projectRoot} && wp acorn livewire:publish --assets --allow-root";
 
         exec($command, $output, $status);
 
