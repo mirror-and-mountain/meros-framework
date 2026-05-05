@@ -101,8 +101,11 @@ final class Framework extends FeatureProvider {
         add_action('after_switch_theme', [$this, 'runActivationTasks']);
 
         // Configure settings and menu pages
-        $this->configureSettings();
-        $this->configureMenuPages();
+        if ($this->context->isAdmin) {
+            $this->configureSettings();
+            $this->configureMenuPages();
+        }
+            
 
         // Discover assets
         $this->assets()->discover();

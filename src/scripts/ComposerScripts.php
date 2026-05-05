@@ -85,62 +85,6 @@ class ComposerScripts {
                     $io->write("<info>Package {$packageName} installed successfully.</info>");
                 }
             }
-
-            // Update livewire assets
-            elseif ($packageName === 'livewire/livewire') {
-                self::publishLivewireAssets($io);
-            }
-        }
-    }
-
-    /**
-     * Publishes Livewire assets to the theme's assets directory.
-     *
-     * Runs WP CLI commands to publish Livewire assets, moves them to the appropriate
-     * theme directory, and cleans up the vendor directory. Skips if WP CLI or the theme
-     * is not activated.
-     *
-     * @param IOInterface $io Composer IO interface for output.
-     * @return void
-     */
-    private static function publishLivewireAssets(IOInterface $io): void {
-        $projectRoot = self::$projectRoot;
-
-        $io->write("<info>Updating Livewire Assets in the theme directory: {$projectRoot}/assets/livewire</info>");
-
-        $testCommand = "cd {$projectRoot} && wp acorn";
-        exec($testCommand, $testOutput, $testStatus);
-
-        if ($testStatus !== 0) {
-            $io->write('Meros theme not currently activated or WP CLI unavailable. Skipping publish Livewire assets.');
-            return;
-        }
-
-        $command = "cd {$projectRoot} && wp acorn livewire:publish --assets";
-
-        exec($command, $output, $status);
-
-        if ($status !== 0) {
-            $io->write('<error>Failed to publish Livewire assets. Check that WP CLI is installed in the environment.</error>');
-        }
-
-        $source = "{$projectRoot}/public/vendor/livewire";
-        $destination = "{$projectRoot}/assets/livewire";
-
-        // Ensure the destination directory is clean
-        if (is_dir($destination)) {
-            self::deleteDirectory($destination);
-        }
-
-        // Move the directory
-        if (! rename($source, $destination)) {
-            $io->write("<error>Failed to move Livewire assets from {$source} to {$destination}</error>");
-        }
-
-        // Delete the vendor directory
-        $vendorDir = "{$projectRoot}/public/vendor";
-        if (is_dir($vendorDir)) {
-            self::deleteDirectory($vendorDir);
         }
     }
 
@@ -162,28 +106,5 @@ class ComposerScripts {
         } else {
             $io->write('<info>WordPress installed and configured successfully.</info>');
         }
-    }
-
-    /**
-     * Deletes a directory and all its contents recursively.
-     *
-     * @param  string  $dir  The directory to delete.
-     */
-    private static function deleteDirectory(string $dir): void {
-        if (! file_exists($dir)) {
-            return;
-        }
-
-        $items = scandir($dir);
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
-                continue;
-            }
-
-            $path = $dir . DIRECTORY_SEPARATOR . $item;
-            is_dir($path) ? self::deleteDirectory($path) : unlink($path);
-        }
-
-        rmdir($dir);
     }
 }
