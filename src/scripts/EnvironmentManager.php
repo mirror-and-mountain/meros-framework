@@ -174,7 +174,7 @@ class EnvironmentManager {
         }
 
         $configCommand = sprintf(
-        'cd %s && wp config create --dbname=%s --dbuser=%s --dbpass=%s --dbhost=%s --dbcharset=%s --dbcollate=%s --dbprefix=%s --allow-root',
+        'cd %s && wp config create --dbname=%s --dbuser=%s --dbpass=%s --dbhost=%s --dbcharset=%s --dbcollate=%s --dbprefix=%s',
             escapeshellarg($this->config['path']),
             escapeshellarg($this->config['db']['name']),
             escapeshellarg($this->config['db']['user']),
@@ -186,7 +186,7 @@ class EnvironmentManager {
         );
 
         $installCommand = sprintf(
-            'cd %s && wp core install --url=%s --title=%s --admin_user=%s --admin_password=%s --admin_email=%s --skip-email --allow-root',
+            'cd %s && wp core install --url=%s --title=%s --admin_user=%s --admin_password=%s --admin_email=%s --skip-email',
             escapeshellarg($this->config['path']),
             escapeshellarg($this->config['url']),
             escapeshellarg($this->config['site_title']),
@@ -196,7 +196,7 @@ class EnvironmentManager {
         );
 
         $activateThemeCommand = sprintf(
-            'cd %s && wp theme activate %s --allow-root',
+            'cd %s && wp theme activate %s',
             escapeshellarg($this->config['path']),
             escapeshellarg($this->themeSlug)
         );
@@ -223,7 +223,7 @@ class EnvironmentManager {
 
         foreach($options as $option => $value) {
             $optionCommand = sprintf(
-                'cd %s && wp option update %s %s --allow-root',
+                'cd %s && wp option update %s %s',
                 escapeshellarg($this->config['path']),
                 escapeshellarg($option),
                 escapeshellarg($value)
@@ -232,7 +232,7 @@ class EnvironmentManager {
         }
 
         $flushCommand = sprintf(
-            'cd %s && wp rewrite flush --allow-root',
+            'cd %s && wp rewrite flush',
             escapeshellarg($this->config['path'])
         );
         exec($flushCommand);
