@@ -33,6 +33,7 @@
                 >&larr; Back
             </a>
             <h1>{{ $packageInstance->getName() }} Settings</h1>
+            <p>{{ $packageInstance->getDescription() }}</p>
             @if($hasSettings)
                 <form method="post" action="options.php">
                     @php

@@ -275,24 +275,30 @@ final class Framework extends FeatureProvider {
                     'theme' => [
                         'label'    => 'Theme',
                         'callback' => function () {
+                            echo '<h2>Theme Configuration</h2>';
+                            echo '<p>Theme features are functionalities provided by your active theme that can be installed, updated and uninstalled independently of the theme itself.</p>';
+                            
                             $hasTables = Theme::hasTables();
-
                             if ($hasTables) {
+                                echo '<h3 style="margin-top: 2em;">Theme Installer</h3>';
                                 $operation = $_GET['operation'] ?? null;
-                                $operationMessage = $operation === 'installed'
-                                    ? 'Theme features have been successfully installed!'
-                                    : ($operation === 'updated' 
-                                        ? 'Theme features have been successfully updated!' 
-                                        : 'Theme features have been successfully uninstalled.'
-                                    );
+                                $operationMessage = $operation ? match($operation) {
+                                    'installed'   => 'Theme features installed successfully.',
+                                    'updated'     => 'Theme features updated successfully.',
+                                    'rolled-back' => 'Theme features rolled back successfully.',
+                                    'uninstalled' => 'Theme features uninstalled successfully.',
+                                    default       => null,
+                                } : null;
 
-                                if ($operation && in_array($operation, ['installed', 'updated', 'uninstalled'])) {
+                                if ($operationMessage) {
                                     echo '<div class="notice notice-success is-dismissible"><p>' . esc_html($operationMessage) . '</p></div>';
                                 }
                                 
                                 echo $this->getInstallerHTML(Theme::get());
+
                             }
 
+                            echo '<h3' . ($hasTables ? ' style="margin-top: 2em;"' : '') . '>Theme Settings</h3>';
                             settings_fields('meros_theme_settings_group');
                             do_settings_sections('meros-features-theme');
                             submit_button();
@@ -378,7 +384,7 @@ final class Framework extends FeatureProvider {
         $hasUpdates  = $provider->hasUpdates();
         $installedAt = null;
 
-        $html .= '<div class="meros-provider-tasks"><div class="meros-installer-info">';
+        $html .= '<div class="meros-provider-tasks">';
 
         if ($installed) {
             $installedAt = $provider->installedAt() ?? 'Unknown time';
@@ -388,54 +394,49 @@ final class Framework extends FeatureProvider {
         $dataAttrs .= 'data-provider-type="' . esc_attr($isTheme ? 'theme' : 'package') . '" ';
         $dataAttrs .= 'data-nonce="' . esc_attr(wp_create_nonce('meros_provider_install_operation_' . $handle)) . '"';
 
-        if ((!$enabled || $isTheme) && $installed) {
-            $html .= '<p style="margin-top:8px;">Installed: ' . esc_html($installedAt) . '</p>';
+        if (!$enabled && !$isTheme && $installed) {
+            $html .= '<p class="meros-installer-info">Installed: ' . esc_html($installedAt) . '</p>';
             $html .= '<a href="#" class="meros-provider-action-button meros-provider-uninstaller-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Uninstall</a>';
             $html .= '</div>';
+            
             return $html;
         }
 
         if ($installed) {
-            $html .= '<p style="margin-top:8px;">Installed: ' . esc_html($installedAt);
+            $html .= '<p class="meros-installer-info"><span><strong>Installed:</strong> ' . esc_html($installedAt) . '</span>';
 
             $lastUpdated = $provider->lastUpdated();
             $newInstall  = $lastUpdated === $installedAt;
             $canRollback = $lastUpdated !== $installedAt;
 
             if (!$newInstall) {
-                $html .= '<span> | Last updated: ' . esc_html($lastUpdated) . '</span>';
-            }
-             
-            if ($hasUpdates || $canRollback) {
-                if ($hasUpdates) {
-                    $html .= '<span style="color:green"> | Update available:</span></p>';
-                } else {
-                    $html .= '</p>';
-                }
-
-                if ($hasUpdates && $canRollback) {
-                    $html .= '<div class="meros-provider-update-tasks">';
-                }
-
-                if ($hasUpdates) {
-                    $html .= '<a href="#" class="meros-provider-action-button meros-provider-update-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Update</a>';
-                }
-
-                if ($canRollback) {
-                    $html .= '<a href="#" class="meros-provider-action-button meros-provider-rollback-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Rollback</a>';
-                }
-
-                if ($hasUpdates && $canRollback) {
-                    $html .= '</div>';
-                }
+                $html .= '<span> | <strong>Last updated:</strong> ' . esc_html($lastUpdated) . '</span>';
             }
 
-            else {
+            if ($hasUpdates) {
+                $html .= '<span style="color:green"> | <strong>Update available:</strong></span></p>';
+            } else {
                 $html .= '</p>';
             }
 
+            $html .= '<div class="meros-provider-action-buttons">';
+
+            if ($isTheme) {
+                $html .= '<a href="#" class="meros-provider-action-button meros-provider-uninstaller-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Uninstall</a>';
+            }
+             
+            if ($hasUpdates) {
+                $html .= '<a href="#" class="meros-provider-action-button meros-provider-update-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Update</a>';
+            }
+
+            if ($canRollback) {
+                $html .= '<a href="#" class="meros-provider-action-button meros-provider-rollback-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Rollback</a>';
+            }
+
+            $html .= '</div>';
+
         } else {
-            $html .= '<p style="margin-top:8px;">This ' . ($isTheme ? 'theme' : 'package') . ' has features that may need to be installed for it to function properly.</p>';
+            $html .= '<p class="meros-installer-info">This ' . ($isTheme ? 'theme' : 'package') . ' has features that may need to be installed for it to function properly.</p>';
             $html .= '<a href="#" class="meros-provider-action-button meros-provider-installer-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Install</a>';
         }
 

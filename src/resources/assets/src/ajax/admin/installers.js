@@ -68,7 +68,11 @@ export default function handleProviderInstaller(e) {
 
         setTimeout(() => {
             const url = new URL(window.location.href);
-            url.searchParams.set('provider', provider);
+
+            if (providerType !== 'theme') {
+                url.searchParams.set('provider', provider);
+            }
+            
             url.searchParams.set('operation', operation);
             window.location.href = url.toString();
         }, 1000); // Slight delay before reload

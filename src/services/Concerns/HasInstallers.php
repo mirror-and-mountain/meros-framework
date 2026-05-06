@@ -13,8 +13,6 @@ use MM\Meros\App\Models\Migration;
 use MM\Meros\Facades\Framework as FrameworkAccessor;
 use MM\Meros\Facades\Tables;
 
-use Illuminate\Support\Facades\Log;
-
 trait HasInstallers {
     private ?string $installedAt = null;
     private ?string $updatedAt = null;
@@ -63,7 +61,7 @@ trait HasInstallers {
             }
         }
 
-        $this->installedAt = (new \DateTime())->format('Y-m-d H:i:s');
+        $this->installedAt = (new \DateTime())->format('d-m-Y H:i:s');
     }
 
     /**
@@ -81,7 +79,7 @@ trait HasInstallers {
             $installed = $table->isInstalled();
             if ($installed && $table->hasUpdates()) {
                 $table->update($batchID);
-                $this->updatedAt = (new \DateTime())->format('Y-m-d H:i:s');
+                $this->updatedAt = (new \DateTime())->format('d-m-Y H:i:s');
             }
 
             if (!$installed) {
@@ -205,7 +203,7 @@ trait HasInstallers {
 
         $this->updatedAt = Migration::where('provider', $this->getHandle())
             ->orderBy('created_at', 'desc')
-            ->value('created_at');
+            ->value('created_at')?->format('d-m-Y H:i:s');
 
         return $this->updatedAt;
     }

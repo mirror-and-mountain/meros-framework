@@ -370,7 +370,7 @@ final class Table extends FeatureDefinition {
     public function getInstalledAt(): ?string {
         return MigrationModel::where('related_table', $this->tableName)
             ->where('type', 'create')
-            ->value('created_at');
+            ->value('created_at')?->format('d-m-Y H:i:s');
     }
 
     /**
@@ -382,7 +382,7 @@ final class Table extends FeatureDefinition {
         return MigrationModel::where('related_table', $this->tableName)
             ->where('type', 'update')
             ->orderBy('created_at', 'desc')
-            ->value('created_at');
+            ->value('created_at')?->format('d-m-Y H:i:s');
     }
 
     /**
