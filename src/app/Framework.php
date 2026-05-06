@@ -17,6 +17,7 @@ use MM\Meros\App\Fields\MultiSelect;
 use MM\Meros\App\Fields\Number;
 use MM\Meros\App\Fields\Radio;
 use MM\Meros\App\Fields\Repeater;
+use MM\Meros\App\Fields\Password;
 use MM\Meros\App\Fields\Select;
 use MM\Meros\App\Fields\Text;
 use MM\Meros\App\Fields\Textarea;
@@ -75,6 +76,7 @@ final class Framework extends FeatureProvider {
         $this->fields()->register('textarea', Textarea::class);
         $this->fields()->register('time', Time::class);
         $this->fields()->register('url', Url::class);
+        $this->fields()->register('password', Password::class);
 
         // Register framework field styles
         $this->fieldStyles()->register('default', DefaultFieldStyle::class);
