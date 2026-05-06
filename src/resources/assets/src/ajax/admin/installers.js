@@ -5,18 +5,46 @@
  * @param {Event} e 
  * @returns {void}
  */
-export default function handleInstallers(e) {
-    const button = e.target.closest(
-        "[data-action='meros_install_feature'], [data-action='meros_update_feature'], [data-action='meros_uninstall_feature']"
-    );
+export default function handleProviderInstaller(e) {
+    const button = e.target;
+    const isInstallerButton   = button.classList.contains('meros-provider-installer-button');
+    const isUpdateButton      = button.classList.contains('meros-provider-update-button');
+    const isUninstallerButton = button.classList.contains('meros-provider-uninstaller-button');
+    
+    // Return if not valid button type
+    if (!isInstallerButton && !isUpdateButton && !isUninstallerButton) {
+        return;
+    }
 
-    if (!button) return;
+    const provider = button.dataset.provider;
+    const providerType = button.dataset.providerType;
 
-    button.classList.add('is-busy');
+    // Return if missing necessary data attributes
+    if (!provider || !providerType) {
+        return;
+    }
+
+    // Add busy class to button
+    button.classList.add('meros-working');
+
+    // Determine action based on button type
+    const subAction = isInstallerButton 
+        ? 'install' 
+        : (isUpdateButton ? 'update' : 'uninstall');
+
+    // Confirm update/uninstall actions
+    if (subAction === 'update' || subAction === 'uninstall') {
+        if (!confirm(`Are you sure you want to ${subAction} "${provider}"? We strongly recommend backing up your site before proceeding as this action cannot be undone.`)) {
+            button.classList.remove('meros-working');
+            return;
+        }
+    }
 
     const data = new FormData();
-    data.append('action', button.dataset.action);
-    data.append('installable', button.dataset.installable);
+    data.append('action', 'meros_provider_install_operation');
+    data.append('provider', provider);
+    data.append('providerType', providerType);
+    data.append('subAction', subAction);
     data.append('nonce', button.dataset.nonce);
 
     fetch(ajaxurl, {
@@ -28,13 +56,20 @@ export default function handleInstallers(e) {
     .then(res => {
         if (!res.success) {
             alert(res.data?.message || 'Something went wrong');
-            button.classList.remove('is-busy');
+            button.classList.remove('meros-working');
             return;
         }
-        
-        button.classList.remove('is-busy');
 
-        // Reload the page
-        window.location.reload();
+        // Add query params and reload
+        const operation = subAction === 'install' 
+            ? 'installed' 
+            : (subAction === 'update' ? 'updated' : 'uninstalled');
+
+        setTimeout(() => {
+            const url = new URL(window.location.href);
+            url.searchParams.set('provider', provider);
+            url.searchParams.set('operation', operation);
+            window.location.href = url.toString();
+        }, 1000); // Slight delay before reload
     });
 }

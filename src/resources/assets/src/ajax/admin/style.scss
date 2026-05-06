@@ -60,17 +60,17 @@
         }
     }
 
-    .meros-installer-button {
+    .meros-provider-action-button {
         transition: opacity 0.3s ease;
     }
 
-    .meros-installer-button.is-busy {
+    .meros-provider-action-button.meros-working {
         position: relative;
         overflow: hidden;
         pointer-events: none;
     }
 
-    .meros-installer-button.is-busy::before {
+    .meros-provider-action-button.meros-working::before {
         content: "";
         position: absolute;
         inset: 0;
@@ -98,7 +98,7 @@ tbody:has(.meros-settings-label) {
 }
 
 tbody:has(.meros-provider-tasks),
-tbody:has(.meros-installer-button) {
+tbody:has(.meros-provider-action-button) {
     td:has(.meros-settings-field) {
         vertical-align: top !important;
         padding-top: 2.5rem !important;

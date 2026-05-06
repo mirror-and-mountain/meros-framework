@@ -105,6 +105,45 @@ final class Context {
     }
 
     /**
+     * Removes specified query arguments from the current full URL and returns the modified URL.
+     *
+     * @param array $args An array of query parameter keys to remove (e.g., ['foo', 'bar']).
+     *
+     * @return string The modified full URL with the specified query parameters removed.
+     */
+    public function removeQueryArgs(array $args): string {
+        return remove_query_arg($args, wp_get_referer());
+    }
+
+    /**
+     * Reloads the current page by redirecting to the full URL.
+     * 
+     * @return void
+     */
+    public function reload(): void {
+        wp_redirect($this->fullUrl);
+        exit;
+    }
+
+    /**
+     * Redirects to a specified URL.
+     *
+     * @param string $url The URL to redirect to.
+     *
+     * @return void
+     */
+    public function redirect(string $url): void {
+        wp_redirect($url);
+        exit;
+    }
+
+     /**
+     * Checks if the provider is installed by verifying if any associated table is installed.
+     *
+     * @return bool
+     */
+
+    /**
      * Determines if the current context is a specific admin screen based on the provided parameters.
      *
      * @param string $page     The page slug to check for (e.g., 'options-general.php').

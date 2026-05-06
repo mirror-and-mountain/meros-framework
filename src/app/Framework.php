@@ -4,6 +4,7 @@ namespace MM\Meros\App;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\App\Providers\FrameworkServiceProvider;
@@ -35,6 +36,7 @@ use MM\Meros\App\Admin\Templates\MerosFeaturesPage;
 
 use MM\Meros\App\Theme as ThemeInstance;
 use MM\Meros\Facades\Theme;
+use MM\Meros\Facades\Packages as PackagesAccessor;
 
 final class Framework extends FeatureProvider {
     /**
@@ -93,7 +95,7 @@ final class Framework extends FeatureProvider {
             $this->menuPageTemplates()->register('meros-features', MerosFeaturesPage::class);
 
             // Initialise AJAX handlers for admin interactions
-            // $this->initAdminAjaxHandlers();
+            $this->initAdminAjaxHandlers();
         }
     }
 
@@ -215,6 +217,12 @@ final class Framework extends FeatureProvider {
      * @return void
      */
     private function configureSettings(): void {
+        // Clear installer operation query args when settings are saved.
+        add_action('update_option_meros_framework_settings', function () {
+            $url = $this->context->removeQueryArgs(['provider', 'operation']);
+            $this->context->redirect($url);
+        }, 10, 3);
+
         $packageSettings = $this->settings()->add(function ($setting) {
             $setting->object('packages')
                 ->label('Packages');
@@ -299,7 +307,10 @@ final class Framework extends FeatureProvider {
      */
     private function getProviderSettingHTML(FeatureProvider $provider): string {
         $html        = '';
-        $enabled     = $provider->isEnabled();
+        $isPackage   = $provider instanceof Package;
+        $isTheme     = !$isPackage;
+        $enabled     = $isPackage ? $provider->isEnabled() : true; // Theme is always enabled as a provider
+        $handle      = $provider->getHandle();
         $installed   = $provider->isInstalled();
         $installedAt = null;
 
@@ -316,9 +327,13 @@ final class Framework extends FeatureProvider {
             $installedAt = $provider->installedAt() ?? 'Unknown time';
         }
 
+        $dataAttrs = 'data-provider="' . esc_attr($handle) . '"';
+        $dataAttrs .= $isPackage ? ' data-provider-type="package"' : ' data-provider-type="theme"';
+        $dataAttrs .= ' data-nonce="' . esc_attr(wp_create_nonce('meros_provider_install_operation_' . $handle)) . '"';
+
         if (!$enabled && $installed) {
             $html .= '<p style="margin-top:8px;">Installed: ' . esc_html($installedAt) . '</p>';
-            $html .= '<a href="#" class="meros-installer-button button button-primary" style="margin-top:8px;">Uninstall</a>';
+            $html .= '<a href="#" class="meros-provider-action-button meros-provider-uninstaller-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Uninstall</a>';
             $html .= '</div></div>';
             return $html;
         }
@@ -335,11 +350,11 @@ final class Framework extends FeatureProvider {
             $html .= '</p>';
              
             if ($provider->hasUpdates()) {
-                $html .= '<a href="#" class="meros-installer-button button button-primary" style="margin-top:8px;">Update</a>';
+                $html .= '<a href="#" class="meros-provider-action-button meros-provider-update-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Update</a>';
             }
 
         } else {
-            return '<a href="#" class="meros-installer-button button button-primary" style="margin-top:8px;">Install</a>';
+            $html .= '<a href="#" class="meros-provider-action-button meros-provider-installer-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Install</a>';
         }
 
         $html .= '</div></div>';
@@ -463,89 +478,65 @@ final class Framework extends FeatureProvider {
      ***************************************************************/
  
     private function initAdminAjaxHandlers(): void {
-        add_action('wp_ajax_meros_toggle_package', [$this, 'handlePackageToggle']);
-        add_action('wp_ajax_meros_install_feature', [$this, 'handleInstaller']);
-        add_action('wp_ajax_meros_update_feature', [$this, 'handleInstaller']);
-        add_action('wp_ajax_meros_uninstall_feature', [$this, 'handleInstaller']);
+        add_action('wp_ajax_meros_provider_install_operation', [$this, 'handleProviderInstallerTasks']);
+        // add_action('wp_ajax_meros_update_provider', [$this, 'handleProviderUpdate']);
+        // add_action('wp_ajax_meros_uninstall_provider', [$this, 'handleProviderUninstallation']);
     }
 
-    /**
-     * Handles toggling packages on and off from the features page.
-     *
-     * @return void
-     */
-    public function handlePackageToggle(): void {
-        $package = sanitize_key($_POST['package'] ?? '');
-        $nonce   = $_POST['nonce'] ?? '';
-        $action  = 'meros_toggle_package_' . $package;
+    public function handleProviderInstallerTasks(): void {
+        $provider     = sanitize_key($_POST['provider'] ?? '');
+        $providerType = sanitize_key($_POST['providerType'] ?? '');
+        $subAction    = $_POST['subAction'] ?? '';
+        $nonce        = $_POST['nonce'] ?? '';
 
-        if (! $package || ! wp_verify_nonce($nonce, $action)) {
+        $hasAction   = in_array($subAction, ['install', 'update', 'uninstall']);
+        $hasProvider = is_string($provider) && $provider !== '';
+        $isValidProviderType = in_array($providerType, ['package', 'theme']);
+
+        $isValid = $hasAction && 
+                   $hasProvider && 
+                   $isValidProviderType && 
+                   wp_verify_nonce($nonce, 'meros_provider_install_operation_' . $provider);
+
+        if (!$isValid) {
             wp_send_json_error([
                 'message' => 'Invalid request'
             ]);
         }
 
-        $packageItem = Registry::getPackage($package);
-        
-        if ($packageItem === null) {
-            wp_send_json_error([
-                'message' => 'Package not found'
+        if ($providerType === 'package') {
+            $package = PackagesAccessor::get($provider);
+            if ($package === null) {
+                wp_send_json_error([
+                    'message' => 'Package not found'
+                ]);
+                return;
+            }
+
+            try {
+                switch ($subAction) {
+                    case 'install':
+                        $package->install();
+                        break;
+                    case 'update':
+                        $package->update();
+                        break;
+                    case 'uninstall':
+                        $package->uninstall();
+                        break;
+                }
+            } catch (\Exception $e) {
+                wp_send_json_error([
+                    'message' => 'Error performing operation: ' . $e->getMessage(),
+                ]);
+                return;
+            }
+
+            wp_send_json_success([
+                'message'  => 'Operation successful'
             ]);
         }
 
-        $isEnabledByDefault = $packageItem->getPreference('is_enabled_by_default');
-
-        $option   = $package . '_enable';
-        $current  = (bool) get_option($option, $isEnabledByDefault);
-        $updated  = update_option($option, $current ? false : true);
-
-        if (! $updated) {
-            wp_send_json_error('Failed to update package status');
-        }
-
-        wp_send_json_success([
-            'value' => (int) ! $current,
-            'nonce' => wp_create_nonce($action)
-        ]);
-    }
-
-    /**
-     * Handles installing, updating and uninstalling packages and theme installables.
-     *
-     * @return void
-     */
-    public function handleInstaller(): void {
-        $action = sanitize_key($_POST['action'] ?? '');
-        $item   = sanitize_key($_POST['installable'] ?? '');
-        $nonce  = $_POST['nonce'] ?? '';
-
-        if (! $action || ! $item || ! wp_verify_nonce($nonce, $action . '_' . ($item !== 'theme' ? $item : 'theme'))) {
-            wp_send_json_error([
-                'message' => 'Invalid request'
-            ]);
-        }
-
-        $installable = $item !== 'theme' 
-            ? Registry::getPackage($item)
-            : 'theme';
-
-        if ($installable === null) {
-            wp_send_json_error([
-                'message' => 'Item not found'
-            ]);
-        }
-
-        $result = $installable === 'theme' 
-            ? Theme::install()
-            : $installable->install();
-
-        if ($result !== true) {
-            wp_send_json_error([
-                'message' => $result
-            ]);
-        }
-
-        wp_send_json_success();
     }
 
     /*************************************************************

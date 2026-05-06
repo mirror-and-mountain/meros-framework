@@ -221,7 +221,7 @@ final class SettingsField extends FeatureDefinition implements FieldParent {
      * @return self
      */
     public function titleHTML(string $html): self {
-        $html = wp_kses_post( $html );
+        $html = wp_kses_post($html);
         $this->titleHTML = $this->getFieldTitleHTML($html);
         return $this;
     }
