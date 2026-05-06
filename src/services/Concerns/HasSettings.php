@@ -18,6 +18,8 @@ use MM\Meros\Services\Registers\MenuPages as MenuPagesRegister;
 use MM\Meros\Services\Registers\SettingsSections as SettingsSectionsRegister;
 use MM\Meros\Services\Registers\MenuPageTemplates as MenuPageTemplatesRegister;
 
+use MM\Meros\App\Theme;
+
 trait HasSettings {
 
     /**
@@ -158,7 +160,9 @@ trait HasSettings {
      */
     private function setRootSetting(): void {
         if (empty($this->settingsHandle)) {
-            $this->settingsHandle = $this->getHandle() . '_settings';
+            $this->settingsHandle = $this instanceof Theme
+                ? 'meros_theme_settings'
+                :  $this->getHandle() . '_settings';
         }
 
         $rootSetting = $this->rootSetting;
@@ -175,13 +179,26 @@ trait HasSettings {
      * @return Setting The newly created root setting instance for the item.
      */
     private function createRootSetting(): Setting {
+        $label = $this instanceof Theme
+            ? 'Theme Settings'
+            : $this->getName() . ' Settings';
+
         $setting = Settings::checkout($this)->make([
             'group' => $this->settingsHandle . '_group',
             'name'  => $this->settingsHandle,
         ])
             ->type('object')
-            ->label($this->getName() . ' Settings');
+            ->label($label);
 
         return $setting;
+    }
+
+    /**
+     * Returns whether this feature provider has any settings.
+     *
+     * @return boolean
+     */
+    final public function hasSettings(): bool {
+        return $this->settings()->hasSubItems();
     }
 }

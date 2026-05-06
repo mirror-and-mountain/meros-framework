@@ -674,4 +674,13 @@ trait IsDataRegistrant {
     public function getItemDataType(): string {
         return $this->itemType;
     }
+
+    /**
+     * Returns whether the current item has any sub-items.
+     *
+     * @return boolean
+     */
+    public function hasSubItems(): bool {
+        return !empty($this->subItems);
+    }
 }

@@ -60,6 +60,11 @@
         }
     }
 
+    .meros-provider-update-tasks {
+        display: flex;
+        gap: 8px;
+    }
+
     .meros-provider-action-button {
         transition: opacity 0.3s ease;
     }

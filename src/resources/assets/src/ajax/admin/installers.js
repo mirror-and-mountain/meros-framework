@@ -9,10 +9,11 @@ export default function handleProviderInstaller(e) {
     const button = e.target;
     const isInstallerButton   = button.classList.contains('meros-provider-installer-button');
     const isUpdateButton      = button.classList.contains('meros-provider-update-button');
+    const isRollbackButton    = button.classList.contains('meros-provider-rollback-button');
     const isUninstallerButton = button.classList.contains('meros-provider-uninstaller-button');
     
     // Return if not valid button type
-    if (!isInstallerButton && !isUpdateButton && !isUninstallerButton) {
+    if (!isInstallerButton && !isUpdateButton && !isRollbackButton && !isUninstallerButton) {
         return;
     }
 
@@ -30,10 +31,10 @@ export default function handleProviderInstaller(e) {
     // Determine action based on button type
     const subAction = isInstallerButton 
         ? 'install' 
-        : (isUpdateButton ? 'update' : 'uninstall');
+        : (isUpdateButton ? 'update' : (isRollbackButton ? 'rollback' : 'uninstall'));
 
     // Confirm update/uninstall actions
-    if (subAction === 'update' || subAction === 'uninstall') {
+    if (subAction === 'update' || subAction === 'uninstall' || subAction === 'rollback') {
         if (!confirm(`Are you sure you want to ${subAction} "${provider}"? We strongly recommend backing up your site before proceeding as this action cannot be undone.`)) {
             button.classList.remove('meros-working');
             return;
@@ -63,7 +64,7 @@ export default function handleProviderInstaller(e) {
         // Add query params and reload
         const operation = subAction === 'install' 
             ? 'installed' 
-            : (subAction === 'update' ? 'updated' : 'uninstalled');
+            : (subAction === 'update' ? 'updated' : (subAction === 'rollback' ? 'rolled-back' : 'uninstalled'));
 
         setTimeout(() => {
             const url = new URL(window.location.href);

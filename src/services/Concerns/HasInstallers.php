@@ -13,6 +13,8 @@ use MM\Meros\App\Models\Migration;
 use MM\Meros\Facades\Framework as FrameworkAccessor;
 use MM\Meros\Facades\Tables;
 
+use Illuminate\Support\Facades\Log;
+
 trait HasInstallers {
     private ?string $installedAt = null;
     private ?string $updatedAt = null;
@@ -33,6 +35,15 @@ trait HasInstallers {
         else {
             return Tables::checkout($this)->get($handle, $callback);
         }
+    }
+
+    /**
+     * Checks if the provider has any associated tables.
+     *
+     * @return bool
+     */
+    final public function hasTables(): bool {
+        return $this->tables()->discover()->checkout($this)->all()->isNotEmpty();
     }
 
     /**
@@ -109,11 +120,12 @@ trait HasInstallers {
             ->orderBy('created_at', 'desc')
             ->first();
 
-        if ($lastUpdate === null) {
-            return; // No updates to rollback
-        }
-
-        $table = $this->tables()->discover()->checkout($this)->get($lastUpdate->related_table);
+        $table = $this->tables()
+            ->discover()
+            ->checkout($this)
+            ->all()
+            ->where('tableName', $lastUpdate->related_table)
+            ->first();
 
         if ($table === null || !$table->isInstalled()) {
             return; // Table not found or not installed, cannot rollback
@@ -129,7 +141,7 @@ trait HasInstallers {
      */
     final public function isInstalled(): bool {
         $tables = $this->tables()->discover()->checkout($this)->all();
-        
+    
         if ($tables->count() === 0) {
             return true; // If there are no tables, consider it installed
         }
@@ -140,6 +152,7 @@ trait HasInstallers {
             if ($table->isInstalled()) {
                 $installed = true;
                 $this->installedAt = $table->getInstalledAt();
+
                 break; // Break the loop early if any table is installed
             }
         }

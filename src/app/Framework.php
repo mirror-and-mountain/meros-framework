@@ -247,7 +247,13 @@ final class Framework extends FeatureProvider {
                     ->field()
                         ->section('meros-features-packages');
 
-                $titleHTML = $this->getProviderSettingHTML($package);
+                $titleHTML = $this->getPackageSettingHTML($package);
+                $hasTables = $package->hasTables();
+                
+                if ($hasTables) {
+                    $titleHTML .= $this->getInstallerHTML($package);
+                }
+
                 $enabledSetting->titleHTML($titleHTML);
             }
         }, 10, 2);
@@ -269,7 +275,27 @@ final class Framework extends FeatureProvider {
                     'theme' => [
                         'label'    => 'Theme',
                         'callback' => function () {
-                            echo 'This is the theme tab';
+                            $hasTables = Theme::hasTables();
+
+                            if ($hasTables) {
+                                $operation = $_GET['operation'] ?? null;
+                                $operationMessage = $operation === 'installed'
+                                    ? 'Theme features have been successfully installed!'
+                                    : ($operation === 'updated' 
+                                        ? 'Theme features have been successfully updated!' 
+                                        : 'Theme features have been successfully uninstalled.'
+                                    );
+
+                                if ($operation && in_array($operation, ['installed', 'updated', 'uninstalled'])) {
+                                    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html($operationMessage) . '</p></div>';
+                                }
+                                
+                                echo $this->getInstallerHTML(Theme::get());
+                            }
+
+                            settings_fields('meros_theme_settings_group');
+                            do_settings_sections('meros-features-theme');
+                            submit_button();
                         }
                     ],
                     'packages' => [
@@ -300,26 +326,57 @@ final class Framework extends FeatureProvider {
     }
 
     /**
-     * Generates the HTML for a provider's setting on the features page, including action links and status info.
+     * Generates the HTML for a package's setting on the features page, including action links and status info.
+     *
+     * @param Package $package
+     * @return string
+     */
+    private function getPackageSettingHTML(Package $package): string {
+        $html        = '';
+        $enabled     = $package->isEnabled();
+        $handle      = $package->getHandle();
+        $hasSettings = $package->hasSettings();
+
+        $html .= 
+            '<div class="meros-provider-links">
+                <a href="' . esc_url($package->getAuthorUri()) . '" target="_blank">Website</a>
+                <span> | </span>
+                <a href="' . esc_url($package->getAuthorSupportUri()) . '" target="_blank">Support</a>';
+
+        if ($enabled && $hasSettings) {
+            $href = admin_url(
+                'options-general.php?page=meros-features' 
+                . '&provider=' . $handle 
+                . '&origin=' . ($_GET['tab'] ?? 'packages')
+            );
+
+            $html .=  
+                '<span> | </span>
+                <a href="' . esc_url($href) .'">Settings</a>
+                </div>';
+        }
+
+        else {
+            $html .= '</div>';
+        }
+
+        return $html;
+    }
+
+    /**
+     * Generates the HTML for a provider's installer status and action buttons on the features page.
      *
      * @param FeatureProvider $provider
      * @return string
      */
-    private function getProviderSettingHTML(FeatureProvider $provider): string {
+    private function getInstallerHTML(FeatureProvider $provider): string {
         $html        = '';
-        $isPackage   = $provider instanceof Package;
-        $isTheme     = !$isPackage;
-        $enabled     = $isPackage ? $provider->isEnabled() : true; // Theme is always enabled as a provider
         $handle      = $provider->getHandle();
+        $isTheme     = $provider instanceof ThemeInstance;
+        $enabled     = $isTheme ? true : $provider->isEnabled();
         $installed   = $provider->isInstalled();
+        $hasUpdates  = $provider->hasUpdates();
         $installedAt = null;
-
-        if ($enabled) {
-            $html .=  
-                '<div class="meros-provider-links>
-                    <a href="' . $this->context->appendQueryArgs(['provider' => $provider->getHandle()]) .'">Settings</a>
-                </div>';
-        }
 
         $html .= '<div class="meros-provider-tasks"><div class="meros-installer-info">';
 
@@ -327,14 +384,14 @@ final class Framework extends FeatureProvider {
             $installedAt = $provider->installedAt() ?? 'Unknown time';
         }
 
-        $dataAttrs = 'data-provider="' . esc_attr($handle) . '"';
-        $dataAttrs .= $isPackage ? ' data-provider-type="package"' : ' data-provider-type="theme"';
-        $dataAttrs .= ' data-nonce="' . esc_attr(wp_create_nonce('meros_provider_install_operation_' . $handle)) . '"';
+        $dataAttrs  = 'data-provider="' . esc_attr($handle) . '" ';
+        $dataAttrs .= 'data-provider-type="' . esc_attr($isTheme ? 'theme' : 'package') . '" ';
+        $dataAttrs .= 'data-nonce="' . esc_attr(wp_create_nonce('meros_provider_install_operation_' . $handle)) . '"';
 
-        if (!$enabled && $installed) {
+        if ((!$enabled || $isTheme) && $installed) {
             $html .= '<p style="margin-top:8px;">Installed: ' . esc_html($installedAt) . '</p>';
             $html .= '<a href="#" class="meros-provider-action-button meros-provider-uninstaller-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Uninstall</a>';
-            $html .= '</div></div>';
+            $html .= '</div>';
             return $html;
         }
 
@@ -342,22 +399,47 @@ final class Framework extends FeatureProvider {
             $html .= '<p style="margin-top:8px;">Installed: ' . esc_html($installedAt);
 
             $lastUpdated = $provider->lastUpdated();
+            $newInstall  = $lastUpdated === $installedAt;
+            $canRollback = $lastUpdated !== $installedAt;
 
-            if ($lastUpdated !== $installedAt) {
+            if (!$newInstall) {
                 $html .= '<span> | Last updated: ' . esc_html($lastUpdated) . '</span>';
             }
-
-            $html .= '</p>';
              
-            if ($provider->hasUpdates()) {
-                $html .= '<a href="#" class="meros-provider-action-button meros-provider-update-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Update</a>';
+            if ($hasUpdates || $canRollback) {
+                if ($hasUpdates) {
+                    $html .= '<span style="color:green"> | Update available:</span></p>';
+                } else {
+                    $html .= '</p>';
+                }
+
+                if ($hasUpdates && $canRollback) {
+                    $html .= '<div class="meros-provider-update-tasks">';
+                }
+
+                if ($hasUpdates) {
+                    $html .= '<a href="#" class="meros-provider-action-button meros-provider-update-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Update</a>';
+                }
+
+                if ($canRollback) {
+                    $html .= '<a href="#" class="meros-provider-action-button meros-provider-rollback-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Rollback</a>';
+                }
+
+                if ($hasUpdates && $canRollback) {
+                    $html .= '</div>';
+                }
+            }
+
+            else {
+                $html .= '</p>';
             }
 
         } else {
+            $html .= '<p style="margin-top:8px;">This ' . ($isTheme ? 'theme' : 'package') . ' has features that may need to be installed for it to function properly.</p>';
             $html .= '<a href="#" class="meros-provider-action-button meros-provider-installer-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Install</a>';
         }
 
-        $html .= '</div></div>';
+        $html .= '</div>';
         return $html;
     }
 
@@ -477,26 +559,34 @@ final class Framework extends FeatureProvider {
      * 
      ***************************************************************/
  
+    /**
+     * Initialises AJAX handlers registered by the framework.
+     *
+     * @return void
+     */
     private function initAdminAjaxHandlers(): void {
         add_action('wp_ajax_meros_provider_install_operation', [$this, 'handleProviderInstallerTasks']);
-        // add_action('wp_ajax_meros_update_provider', [$this, 'handleProviderUpdate']);
-        // add_action('wp_ajax_meros_uninstall_provider', [$this, 'handleProviderUninstallation']);
     }
 
+    /**
+     * Handles AJAX requests for provider installer operations (install, update, rollback, uninstall).
+     *
+     * @return void
+     */
     public function handleProviderInstallerTasks(): void {
-        $provider     = sanitize_key($_POST['provider'] ?? '');
-        $providerType = sanitize_key($_POST['providerType'] ?? '');
-        $subAction    = $_POST['subAction'] ?? '';
-        $nonce        = $_POST['nonce'] ?? '';
+        $providerHandle = sanitize_key($_POST['provider'] ?? '');
+        $providerType   = sanitize_key($_POST['providerType'] ?? '');
+        $subAction      = $_POST['subAction'] ?? '';
+        $nonce          = $_POST['nonce'] ?? '';
 
-        $hasAction   = in_array($subAction, ['install', 'update', 'uninstall']);
-        $hasProvider = is_string($provider) && $provider !== '';
+        $hasAction   = in_array($subAction, ['install', 'update', 'rollback', 'uninstall']);
+        $hasProvider = is_string($providerHandle) && $providerHandle !== '';
         $isValidProviderType = in_array($providerType, ['package', 'theme']);
 
         $isValid = $hasAction && 
                    $hasProvider && 
                    $isValidProviderType && 
-                   wp_verify_nonce($nonce, 'meros_provider_install_operation_' . $provider);
+                   wp_verify_nonce($nonce, 'meros_provider_install_operation_' . $providerHandle);
 
         if (!$isValid) {
             wp_send_json_error([
@@ -505,38 +595,43 @@ final class Framework extends FeatureProvider {
         }
 
         if ($providerType === 'package') {
-            $package = PackagesAccessor::get($provider);
-            if ($package === null) {
-                wp_send_json_error([
-                    'message' => 'Package not found'
-                ]);
-                return;
-            }
-
-            try {
-                switch ($subAction) {
-                    case 'install':
-                        $package->install();
-                        break;
-                    case 'update':
-                        $package->update();
-                        break;
-                    case 'uninstall':
-                        $package->uninstall();
-                        break;
-                }
-            } catch (\Exception $e) {
-                wp_send_json_error([
-                    'message' => 'Error performing operation: ' . $e->getMessage(),
-                ]);
-                return;
-            }
-
-            wp_send_json_success([
-                'message'  => 'Operation successful'
-            ]);
+            $provider = PackagesAccessor::get($providerHandle);
+        } else {
+            $provider = Theme::get();
         }
 
+        if ($provider === null) {
+            wp_send_json_error([
+                'message' => 'Provider not found.'
+            ]);
+            return;
+        }
+
+        try {
+            switch ($subAction) {
+                case 'install':
+                    $provider->install();
+                    break;
+                case 'update':
+                    $provider->update();
+                    break;
+                case 'rollback':
+                    $provider->rollback();
+                    break;
+                case 'uninstall':
+                    $provider->uninstall();
+                    break;
+            }
+        } catch (\Exception $e) {
+            wp_send_json_error([
+                'message' => 'Error performing operation: ' . $e->getMessage(),
+            ]);
+            return;
+        }
+
+        wp_send_json_success([
+            'message'  => 'Operation successful'
+        ]);
     }
 
     /*************************************************************

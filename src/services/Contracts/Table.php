@@ -11,6 +11,8 @@ use MM\Meros\Support\SchemaManager;
 
 use MM\Meros\Services\Contracts\FeatureDefinition;
 
+use MM\Meros\App\Theme;
+
 use MM\Meros\App\Models\Migration as MigrationModel;
 
 final class Table extends FeatureDefinition {

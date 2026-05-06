@@ -226,7 +226,9 @@ trait HasIdentity {
      * @return string
      */
     final public function getSettingsPageSlug(): string {
-        return 'meros-features-' . Str::kebab($this->getHandle());
+        return $this instanceof Theme 
+            ? 'meros-features-theme' 
+            : 'meros-features-' . Str::kebab($this->getHandle());
     }
 
     /**

@@ -111,8 +111,8 @@ final class Context {
      *
      * @return string The modified full URL with the specified query parameters removed.
      */
-    public function removeQueryArgs(array $args): string {
-        return remove_query_arg($args, wp_get_referer());
+    public function removeQueryArgs(array $args, string $referer = ''): string {
+        return remove_query_arg($args, $referer ?: wp_get_referer());
     }
 
     /**
