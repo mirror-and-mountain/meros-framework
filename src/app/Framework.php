@@ -2,6 +2,7 @@
 
 namespace MM\Meros\App;
 
+use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
 use MM\Meros\Services\Contracts\FeatureProvider;
@@ -96,6 +97,11 @@ final class Framework extends FeatureProvider {
         }
     }
 
+    /**
+     * Configures the framework's features, settings and menu pages.
+     *
+     * @return void
+     */
     protected function configure(): void {
         // Run theme activation tasks
         add_action('after_switch_theme', [$this, 'runActivationTasks']);
@@ -114,23 +120,87 @@ final class Framework extends FeatureProvider {
         $this->blocks()->discover();
     }
 
+    /*****************************************************************************************
+     * 
+     * The following methods are installing core framework tables when required by providers
+     * 
+     *****************************************************************************************/
+
     /**
      * Called by provider installers to ensure the framework's core tables are installed
      * before they undertake any installer operations.
      *
      * @return void
      */
-    public function require(): void {
-        $installed  = $this->isInstalled();
-
-        if (!$installed) {
-            $this->install();
+    public function require(string $service = 'migrations'): void {
+        if ($service === 'migrations') {
+            $this->requireMigrationsService();
+            return;
         }
 
-        $hasUpdates = $this->hasUpdates();
+        if ($service === 'integrations') {
+            $this->requireIntegrationsService();
+            return;
+        }
+    }
 
-        if ($hasUpdates) {
-            $this->update();
+    /**
+     * Installs the meros_migrations table if it doesn't exist.
+     *
+     * @return void
+     * @throws \RuntimeException if the meros_migrations table cannot be found in the framework's tables collection.
+     */
+    private function requireMigrationsService() {
+        $table = $this->tables()
+            ->discover()
+            ->checkout($this)
+            ->all()
+            ->where('tableName', 'meros_migrations')
+            ->first();
+
+        if ($table === null) {
+            throw new \RuntimeException('Meros Framework requires the meros_migrations table to manage updates. No such table was found.');
+        }
+
+        if (!$table->isInstalled()) {
+            $table->install(Str::ulid());
+        }
+    }
+
+    /**
+     * Installs the meros_integration_accounts and meros_integration_connections tables if they don't exist.
+     *
+     * @return void
+     * @throws \RuntimeException if either the meros_integration_accounts or meros_integration_connections table cannot be found in the framework's tables collection.
+     */
+    private function requireIntegrationsService(): void {
+        $this->requireMigrationsService(); // Ensure the migrations service is installed before attempting to install integration tables
+
+        $tables = $this->tables()
+            ->discover()
+            ->checkout($this)
+            ->all();
+
+        $accountsTable = $tables
+            ->where('tableName', 'meros_integration_accounts')
+            ->first();
+
+        $connectionsTable = $tables
+            ->where('tableName', 'meros_integration_connections')
+            ->first();
+
+        if ($accountsTable === null || $connectionsTable === null) {
+            throw new \RuntimeException('Meros Framework requires the meros_integration_accounts and meros_integration_connections tables to manage integrations. One or both of these tables were not found.');
+        }
+
+        $batchID = Str::ulid();
+
+        if (!$accountsTable->isInstalled()) {
+            $accountsTable->install($batchID);
+        }
+
+        if (!$connectionsTable->isInstalled()) {
+            $connectionsTable->install($batchID);
         }
     }
 

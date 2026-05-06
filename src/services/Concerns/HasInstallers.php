@@ -208,6 +208,6 @@ trait HasInstallers {
             return;
         }
 
-        FrameworkAccessor::require();
+        FrameworkAccessor::require('migrations');
     }
 }
