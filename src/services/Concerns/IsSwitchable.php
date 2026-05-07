@@ -27,13 +27,6 @@ trait IsSwitchable {
     protected string $enabledSetting = '';
 
     /**
-     * The WordPress hook that the item uses to register itself.
-     *
-     * @var string
-     */
-    protected string $hook = '';
-
-    /**
      * Sets the name of the setting that controls whether the item is enabled.
      *
      * @param string $settingName
@@ -63,7 +56,7 @@ trait IsSwitchable {
      * @return void
      */
     protected function setIsEnabled(): void {
-        $item           = Str::plural(Str::lower(class_basename($this)));
+        $item           = Str::snake(Str::plural(Str::lower(Str::headline(class_basename($this)))));
         $preferenceName = $item . '_are_enabled_by_default';
 
         if ($this->isSwitchable) {
@@ -71,5 +64,14 @@ trait IsSwitchable {
         } else {
             $this->isEnabled = true;
         }
+    }
+
+    /**
+     * Gets whether the item is enabled.
+     *
+     * @return bool
+     */
+    final public function isEnabled(): bool {
+        return $this->isEnabled;
     }
 }

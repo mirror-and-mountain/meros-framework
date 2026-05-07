@@ -10,6 +10,9 @@ class Packages extends SettingsSection {
     protected string $page  = 'meros-features-packages';
 
     public function render(): void {
-        echo '<p>Packages are modular add-ons that extend the functionality of your Meros-powered site.</p>';
+        echo '
+            <p>Packages are modular add-ons that extend the functionality of your Meros-powered site.<br>
+            You can toggle individual packages on or off, change their settings, and manage any installable features they provide.</p>
+            ';
     }
 }

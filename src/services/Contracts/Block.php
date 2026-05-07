@@ -53,10 +53,9 @@ class Block extends FeatureDefinition {
         }
 
         $this->setIsEnabled(); // Set the enabled state using the switch setting if applicable.
-        $this->hook = 'init'; // Needed for the IsSwitchable trait to manage the registration hook.
 
         if (!$this->queued && $this->isEnabled) {
-            add_action($this->hook, function() {
+            add_action('init', function() {
                 $this->register();
             });
         }

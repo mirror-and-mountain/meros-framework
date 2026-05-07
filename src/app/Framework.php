@@ -5,8 +5,6 @@ namespace MM\Meros\App;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
-use MM\Meros\Services\Contracts\Asset;
-use MM\Meros\Services\Contracts\Block;
 use MM\Meros\Services\Contracts\Admin\Setting;
 use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\App\Providers\FrameworkServiceProvider;
@@ -30,6 +28,7 @@ use MM\Meros\App\Fields\Styles\DefaultFieldStyle;
 use MM\Meros\App\Fields\Styles\NiceFieldStyle;
 use MM\Meros\App\Fields\Styles\SettingsFieldStyle;
 
+use MM\Meros\App\Admin\SettingsSections\Assets;
 use MM\Meros\App\Admin\SettingsSections\Blocks;
 use MM\Meros\App\Admin\SettingsSections\Packages;
 
@@ -41,6 +40,7 @@ use MM\Meros\App\Theme;
 use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Packages as PackagesAccessor;
 use MM\Meros\Facades\Blocks as BlocksAccessor;
+use MM\Meros\Facades\AssetGroups as AssetGroupsAccessor;
 
 final class Framework extends FeatureProvider {
     /**
@@ -93,6 +93,7 @@ final class Framework extends FeatureProvider {
             // Register framework settings sections
             $this->settingsSections()->register('meros-features-packages', Packages::class);
             $this->settingsSections()->register('meros-features-blocks', Blocks::class);
+            $this->settingsSections()->register('meros-features-assets', Assets::class);
 
             // Register menu page templates
             $this->menuPageTemplates()->register('simple-settings', SimpleSettingsPage::class);
@@ -232,8 +233,14 @@ final class Framework extends FeatureProvider {
                 ->label('Blocks');
         });
 
+        $assetGroupSettings = $this->settings()->add(function ($setting) {
+            $setting->object('asset_groups')
+                ->label('Scripts & Styles');
+        });
+
         $this->configurePackageSettings($packageSettings);
         $this->configureBlocksSettings($blockSettings);
+        $this->configureAssetGroupSettings($assetGroupSettings);
     }
 
     /**
@@ -288,7 +295,7 @@ final class Framework extends FeatureProvider {
                 $settingName      = $blockSlug . '_enable';
 
                 $settings->add()->boolean($settingName)
-                    ->label('Enable ' . $blockTitle . ' block')
+                    ->label('Enable the "' . $blockTitle . '" Block')
                     ->description($block->getDescription())
                     ->default($enabledByDefault)
                     ->field()
@@ -296,6 +303,48 @@ final class Framework extends FeatureProvider {
 
                 $block->setIsSwitchable(true);
                 $block->setEnabledSetting($settingName);
+            }
+        }, 10, 2);
+    }
+
+    /**
+     * Configures settings for discovered asset groups, allowing them to be enabled/disabled.
+     *
+     * @param Setting $settings The settings object to add asset group settings to.
+     *
+     * @return void
+     */
+    private function configureAssetGroupSettings(Setting $settings): void {
+        add_action('meros_providers_registered', function () use ($settings) {
+            $groups = AssetGroupsAccessor::all(false);
+
+            foreach ($groups as $group) {
+                $switchable = $group->provider()->getPreference('asset_groups_are_switchable_by_default');
+
+                if (!$switchable) {
+                    continue;
+                }
+
+                $enabledByDefault = $group->provider()->getPreference('asset_groups_are_enabled_by_default');
+                $groupSlug        = $group->getName();
+                $groupLabel       = $group->getLabel();
+                $settingName      = $groupSlug . '_enable';
+                $providerName     = $group->provider()->getName();
+
+                if (Str::contains($providerName, ['Meros', 'Framework'])) {
+                    $providerName = Str::replace('Framework', '', $providerName);
+                }
+
+                $settings->add()->boolean($settingName)
+                    ->label('Enable "' . $providerName . ' ' . $groupLabel . '" Scripts/Styles')
+                    ->description($group->getDescription())
+                    ->default($enabledByDefault)
+                    ->field()
+                        ->section('meros-features-assets');
+
+                $group->setIsSwitchable(true);
+                $group->setEnabledSetting($settingName);
+                $group->queueAssets();
             }
         }, 10, 2);
     }
@@ -317,7 +366,7 @@ final class Framework extends FeatureProvider {
                         'label'    => 'Theme',
                         'callback' => function () {
                             echo '<h2>Theme Configuration</h2>';
-                            echo '<p>Theme features are functionalities provided by your active theme that can be installed, updated and uninstalled independently of the theme itself.</p>';
+                            echo '<p>Manage settings and installable features registered by the active theme.</p>';
                             
                             $hasTables = ThemeAccessor::hasTables();
                             if ($hasTables) {
@@ -364,7 +413,9 @@ final class Framework extends FeatureProvider {
                     'assets' => [
                         'label'    => 'Scripts & Styles',
                         'callback' => function () {
-                            echo 'This is the assets tab';
+                            settings_fields('meros_framework_settings_group');
+                            do_settings_sections('meros-features-assets');
+                            submit_button();
                         }
                     ],
                     'integrations' => [

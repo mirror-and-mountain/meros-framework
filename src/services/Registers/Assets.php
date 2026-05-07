@@ -9,6 +9,8 @@ use MM\Meros\Services\Contracts\Asset;
 use MM\Meros\Services\Contracts\Register;
 use MM\Meros\Services\Registers\Interfaces\Discovery;
 
+use MM\Meros\Facades\AssetGroups;
+
 class Assets extends Register implements Discovery {
     protected string $identifier = 'handle';
     protected string $definition = Asset::class;
@@ -45,7 +47,7 @@ class Assets extends Register implements Discovery {
             'label'        => $props['label'] ?? '',
             'description'  => $props['description'] ?? '',
             'type'         => $props['type'] ?? '',
-            'group'        => $props['group'] ?? '',
+            'group'        => $props['group'] ?? null,
             'location'     => $props['location'] ?? '',
             'dependencies' => $props['dependencies'] ?? [],
             'version'      => $props['version'] ?? '',
@@ -135,6 +137,7 @@ class Assets extends Register implements Discovery {
             // Check for config file
             $label = '';
             $desc  = '';
+            $isGroupConfig = false;
 
             $configPath = dirname($path) . DIRECTORY_SEPARATOR . 'config.php'; // In the same directory as the asset
 
@@ -149,6 +152,8 @@ class Assets extends Register implements Discovery {
                     $label  = $config['label'] ?? '';
                     $desc   = $config['description'] ?? '';
                 }
+
+                $isGroupConfig = true;
             }
 
             // Check for dependency file
@@ -175,26 +180,52 @@ class Assets extends Register implements Discovery {
             $handle = $base . ($groupIsLocation ? '' : $group . '-') . $location . '-' . $type;
 
             // Generate label if not set in config
-            if ($label === '') {
-                $label = Str::title(Str::replace(['-', '_'], ' ', $location)) . ' ' . ($type === 'script' ? 'Script' : 'Style');
+            $assetLabel = '';
+            if ($isGroupConfig || (!$isGroupConfig && $label === '')) {
+                $assetLabel = Str::title(Str::replace(['-', '_'], ' ', $location)) . ' ' . ($type === 'script' ? 'Script' : 'Style');
             }
 
             // Set the src
             $src = Str::replace($this->provider->getPath(), $this->provider->getUri(), $path);
 
+            // Setup an asset group if the asset is in a non-location subdirectory and is for the 'site' or 'editor' location
+            $groupInstance = null;
+
+            if (!$groupIsLocation && $location !== 'admin') {
+                $groupName = $base . $group;
+                $groupInstance = AssetGroups::all(false)->firstWhere('name', $groupName);
+
+                if (!$groupInstance) {
+                    if ($isGroupConfig) {
+                        $groupLabel = $config['label'] ?? '';
+                        $groupDesc  = $config['description'] ?? '';
+                    }
+                    $groupInstance = AssetGroups::checkout($this->provider)
+                        ->make([
+                            'name'        => $groupName,
+                            'label'       => $groupLabel,
+                            'description' => $groupDesc,
+                        ]);
+                }
+            }
+
             // Create and register the asset
-            $this->make([
+            $asset = $this->make([
                 'path'         => $path,
                 'src'          => $src,
                 'handle'       => $handle,
-                'label'        => $label,
-                'description'  => $desc,
+                'label'        => $assetLabel,
+                'description'  => $isGroupConfig ? '' : $desc,
                 'type'         => $type,
-                'group'        => $group,
+                'group'        => $groupInstance,
                 'location'     => $location,
                 'version'      => filemtime($path), // Use file modification time as version for cache busting
                 'dependencies' => $dependencies,
             ]);
+
+            if ($groupInstance) {
+                $groupInstance->addAsset($asset);
+            }
 
             $this->checkout($checkedOutTo); // Checkout the register for the next iteration
         }

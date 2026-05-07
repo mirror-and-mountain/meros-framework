@@ -52,11 +52,11 @@ final class Asset extends FeatureDefinition {
     protected string $type = '';
 
     /**
-     * A group name for the asset, which can be used to group related assets together in the admin UI.
+     * An instance of the asset's group if set.
      *
-     * @var string
+     * @var AssetGroup|null
      */
-    protected string $group = '';
+    protected ?AssetGroup $group = null;
 
     /**
      * The location where the asset should be enqueued, which determines the WordPress hook it will be attached to.
@@ -106,16 +106,16 @@ final class Asset extends FeatureDefinition {
     ];
 
     /**
-     * Queues the asset with the appropriate WordPress hook for enqueuing when the asset is ready.
-     * 
-     * @return void
+     * Validates the asset's configuration and sets the hook for enqueuing in the correct WordPress location.
+     *
+     * @return boolean True if the asset is ready to be enqueued, false otherwise.
      */
-    protected function queue(): void {
+    protected function isReady(): bool {
         $requiredConfig = ['handle', 'type', 'location', 'src'];
         
         foreach ($requiredConfig as $configKey) {
             if (empty($this->$configKey)) {
-                return;
+                return false;
             }
         }
 
@@ -124,7 +124,7 @@ final class Asset extends FeatureDefinition {
             : ($this->hookMapping[$this->location] ?? '');
 
         if (empty($hook)) {
-            return;
+            return false;
         }
 
         // Fix for styles in the block editor.
@@ -134,9 +134,50 @@ final class Asset extends FeatureDefinition {
 
         $this->hook = $hook;
 
+        return true;
+    }
+
+    /**
+     * Queues the asset with the appropriate WordPress hook for enqueuing when the asset is ready.
+     * 
+     * @return void
+     */
+    protected function queue(): void {
+        if ($this->group !== null) {
+            return; // Asset will be queued by the group via the groupQueue() method.
+        }
+
+        if (!$this->isReady()) {
+            return; // Don't queue the asset until it's ready to avoid hooking into WordPress with incomplete configuration.
+        }
+
         if (!$this->queued) {
-            add_action($hook, function() {
-                $this->register();
+            add_action($this->hook, function() {
+                $this->enqueue();
+            });
+        }
+
+        $this->queued = true;
+    }
+
+    /**
+     * Queues the asset when it's part of a group by hooking it into WordPress.
+     * This method is called by the AssetGroup when queuing its assets.
+     * 
+     * @return void
+     */
+    public function groupQueue(): void {
+        if ($this->group === null) {
+            return; // This method should only be called by an AssetGroup when queuing its assets
+        }
+
+        if (!$this->isReady()) {
+            return; // Don't queue the asset if it's not ready.
+        }
+
+        if (!$this->queued) {
+            add_action($this->hook, function() {
+                $this->enqueue();
             });
         }
 
@@ -148,7 +189,7 @@ final class Asset extends FeatureDefinition {
      *
      * @return void
      */
-    protected function register(): void {
+    protected function enqueue(): void {
         if ($this->type === 'script') {
             wp_enqueue_script(
                 $this->handle,
@@ -317,13 +358,13 @@ final class Asset extends FeatureDefinition {
     }
 
     /**
-     * Set a group for the asset, which can be used to group related assets together in the admin UI.
+     * Set a group for the asset, which can be used to group related assets together for switching.
      *
-     * @param  string  $group
+     * @param  AssetGroup $group
      *
      * @return self
      */
-    public function group(string $group): self {
+    public function group(AssetGroup $group): self {
         $this->group = $group;
         return $this;
     }
@@ -433,7 +474,6 @@ final class Asset extends FeatureDefinition {
 
         return $this;
     }
-
 
     /***************************
      * Helpers

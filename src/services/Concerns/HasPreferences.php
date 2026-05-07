@@ -12,16 +12,16 @@ trait HasPreferences {
      * @var array
      */
     protected array $defaultPreferences = [
-        'assets_path'                      => 'resources/assets/build', // No leading or trailing slashes
-        'assets_are_enabled_by_default'    => true, // Whether to enable discovered assets by default.
-        'assets_are_switchable_by_default' => true, // Whether to allow enabling/disabling assets in WP Admin by default.
-        'blocks_path'                      => 'resources/blocks/build', // No leading or trailing slashes
-        'blocks_are_enabled_by_default'    => true, // Whether to enable discovered blocks by default.
-        'blocks_are_switchable_by_default' => true, // Whether to allow enabling/disabling blocks in WP Admin by default.
-        'components_path'                  => 'src/app/View/Components', // No leading or trailing slashes
-        'views_path'                       => 'resources/views', // No leading or trailing slashes
-        'routes_path'                      => 'routes', // No leading or trailing slashes
-        'tables_path'                      => 'database/tables', // No leading or trailing slashes
+        'assets_path'                            => 'resources/assets/build', // No leading or trailing slashes
+        'asset_groups_are_enabled_by_default'    => true, // Whether to enable discovered asset groups by default.
+        'asset_groups_are_switchable_by_default' => true, // Whether to allow enabling/disabling asset groups in WP Admin by default.
+        'blocks_path'                            => 'resources/blocks/build', // No leading or trailing slashes
+        'blocks_are_enabled_by_default'          => true, // Whether to enable discovered blocks by default.
+        'blocks_are_switchable_by_default'       => true, // Whether to allow enabling/disabling blocks in WP Admin by default.
+        'components_path'                        => 'src/app/View/Components', // No leading or trailing slashes
+        'views_path'                             => 'resources/views', // No leading or trailing slashes
+        'routes_path'                            => 'routes', // No leading or trailing slashes
+        'tables_path'                            => 'database/tables', // No leading or trailing slashes
     ];
 
     /**

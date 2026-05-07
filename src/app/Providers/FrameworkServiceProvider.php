@@ -15,6 +15,7 @@ use MM\Meros\App\Context;
 use MM\Meros\Support\ClassInfo;
 
 use MM\Meros\Services\Registers\Assets;
+use MM\Meros\Services\Registers\AssetGroups;
 use MM\Meros\Services\Registers\Blocks;
 use MM\Meros\Services\Registers\Forms;
 use MM\Meros\Services\Registers\Fields;
@@ -111,6 +112,10 @@ class FrameworkServiceProvider extends ServiceProvider {
      * @return void
      */
     private function registerRegisters(): void {
+        $this->app->singleton(AssetGroups::class, function () {
+            return new AssetGroups();
+        });
+
         $this->app->singleton(Assets::class, function () {
             return new Assets();
         });
@@ -163,6 +168,7 @@ class FrameworkServiceProvider extends ServiceProvider {
             return new SettingsSections();
         });
 
+        $this->app->alias(AssetGroups::class, 'meros.registers.asset_groups');
         $this->app->alias(Assets::class, 'meros.registers.assets');
         $this->app->alias(Blocks::class, 'meros.registers.blocks');
         $this->app->alias(Forms::class, 'meros.registers.forms');

@@ -10,6 +10,6 @@ class Blocks extends SettingsSection {
     protected string $page  = 'meros-features-blocks';
 
     public function render(): void {
-        echo '';
+        echo '<p>Manage blocks registered by the theme or packages.</p>';
     }
 }
