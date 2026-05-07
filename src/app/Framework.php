@@ -425,7 +425,7 @@ final class Framework extends FeatureProvider {
     private function getInstallerHTML(FeatureProvider $provider): string {
         $html        = '';
         $handle      = $provider->getHandle();
-        $isTheme     = $provider instanceof ThemeInstance;
+        $isTheme     = $provider instanceof Theme;
         $enabled     = $isTheme ? true : $provider->isEnabled();
         $installed   = $provider->isInstalled();
         $hasUpdates  = $provider->hasUpdates();
