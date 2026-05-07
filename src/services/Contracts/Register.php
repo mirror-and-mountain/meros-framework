@@ -291,25 +291,38 @@ abstract class Register {
     /**
      * Retrieves a feature or collection of features from the register.
      *
-     * @param string       $id The identifier to retrieve a specific feature.
+     * @param string       $id       Optional identifier to retrieve a specific feature.
      * @param Closure|null $callback Optional callback to filter or modify the retrieved feature(s).
      * 
-     * @return FeatureDefinition|null The requested feature or null if not found.
+     * @return FeatureDefinition|Collection|null The requested feature, all the provider's features, or null if not found.
      * @throws \BadMethodCallException If the register does not support retrieving features.
      */
-    public function get(string $id, ?Closure $callback = null): FeatureDefinition|null {
+    public function get(string $id = '', ?Closure $callback = null): FeatureDefinition|Collection|null {
         if (!$this->supports('get')) {
             throw new \BadMethodCallException("This register does not support retrieving features.");
         }
 
         // If the register supports public retrieval, search all instances regardless of provider
         if ($this->supports('public')) {
+            // If no ID is provided, return all instances (optionally filtered by the callback)
+            if ($id === '') {
+                $items = $this->instances;
+
+                if ($callback) {
+                    $items->each($callback);
+                }
+
+                return $items;
+            }
+
+            // Search for the item by the identifier fieldor nickname across all instances
             $item = $this->instances->firstWhere($this->identifier, $id);
 
             if ($item === null) {
                 $item = $this->instances->firstWhere('nickname', $id);
             }
 
+            // If a callback is provided, execute it with the found item
             if ($item && $callback) {
                 $callback($item);
             }
@@ -317,15 +330,29 @@ abstract class Register {
             return $item;
         }
 
-        // Otherwise, only search instances from the current provider
+        // If public retrieval is not supported, search instances from the current provider
         $this->ensureCheckedOut();
 
+        // If no ID is provided, return all instances for the current provider (optionally filtered by the callback)
+        if ($id === '') {
+            $items = $this->instances->where('provider', $this->provider);
+
+            if ($callback) {
+                $items->each($callback);
+            }
+
+            $this->checkin();
+            return $items;
+        }
+
+        // Search for the item by the identifier field or nickname among instances from the current provider
         $item = $this->instances->where('provider', $this->provider)->firstWhere($this->identifier, $id);
         
         if ($item === null) {
             $item = $this->instances->where('provider', $this->provider)->firstWhere('nickname', $id);
         }
 
+        // If a callback is provided, execute it with the found item
         if ($item && $callback) {
             $callback($item);
         }
@@ -335,34 +362,26 @@ abstract class Register {
     }
 
     /**
-     * Retrieves all features from the register.
-     * 
-     * @param bool $currentProvider Whether to retrieve only features from the current provider or all features in the register.
+     * If the register supports public retrieval, returns all features in the register. Otherwise, returns all features for the current provider.
      *
      * @return Collection A collection of all features in the register.
      * @throws \BadMethodCallException If the register does not support retrieving all features.
      */
-    public function all(bool $currentProvider = true): Collection {
+    public function all(): Collection {
         if (!$this->supports('all')) {
             throw new \BadMethodCallException("This register (" . static::class . ") does not support retrieving all features.");
         }
 
-        if ($currentProvider) {
-            $this->ensureCheckedOut();
-
-            $items = $this->instances->where('provider', $this->provider);
-
-            $this->checkin();
-            return $items;
-        }
-
-        else if ($this->supports('public')) {
+        if ($this->supports('public')) {
             return $this->instances;
         }
 
-        else {
-            throw new \BadMethodCallException("This register (" . static::class . ") does not support retrieving all features publicly.");
-        }
+        $this->ensureCheckedOut();
+        
+        $items = $this->instances->where('provider', $this->provider);
+        $this->checkin();
+
+        return $items;
     }
 
     /**

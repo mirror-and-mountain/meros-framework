@@ -21,41 +21,46 @@ use MM\Meros\Services\Registers\MenuPageTemplates as MenuPageTemplatesRegister;
 use MM\Meros\App\Theme;
 
 trait HasSettings {
+    /**
+     * The container that the provider is currently able to access for settings.
+     *
+     * @var array<Setting>
+     */
+    protected array $settingsContainers = [];
 
     /**
-     * The handle for the root setting associated with this feature provider.
+     * The name of the current (working) settings container for this provider.
+     * 
      *
      * @var string
      */
-    private string $settingsHandle = '';
+    protected string $currentSettingsContainer = '';
 
     /**
-     * The root setting instance for this feature provider.
-     *
-     * @var Setting|null
-     */
-    private ?Setting $rootSetting = null;
-
-    /**
-     * Retrieves the root setting for this feature provider, or a specific sub-setting if a name is provided.
+     * Retrieves the current settings container for this feature provider, or a specific sub-setting 
+     * inside the current container if a name is provided. 
+     * 
+     * If the current settings container is not set, the default settings container will be used instead.
      *
      * @param string $name
      *
      * @return Setting|null
      */
     protected function settings(string $name = ''): Setting|null {
-        $rootSetting = $this->rootSetting;
+        $container = isset($this->settingsContainers[$this->currentSettingsContainer])
+            ? $this->settingsContainers[$this->currentSettingsContainer]
+            : null;
 
-        if (!$rootSetting) {
-            $this->setRootSetting();
+        if ($container === null) {
+            return null;
         }
 
         if (!empty($name)) {
-            return collect($this->rootSetting->subItems)->firstWhere('name', $name);
+            return collect($container->getSubItems())->firstWhere('name', $name);
         } 
         
         else {
-            return $this->rootSetting;
+            return $container;
         }
     }
 
@@ -153,43 +158,78 @@ trait HasSettings {
     }
 
     /**
-     * Sets the root setting for this feature provider if it doesn't already exist. The root setting is automatically created when the 
-     * feature provider is instantiated, so this method should never need to be called manually.
+     * Creates the default settings container for this feature provider and adds it to the registry.
+     * 
+     * @param string $name The name of the settings container to create. If not provided, 'default' will be used.
      *
-     * @return void
+     * @return Setting The newly created default settings container instance for the item.
      */
-    private function setRootSetting(): void {
-        if (empty($this->settingsHandle)) {
-            $this->settingsHandle = $this instanceof Theme
-                ? 'meros_theme_settings'
-                :  $this->getHandle() . '_settings';
+    protected function settingsContainer(string $name = ''): Setting {
+        if (empty($name) || $name === 'default') {
+            $container = $this->getDefaultSettingsContainer();
+            $this->currentSettingsContainer = 'default';
+            return $container;
         }
 
-        $rootSetting = $this->rootSetting;
+        else if (!empty($name) && isset($this->settingsContainers[$name])) {
+            $this->currentSettingsContainer = $name;
+            return $this->settingsContainers[$name];
+        }
 
-        if (!$rootSetting) {
-            $rootSetting = $this->createRootSetting();
-            $this->rootSetting = $rootSetting;
+        else {
+            // Create new settings container with provided name
+            $container = Settings::checkout($this)->make([
+                'group' => Str::snake($name) . '_container',
+                'name'  => Str::snake($name),
+            ])
+                ->type('object')
+                ->label(Str::title(Str::replace('_', ' ', $name)) . ' Settings');
+
+            $this->settingsContainers[$name] = $container;
+            $this->currentSettingsContainer  = $name;
+
+            return $container;
         }
     }
 
     /**
-     * Creates the root setting for this feature provider and adds it to the registry.
+     * Retrieves a settings container by name, or the default settings container if no name is provided.
+     * Alias of settingsContainer() for users who prefer snake_case method names.
      *
-     * @return Setting The newly created root setting instance for the item.
+     * @param string $name
+     *
+     * @return Setting The settings container instance for the item.
      */
-    private function createRootSetting(): Setting {
+    protected function settings_container(string $name = ''): Setting {
+        return $this->settingsContainer($name);
+    }
+
+    /**
+      * Retrieves the default settings container for this feature provider, creating it if it doesn't already exist.
+      *
+      * @return Setting The default settings container instance for the item.
+      */
+    private function getDefaultSettingsContainer(): Setting {
+        if (isset($this->settingsContainers['default'])) {
+            return $this->settingsContainers['default'];
+        }
+
+        $name = $this instanceof Theme
+            ? 'meros_theme_settings'
+            : $this->getHandle() . '_settings';
+
         $label = $this instanceof Theme
             ? 'Theme Settings'
             : $this->getName() . ' Settings';
 
         $setting = Settings::checkout($this)->make([
-            'group' => $this->settingsHandle . '_group',
-            'name'  => $this->settingsHandle,
+            'group' => $name . '_container',
+            'name'  => $name,
         ])
             ->type('object')
             ->label($label);
 
+        $this->settingsContainers['default'] = $setting;
         return $setting;
     }
 

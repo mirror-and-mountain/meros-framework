@@ -16,7 +16,6 @@ use MM\Meros\App\Context;
 use MM\Meros\Facades\Context as ContextAccessor;
 
 abstract class FeatureProvider {
-
     /**
      * An object containing several properties and methods that the feature provider
      * can utilise throughout its lifecycle.
@@ -54,13 +53,8 @@ abstract class FeatureProvider {
         // Init preferences
         $this->initPreferences();
 
-        // Init root setting
-        $this->setRootSetting();
-
-        // if ($isFramework && $this->isFeaturesAdminPage()) {
-        //     $this->tables()->discover(); // Discover tables in this context so we can load installers if available.
-        //     dd($this->tables());
-        // }
+        // Init default settings container
+        $this->settingsContainer('default');
 
         // Framework is booted from its service provider
         if ($isFramework) {return;}
@@ -82,39 +76,5 @@ abstract class FeatureProvider {
 
     protected function loaded(): void {
         // Intentionally left blank for child classes to override.
-    }
-
-    /**
-     * Determines if the current context is the features admin page.
-     * Used to load installers in this context if available.
-     *
-     * @return boolean
-     */
-    private function isFeaturesAdminPage(): bool {
-        $context = Context::get();
-
-        if (!$context->isAdmin) {
-            return false;
-        }
-
-        if ($context->adminScreen !== 'options-general.php') {
-            return false;
-        }
-
-        $params = $context->params;
-
-        if (!isset($params['page']) || $params['page'] !== 'meros-features') {
-            return false;
-        }
-
-        if (!isset($params['tab'])) {
-            return true;
-        } 
-        
-        else if (in_array($params['tab'], ['theme', 'packages'])) {
-            return true;
-        }
-
-        return false;
     }
 }

@@ -56,7 +56,7 @@ trait IsDataRegistrant {
      *
      * @var array
      */
-    public array $subItems = [];
+    protected array $subItems = [];
 
     /**
      * Valid types for settings and schema definitions.
@@ -642,6 +642,14 @@ trait IsDataRegistrant {
     /***************************
      * Helpers
      ***************************/
+    /**
+     * Retrieves the sub-items for the current item.
+     *
+     * @return array The sub-items for the current item.
+     */
+    public function getSubItems(): array {
+        return $this->subItems;
+    }
 
     /**
      * Retrieves the dot-notated path for the item.

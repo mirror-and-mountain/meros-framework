@@ -26,6 +26,7 @@ abstract class Package extends FeatureProvider {
 
         else {
             $this->setIdentity($name, $path, $uri);
+            $this->settingsContainer('default');
         }
     }
 

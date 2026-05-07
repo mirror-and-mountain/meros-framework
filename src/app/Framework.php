@@ -280,7 +280,7 @@ final class Framework extends FeatureProvider {
      */
     private function configureBlocksSettings(Setting $settings): void {
         add_action('meros_providers_registered', function () use ($settings) {
-            $blocks = BlocksAccessor::all(false);
+            $blocks = BlocksAccessor::all();
             
             foreach ($blocks as $block) {
                 $switchable = $block->provider()->getPreference('blocks_are_switchable_by_default');
@@ -316,7 +316,7 @@ final class Framework extends FeatureProvider {
      */
     private function configureAssetGroupSettings(Setting $settings): void {
         add_action('meros_providers_registered', function () use ($settings) {
-            $groups = AssetGroupsAccessor::all(false);
+            $groups = AssetGroupsAccessor::all();
 
             foreach ($groups as $group) {
                 $switchable = $group->provider()->getPreference('asset_groups_are_switchable_by_default');
@@ -389,7 +389,7 @@ final class Framework extends FeatureProvider {
                             }
 
                             echo '<h2' . ($hasTables ? ' style="margin-top: 2em;"' : '') . '>Theme Settings</h2>';
-                            settings_fields('meros_theme_settings_group');
+                            settings_fields('meros_theme_settings_container');
                             do_settings_sections('meros-features-theme');
                             submit_button();
                         }
@@ -397,7 +397,7 @@ final class Framework extends FeatureProvider {
                     'packages' => [
                         'label'    => 'Packages',
                         'callback' => function () {
-                            settings_fields('meros_framework_settings_group');
+                            settings_fields('meros_framework_settings_container');
                             do_settings_sections('meros-features-packages');
                             submit_button();
                         }
@@ -405,7 +405,7 @@ final class Framework extends FeatureProvider {
                     'blocks' => [
                         'label'    => 'Blocks',
                         'callback' => function () {
-                            settings_fields('meros_framework_settings_group');
+                            settings_fields('meros_framework_settings_container');
                             do_settings_sections('meros-features-blocks');
                             submit_button();
                         }
@@ -413,7 +413,7 @@ final class Framework extends FeatureProvider {
                     'assets' => [
                         'label'    => 'Scripts & Styles',
                         'callback' => function () {
-                            settings_fields('meros_framework_settings_group');
+                            settings_fields('meros_framework_settings_container');
                             do_settings_sections('meros-features-assets');
                             submit_button();
                         }

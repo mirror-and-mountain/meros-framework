@@ -37,7 +37,7 @@
             @if($hasSettings)
                 <form method="post" action="options.php">
                     @php
-                        settings_fields( $package . '_settings_group' );
+                        settings_fields( $package . '_settings_container' );
                         do_settings_sections( $pageSlug . '-' . $package);
                         submit_button();
                     @endphp
