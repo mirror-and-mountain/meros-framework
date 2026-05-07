@@ -29,6 +29,13 @@ abstract class FeatureDefinition {
     protected bool $queued = false;
 
     /**
+     * Whether to automatically queue the feature after setting properties.
+     *
+     * @var boolean
+     */
+    protected bool $autoQueue = true;
+
+    /**
      * The output of the function used to load the feature, if applicable.
      *
      * @var boolean
@@ -117,7 +124,9 @@ abstract class FeatureDefinition {
             }
         }
 
-        $this->queue();
+        if ($this->autoQueue) {
+            $this->queue();
+        }
     }
 
     /**
@@ -130,6 +139,15 @@ abstract class FeatureDefinition {
     final public function nickname(string $nickname): self {
         $this->nickname = $nickname;
         return $this;
+    }
+
+    /**
+     * Returns the provider that registered the feature.
+     *
+     * @return FeatureProvider The provider this feature belongs to.
+     */
+    final public function provider(): FeatureProvider {
+        return $this->provider;
     }
     
     /**

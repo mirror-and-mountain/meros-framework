@@ -1,16 +1,6 @@
 @use 'nice-forms.css/dist/nice-forms.css';
 
-textarea.meros-admin-field,
-select.meros-admin-field,
-input[type="text"].meros-admin-field,
-input[type="email"].meros-admin-field,
-input[type="url"].meros-admin-field,
-input[type="number"].meros-admin-field,
-input[type="password"].meros-admin-field,
-input[type="color"].meros-admin-field,
-input[type="date"].meros-admin-field,
-input[type="datetime-local"].meros-admin-field,
-input[type="time"].meros-admin-field {
+.meros-settings-field:not([type="checkbox"]):not([type="radio"]) {
     width: 50% !important;
     max-width: 50% !important;
 }

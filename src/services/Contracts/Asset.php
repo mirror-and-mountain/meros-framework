@@ -17,13 +17,6 @@ final class Asset extends FeatureDefinition {
     public string $handle = '';
 
     /**
-     * Whether the asset is enabled and should be enqueued.
-     *
-     * @var boolean
-     */
-    protected bool $enabled = true;
-
-    /**
      * The file path to the asset on the server, used for versioning and validation.
      *
      * @var string
@@ -141,9 +134,9 @@ final class Asset extends FeatureDefinition {
 
         $this->hook = $hook;
 
-        if (!$this->queued && $this->enabled) {
+        if (!$this->queued) {
             add_action($hook, function() {
-                $this->enqueue();
+                $this->register();
             });
         }
 
@@ -155,7 +148,7 @@ final class Asset extends FeatureDefinition {
      *
      * @return void
      */
-    protected function enqueue(): void {
+    protected function register(): void {
         if ($this->type === 'script') {
             wp_enqueue_script(
                 $this->handle,

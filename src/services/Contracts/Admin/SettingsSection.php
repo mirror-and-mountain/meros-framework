@@ -24,6 +24,13 @@ class SettingsSection extends FeatureDefinition {
     protected string $title = '';
 
     /**
+     * A description of the settings section.
+     *
+     * @var string
+     */
+    protected string $description = '';
+
+    /**
      * The slug of the settings page that the section belongs to.
      *
      * @var string
@@ -75,18 +82,19 @@ class SettingsSection extends FeatureDefinition {
             'id',
             'title',
             'page',
-            'callback'
          ];
 
-         foreach ($requiredProps as $prop) {
-            if ($prop === 'callback' && $this->$prop === null) {
-                $this->callback = [$this, 'render'];
-            }
-
-            else if (empty($this->$prop)) {
+        foreach ($requiredProps as $prop) {
+            if (empty($this->$prop)) {
                  return;
             }
-         }
+        }
+
+        if ($this->callback === null) {
+            $this->callback = function() {
+                $this->render();
+            };
+        }
 
         if (!$this->queued) {
              add_action('admin_init', function() {
@@ -122,7 +130,17 @@ class SettingsSection extends FeatureDefinition {
      * @return void
      */
     public function render(): void {
-        echo '';
+        if (empty($this->title) && empty($this->description)) {
+            echo '';
+        }
+
+        if (!empty($this->title)) {
+            echo '<h3 class="meros-settings-section-title">' . esc_html($this->title) . '</h3>';
+        }
+
+        if (!empty($this->description)) {
+            echo '<p class="meros-settings-section-description">' . esc_html($this->description) . '</p>';
+        }
     }
 
     /***************************
@@ -159,6 +177,20 @@ class SettingsSection extends FeatureDefinition {
         if (empty($this->id)) {
             $this->id = Str::slug($title);
         }
+
+        $this->queue();
+        return $this;
+    }
+
+    /**
+     * Sets the description of the settings section.
+     *
+     * @param string $description The description of the settings section.
+     *
+     * @return self
+     */
+    public function description(string $description): self {
+        $this->description = $description;
 
         $this->queue();
         return $this;

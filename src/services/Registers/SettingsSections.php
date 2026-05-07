@@ -19,10 +19,11 @@ class SettingsSections extends Register {
      */
     protected function parseProperties(array $props): array {
         return [
-            'id'       => $props['id'] ?? '',
-            'title'    => $props['title'] ?? '',
-            'args'     => $props['args'] ?? [],
-            'callback' => $props['callback'] ?? null
+            'id'          => $props['id'] ?? '',
+            'title'       => $props['title'] ?? '',
+            'description' => $props['description'] ?? '',
+            'args'        => $props['args'] ?? [],
+            'callback'    => $props['callback'] ?? null
         ];
     }
 }

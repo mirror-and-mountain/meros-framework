@@ -4,8 +4,10 @@ namespace MM\Meros\App;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 
+use MM\Meros\Services\Contracts\Asset;
+use MM\Meros\Services\Contracts\Block;
+use MM\Meros\Services\Contracts\Admin\Setting;
 use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\App\Providers\FrameworkServiceProvider;
 
@@ -35,9 +37,10 @@ use MM\Meros\App\Admin\Templates\SimpleSettingsPage;
 use MM\Meros\App\Admin\Templates\TabbedSettingsPage;
 use MM\Meros\App\Admin\Templates\MerosFeaturesPage;
 
-use MM\Meros\App\Theme as ThemeInstance;
-use MM\Meros\Facades\Theme;
+use MM\Meros\App\Theme;
+use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Packages as PackagesAccessor;
+use MM\Meros\Facades\Blocks as BlocksAccessor;
 
 final class Framework extends FeatureProvider {
     /**
@@ -219,12 +222,6 @@ final class Framework extends FeatureProvider {
      * @return void
      */
     private function configureSettings(): void {
-        // Clear installer operation query args when settings are saved.
-        add_action('update_option_meros_framework_settings', function () {
-            $url = $this->context->removeQueryArgs(['provider', 'operation']);
-            $this->context->redirect($url);
-        }, 10, 3);
-
         $packageSettings = $this->settings()->add(function ($setting) {
             $setting->object('packages')
                 ->label('Packages');
@@ -233,17 +230,23 @@ final class Framework extends FeatureProvider {
         $blockSettings = $this->settings()->add(function ($setting) {
             $setting->object('blocks')
                 ->label('Blocks');
-
-            $setting->add()->boolean('example_block_setting')
-                ->label('Example Block Setting')
-                ->description('This is an example setting for blocks.')
-                ->field()
-                    ->section('meros-features-blocks');
         });
 
-        add_action('meros_providers_registered', function (ThemeInstance $theme, Collection $packages) use ($packageSettings) {
+        $this->configurePackageSettings($packageSettings);
+        $this->configureBlocksSettings($blockSettings);
+    }
+
+    /**
+     * Configures settings for discovered packages, allowing them to be enabled/disabled and providing links to their settings pages if applicable.
+     *
+     * @param Setting $settings The settings object to add package settings to.
+     *
+     * @return void
+     */
+    private function configurePackageSettings(Setting $settings): void {
+        add_action('meros_providers_registered', function (Theme $theme, Collection $packages) use ($settings) {
             foreach ($packages as $package) {
-                $enabledSetting = $packageSettings->add()->boolean($package->getHandle() . '_enable')
+                $enabledSetting = $settings->add()->boolean($package->getHandle() . '_enable')
                     ->label('Enable ' . $package->getName())
                     ->description($package->getDescription())
                     ->field()
@@ -257,6 +260,42 @@ final class Framework extends FeatureProvider {
                 }
 
                 $enabledSetting->titleHTML($titleHTML);
+            }
+        }, 10, 2);
+    }
+
+    /**
+     * Configures settings for discovered blocks, allowing them to be enabled/disabled.
+     *
+     * @param Setting $settings The settings object to add block settings to.
+     *
+     * @return void
+     */
+    private function configureBlocksSettings(Setting $settings): void {
+        add_action('meros_providers_registered', function () use ($settings) {
+            $blocks = BlocksAccessor::all(false);
+            
+            foreach ($blocks as $block) {
+                $switchable = $block->provider()->getPreference('blocks_are_switchable_by_default');
+                
+                if (!$switchable) {
+                    continue;
+                }
+
+                $enabledByDefault = $block->provider()->getPreference('blocks_are_enabled_by_default');
+                $blockSlug        = $block->getName(true);
+                $blockTitle       = Str::title(str_replace('_', ' ', $blockSlug));
+                $settingName      = $blockSlug . '_enable';
+
+                $settings->add()->boolean($settingName)
+                    ->label('Enable ' . $blockTitle . ' block')
+                    ->description($block->getDescription())
+                    ->default($enabledByDefault)
+                    ->field()
+                        ->section('meros-features-blocks');
+
+                $block->setIsSwitchable(true);
+                $block->setEnabledSetting($settingName);
             }
         }, 10, 2);
     }
@@ -280,9 +319,9 @@ final class Framework extends FeatureProvider {
                             echo '<h2>Theme Configuration</h2>';
                             echo '<p>Theme features are functionalities provided by your active theme that can be installed, updated and uninstalled independently of the theme itself.</p>';
                             
-                            $hasTables = Theme::hasTables();
+                            $hasTables = ThemeAccessor::hasTables();
                             if ($hasTables) {
-                                echo '<h3 style="margin-top: 2em;">Theme Installer</h3>';
+                                echo '<h2 style="margin-top: 2em;">Theme Installer</h2>';
                                 $operation = $_GET['operation'] ?? null;
                                 $operationMessage = $operation ? match($operation) {
                                     'installed'   => 'Theme features installed successfully.',
@@ -296,11 +335,11 @@ final class Framework extends FeatureProvider {
                                     echo '<div class="notice notice-success is-dismissible"><p>' . esc_html($operationMessage) . '</p></div>';
                                 }
                                 
-                                echo $this->getInstallerHTML(Theme::get());
+                                echo $this->getInstallerHTML(ThemeAccessor::get());
 
                             }
 
-                            echo '<h3' . ($hasTables ? ' style="margin-top: 2em;"' : '') . '>Theme Settings</h3>';
+                            echo '<h2' . ($hasTables ? ' style="margin-top: 2em;"' : '') . '>Theme Settings</h2>';
                             settings_fields('meros_theme_settings_group');
                             do_settings_sections('meros-features-theme');
                             submit_button();
@@ -326,6 +365,12 @@ final class Framework extends FeatureProvider {
                         'label'    => 'Scripts & Styles',
                         'callback' => function () {
                             echo 'This is the assets tab';
+                        }
+                    ],
+                    'integrations' => [
+                        'label'    => 'Integrations',
+                        'callback' => function () {
+                            echo 'This is the integrations tab';
                         }
                     ]
                 ]
@@ -600,7 +645,7 @@ final class Framework extends FeatureProvider {
         if ($providerType === 'package') {
             $provider = PackagesAccessor::get($providerHandle);
         } else {
-            $provider = Theme::get();
+            $provider = ThemeAccessor::get();
         }
 
         if ($provider === null) {

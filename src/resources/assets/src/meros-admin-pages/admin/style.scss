@@ -42,6 +42,7 @@
     }
 }
 
+/* Widen the label column for settings and align action buttons to the top of their cells */
 tbody:has(.meros-settings-label) {
     th[scope="row"]:has(.meros-settings-label) {
         width: 400px;

@@ -11,7 +11,6 @@ use MM\Meros\Services\Registers\Interfaces\Discovery;
 class Blocks extends Register implements Discovery {
     protected string $identifier = 'name';
     protected string $definition = Block::class;
-    protected array  $rejects    = ['public'];
 
     use Concerns\Discovers;
 

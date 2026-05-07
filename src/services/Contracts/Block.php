@@ -3,9 +3,12 @@
 namespace MM\Meros\Services\Contracts;
 
 use Closure;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
 use MM\Meros\Services\Contracts\FeatureDefinition;
+
+use MM\Meros\Services\Concerns\IsSwitchable;
 
 class Block extends FeatureDefinition {
     /**
@@ -14,13 +17,6 @@ class Block extends FeatureDefinition {
      * @var string
      */
     public string $name = '';
-
-    /**
-     * Whether the block is enabled.
-     *
-     * @var boolean
-     */
-    protected bool $enabled = true;
 
     /**
      * The path to a directory containing a block.json file.
@@ -37,6 +33,16 @@ class Block extends FeatureDefinition {
     protected array $args = [];
 
     /**
+     * Whether to automatically queue the block for registration on instantiation. 
+     * Set to false as we need to set the enabled setting first if the block is switchable.
+     *
+     * @var bool
+     */
+    final protected bool $autoQueue = false;
+
+    use IsSwitchable;
+
+    /**
      * Queues the block for registration by hooking into WordPress' 'init' action.
      * 
      * @return void
@@ -46,8 +52,11 @@ class Block extends FeatureDefinition {
             return;
         }
 
-        if (!$this->queued && $this->enabled) {
-            add_action('init', function() {
+        $this->setIsEnabled(); // Set the enabled state using the switch setting if applicable.
+        $this->hook = 'init'; // Needed for the IsSwitchable trait to manage the registration hook.
+
+        if (!$this->queued && $this->isEnabled) {
+            add_action($this->hook, function() {
                 $this->register();
             });
         }
@@ -67,6 +76,32 @@ class Block extends FeatureDefinition {
     }
 
     /***************************
+     * Getters
+     ***************************/
+
+    /**
+     * Returns the name of the block.
+     *
+     * @return string
+     */
+    public function getName(bool $snake = false): string {
+        if ($snake) {
+            return Str::replace('/', '_', $this->name);
+        }
+
+        return $this->name;
+    }
+
+    /**
+     * Returns the description of the block, either from the block's arguments or from the block.json file if a path is set.
+     *
+     * @return string
+     */
+    public function getDescription(): string {
+        return $this->args['description'] ?? '';
+    }
+
+    /***************************
      * Public Chainable methods
      ***************************/
 
@@ -79,7 +114,6 @@ class Block extends FeatureDefinition {
      */
     public function name(string $name): self {
         $this->name = $name;
-        $this->queue();
         return $this;
     }
 
@@ -99,8 +133,6 @@ class Block extends FeatureDefinition {
         }
         
         $this->path = $path;
-
-        $this->queue();
         return $this;
     }
 

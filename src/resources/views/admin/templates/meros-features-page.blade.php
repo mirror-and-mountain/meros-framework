@@ -49,5 +49,9 @@
         </div>
     @endif
 @else
-    @include('meros::admin.templates.tabbed-page')
+    <div class="wrap">
+        <h1>Meros Features</h1>
+        <p>Manage the features of your Meros packages here. You can enable or disable specific features, configure settings, and customize the behavior of your packages to suit your needs.</p>
+        @include('meros::admin.templates.tabbed-page')
+    </div>
 @endif
