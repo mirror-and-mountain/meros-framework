@@ -20,6 +20,13 @@ trait IsSwitchable {
     protected bool $isEnabled = true;
 
     /**
+     * Whether the item is enabled by default.
+     *
+     * @var bool
+     */
+    protected bool $enabledByDefault = false;
+
+    /**
      * The name of the setting that controls whether the item is enabled.
      *
      * @var string
@@ -27,15 +34,23 @@ trait IsSwitchable {
     protected string $enabledSetting = '';
 
     /**
+     * An array of other switchable items that this item depends on.
+     *
+     * @var array<string>
+     */
+    protected array $dependsOn = [];
+
+    /**
      * Sets the name of the setting that controls whether the item is enabled.
      *
      * @param string $settingName
      *
-     * @return void
+     * @return self
      */
-    final public function setEnabledSetting(string $settingName): void {
+    final public function setEnabledSetting(string $settingName): self {
         $this->enabledSetting = $settingName;
         $this->queue();
+        return $this;
     }
 
     /**
@@ -43,10 +58,35 @@ trait IsSwitchable {
      *
      * @param bool $switchable
      *
-     * @return void
+     * @return self
      */
-    final public function setIsSwitchable(bool $switchable): void {
+    final public function switchable(bool $switchable): self {
         $this->isSwitchable = $switchable;
+        return $this;
+    }
+
+    /**
+     * Sets whether the item is enabled by default.
+     *
+     * @param bool $enabledByDefault
+     *
+     * @return self
+     */
+    final public function enabledByDefault(bool $enabledByDefault): self {
+        $this->enabledByDefault = $enabledByDefault;
+        return $this;
+    }
+
+    /**
+     * Sets the items that this item depends on.
+     *
+     * @param string|array $items
+     *
+     * @return self
+     */
+    final public function dependsOn(string|array $items): self {
+        $this->dependsOn = is_array($items) ? $items : [$items];
+        return $this;
     }
 
     /**
@@ -56,14 +96,33 @@ trait IsSwitchable {
      * @return void
      */
     protected function setIsEnabled(): void {
-        $item           = Str::snake(Str::plural(Str::lower(Str::headline(class_basename($this)))));
-        $preferenceName = $item . '_are_enabled_by_default';
-
         if ($this->isSwitchable) {
-            $this->isEnabled = get_option('meros_framework_settings')[$item][$this->enabledSetting] ?? $this->provider->getPreference($preferenceName);
-        } else {
-            $this->isEnabled = true;
+            $item = Str::snake(Str::plural(Str::lower(Str::headline(class_basename($this)))));
+            
+            if ($this->dependsOn !== []) {
+                $dependenciesCount    = count($this->dependsOn);
+                $disabledDependencies = [];
+
+                foreach ($this->dependsOn as $dependency) {
+                    if (get_option('meros_framework_settings')[$item][$dependency] ?? $this->enabledByDefault) {
+                        continue;
+                    }
+
+                    $disabledDependencies[] = $dependency;
+                }
+
+                if ($dependenciesCount === count($disabledDependencies)) {
+                    $this->isEnabled = false;
+                    return;
+                }
+            }
+
+            $this->isEnabled = get_option('meros_framework_settings')[$item][$this->enabledSetting] ?? $this->enabledByDefault;
+            return;
         }
+
+        $this->isEnabled = true;
+        return;
     }
 
     /**
@@ -73,5 +132,23 @@ trait IsSwitchable {
      */
     final public function isEnabled(): bool {
         return $this->isEnabled;
+    }
+
+    /**
+     * Gets whether the item is switchable.
+     *
+     * @return bool
+     */
+    final public function isSwitchable(): bool {
+        return $this->isSwitchable;
+    }
+
+    /**
+     * Gets the items that this item depends on.
+     *
+     * @return array<string>
+     */
+    final public function getDependsOn(): array {
+        return $this->dependsOn;
     }
 }

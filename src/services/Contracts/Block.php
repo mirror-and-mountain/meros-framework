@@ -7,10 +7,12 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
 use MM\Meros\Services\Contracts\FeatureDefinition;
+use MM\Meros\Services\Contracts\Interfaces\Switchable;
 
 use MM\Meros\Services\Concerns\IsSwitchable;
+use MM\Meros\Services\Concerns\Discoverable;
 
-class Block extends FeatureDefinition {
+class Block extends FeatureDefinition implements Switchable {
     /**
      * The name of the block, in namespace/block-name format. Required for the block to be registered.
      *
@@ -40,7 +42,7 @@ class Block extends FeatureDefinition {
      */
     final protected bool $autoQueue = false;
 
-    use IsSwitchable;
+    use IsSwitchable, Discoverable;
 
     /**
      * Queues the block for registration by hooking into WordPress' 'init' action.
@@ -52,7 +54,7 @@ class Block extends FeatureDefinition {
             return;
         }
 
-        $this->setIsEnabled(); // Set the enabled state using the switch setting if applicable.
+        $this->setIsEnabled();
 
         if (!$this->queued && $this->isEnabled) {
             add_action('init', function() {
@@ -85,7 +87,7 @@ class Block extends FeatureDefinition {
      */
     public function getName(bool $snake = false): string {
         if ($snake) {
-            return Str::replace('/', '_', $this->name);
+            return Str::replace(['/', '-'], '_', $this->name);
         }
 
         return $this->name;
@@ -448,6 +450,15 @@ class Block extends FeatureDefinition {
     public function hooks(array $hooks): self {
         $this->args['block_hooks'] = $hooks;
         return $this;
+    }
+
+    /**
+     * Gets the parent block types that this block can be inserted into.
+     *
+     * @return array
+     */
+    public function getParents(): array {
+        return $this->args['parent'] ?? [];
     }
 }
 

@@ -194,9 +194,9 @@ final class Asset extends FeatureDefinition {
             wp_enqueue_script(
                 $this->handle,
                 $this->src,
-                $this->dependencies ?? [],
+                $this->dependencies,
                 $this->version,
-                $this->inFooter ?? false
+                $this->inFooter
             );
 
         } 
@@ -205,7 +205,7 @@ final class Asset extends FeatureDefinition {
             wp_enqueue_style(
                 $this->handle,
                 $this->src,
-                $this->dependencies ?? [],
+                $this->dependencies,
                 $this->version
             );
         }

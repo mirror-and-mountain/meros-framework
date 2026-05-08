@@ -37,6 +37,8 @@ use MM\Meros\Scripts\UninstallCommands;
 use MM\Meros\Facades\Theme;
 use MM\Meros\Facades\Packages;
 
+use Livewire\Livewire;
+
 class FrameworkServiceProvider extends ServiceProvider {
     
     /**
@@ -59,6 +61,14 @@ class FrameworkServiceProvider extends ServiceProvider {
 
         // Init the Framework class to trigger the constructor and set up the framework
         $framework = $this->app->make(Framework::class)->__initialise($this);
+
+        // Register Livewire components
+        Livewire::addNamespace(
+            namespace: 'meros',
+            classNamespace: 'MM\Meros\App\Livewire',
+            classPath: __DIR__ . '/../Livewire',
+            classViewPath: __DIR__ . '/../../resources/views/livewire'
+        );
         
         // Load views from the framework's views directory
         $viewsPath = $framework->getPreference('views_path');

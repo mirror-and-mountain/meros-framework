@@ -1,7 +1,6 @@
 <?php 
 
 use Illuminate\Support\Facades\Route;
+use MM\Meros\App\Middleware\AuthenticateAdmin;
 
-Route::get('/portal', function () {
-    return 'hello world';
-})->name('meros.portal');
+Route::livewire('/test', 'meros::test')->name('livewire.test')->middleware(AuthenticateAdmin::class);

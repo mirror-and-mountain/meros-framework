@@ -4,7 +4,9 @@ namespace MM\Meros\Services\Contracts;
 
 use Illuminate\Support\Str;
 use MM\Meros\Services\Contracts\FeatureDefinition;
+
 use MM\Meros\Services\Concerns\IsSwitchable;
+use MM\Meros\Services\Concerns\Discoverable;
 
 final class AssetGroup extends FeatureDefinition {
     /**
@@ -42,7 +44,7 @@ final class AssetGroup extends FeatureDefinition {
      */
     protected bool $queued = true;
 
-    use IsSwitchable;
+    use IsSwitchable, Discoverable;
 
     /***************************
      * Contract methods

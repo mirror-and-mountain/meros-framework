@@ -18,9 +18,11 @@ class AssetGroups extends Register {
      */
     protected function parseProperties(array $props): array {
         return [
-            'name'        => $props['name'] ?? '',
-            'label'       => $props['label'] ?? '',
-            'description' => $props['description'] ?? ''
+            'name'          => $props['name'] ?? '',
+            'label'         => $props['label'] ?? '',
+            'description'   => $props['description'] ?? '',
+            'isSwitchable'  => $props['switchable'] ?? null,
+            'wasDiscovered' => $props['discovered'] ?? false,
         ];
     }
 }

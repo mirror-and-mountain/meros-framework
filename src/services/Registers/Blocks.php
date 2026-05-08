@@ -36,38 +36,12 @@ class Blocks extends Register implements Discovery {
      * @return array
      */
     protected function parseProperties(array $props): array {
-        $args = $props['args'] ?? [];
-
         return [
-            'name' => $props['name'] ?? '',
-            'path' => $props['path'] ?? '',
-            'args' => [
-                'api_version'           => $args['api_version'] ?? 1,
-                'title'                 => $args['title'] ?? '',
-                'description'           => $args['description'] ?? '',
-                'textdomain'            => $args['textdomain'] ?? '',
-                'render_callback'       => $args['render_callback'] ?? null,
-                'category'              => $args['category'] ?? '',
-                'icon'                  => $args['icon'] ?? '',
-                'keywords'              => $args['keywords'] ?? [],
-                'parent'                => $args['parent'] ?? [],
-                'ancestor'              => $args['ancestor'] ?? [],
-                'allowed_blocks'        => $args['allowed_blocks'] ?? [],
-                'provides_context'      => $args['provides_context'] ?? [],
-                'uses_context'          => $args['uses_context'] ?? [],
-                'supports'              => $args['supports'] ?? [],
-                'attributes'            => $args['attributes'] ?? [],
-                'styles'                => $args['style_variations'] ?? [],
-                'variations'            => $args['variations'] ?? [],
-                'selectors'             => $args['selectors'] ?? [],
-                'variation_callback'    => $args['variation_callback'] ?? null,
-                'script_handles'        => $args['script_handles'] ?? [],
-                'style_handles'         => $args['style_handles'] ?? [],
-                'editor_script_handles' => $args['editor_script_handles'] ?? [],
-                'editor_style_handles'  => $args['editor_style_handles'] ?? [],
-                'view_script_handles'   => $args['view_script_handles'] ?? [],
-                'view_style_handles'    => $args['view_style_handles'] ?? [],
-            ]
+            'name'          => $props['name'] ?? '',
+            'path'          => $props['path'] ?? '',
+            'isSwitchable'  => $props['switchable'] ?? false,
+            'wasDiscovered' => $props['discovered'] ?? false,
+            'args'          => $props['args'] ?? [],
         ];
     }
 
@@ -103,11 +77,17 @@ class Blocks extends Register implements Discovery {
             }
 
             // Make the block
-            $this->make([
-                'name' => $config['name'],
-                'path' => $blockPath,
-                'args' => $config,
+            $block = $this->make([
+                'name'         => $config['name'],
+                'path'         => $blockPath,
+                'args'         => $config,
+                'discovered'   => true,
+                'switchable'   => $this->provider->getPreference('blocks_are_switchable_by_default'),
             ]);
+
+            if (is_array($config['parent'] ?? null)) {
+                $block->parent($config['parent']);
+            }
 
             $this->checkout($checkedOutTo); // Checkout the register for the next iteration
         }

@@ -85,22 +85,21 @@ final class Framework extends FeatureProvider {
         $this->fieldStyles()->register('default', DefaultFieldStyle::class);
         $this->fieldStyles()->register('nice', NiceFieldStyle::class);
 
-        // Only load admin features if we're in the admin context
+        // Register the Settings field style for admin settings pages
+        $this->fieldStyles()->register('settings', SettingsFieldStyle::class);
+
+        // Register framework settings sections
+        $this->settingsSections()->register('meros-features-packages', Packages::class);
+        $this->settingsSections()->register('meros-features-blocks', Blocks::class);
+        $this->settingsSections()->register('meros-features-assets', Assets::class);
+
+        // Register menu page templates
+        $this->menuPageTemplates()->register('simple-settings', SimpleSettingsPage::class);
+        $this->menuPageTemplates()->register('tabbed-settings', TabbedSettingsPage::class);
+        $this->menuPageTemplates()->register('meros-features', MerosFeaturesPage::class);
+
+        // Initialise AJAX handlers for admin interactions
         if ($this->context->isAdmin) {
-            // Register the Settings field style for admin settings pages
-            $this->fieldStyles()->register('settings', SettingsFieldStyle::class);
-
-            // Register framework settings sections
-            $this->settingsSections()->register('meros-features-packages', Packages::class);
-            $this->settingsSections()->register('meros-features-blocks', Blocks::class);
-            $this->settingsSections()->register('meros-features-assets', Assets::class);
-
-            // Register menu page templates
-            $this->menuPageTemplates()->register('simple-settings', SimpleSettingsPage::class);
-            $this->menuPageTemplates()->register('tabbed-settings', TabbedSettingsPage::class);
-            $this->menuPageTemplates()->register('meros-features', MerosFeaturesPage::class);
-
-            // Initialise AJAX handlers for admin interactions
             $this->initAdminAjaxHandlers();
         }
     }
@@ -113,10 +112,11 @@ final class Framework extends FeatureProvider {
     protected function configure(): void {
         // Run theme activation tasks
         add_action('after_switch_theme', [$this, 'runActivationTasks']);
+        
+        $this->configureSettings();
 
         // Configure settings and menu pages
         if ($this->context->isAdmin) {
-            $this->configureSettings();
             $this->configureMenuPages();
         }
             
@@ -283,16 +283,53 @@ final class Framework extends FeatureProvider {
             $blocks = BlocksAccessor::all();
             
             foreach ($blocks as $block) {
-                $switchable = $block->provider()->getPreference('blocks_are_switchable_by_default');
+                $switchable = $block->isSwitchable();
                 
                 if (!$switchable) {
                     continue;
+                }
+
+                $parentSettingName = '';
+                $parents           = $block->getParents();
+                $dependsOn         = [];
+
+                if ($parents !== []) {
+                    foreach ($parents as $parentName) {
+                        $parent = $blocks->where('name', $parentName)->first();
+
+                        if ($parent && !$parent->isSwitchable()) {
+                            continue;
+                        }
+
+                        if ($parent && $parent->isSwitchable()) {
+                            $parentSettingName = $parent->getName(true) . '_enable';
+                            $dependsOn[]       = $parentSettingName;
+                        }
+                    }
                 }
 
                 $enabledByDefault = $block->provider()->getPreference('blocks_are_enabled_by_default');
                 $blockSlug        = $block->getName(true);
                 $blockTitle       = Str::title(str_replace('_', ' ', $blockSlug));
                 $settingName      = $blockSlug . '_enable';
+
+                $hasDependencies  = $dependsOn !== [];
+                $isEnabled        = $enabledByDefault;
+
+                if ($hasDependencies) {
+                    $block->dependsOn($dependsOn);
+                    $block->enabledByDefault($enabledByDefault);
+                    $block->setEnabledSetting($settingName);
+                    $isEnabled = $block->isEnabled();
+                }
+
+                if ($hasDependencies && count($dependsOn) === 1) {
+                    continue; // Skip blocks with a single dependency as they will be hidden/shown based on their parent's setting.
+                }
+
+                if ($hasDependencies && !$isEnabled) {
+                    continue; // Skip blocks where all dependencies are disabled.
+                }
 
                 $settings->add()->boolean($settingName)
                     ->label('Enable the "' . $blockTitle . '" Block')
@@ -301,7 +338,7 @@ final class Framework extends FeatureProvider {
                     ->field()
                         ->section('meros-features-blocks');
 
-                $block->setIsSwitchable(true);
+                $block->enabledByDefault($enabledByDefault);
                 $block->setEnabledSetting($settingName);
             }
         }, 10, 2);
@@ -319,7 +356,7 @@ final class Framework extends FeatureProvider {
             $groups = AssetGroupsAccessor::all();
 
             foreach ($groups as $group) {
-                $switchable = $group->provider()->getPreference('asset_groups_are_switchable_by_default');
+                $switchable = $group->isSwitchable();
 
                 if (!$switchable) {
                     continue;
@@ -336,13 +373,13 @@ final class Framework extends FeatureProvider {
                 }
 
                 $settings->add()->boolean($settingName)
-                    ->label('Enable "' . $providerName . ' ' . $groupLabel . '" Scripts/Styles')
+                    ->label('Enable "' . $providerName . ' - ' . $groupLabel . '"')
                     ->description($group->getDescription())
                     ->default($enabledByDefault)
                     ->field()
                         ->section('meros-features-assets');
 
-                $group->setIsSwitchable(true);
+                $group->enabledByDefault($enabledByDefault);
                 $group->setEnabledSetting($settingName);
                 $group->queueAssets();
             }

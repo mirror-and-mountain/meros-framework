@@ -134,80 +134,47 @@ class Assets extends Register implements Discovery {
             // Set the group
             $groupIsLocation = $group === $location;
 
-            // Check for config file
-            $label = '';
-            $desc  = '';
-            $isGroupConfig = false;
+            // Check for a group config file
+            $groupLabel = '';
+            $groupDesc  = '';
+            $switchable = $this->provider->getPreference('asset_groups_are_switchable_by_default');
 
-            $configPath = dirname($path) . DIRECTORY_SEPARATOR . 'config.php'; // In the same directory as the asset
-
-            if (!File::exists($configPath)) {
-                $configPath = dirname(dirname($path)) . DIRECTORY_SEPARATOR . 'config.php'; // In the parent directory (for grouped assets)
+            if ($location !== 'admin') {
+                $groupConfig = $this->getAssetGroupConfiguration($path, $groupIsLocation);
+                $groupLabel  = $groupConfig['label'] ?? '';
+                $groupDesc   = $groupConfig['description'] ?? '';
+                $switchable  = $groupConfig['switchable'] ?? $switchable;
             }
 
-            if (File::exists($configPath)) {
-                $config = include $configPath;
-
-                if (is_array($config)) {
-                    $label  = $config['label'] ?? '';
-                    $desc   = $config['description'] ?? '';
-                }
-
-                $isGroupConfig = true;
-            }
-
-            // Check for dependency file
-            $dependencies = [];
-            $wpFile = false;
-
-            $dependencyPath = dirname($path) . DIRECTORY_SEPARATOR . 'dependencies.php'; // Custom dependencies file in the same directory
-
-            if (!File::exists($dependencyPath)) {
-                $dependencyPath = dirname($path) . DIRECTORY_SEPARATOR . 'index.asset.php'; // WordPress-style asset file in the same directory
-                $wpFile = File::exists($dependencyPath);
-            }
-
-            if (File::exists($dependencyPath)) {
-                $dependencyConfig = include $dependencyPath;
-
-                if (is_array($dependencyConfig)) {
-                    $dependencies = $wpFile ? $dependencyConfig['dependencies'] ?? [] : $dependencyConfig;
-                }
-            }
-
-            // Generate the handle
-            $base   = Str::slug($this->provider->getName()) . '-';
-            $handle = $base . ($groupIsLocation ? '' : $group . '-') . $location . '-' . $type;
-
-            // Generate label if not set in config
-            $assetLabel = '';
-            if ($isGroupConfig || (!$isGroupConfig && $label === '')) {
-                $assetLabel = Str::title(Str::replace(['-', '_'], ' ', $location)) . ' ' . ($type === 'script' ? 'Script' : 'Style');
-            }
-
-            // Set the src
-            $src = Str::replace($this->provider->getPath(), $this->provider->getUri(), $path);
-
-            // Setup an asset group if the asset is in a non-location subdirectory and is for the 'site' or 'editor' location
+            // Setup an asset group if groupConfig is available
             $groupInstance = null;
+            $baseName      = Str::slug($this->provider->getName()) . '-';
 
-            if (!$groupIsLocation && $location !== 'admin') {
-                $groupName = $base . $group;
+            if ($location !== 'admin' && $groupLabel !== '') {
+                $groupName     = $baseName . $group;
                 $groupInstance = AssetGroups::all(false)->firstWhere('name', $groupName);
 
                 if (!$groupInstance) {
-                    if ($isGroupConfig) {
-                        $groupLabel = $config['label'] ?? '';
-                        $groupDesc  = $config['description'] ?? '';
-                    }
                     $groupInstance = AssetGroups::checkout($this->provider)
                         ->make([
-                            'name'        => $groupName,
-                            'label'       => $groupLabel,
-                            'description' => $groupDesc,
+                            'name'          => $groupName,
+                            'label'         => $groupLabel,
+                            'description'   => $groupDesc,
+                            'switchable'    => $switchable,
+                            'wasDiscovered' => true,
                         ]);
                 }
             }
+
+
+            // Generate the asset handle
+            $handle = $baseName . ($groupIsLocation ? '' : $group . '-') . $location . '-' . $type;
+
+            // Generate the asset label
+            $assetLabel = Str::title(Str::replace(['-', '_'], ' ', $location)) . ' ' . ($type === 'script' ? 'Script' : 'Style');
+
+            // Set the src
+            $src = Str::replace($this->provider->getPath(), $this->provider->getUri(), $path);
 
             // Create and register the asset
             $asset = $this->make([
@@ -215,12 +182,12 @@ class Assets extends Register implements Discovery {
                 'src'          => $src,
                 'handle'       => $handle,
                 'label'        => $assetLabel,
-                'description'  => $isGroupConfig ? '' : $desc,
+                'description'  => '',
                 'type'         => $type,
                 'group'        => $groupInstance,
                 'location'     => $location,
                 'version'      => filemtime($path), // Use file modification time as version for cache busting
-                'dependencies' => $dependencies,
+                'dependencies' => $type === 'script' ? $this->getAssetDependencies($path) : [],
             ]);
 
             if ($groupInstance) {
@@ -229,5 +196,66 @@ class Assets extends Register implements Discovery {
 
             $this->checkout($checkedOutTo); // Checkout the register for the next iteration
         }
+    }
+
+    /**
+     * Retrieves the configuration for an asset group based on the asset's path and whether the group is a location.
+     *
+     * @param string $assetPath The file path of the asset being processed.
+     * @param bool   $groupIsLocation Indicates whether the group is a location (e.g. 'admin', 'editor', 'site') or a custom group.
+     *
+     * @return array An associative array containing 'label' and 'description' for the asset group, if available.
+     */
+    protected function getAssetGroupConfiguration(string $assetPath, bool $groupIsLocation): array {
+        $config = [];
+
+         if ($groupIsLocation) {
+            $groupConfigPath = dirname($assetPath) . DIRECTORY_SEPARATOR . 'config.php'; // In the same directory for location-level config
+        }
+
+        else {
+            $groupConfigPath = dirname(dirname($assetPath)) . DIRECTORY_SEPARATOR . 'config.php'; // In the parent directory for group-level config
+        }
+
+        if (File::exists($groupConfigPath)) {
+            $groupConfig = include $groupConfigPath;
+
+            if (is_array($groupConfig)) {
+                $config['label']       = $groupConfig['label'] ?? '';
+                $config['description'] = $groupConfig['description'] ?? '';
+                $config['switchable']  = $groupConfig['switchable'] ?? null;
+            }
+        }
+
+        return $config;
+    }
+
+    /**
+     * Retrieves the dependencies for an asset based on a custom dependencies file or a WordPress-style asset file.
+     *
+     * @param string $assetPath The file path of the asset being processed.
+     *
+     * @return array An array of dependency handles that the asset depends on, if available.
+     */
+    protected function getAssetDependencies(string $assetPath): array {
+        $dependencies = [];
+        $wpFile = false;
+
+        $dependencyPath = dirname($assetPath) . DIRECTORY_SEPARATOR . 'dependencies.php'; // Custom dependencies file in the same directory
+
+        if (!File::exists($dependencyPath)) {
+            $dependencyPath = dirname($assetPath) . DIRECTORY_SEPARATOR . 'index.asset.php'; // WordPress-style asset file in the same directory
+            $wpFile = File::exists($dependencyPath);
+        }
+
+        if (File::exists($dependencyPath)) {
+            $dependencyConfig = include $dependencyPath;
+
+            if (is_array($dependencyConfig)) {
+                $dependencies = $wpFile ? $dependencyConfig['dependencies'] ?? [] : $dependencyConfig;
+            }
+        }
+
+        return $dependencies;
     }
 }
