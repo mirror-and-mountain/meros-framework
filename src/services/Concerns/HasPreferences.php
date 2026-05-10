@@ -19,6 +19,9 @@ trait HasPreferences {
         'blocks_are_enabled_by_default'          => true, // Whether to enable discovered blocks by default.
         'blocks_are_switchable_by_default'       => true, // Whether to allow enabling/disabling blocks in WP Admin by default.
         'components_path'                        => 'src/app/View/Components', // No leading or trailing slashes
+        'livewire_path'                          => 'app/Livewire',
+        'livewire_views_path'                    => 'resources/views/livewire', // No leading or trailing slashes
+        'livewire_namespace'                     => 'App\\Livewire', // The namespace for Livewire components
         'views_path'                             => 'resources/views', // No leading or trailing slashes
         'routes_path'                            => 'routes', // No leading or trailing slashes
         'tables_path'                            => 'database/tables', // No leading or trailing slashes

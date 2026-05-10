@@ -3,7 +3,6 @@
 namespace MM\Meros\App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 use MM\Meros\App\Package;
@@ -17,6 +16,8 @@ abstract class PackageServiceProvider extends ServiceProvider {
      * @var string
      */
     protected string $serviceClass;
+
+    use Concerns\HasViews, Concerns\HasRoutes, Concerns\HasLivewire;
 
     /**
      * The instance of the package being registered.
@@ -42,6 +43,10 @@ abstract class PackageServiceProvider extends ServiceProvider {
         }
     }
 
+    protected function beforeBoot(): void {
+        // This method can be overridden by child classes to perform actions before the boot process
+    }
+
     final public function boot(): void {
         $package = $this->instance;
 
@@ -49,18 +54,21 @@ abstract class PackageServiceProvider extends ServiceProvider {
             return;
         }
 
-        // Load views from the package's views directory
-        $this->loadViewsFrom($package->getPreference('views_path'), $package->getHandle());
+        $this->beforeBoot();
+
+        // Register Livewire components
+        $this->registerLivewireComponents($package);
+        
+        // Load views from the packages's views directory
+        $this->registerViews($package);
 
         // Load routes from the package's routes directory
-        $routesPath = $package->getPreference('routes_path');
-        if (File::exists($routesPath) && File::isDirectory($routesPath)) {
-            $routeFiles = File::files($routesPath);
-            foreach ($routeFiles as $file) {
-                if ($file->getExtension() === 'php') {
-                    $this->loadRoutesFrom($file->getPathname());
-                }
-            }
-        }
+        $this->registerRoutes($package);
+
+        $this->afterBoot();
+    }
+
+    protected function afterBoot(): void {
+        // This method can be overridden by child classes to perform actions after the boot process
     }
 }

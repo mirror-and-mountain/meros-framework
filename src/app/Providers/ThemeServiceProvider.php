@@ -4,7 +4,6 @@ namespace MM\Meros\App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\File;
 
 use MM\Meros\App\Theme as MerosTheme;
 ;
@@ -13,6 +12,8 @@ use MM\Meros\Support\ClassInfo;
 use MM\Meros\Facades\Theme;
 
 class ThemeServiceProvider extends ServiceProvider {
+
+    use Concerns\HasViews, Concerns\HasRoutes, Concerns\HasLivewire;
 
     final public function register(): void {
         $themeClass = Config::get('theme.theme_class');
@@ -32,22 +33,30 @@ class ThemeServiceProvider extends ServiceProvider {
         defined('MEROS') || define('MEROS', true);
     }
 
+    protected function beforeBoot(): void {
+        // This method can be overridden by child classes to perform actions before the boot process
+    }
+
     final public function boot(): void {
+        $this->beforeBoot();
+
         $theme = Theme::get(); // Get the theme instance
 
         $theme->initialiseStyleSheet(); // Ensure the theme's stylesheet is enqueued
-        $this->loadViewsFrom($theme->getPreference('views_path'), 'theme'); // Load views from the theme's views directory
+        
+        // Register Livewire components
+        $this->registerLivewireComponents($theme, 'theme');
+        
+        // Load views from the theme's views directory
+        $this->registerViews($theme, 'theme');
 
         // Load routes from the theme's routes directory
-        $routesPath = $theme->getPreference('routes_path');
-        
-        if (File::exists($routesPath) && File::isDirectory($routesPath)) {
-            $routeFiles = File::files($routesPath);
-            foreach ($routeFiles as $file) {
-                if ($file->getExtension() === 'php') {
-                    $this->loadRoutesFrom($file->getPathname());
-                }
-            }
-        }
+        $this->registerRoutes($theme);
+
+        $this->afterBoot();
+    }
+
+    protected function afterBoot(): void {
+        // This method can be overridden by child classes to perform actions after the boot process
     }
 }

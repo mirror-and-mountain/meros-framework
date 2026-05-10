@@ -51,6 +51,9 @@ final class Framework extends FeatureProvider {
      * @return self
      */
     public function __initialise(FrameworkServiceProvider $serviceProvider): self {
+        // Set framework preferences
+        $this->setPreference('livewire_namespace', 'MM\\Meros\\App\\Livewire');
+
         $this->load();
         $this->configure();
         return $this;

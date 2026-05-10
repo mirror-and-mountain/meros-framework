@@ -6,8 +6,6 @@ use Illuminate\Support\ServiceProvider;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Blade;
 
 use MM\Meros\App\Framework;
 use MM\Meros\App\Context;
@@ -37,9 +35,9 @@ use MM\Meros\Scripts\UninstallCommands;
 use MM\Meros\Facades\Theme;
 use MM\Meros\Facades\Packages;
 
-use Livewire\Livewire;
-
 class FrameworkServiceProvider extends ServiceProvider {
+
+    use Concerns\HasViews, Concerns\HasRoutes, Concerns\HasLivewire;
     
     /**
      * Registers the framework's services, including helper classes and the Framework class itself.
@@ -63,31 +61,13 @@ class FrameworkServiceProvider extends ServiceProvider {
         $framework = $this->app->make(Framework::class)->__initialise($this);
 
         // Register Livewire components
-        Livewire::addNamespace(
-            namespace: 'meros',
-            classNamespace: 'MM\Meros\App\Livewire',
-            classPath: __DIR__ . '/../Livewire',
-            classViewPath: __DIR__ . '/../../resources/views/livewire'
-        );
+        $this->registerLivewireComponents($framework, 'meros');
         
         // Load views from the framework's views directory
-        $viewsPath = $framework->getPreference('views_path');
-        $this->loadViewsFrom($viewsPath, 'meros');
-        
-        // Register the framework's components directory for anonymous components
-        Blade::anonymousComponentPath($viewsPath . '/components');
+        $this->registerViews($framework, 'meros');
 
         // Load routes from the framework's routes directory
-        $routesPath = $framework->getPreference('routes_path');
-
-        if (File::exists($routesPath) && File::isDirectory($routesPath)) {
-            $routeFiles = File::files($routesPath);
-            foreach ($routeFiles as $file) {
-                if ($file->getExtension() === 'php') {
-                    $this->loadRoutesFrom($file->getPathname());
-                }
-            }
-        }
+        $this->registerRoutes($framework);
 
         // Call the Theme Service Provider
         $this->app->register(ThemeServiceProvider::class);
