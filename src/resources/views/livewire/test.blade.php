@@ -1,1 +1,0 @@
-<button type="button" wire:click="changeMessage">{{ $message }}</button>

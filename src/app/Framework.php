@@ -131,6 +131,15 @@ final class Framework extends FeatureProvider {
         $this->blocks()->discover();
     }
 
+    /**
+     * Returns the framework instance.
+     *
+     * @return self
+     */
+    public function get(): self {
+        return $this;
+    }
+
     /*****************************************************************************************
      * 
      * The following methods are installing core framework tables when required by providers

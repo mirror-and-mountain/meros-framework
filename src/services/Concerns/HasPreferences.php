@@ -12,7 +12,9 @@ trait HasPreferences {
      * @var array
      */
     protected array $defaultPreferences = [
-        'assets_path'                            => 'resources/assets/build', // No leading or trailing slashes
+        'assets_path'                            => 'resources/assets/wordpress/build', // No leading or trailing slashes
+        'vite_assets_entry'                      => 'resources/assets/vite/src/index.js', // The default entry point for vite assets.
+        'vite_build_path'                        => 'resources/assets/vite/build', // No leading or trailing slashes
         'asset_groups_are_enabled_by_default'    => true, // Whether to enable discovered asset groups by default.
         'asset_groups_are_switchable_by_default' => true, // Whether to allow enabling/disabling asset groups in WP Admin by default.
         'blocks_path'                            => 'resources/blocks/build', // No leading or trailing slashes
@@ -82,15 +84,36 @@ trait HasPreferences {
      * @return mixed
      */
     final public function getPreference(string $key, bool $fullPath = true): mixed {
-        if (Str::endsWith($key, '_path') && $fullPath) {
+        if ((Str::endsWith($key, '_path') || Str::endsWith($key, '_entry')) && $fullPath) {
+            
             if (isset($this->preferences[$key])) {
                 return trailingslashit( $this->path ) . $this->preferences[$key];
-            } else if (isset($this->defaultPreferences[$key])) {
+            } 
+            
+            else if (isset($this->defaultPreferences[$key])) {
                 return trailingslashit( $this->path ) . $this->defaultPreferences[$key];
-            } else {
+            } 
+            
+            else {
                 return null;
             }
         }
+
+        if (Str::endsWith($key, '_url')) {
+
+            if (isset($this->preferences[$key])) {
+                return trailingslashit( $this->uri ) . $this->preferences[$key];
+            } 
+            
+            else if (isset($this->defaultPreferences[$key])) {
+                return trailingslashit( $this->uri ) . $this->defaultPreferences[$key];
+            } 
+            
+            else {
+                return null;
+            }
+        }
+        
         return $this->preferences[$key] ?? $this->defaultPreferences[$key] ?? null;
     }
 }

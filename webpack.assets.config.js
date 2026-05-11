@@ -7,17 +7,17 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 /**
  * ------------------------------------------------------------
- * Build entry points from src/resources/assets/src/**
+ * Build entry points
  * ------------------------------------------------------------
  */
 const entries = {};
 
-glob.sync('./src/resources/assets/src/*/index.js').forEach((file) => {
+glob.sync('./src/resources/assets/wordpress/src/*/index.js').forEach((file) => {
   const name = path.basename(path.dirname(file));
   entries[name] = path.resolve(__dirname, file);
 });
 
-glob.sync('./src/resources/assets/src/*/*/index.js').forEach((file) => {
+glob.sync('./src/resources/assets/wordpress/src/*/*/index.js').forEach((file) => {
   const dir = path.dirname(file);
   const parent = path.basename(path.dirname(dir));
   const name = `${parent}/${path.basename(dir)}`;
@@ -37,7 +37,7 @@ module.exports = {
   /**
    * Scope webpack to assets only
    */
-  context: path.resolve(__dirname, 'src/resources/assets'),
+  context: path.resolve(__dirname, 'src/resources/assets/wordpress/src'),
   entry: entries,
 
   /**
@@ -45,7 +45,7 @@ module.exports = {
    */
   output: {
     ...defaultConfig.output,
-    path: path.resolve(__dirname, 'src/resources/assets/build'),
+    path: path.resolve(__dirname, 'src/resources/assets/wordpress/build'),
     filename: '[name]/index.js',
     clean: true,
   },
@@ -82,14 +82,14 @@ module.exports = {
       patterns: [
         {
           from: '**/dependencies.php',
-          context: path.resolve(__dirname, 'src/resources/assets/src'),
-          to: path.resolve(__dirname, 'src/resources/assets/build'),
+          context: path.resolve(__dirname, 'src/resources/assets/wordpress/src'),
+          to: path.resolve(__dirname, 'src/resources/assets/wordpress/build'),
           noErrorOnMissing: true,
         },
         {
           from: '**/config.php',
-          context: path.resolve(__dirname, 'src/resources/assets/src'),
-          to: path.resolve(__dirname, 'src/resources/assets/build'),
+          context: path.resolve(__dirname, 'src/resources/assets/wordpress/src'),
+          to: path.resolve(__dirname, 'src/resources/assets/wordpress/build'),
           noErrorOnMissing: true,
         }
       ],
