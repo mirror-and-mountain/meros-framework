@@ -11,6 +11,13 @@ class Checkboxes extends Select {
     public string $handle = 'checkboxes';
 
     /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'tick';
+
+    /**
      * Choice features supported by the checkboxes field.
      *
      * @var array

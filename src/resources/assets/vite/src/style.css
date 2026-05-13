@@ -1,1 +1,59 @@
+@import 'nice-forms.css/dist/nice-forms.css';
+@import 'tom-select/dist/css/tom-select.css';
 @import "tailwindcss";
+
+[x-cloak] {
+    display: none !important;
+}
+
+.meros-field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),
+.meros-field select,
+.meros-field textarea {
+    width: 100%;
+}
+
+.meros-field input[type="text"],
+.meros-field input[type="email"],
+.meros-field input[type="url"],
+.meros-field input[type="number"],
+.meros-field input[type="password"] {
+    height: auto !important;
+}
+
+.meros-repeater-table {
+    width: max-content;
+    min-width: 100%;
+}
+
+.meros-repeater-table .meros-repeater-data-header,
+.meros-repeater-table .meros-repeater-data-cell {
+    min-width: 16rem;
+}
+
+.meros-repeater-table .meros-repeater-data-cell .meros-field,
+.meros-repeater-table .meros-repeater-data-cell .meros-field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),
+.meros-repeater-table .meros-repeater-data-cell .meros-field select,
+.meros-repeater-table .meros-repeater-data-cell .meros-field textarea {
+    min-width: 100%;
+}
+
+/* Ensure TomSelect dropdown is visible in repeater cells */
+.meros-repeater-table .meros-repeater-data-cell {
+    position: relative;
+    overflow: visible !important;
+}
+
+/* Global TomSelect dropdown styling - high z-index for teleported dropdowns */
+.ts-dropdown {
+    z-index: 999999 !important;
+}
+
+/* Prevent parent overflow containers from clipping the dropdown */
+.overflow-x-auto {
+    overflow-y: visible !important;
+}
+
+/* Ensure the repeater scroll container allows vertical overflow */
+.overflow-x-auto > div {
+    overflow-y: visible !important;
+}

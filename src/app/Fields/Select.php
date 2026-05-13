@@ -14,6 +14,20 @@ class Select extends Field {
     public string $handle = 'select';
 
     /**
+     * The category for the field, used for grouping in the UI.
+     *
+     * @var string
+     */
+    public static string $category = 'choice';
+
+    /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'list';
+
+    /**
      * The options for the select field.
      *
      * @var array
@@ -200,8 +214,22 @@ class Select extends Field {
         return $this->attributes['multiple'] ?? false;
     }
 
+    /**
+     * Checks if the field allows adding new options in the UI.
+     *
+     * @return bool True if adding new options is allowed, false otherwise.
+     */
     public function allowsAdd(): bool {
         return ($this->attributes['data-allow-add'] ?? 'false') === 'true';
+    }
+
+    /**
+     * Checks if the field is set to use an advanced UI (e.g., tomselect).
+     *
+     * @return bool True if advanced UI is enabled, false otherwise.
+     */
+    public function isAdvanced(): bool {
+        return ($this->attributes['data-advanced'] ?? 'false') === 'true';
     }
 
     /**

@@ -11,6 +11,13 @@ class Color extends Input {
     public string $handle = 'color';
 
     /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'swatch';
+
+    /**
      * Default attributes for the color field.
      *
      * @var array

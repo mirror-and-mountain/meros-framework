@@ -11,6 +11,20 @@ class Url extends Input {
     public string $handle = 'url';
 
     /**
+     * The category for the field, used for grouping in the UI.
+     *
+     * @var string
+     */
+    public static string $category = 'specialised';
+
+    /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'link';
+
+    /**
      * Default attributes for the URL field.
      *
      * @var array

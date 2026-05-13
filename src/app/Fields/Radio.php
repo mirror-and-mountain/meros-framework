@@ -11,6 +11,20 @@ class Radio extends Select {
     public string $handle = 'radio';
 
     /**
+     * The category for the field, used for grouping in the UI.
+     *
+     * @var string
+     */
+    public static string $category = 'choice';
+
+    /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'list';
+
+    /**
      * Choice features supported by the radio field.
      *
      * @var array

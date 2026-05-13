@@ -13,6 +13,13 @@ class Checkbox extends Field {
     public string $handle = 'checkbox';
 
     /**
+     * The category for the field, used for grouping in the UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'tick';
+
+    /**
      * Default attributes for the number field.
      *
      * @var array

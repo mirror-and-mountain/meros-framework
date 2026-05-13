@@ -1,1 +1,1 @@
-<p>This is the toolbox index page.</p>
+<p class="text-red-500">This is the toolbox index page.</p>

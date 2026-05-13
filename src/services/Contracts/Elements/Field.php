@@ -20,6 +20,20 @@ abstract class Field extends FeatureDefinition {
     public string $handle;
 
     /**
+     * The category this field belongs to, used for organising fields in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $category = 'basic';
+
+    /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = '';
+
+    /**
      * An array of data types that this field is compatible with.
      *
      * @var array
@@ -672,6 +686,24 @@ abstract class Field extends FeatureDefinition {
      */
     public function isCompatibleWith(string $dataType): bool {
         return in_array($dataType, $this->compatibleDataTypes);
+    }
+
+    /**
+     * Retrieves the category this field belongs to.
+     *
+     * @return string
+     */
+    public static function getCategory(): string {
+        return static::$category;
+    }
+
+    /**
+     * Retrieves the icon for this field.
+     *
+     * @return string
+     */
+    public static function getIcon(): string {
+        return static::$icon;
     }
 
     /***************************

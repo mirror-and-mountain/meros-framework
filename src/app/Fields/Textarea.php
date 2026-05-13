@@ -13,6 +13,13 @@ class Textarea extends Field {
     public string $handle = 'textarea';
 
     /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'bars-long';
+
+    /**
      * Default attributes for the textarea field.
      *
      * @var array

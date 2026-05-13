@@ -9,7 +9,30 @@ use MM\Meros\Services\Contracts\Elements\Interfaces\FieldParent;
 
 use MM\Meros\Services\Contracts\Elements\Concerns\CanAttachFields;
 
+use MM\Meros\Facades\Context;
+
 class Repeater extends Field implements FieldParent {
+    /**
+     * The unique identifier for the field, used for resolution.
+     *
+     * @var string
+     */
+    public string $handle = 'repeater';
+
+    /**
+     * The category for the field, used for grouping in the UI.
+     *
+     * @var string
+     */
+    public static string $category = 'specialised';
+
+    /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'table';
+    
     /**
      * The root name for the repeater field, used to generate sub-field names.
      *
@@ -75,10 +98,11 @@ class Repeater extends Field implements FieldParent {
      * 
      * @param bool $showLabel Whether to show the field's label in the wrapper. Some styles may ignore this and always show the label, or never show the label.
      * @param bool $showHelp Whether to show the field's help text in the wrapper. Some styles may ignore this and always show the help text, or never show the help text.
+     * @param array|null $location Optional location context for form builder integration (groupRowIndex, rowIndex, fieldIndex).
      *
      * @return void
      */
-    public function render(bool $showLabel = true, bool $showHelp = true): void {
+    public function render(bool $showLabel = true, bool $showHelp = true, ?array $location = null): void {
         $view = $this->resolveStyle();
 
         echo view($view, [
@@ -87,6 +111,7 @@ class Repeater extends Field implements FieldParent {
             'rows'      => $this->buildRows(),
             'showLabel' => $showLabel,
             'showHelp'  => $showHelp,
+            'location'  => $location,
         ]);
     }
 
@@ -96,7 +121,7 @@ class Repeater extends Field implements FieldParent {
      * @return string
      */
     public function getFieldComponent(): string {
-        return 'meros::fields.repeater';
+        return Context::isAdmin() ? 'meros::fields.repeater-admin' : 'meros::fields.repeater';
     }
 
     /**
@@ -108,7 +133,7 @@ class Repeater extends Field implements FieldParent {
         $value = $this->getValue();
         $items = is_array($value) && !empty($value)
             ? $value
-            : [[]];
+            : [];
 
         $rows = [];
 
@@ -118,12 +143,18 @@ class Repeater extends Field implements FieldParent {
 
             foreach ($this->fields as $field) {
                 $fieldInstance = clone $field;
+                
+                // Store the original field name before generating the indexed name
+                $baseFieldName = $fieldInstance->getName();
 
                 $fieldInstance->id($this->generateSubFieldId($fieldInstance, $index));
                 $fieldInstance->name($this->generateSubFieldName($fieldInstance, $index));
-                $fieldInstance->value($rowData[$fieldInstance->getName()] ?? null);
+                
+                // Look up value using the base field name, not the generated indexed name
+                $fieldInstance->value($rowData[$baseFieldName] ?? null);
 
-                $row[$fieldInstance->getName()] = $fieldInstance;
+                // Key the row by base field name so repeater view can access with getFieldNames()
+                $row[$baseFieldName] = $fieldInstance;
             }
 
             $rows[] = $row;

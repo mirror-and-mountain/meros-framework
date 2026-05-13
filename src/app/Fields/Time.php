@@ -11,6 +11,20 @@ class Time extends Input {
     public string $handle = 'time';
 
     /**
+     * The category for the field, used for grouping in the UI.
+     *
+     * @var string
+     */
+    public static string $category = 'dates';
+
+    /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'clock';
+
+    /**
      * Default attributes for the time field.
      *
      * @var array

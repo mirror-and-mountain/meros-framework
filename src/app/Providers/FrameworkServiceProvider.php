@@ -200,32 +200,34 @@ class FrameworkServiceProvider extends ServiceProvider {
         $this->app->alias(Context::class, 'meros.context');
 
         // Add blade directive for vite assets
-        Blade::directive('viteAssets', function (?string $context = null) {
-            $context   = $context ?: 'theme';
-            $context   = trim($context, '\'"'); // Remove quotes if present
-            $entry     = null;
-            $buildPath = null;
-            $package   = null;
+        Blade::directive('viteAssets', function (?string $context = null, ?string $entry = null) {
+            $context  = $context ?: 'theme';
+            $context  = trim($context, '\'"'); // Remove quotes if present
+            $vitePath = null;
+            $instance = null;
 
             $isPackageContext = !in_array($context, ['theme', 'framework']);
 
             if ($isPackageContext) {
-                $package = Packages::all()->where('handle', $context)->first();
-                if (!$package) {
-                    return "<!-- Vite Assets: Invalid context '{$context}' -->";
-                }
-
-                $entry     = $package->preference('vite_assets_entry');
-                $buildPath = $package->getPreference('vite_build_path');
+                $instance = Packages::all()->where('handle', $context)->first();
             }
 
-            if ($context === 'theme') {
-                $entry     = Theme::get()->getPreference('vite_assets_entry');
-                $buildPath = Theme::get()->getPreference('vite_build_path');
-            } else if ($context === 'framework') {
-                $entry     = FrameworkAccessor::getPreference('vite_assets_entry');
-                $buildPath = FrameworkAccessor::getPreference('vite_build_path');
+            else if ($context === 'theme') {
+                $instance  = Theme::get();
+            } 
+            
+            else if ($context === 'framework') {
+                $instance  = FrameworkAccessor::get();
             }
+
+            if (!$instance) {
+                return "<!-- Vite Assets: No instance found for context '{$context}' -->";
+            }
+
+            $vitePath  = $instance->getPreference('vite_assets_path');
+            $srcPath   = trailingslashit($vitePath) . 'src';
+            $buildPath = trailingslashit($vitePath) . 'build';
+            $entry     = trailingslashit($srcPath)  . ($entry ?: 'index.js');
 
             $entryExists     = $entry && File::exists($entry);
             $buildPathExists = $buildPath && File::exists($buildPath) && File::isDirectory($buildPath);

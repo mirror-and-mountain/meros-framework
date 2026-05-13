@@ -11,6 +11,13 @@ class Number extends Input {
     public string $handle = 'number';
 
     /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'calculator';
+
+    /**
      * Default attributes for the number field.
      *
      * @var array
@@ -25,7 +32,9 @@ class Number extends Input {
      * @var array
      */
     protected array $compatibleDataTypes = [
-        'number'
+        'integer',
+        'float',
+        'decimal',
     ];
 
 

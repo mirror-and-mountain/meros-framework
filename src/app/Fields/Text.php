@@ -11,6 +11,13 @@ class Text extends Input {
     public string $handle = 'text';
 
     /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'bars';
+
+    /**
      * Default attributes for the text field.
      *
      * @var array

@@ -137,6 +137,15 @@ final class Context {
         exit;
     }
 
+    /**
+     * Determines if the current context is in the WordPress admin area.
+     *
+     * @return boolean True if in admin context, false otherwise.
+     */
+    public function isAdmin(): bool {
+        return $this->isAdmin;
+    }
+
      /**
      * Checks if the provider is installed by verifying if any associated table is installed.
      *

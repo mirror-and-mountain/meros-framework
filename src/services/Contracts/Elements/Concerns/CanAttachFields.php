@@ -11,7 +11,7 @@ use MM\Meros\Facades\Fields as FieldsRegister;
 
 trait CanAttachFields {
     /**
-     * Field instances that belong to this field group.
+     * Field classes/instances that belong to this field group.
      *
      * @var array<string|Field>
      */

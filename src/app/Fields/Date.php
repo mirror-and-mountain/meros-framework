@@ -11,6 +11,20 @@ class Date extends Input {
     public string $handle = 'date';
 
     /**
+     * The category for the field, used for grouping in the UI.
+     *
+     * @var string
+     */
+    public static string $category = 'dates';
+
+    /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'calendar';
+
+    /**
      * Default attributes for the date field.
      *
      * @var array

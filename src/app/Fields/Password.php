@@ -11,6 +11,20 @@ class Password extends Input {
     public string $handle = 'password';
 
     /**
+     * The category for the field, used for grouping in the UI.
+     *
+     * @var string
+     */
+    public static string $category = 'specialised';
+
+    /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'lock';
+
+    /**
      * Default attributes for the password field.
      *
      * @var array

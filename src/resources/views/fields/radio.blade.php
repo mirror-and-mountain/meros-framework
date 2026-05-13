@@ -1,5 +1,5 @@
 @php 
-    $classList = $field->classList();;
+    $classList = $field->classList();
 @endphp
 
 @foreach($field->getOptions() as $value => $label)

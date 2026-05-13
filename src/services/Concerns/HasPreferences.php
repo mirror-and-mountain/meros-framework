@@ -13,8 +13,7 @@ trait HasPreferences {
      */
     protected array $defaultPreferences = [
         'assets_path'                            => 'resources/assets/wordpress/build', // No leading or trailing slashes
-        'vite_assets_entry'                      => 'resources/assets/vite/src/index.js', // The default entry point for vite assets.
-        'vite_build_path'                        => 'resources/assets/vite/build', // No leading or trailing slashes
+        'vite_assets_path'                       => 'resources/assets/vite', // The default entry point for vite assets.
         'asset_groups_are_enabled_by_default'    => true, // Whether to enable discovered asset groups by default.
         'asset_groups_are_switchable_by_default' => true, // Whether to allow enabling/disabling asset groups in WP Admin by default.
         'blocks_path'                            => 'resources/blocks/build', // No leading or trailing slashes

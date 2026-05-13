@@ -163,6 +163,19 @@ abstract class Register {
     }
 
     /**
+     * Retrieves all registered feature classes in this register.
+     *
+     * @return array An associative array of registered feature classes.
+     */
+    public function getRegistered(): array {
+        if (!$this->supports('register')) {
+            throw new \BadMethodCallException("This register (" . static::class . ") does not support retrieving registered feature classes.");
+        }
+        
+        return $this->classes;
+    }
+
+    /**
      * Creates a new feature and adds it to the register.
      *
      * @param Closure|array|null $callback Optional callback to configure the feature.

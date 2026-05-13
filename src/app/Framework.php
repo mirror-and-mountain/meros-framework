@@ -140,6 +140,17 @@ final class Framework extends FeatureProvider {
         return $this;
     }
 
+    /**
+     * Returns the URI to the framework's image resources.
+     * 
+     * @phan-param string $path A relative path to an image within the framework's resources/img directory. Optional.
+     *
+     * @return string
+     */
+    public function img(string $path = ''): string {
+        return $this->getUri() . 'resources/img/' . ltrim($path, '/');
+    }
+
     /*****************************************************************************************
      * 
      * The following methods are installing core framework tables when required by providers
