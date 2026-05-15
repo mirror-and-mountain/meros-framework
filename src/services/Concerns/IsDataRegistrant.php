@@ -24,13 +24,6 @@ trait IsDataRegistrant {
     public string $name = ''; 
 
     /**
-     * Array of arguments for the item.
-     *
-     * @var array
-     */
-    protected array $args = [];
-
-    /**
      * The dot-notated path for the item, used for nested settings (e.g. 'my_array.*.child').
      *
      * @var string

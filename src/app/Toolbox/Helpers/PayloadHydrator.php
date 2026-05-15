@@ -58,12 +58,13 @@ class PayloadHydrator {
         ];
 
         if ($handle === 'repeater') {
-            $defaultTextField = $this->makeFieldPayload('text');
+            $defaultTextField       = $this->makeFieldPayload('text');
+            $payload['fields']      = is_array($defaultTextField) ? [$defaultTextField] : [];
 
-            $payload['fields'] = is_array($defaultTextField) ? [$defaultTextField] : [];
             $payload['defaultRows'] = [
                 ['text' => null],
             ];
+            
             $payload['value'] = $payload['defaultRows'];
         }
 
@@ -126,7 +127,7 @@ class PayloadHydrator {
                     }
                 }
             } catch (\Throwable) {
-                // Keep payload creation resilient; fall back to an empty group.
+                // Fall back to an empty group.
             }
         }
 

@@ -22,6 +22,13 @@ abstract class FeatureDefinition {
     public string $nickname = '';
 
     /**
+     * Array of arguments for the item.
+     *
+     * @var array
+     */
+    protected array $args = [];
+
+    /**
      * Indicates that the feature has been queued for loading via a WordPress hook.
      *
      * @var boolean
@@ -104,6 +111,11 @@ abstract class FeatureDefinition {
      */
     protected function setProps(array $props): void {
         foreach ($props as $key => $value) {
+            if ($key === 'args' && is_array($value)) {
+                $this->args = array_merge($this->args ?? [], $value);
+                continue;
+            }
+
             if (property_exists($this, $key)) {
 
                 if (isset($this->$key) && !empty($this->$key)) {

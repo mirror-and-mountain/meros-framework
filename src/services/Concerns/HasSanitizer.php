@@ -22,7 +22,6 @@ trait HasSanitizer {
     public function sanitizer(callable|Closure $callback): self {
         $this->args['sanitize_callback'] = $this->convertToClosure($callback);
 
-        $this->setReady();
         return $this;
     }
 

@@ -25,6 +25,8 @@ use MM\Meros\Services\Registers\Tables;
 use MM\Meros\Services\Registers\MenuPages;
 use MM\Meros\Services\Registers\MenuPageTemplates;
 use MM\Meros\Services\Registers\Packages as PackagesRegister;
+use MM\Meros\Services\Registers\PostTypes;
+use MM\Meros\Services\Registers\PostMetaDefinitions;
 use MM\Meros\Services\Registers\Settings;
 use MM\Meros\Services\Registers\SettingsFields;
 use MM\Meros\Services\Registers\SettingsSections;
@@ -156,6 +158,14 @@ class FrameworkServiceProvider extends ServiceProvider {
             return new MenuPageTemplates();
         });
 
+        $this->app->singleton(PostTypes::class, function () {
+            return new PostTypes();
+        });
+
+        $this->app->singleton(PostMetaDefinitions::class, function () {
+            return new PostMetaDefinitions();
+        });
+
         $this->app->singleton(PackagesRegister::class, function () {
             return new PackagesRegister();
         });
@@ -183,6 +193,8 @@ class FrameworkServiceProvider extends ServiceProvider {
         $this->app->alias(MenuPages::class, 'meros.registers.menu_pages');
         $this->app->alias(MenuPageTemplates::class, 'meros.registers.menu_page_templates');
         $this->app->alias(PackagesRegister::class, 'meros.registers.packages');
+        $this->app->alias(PostTypes::class, 'meros.registers.post_types');
+        $this->app->alias(PostMetaDefinitions::class, 'meros.registers.post_meta_definitions');
         $this->app->alias(Settings::class, 'meros.registers.settings');
         $this->app->alias(SettingsFields::class, 'meros.registers.settings_fields');
         $this->app->alias(SettingsSections::class, 'meros.registers.settings_sections');
