@@ -40,6 +40,8 @@ use MM\Meros\Facades\Theme;
 use MM\Meros\Facades\Packages;
 use MM\Meros\Facades\Framework as FrameworkAccessor;
 
+use Livewire\Livewire;
+
 class FrameworkServiceProvider extends ServiceProvider {
 
     use Concerns\HasViews, Concerns\HasRoutes, Concerns\HasLivewire;
@@ -67,6 +69,13 @@ class FrameworkServiceProvider extends ServiceProvider {
 
         // Register Livewire components
         $this->registerLivewireComponents($framework, 'meros');
+
+        Livewire::addNamespace(
+            namespace: 'toolbox',
+            classNamespace: 'MM\\Meros\\App\\Toolbox',
+            classPath: $framework->getPath('app/Toolbox'),
+            classViewPath: $framework->getPath('resources/views/toolbox')
+        );
         
         // Load views from the framework's views directory
         $this->registerViews($framework, 'meros');

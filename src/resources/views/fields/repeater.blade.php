@@ -30,9 +30,9 @@
                                 <div
                                     class="h-0 rounded-sm transition-all duration-150"
                                     :class="isDraggingRow ? 'h-2' : 'h-0'"
-                                    @dragover.prevent="$store.formDrag.showRowGap($el)"
+                                    @dragover.prevent="$store.formDrag.handleFieldRepeaterRowGapDragOver($el)"
                                     @dragleave="$store.formDrag.hideRowGap($el)"
-                                    @drop.prevent="$store.formDrag.hideRowGap($el); (() => { const raw = $event.dataTransfer.getData('application/x-meros-field-repeater-row') || $event.dataTransfer.getData('text/plain'); const from = Number(raw); if (!Number.isNaN(from)) { $wire.moveFieldRepeaterRow({{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }}, from, 0); } })()"
+                                    @drop.prevent="$store.formDrag.handleFieldRepeaterRowGapDrop($event, $el, $wire, {{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }}, 0)"
                                 ></div>
                             </td>
                         </tr>
@@ -74,7 +74,7 @@
                                 <button
                                     type="button"
                                     wire:click="removeFieldRepeaterRow({{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }}, {{ $rowIndex }})"
-                                    class="inline-flex items-center rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                                    class="inline-flex items-center cursor-pointer rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
                                 >
                                     Remove
                                 </button>
@@ -86,9 +86,9 @@
                                 <div
                                     class="h-0 rounded-sm transition-all duration-150"
                                     :class="isDraggingRow ? 'h-2' : 'h-0'"
-                                    @dragover.prevent="$store.formDrag.showRowGap($el)"
+                                    @dragover.prevent="$store.formDrag.handleFieldRepeaterRowGapDragOver($el)"
                                     @dragleave="$store.formDrag.hideRowGap($el)"
-                                    @drop.prevent="$store.formDrag.hideRowGap($el); (() => { const raw = $event.dataTransfer.getData('application/x-meros-field-repeater-row') || $event.dataTransfer.getData('text/plain'); const from = Number(raw); if (!Number.isNaN(from)) { $wire.moveFieldRepeaterRow({{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }}, from, {{ $rowIndex + 1 }}); } })()"
+                                    @drop.prevent="$store.formDrag.handleFieldRepeaterRowGapDrop($event, $el, $wire, {{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }}, {{ $rowIndex + 1 }})"
                                 ></div>
                             </td>
                         </tr>
@@ -107,7 +107,7 @@
             <button
                 type="button"
                 wire:click="addFieldRepeaterRow({{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }})"
-                class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-gray-400 hover:bg-gray-100 hover:text-gray-900"
+                class="inline-flex items-center cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-gray-400 hover:bg-gray-100 hover:text-gray-900"
             >
                 Add Row
             </button>

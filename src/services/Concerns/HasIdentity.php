@@ -167,20 +167,24 @@ trait HasIdentity {
 
     /**
      * Returns the path.
+     * 
+     * @param string $subPath Optional sub-path to append to the base path.
      *
      * @return string
      */
-    final public function getPath(): string {
-        return $this->path;
+    final public function getPath(string $subPath = ''): string {
+        return $this->path . ltrim($subPath, '/');
     }
 
     /**
      * Returns the uri.
      * 
+     * @param string $subURI Optional sub-URI to append to the base URI.
+     * 
      * @return string
      */
-    final public function getUri(): string {
-        return $this->uri;
+    final public function getUri(string $subURI = ''): string {
+        return $this->uri . ltrim($subURI, '/');
     }
 
     /**

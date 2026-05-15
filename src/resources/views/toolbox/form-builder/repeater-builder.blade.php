@@ -11,7 +11,7 @@
             (string) ($repeaterLocation['rowIndex'] ?? 'x')
         );
     @endphp
-    @component('meros::livewire.toolbox.form-builder.settings-panel', [
+    @component('meros::toolbox.form-builder.settings-panel', [
         'title' => 'Configure Repeater',
         'subtitle' => $repeaterField->getLabel() ?: 'Repeater field',
         'closeAction' => 'closeRepeaterBuilder',
@@ -22,9 +22,9 @@
 
             <div
                 class="mb-3 min-h-16 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-3 py-4 text-sm text-gray-500 transition-colors"
-                @dragover.prevent="$store.formDrag.itemKind === 'field' ? $el.classList.add('border-blue-400', 'bg-blue-50', 'text-blue-600') : null"
-                @dragleave="$el.classList.remove('border-blue-400', 'bg-blue-50', 'text-blue-600')"
-                @drop.prevent="$el.classList.remove('border-blue-400', 'bg-blue-50', 'text-blue-600'); $store.formDrag.itemKind === 'field' ? $wire.addRepeaterColumnAt({{ count($repeaterColumns) }}, $store.formDrag.itemHandle ?? '') : null"
+                @dragover.prevent="$store.formDrag.showRepeaterColumnDropHighlight($el)"
+                @dragleave="$store.formDrag.hideRepeaterColumnDropHighlight($el)"
+                @drop.prevent="$store.formDrag.handleRepeaterColumnDrop($el, $wire, {{ count($repeaterColumns) }})"
             >
                 Drag a field here to add a column
             </div>
@@ -32,9 +32,9 @@
             <div class="space-y-2">
                 <div
                     class="h-2 rounded-sm transition-all duration-150"
-                    @dragover.prevent="($store.formDrag.itemKind === 'field' || $event.dataTransfer.types.includes('application/x-meros-repeater-column')) ? $store.formDrag.showRowGap($el) : null"
+                    @dragover.prevent="$store.formDrag.handleRepeaterColumnGapDragOver($event, $el)"
                     @dragleave="$store.formDrag.hideRowGap($el)"
-                    @drop.prevent="$store.formDrag.hideRowGap($el); $store.formDrag.itemKind === 'field' ? $wire.addRepeaterColumnAt(0, $store.formDrag.itemHandle ?? '') : (() => { const from = Number($event.dataTransfer.getData('application/x-meros-repeater-column')); if (!Number.isNaN(from)) { $wire.moveRepeaterColumn(from, 0); } })()"
+                    @drop.prevent="$store.formDrag.handleRepeaterColumnGapDrop($event, $el, $wire, 0)"
                 ></div>
 
                 @foreach($repeaterColumns as $columnIndex => $column)
@@ -54,7 +54,7 @@
                             <button
                                 type="button"
                                 wire:click="removeRepeaterColumn({{ $columnIndex }})"
-                                class="shrink-0 text-gray-300 hover:text-red-500 transition-colors text-lg leading-none"
+                                class="shrink-0 cursor-pointer text-gray-300 hover:text-red-500 transition-colors text-lg leading-none"
                                 title="Remove column"
                                 @mousedown.stop
                             >&times;</button>
@@ -64,9 +64,9 @@
 
                     <div
                         class="h-2 rounded-sm transition-all duration-150"
-                        @dragover.prevent="($store.formDrag.itemKind === 'field' || $event.dataTransfer.types.includes('application/x-meros-repeater-column')) ? $store.formDrag.showRowGap($el) : null"
+                        @dragover.prevent="$store.formDrag.handleRepeaterColumnGapDragOver($event, $el)"
                         @dragleave="$store.formDrag.hideRowGap($el)"
-                        @drop.prevent="$store.formDrag.hideRowGap($el); $store.formDrag.itemKind === 'field' ? $wire.addRepeaterColumnAt({{ $columnIndex + 1 }}, $store.formDrag.itemHandle ?? '') : (() => { const from = Number($event.dataTransfer.getData('application/x-meros-repeater-column')); if (!Number.isNaN(from)) { $wire.moveRepeaterColumn(from, {{ $columnIndex + 1 }}); } })()"
+                        @drop.prevent="$store.formDrag.handleRepeaterColumnGapDrop($event, $el, $wire, {{ $columnIndex + 1 }})"
                     ></div>
                 @endforeach
             </div>
@@ -86,9 +86,9 @@
                 <div class="space-y-2">
                     <div
                         class="h-2 rounded-sm transition-all duration-150"
-                        @dragover.prevent="$event.dataTransfer.types.includes('application/x-meros-repeater-row') ? $store.formDrag.showRowGap($el) : null"
+                        @dragover.prevent="$store.formDrag.handleRepeaterRowGapDragOver($event, $el)"
                         @dragleave="$store.formDrag.hideRowGap($el)"
-                        @drop.prevent="$store.formDrag.hideRowGap($el); (() => { const from = Number($event.dataTransfer.getData('application/x-meros-repeater-row')); if (!Number.isNaN(from)) { $wire.moveRepeaterDefaultRow(from, 0); } })()"
+                        @drop.prevent="$store.formDrag.handleRepeaterRowGapDrop($event, $el, $wire, 0)"
                     ></div>
 
                     @forelse($previewRows as $rowIndex => $row)
@@ -132,14 +132,14 @@
                                                     <button
                                                         type="button"
                                                         wire:click="selectRepeaterRow({{ $rowIndex }})"
-                                                        class="inline-flex items-center rounded-md border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-600 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                                                        class="inline-flex items-center cursor-pointer rounded-md border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-600 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
                                                     >
                                                         Edit
                                                     </button>
                                                     <button
                                                         type="button"
                                                         wire:click="removeRepeaterDefaultRow({{ $rowIndex }})"
-                                                        class="inline-flex items-center rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                                                        class="inline-flex items-center cursor-pointer rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
                                                     >
                                                         Remove
                                                     </button>
@@ -153,9 +153,9 @@
 
                         <div
                             class="h-2 rounded-sm transition-all duration-150"
-                            @dragover.prevent="$event.dataTransfer.types.includes('application/x-meros-repeater-row') ? $store.formDrag.showRowGap($el) : null"
+                            @dragover.prevent="$store.formDrag.handleRepeaterRowGapDragOver($event, $el)"
                             @dragleave="$store.formDrag.hideRowGap($el)"
-                            @drop.prevent="$store.formDrag.hideRowGap($el); (() => { const from = Number($event.dataTransfer.getData('application/x-meros-repeater-row')); if (!Number.isNaN(from)) { $wire.moveRepeaterDefaultRow(from, {{ $rowIndex + 1 }}); } })()"
+                            @drop.prevent="$store.formDrag.handleRepeaterRowGapDrop($event, $el, $wire, {{ $rowIndex + 1 }})"
                         ></div>
                     @empty
                         <div class="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-4 text-sm text-gray-500">
@@ -168,7 +168,7 @@
                     <button
                         type="button"
                         wire:click="addRepeaterDefaultRow"
-                        class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-gray-400 hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="inline-flex items-center cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-gray-400 hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
                         @disabled(empty($repeaterColumns))
                     >
                         Add Row
@@ -197,7 +197,7 @@
     @endphp
 
     @if($rowData)
-        @component('meros::livewire.toolbox.form-builder.settings-panel', [
+        @component('meros::toolbox.form-builder.settings-panel', [
             'title' => 'Edit Row',
             'subtitle' => 'Row ' . ($activeRepeaterRow + 1),
             'closeAction' => 'closeRepeaterRow',

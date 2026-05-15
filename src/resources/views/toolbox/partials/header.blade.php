@@ -1,6 +1,6 @@
 <header class="flex justify-between bg-[#1d2327] text-white px-4 rounded-t sticky top-0 z-50 h-12">
     <div class="flex items-center">
-        @include('meros::livewire.toolbox.partials.wordpress')
+        @include('meros::toolbox.partials.wordpress')
         <h1 class="text-xl font-bold">Toolbox | Form Builder</h1>
     </div>
     <div class="flex items-center">

@@ -4,9 +4,8 @@ use Illuminate\Support\Facades\Route;
 use MM\Meros\App\Middleware\AuthenticateAdmin;
 
 Route::middleware(AuthenticateAdmin::class)->prefix('toolbox')->group(function() {
-    Route::livewire('/', 'meros::toolbox.index')->name('meros.toolbox.index');
-
-    Route::livewire('/form-builder', 'meros::toolbox.form-builder')->name('meros.toolbox.form-builder');
+    Route::livewire('/', 'toolbox::index')->name('meros.toolbox.index');
+    Route::livewire('/form-builder', 'toolbox::form-builder')->name('meros.toolbox.form-builder');
 });
 
 // Vite dev server proxy route - in development.

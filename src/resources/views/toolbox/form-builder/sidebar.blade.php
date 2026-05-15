@@ -107,7 +107,7 @@
                 @dragend="$store.formDrag.endDrag()"
             >
                 @if ($field['icon'] !== '')
-                    <span class="mr-2">@include('meros::livewire.toolbox.form-builder.field-icons.' . $field['icon'])</span>
+                    <span class="mr-2">@include('meros::toolbox.form-builder.field-icons.' . $field['icon'])</span>
                 @endif
                 <div class="flex justify-between items-center w-full">
                     {{ $field['label'] }}

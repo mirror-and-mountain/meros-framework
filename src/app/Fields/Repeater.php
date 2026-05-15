@@ -133,7 +133,7 @@ class Repeater extends Field implements FieldParent {
         $value = $this->getValue();
         $items = is_array($value) && !empty($value)
             ? $value
-            : [];
+            : [[]];
 
         $rows = [];
 

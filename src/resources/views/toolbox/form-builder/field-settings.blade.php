@@ -19,7 +19,7 @@
         );
     @endphp
 
-    @component('meros::livewire.toolbox.form-builder.settings-panel', [
+    @component('meros::toolbox.form-builder.settings-panel', [
         'title' => 'Field Settings',
         'subtitle' => $field->getLabel() ?: ucwords(str_replace(['-', '_'], ' ', (string) ($payload['handle'] ?? 'Field'))),
         'closeAction' => 'closeFieldSettings',

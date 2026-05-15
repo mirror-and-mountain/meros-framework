@@ -8,7 +8,7 @@
     @livewireStyles
 </head>
 <body>
-    @include('meros::livewire.toolbox.partials.header')
+    @include('meros::toolbox.partials.header')
     <main>
         {{ $slot }}
     </main>
