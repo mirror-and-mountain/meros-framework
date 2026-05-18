@@ -40,14 +40,48 @@ trait CanAttachFields {
             $this->fields = array_merge($this->fields, $field);
 
             $this->walkFields(function(Field $field) {
+                $existingParent = $field->getParent();
+                if ($existingParent !== null) {
+                    // Detach from existing parent if it's different from the current parent
+                    if ($existingParent !== $this) {
+                        $existingParent->detach($field);
+                    }
+                }
                 $field->parent($this);
                 $field->style($this->fieldStyle);
             });
 
         } else {
-            $field->style($this->fieldStyle);
+            $existingParent = $field->getParent();
+            if ($existingParent !== null) {
+                // Detach from existing parent if it's different from the current parent
+                if ($existingParent !== $this) {
+                    $existingParent->detach($field);
+                }
+            }
             $field->parent($this);
+            $field->style($this->fieldStyle);
             $this->fields[] = $field;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Removes a field instance from the item's fields array.
+     *
+     * @param Field|array<Field> $field A single Field instance or an array of Field instances to remove from the group.
+     *
+     * @return self
+     */
+    public function detach(Field|array $field): self {
+        if (is_array($field)) {
+            foreach ($field as $f) {
+                $this->detach($f);
+            }
+        } else {
+            $this->fields = array_filter($this->fields, fn($f) => $f !== $field);
+            $field->parent(null);
         }
 
         return $this;

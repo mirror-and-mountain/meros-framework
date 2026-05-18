@@ -6,7 +6,7 @@ use MM\Meros\Services\Contracts\Register;
 use MM\Meros\Services\Contracts\PostMeta;
 
 class PostMetaDefinitions extends Register {
-    protected string $identifier = 'key';
+    protected string $identifier = 'name';
     protected string $definition = PostMeta::class;
     protected array  $rejects    = ['multiple'];
 
@@ -21,8 +21,11 @@ class PostMetaDefinitions extends Register {
         $args = $props['args'] ?? [];
 
         return [
-            'key'  => $props['key'] ?? '',
-            'args' => [
+            'name'      => $props['name'] ?? '',
+            'postType'  => $props['post_type'] ?? '',
+            'autoQueue' => $props['auto_queue'] ?? false,
+            'type'      => $props['type'] ?? '',
+            'args'      => [
                 'type'              => $args['type'] ?? 'string',
                 'default'           => $args['default'] ?? null,
                 'label'             => $args['label'] ?? '',

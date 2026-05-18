@@ -9,6 +9,7 @@ use MM\Meros\Services\Concerns\HasBlocks;
 use MM\Meros\Services\Concerns\HasFields;
 use MM\Meros\Services\Concerns\HasInstallers;
 use MM\Meros\Services\Concerns\HasIdentity;
+use MM\Meros\Services\Concerns\HasPostTypes;
 use MM\Meros\Services\Concerns\HasSettings;
 use MM\Meros\Services\Concerns\HasPreferences;
 
@@ -27,6 +28,7 @@ abstract class FeatureProvider {
     use HasIdentity,
         HasPreferences,
         HasSettings,
+        HasPostTypes,
         HasAssets,
         HasBlocks,
         HasFields,

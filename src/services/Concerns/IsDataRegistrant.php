@@ -264,16 +264,24 @@ trait IsDataRegistrant {
     /**
      * Shorthand method to set the name and type for an array item.
      *
-     * @param string $name The item name.
+     * @param string $name      The item name.
+     * @param Closure $callback An optional callback function to define sub-items if the array is an array of objects (i.e. itemType is 'object').
      * 
      * @return self
      */
-    final public function array(string $name = ''): self {
+    final public function array(string $name = '', ?Closure $callback = null): self {
         if (!empty($name)) {
             $this->name($name);
         }
 
         $this->type('array');
+
+        if ($callback instanceof Closure) {
+            $this->itemType('object');
+            $callback($this);
+            return $this;
+        }
+
         return $this->itemType('string'); // Default to array of strings unless otherwise specified
     }
 

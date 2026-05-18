@@ -10,6 +10,8 @@ use MM\Meros\Services\Contracts\Elements\Interfaces\FieldParent;
 
 use MM\Meros\Facades\FieldStyles;
 
+use MM\Meros\App\Fields\Repeater;
+
 abstract class Field extends FeatureDefinition {
     /**
      * The field's unique slug, should be implemented by concrete field classes 
@@ -39,6 +41,13 @@ abstract class Field extends FeatureDefinition {
      * @var array
      */
     protected array $compatibleDataTypes = [];
+
+    /**
+     * The data type of the field's value.
+     *
+     * @var string
+     */
+    protected string $dataType = '';
 
     /**
      * The root name for the field, used to generate names.
@@ -232,6 +241,18 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
+     * Sets the field's data type.
+     *
+     * @param string $dataType The data type to set for the field (e.g., 'string', 'integer', 'array').
+     *
+     * @return self
+     */
+    public function dataType(string $dataType): self {
+        $this->dataType = $dataType;
+        return $this;
+    }
+
+    /**
      * Sets the field's label.
      *
      * @param string $label
@@ -399,11 +420,11 @@ abstract class Field extends FeatureDefinition {
     /**
      * Associates the field with a parent, marking it as a sub-field.
      *
-     * @param FieldParent $parent The parent to associate with this field.
+     * @param FieldParent|null $parent The parent to associate with this field. If null is passed, the parent property will be set to null.
      *
      * @return self
      */
-    public function parent(FieldParent $parent): self {
+    public function parent(FieldParent|null $parent): self {
         $this->parent = $parent;
         return $this;
     }
@@ -468,12 +489,39 @@ abstract class Field extends FeatureDefinition {
      ***************************/
 
     /**
-     * Returns whether the field is a sub-field of a repeater or field group.
+     * Retrieves the field's data type.
+     *
+     * @return string
+     * @throws \RuntimeException If the field does not have a data type defined.
+     */
+    public function getDataType(): string {
+        if ($this->dataType !== '') {
+            return $this->dataType;
+        }
+
+        if ($this->compatibleDataTypes[0] ?? null) {
+            return Str::before($this->compatibleDataTypes[0], '.');
+        }
+
+        throw new \RuntimeException('Field must have a data type defined either in the $dataType property or the $compatibleDataTypes array.');
+    }
+
+    /**
+     * Retrieves the parent field group or repeater instance if this field is a sub-field.
+     *
+     * @return FieldParent|null
+     */
+    public function getParent(): ?FieldParent {
+        return $this->parent;
+    }
+
+    /**
+     * Returns whether the field is a sub-field of a repeater.
      *
      * @return boolean
      */
     public function isSubField(): bool {
-        return $this->parent !== null;
+        return $this->parent !== null && $this->parent instanceof Repeater;
     }
 
     /**
@@ -538,6 +586,15 @@ abstract class Field extends FeatureDefinition {
         return empty($this->value) || $this->value === null 
             ? $default 
             : $value;
+    }
+
+    /**
+     * Retrieves the field's default value.
+     *
+      * @return mixed
+      */
+    public function getDefault(): mixed {
+        return $this->default;
     }
 
     /**

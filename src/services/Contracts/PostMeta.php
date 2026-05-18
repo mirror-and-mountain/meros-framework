@@ -3,21 +3,21 @@
 namespace MM\Meros\Services\Contracts;
 
 use Closure;
+use Illuminate\Support\Str;
 use MM\Meros\Services\Contracts\FeatureDefinition;
+
+use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Elements\FieldGroup;
 
 use MM\Meros\Services\Contracts\Interfaces\DataRegistrant;
 use MM\Meros\Services\Contracts\Interfaces\AdminFieldRegistrant;
 
 use MM\Meros\Services\Concerns\IsDataRegistrant;
 
+use MM\Meros\Facades\Context;
+use MM\Meros\Facades\FieldGroups;
+
 class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRegistrant {
-    
-    /**
-     * The meta key for the post meta.
-     *
-     * @var string
-     */
-    public string $key = '';
 
     /**
      * The post type that this meta belongs to.
@@ -26,7 +26,23 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
      */
     protected string $postType = '';
 
-    use IsDataRegistrant;
+    /**
+     * Indicates whether the meta box associated with this post meta has been queued for rendering.
+     *
+     * @var boolean
+     */
+    protected bool $metaBoxQueued = false;
+
+    /**
+     * The field group associated with this post meta, if any
+     *
+     * @var FieldGroup|null
+     */
+    protected ?FieldGroup $fieldGroup = null;
+
+    use IsDataRegistrant {
+        IsDataRegistrant::field as protected makeField;
+    }
 
     final public function __construct(
         FeatureProvider $provider,
@@ -51,8 +67,6 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         if ($this->canBeParent()) {
             $this->instantiateSubItems();
         }
-
-        $this->queue();
     }
 
     /**
@@ -73,45 +87,86 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         ]);
     }
 
+    /**
+     * Hooks into the 'init' action to register the post meta with WordPress.
+     *
+     * @return void
+     */
     protected function queue(): void {
-        if (empty($this->postType) || empty($this->key)) {
+        if (!$this->isRoot() || empty($this->name)) {
             return;
         }
 
-
-        if ($this->queued) {
+        if (empty($this->postType)) {
             return;
         }
 
-
-        add_action('init', function () {
-            register_post_meta(
-                $this->postType,
-                $this->key,
-                $this->args
-            );
-        });
+        if (!$this->queued) {
+            add_action('init', function () {
+                register_post_meta(
+                    $this->postType,
+                    $this->name,
+                    $this->args
+                );
+            });
+        }
 
         $this->queued = true;
     }
 
     /**
-     * Queues the post meta for registration based on a given post type and meta key.
-     * 
-     * Should be called by concrete PostType instances when they register their post type.
+     * Queues the post meta for registration through a specific post type. Should be called from the PostType contract when registering meta containers.
      *
-     * @param PostType $postType The post type that this meta belongs to.
-     * @param string   $key      The meta key for the post meta.
-     * @param array    $args     Optional additional arguments for register_post_meta.
+     * @param PostType $postType
      *
      * @return void
      */
-    final public function queueFromPostType(PostType $postType, string $key, array $args = []): void {
-        $this->postType = $postType->handle;
-        $this->key      = $key;
-        $this->args     = array_merge($this->args, $args);
+    final public function queueFromPostType(PostType $postType): void {
+        if ($this->isRoot()) {
+            $this->postType = $postType->handle;
 
-        $this->queue();
+            register_post_meta(
+                $this->postType,
+                $this->name,
+                $this->args
+            );
+
+            if ($this->fieldGroup !== null && !$this->metaBoxQueued) {
+                $isEditing = Context::isEditingPostType($this->postType);
+
+                if (!$isEditing || $this->metaBoxQueued) {
+                    return;
+                }
+
+                add_action('add_meta_boxes', function() {
+                    $fields = $this->fieldGroup->getFields();
+                    $postID = get_post()->ID;
+                    $value  = $this->getValue($postID) ?? [];
+
+                    foreach($fields as $field) {
+                        $field->value($value[$field->getName(false)] ?? null);
+                        $field->default($this->getDefault());
+                    }
+
+                    add_meta_box(
+                        $this->name . '_meta_box',
+                        $this->args['label'] ?: Str::title(str_replace('_', ' ', $this->name)),
+                        function() {
+                            wp_nonce_field(
+                                $this->name . '_save_meta',
+                                $this->name . '_meta_nonce'
+                            );
+                            $this->fieldGroup->render();
+                        },
+                        $this->postType,
+                        'advanced',
+                        'default'
+                    );
+                });
+
+                $this->metaBoxQueued = true;
+            }
+        }
     }
 
     /***************************
@@ -126,9 +181,82 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         return current_user_can('edit_posts');
     }
 
+    /**
+     * Saves the post meta value when the post is saved.
+     *
+     * @param string $postId
+     *
+     * @return void
+     */
+    final public function save(string $postId): void {
+        // Bail if not in admin context
+        if (!Context::isAdmin()) {
+            return;
+        }
+
+        // Bail if this is not a root definition
+        if (!$this->isRoot()) {
+            return;
+        }
+
+        // Bail if autosaving
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+            return;
+        }
+
+        // Verify nonce
+        $nonceKey = $this->name . '_meta_nonce';
+
+        if (!isset($_POST[$nonceKey]) || 
+            !wp_verify_nonce($_POST[$nonceKey], $this->name . '_save_meta')
+        ) {
+            return;
+        }
+
+        // Check user permissions
+        if ($this->authenticate() === false) {
+            return;
+        }
+
+        // Get submitted data
+        $submittedData = $_POST[$this->name] ?? [];
+        
+        // Get existing meta to merge with
+        $existingData = $this->getValue($postId);
+
+        // Merge submitted data with existing data, ensuring we only save defined sub-fields
+        foreach ($this->fieldGroup->getFields() as $field) {
+            $subKey = $field->getName(false); // Get the field name without the root path
+
+            if (array_key_exists($subKey, $submittedData)) {
+                $existingData[$subKey] = $submittedData[$subKey];
+            } else {
+                // Handle unchecked checkboxes, empty selects, etc.
+                $existingData[$subKey] = $field->getValue();
+            }
+        }
+
+        // Save the merged data
+        update_post_meta($postId, $this->name, $existingData);
+    }
+
     /***************************
      * Public Chainable methods
      ***************************/
+
+    /**
+     * Sets the key for the post meta. This is required for the post meta to be registered.
+     *
+     * @param string $key The meta key to register.
+     *
+     * @return self
+     */
+    public function key(string $key): self {
+        $this->name = Str::snake($key); // default name to key if not explicitly set
+
+        $this->queue();
+        return $this;
+    }
 
     /**
      * Sets the authentication callback for the post meta.
@@ -139,6 +267,8 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
      */
     public function authCallback(callable|Closure $callback): self {
         $this->args['auth_callback'] = $this->convertToClosure($callback);
+
+        $this->queue();
         return $this;
     }
 
@@ -151,6 +281,8 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
      */
     public function single(bool $single = true): self {
         $this->args['single'] = $single;
+
+        $this->queue();
         return $this;
     }
 
@@ -165,6 +297,25 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         return $this->single(!$multiple);
     }
 
+    /**
+     * Overrides field() method from IsAdminFieldRegistrant to ensure the field is attached to the correct field group.
+     *
+     * @param  Field|string|null $type    The type of field to add (e.g. 'text', 'checkbox', etc.), a Field instance, a Field class name, or null to infer the field type.
+     * @param  array             $props   Optional properties for the field.
+     * @param  array             $args    Additional arguments for the field. Not used by default, but may be used in child overrides of this method.
+     *
+     * @return Field
+     */
+    final public function field(Field|string|null $type = null, array $props = [], array $args = []): Field {
+        $this->makeField($type, $props, $args);
+
+        if ($this->field->getParent() === null) {
+            $this->getFieldGroup()->attach($this->field);
+        }
+
+        return $this->field;
+    }
+
     /***************************
      * Getters
      ***************************/
@@ -172,68 +323,66 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
     /**
      * Retrieves the value of the post meta for a given post ID. If no post ID is provided, it will attempt to use the global $post.
      *
-     * @param string|int $postId Optional post ID to retrieve the meta for. If not provided, uses the global $post.
+     * @param int|null $postId Optional post ID to retrieve the meta for. If not provided, uses the global $post.
      *
      * @return mixed The value of the post meta, or null if not found or if required properties are missing.
      */
-    final public function getValue(string $postId = ''): mixed {
+    final public function getValue(?int $postId = null): mixed {
         // If required properties are missing, return null
-        if (empty($this->postType) || empty($this->key)) {
+        if (empty($this->name)) {
             return null;
         }
 
+        if ($this->isRoot() && empty($this->postType)) {
+            return null;
+        }
+
+        $postType = $this->getPostType();
+        $post     = get_post($postId);
+
         // If no post ID is provided, attempt to use the global $post
-        if ($postId === '') {
-            global $post;
-            $postId = $post->ID ?? '';
+        if ($post === null) {
+            $post = get_post();
+            $postId = $post->ID ?? null;
         }
 
         // If we still don't have a post ID, return null
-        if (empty($postId)) {
+        if (is_null($postId)) {
             return null;
         }
 
-        // Traverse to the root PostMeta if this is a nested structure
-        $root = $this;
+        // If the post type doesn't match, return null
+        if ($post->post_type !== $postType) {
+            return null;
+        }
 
         // Traverse up to the root of the post meta structure
+        $root = $this;
         while ($root->parent !== null) {
             $root = $root->parent;
         }
 
-        // If the root post type doesn't match, return null
-        if ($root->name !== $this->postType) {
-            return null;
-        }
-
         // Retrieve the post meta value using get_post_meta
-        $value = get_post_meta($postId, $this->key, $this->args['single']);
-        
-        // If this is the root, return directly
-        if ($this === $root) {
-            return $value ?? $this->args['default']; // Return default if meta not found
-        }
+        $value = get_post_meta($postId, $root->getName(), $this->args['single']);
 
-        // Traverse into nested structure using path
-        $segments = explode('.', $this->path);
+        if ($this->isRoot()) {
+            // Merge with default values from sub-items 
+            if (!empty($this->subItems)) {
+                $value = is_array($value) ? $value : [];
 
-        // Remove the root segment
-        array_shift($segments);
+                foreach ($root->getSubItems() as $subItem) {
+                    if (!isset($value[$subItem->name])) {
+                        $value[$subItem->name] = $subItem->getValue($postId);
+                    }
+                }
 
-        foreach ($segments as $segment) {
-            if ($segment === '*') {
-                // For repeaters, return full array (handled elsewhere per index)
                 return $value;
             }
 
-            if (!is_array($value) || !array_key_exists($segment, $value)) {
-                return $this->args['default'] ?? null;
-            }
-
-            $value = $value[$segment];
+            return $value;
         }
 
-        return $value ?? $this->args['default']; // Return default if final value is null
+        return $value[$this->name] ?? ($this->args['default'] ?? null);
     }
 
     /**
@@ -245,7 +394,45 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         return $this->args['default'] ?? null;
     }
 
+    /**
+     * Retrieves the post type that this meta belongs to. If this is a nested meta, it will traverse up to the root to get the post type.
+     *
+     * @return string|null The post type this meta belongs to, or null if not set.
+     */
+    public function getPostType(): ?string {
+        if ($this->isRoot()) {
+            return $this->postType;
+        }
+
+        return $this->parent->getPostType();
+    }
+
     /***************************
      * Helpers
      ***************************/
+
+    /**
+     * Retrieves the root field group for this post meta, creating it if it doesn't exist.
+     *
+     * @return FieldGroup
+     */
+    public function getFieldGroup(): FieldGroup {
+        if ($this->isRoot()) {
+            if ($this->fieldGroup === null) {
+                $this->fieldGroup = FieldGroups::checkout($this->provider)->make([
+                    'handle'      => $this->name . '_field_group',
+                    'title'       => $this->args['label'] ?? Str::title(str_replace('_', ' ', $this->name)) . ' Fields',
+                    'description' => $this->args['description'] ?? '',
+                ]);
+
+                $this->fieldGroup->parentMeta($this);
+            }
+
+            return $this->fieldGroup;
+        }
+
+        else {
+            return $this->parent->getFieldGroup();
+        }
+    }
 }

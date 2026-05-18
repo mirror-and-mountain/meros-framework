@@ -50,6 +50,8 @@ trait IsAdminFieldRegistrant {
             }
 
             $this->field = $type;
+            $this->field->dataType($this->getDataType()); // Set the data type
+
             return $this->field;
         }
 
@@ -62,6 +64,7 @@ trait IsAdminFieldRegistrant {
             }
 
             $this->addRepeaterFields(); // If it's a repeater, add child fields for any compatible sub-items
+            $this->field->dataType($this->getDataType()); // Set the data type
             return $this->field;
         }
 
@@ -75,8 +78,8 @@ trait IsAdminFieldRegistrant {
             throw new \InvalidArgumentException("Field of type '{$fieldKey}' is not compatible with data type '{$this->getDataType(true)}'.");
         }
 
-        // If the field is a repeater, add child fields for any compatible sub-items
-        $this->addRepeaterFields();
+        $this->addRepeaterFields(); // If the field is a repeater, add child fields for any compatible sub-items
+        $this->field->dataType($this->getDataType()); // Set the data type
 
         return $this->field;
     }
@@ -121,8 +124,6 @@ trait IsAdminFieldRegistrant {
         $field = Fields::checkout($this->provider)->makeFrom($classOrId, [
             'id'        => $this->name . '_field',
             'name'      => $this->name,
-            'value'     => $this->getValue(),
-            'default'   => $this->getDefault(),
             'style'     => 'settings'
         ] + $props);
 

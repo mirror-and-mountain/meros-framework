@@ -65,7 +65,7 @@ trait HasSettings {
     }
 
     /**
-     * Retrieves a menu page or collection of menu pages associated with this feature provider.
+     * Retrieves a menu page if a slug is provided or the menu page register if no slug is provided.
      *
      * @param string       $slug
      * @param Closure|null $callback
@@ -83,7 +83,7 @@ trait HasSettings {
     }
 
     /**
-     * Retrieves a menu page template or collection of menu page templates associated with this feature provider.
+     * Retrieves a menu page template if a handle is provided or the menu page template register if no handle is provided.
      *
      * @param string       $handle
      * @param Closure|null $callback
@@ -101,7 +101,7 @@ trait HasSettings {
     }
 
     /**
-     * Retrieves a menu page or collection of menu pages associated with this feature provider.
+     * Retrieves a menu page if a slug is provided or the menu page register if no slug is provided.
      * Alias of menuPages() for users who prefer snake_case method names.
      *
      * @param string       $slug
@@ -114,7 +114,7 @@ trait HasSettings {
     }
 
     /**
-     * Retrieves a menu page template or collection of menu page templates associated with this feature provider.
+     * Retrieves a menu page template if a handle is provided or the menu page template register if no handle is provided.
      * Alias of menuPageTemplates() for users who prefer snake_case method names.
      *
      * @param string       $handle
@@ -127,7 +127,7 @@ trait HasSettings {
     }
 
     /**
-     * Retrieves a settings section or collection of settings sections associated with this feature provider.
+     * Retrieves a settings section if an ID is provided or the settings section register if no ID is provided.
      *
      * @param string       $id
      * @param Closure|null $callback
@@ -145,7 +145,7 @@ trait HasSettings {
     }
 
     /**
-     * Retrieves a settings section or collection of settings sections associated with this feature provider.
+     * Retrieves a settings section if an ID is provided or the settings section register if no ID is provided.
      * Alias of settingsSections() for users who prefer snake_case method names.
      *
      * @param string       $id
@@ -158,7 +158,7 @@ trait HasSettings {
     }
 
     /**
-     * Creates the default settings container for this feature provider and adds it to the registry.
+     * Sets the working settings container, using the 'default' container if $name isn't specified.
      * 
      * @param string $name The name of the settings container to create. If not provided, 'default' will be used.
      *

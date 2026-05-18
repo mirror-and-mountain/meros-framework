@@ -9,6 +9,7 @@ use MM\Meros\Services\Contracts\Admin\Setting;
 use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\App\Providers\FrameworkServiceProvider;
 
+use MM\Meros\App\Fields\AdminButton;
 use MM\Meros\App\Fields\Checkbox;
 use MM\Meros\App\Fields\Checkboxes;
 use MM\Meros\App\Fields\Color;
@@ -42,6 +43,8 @@ use MM\Meros\Facades\Packages as PackagesAccessor;
 use MM\Meros\Facades\Blocks as BlocksAccessor;
 use MM\Meros\Facades\AssetGroups as AssetGroupsAccessor;
 
+use MM\Meros\App\Models\MerosForm;
+
 final class Framework extends FeatureProvider {
     /**
      * Called from the FrameworkServiceProvider on boot
@@ -69,6 +72,7 @@ final class Framework extends FeatureProvider {
         $this->registerRestRoutes();
 
         // Register framework fields
+        $this->fields()->register('admin_button', AdminButton::class);
         $this->fields()->register('checkbox', Checkbox::class);
         $this->fields()->register('checkboxes', Checkboxes::class);
         $this->fields()->register('color', Color::class);
@@ -122,13 +126,15 @@ final class Framework extends FeatureProvider {
         if ($this->context->isAdmin) {
             $this->configureMenuPages();
         }
-            
 
         // Discover assets
         $this->assets()->discover();
 
         // Discover blocks
         $this->blocks()->discover();
+
+        // Register post types
+        $this->registerPostTypes();
     }
 
     /**
@@ -235,11 +241,50 @@ final class Framework extends FeatureProvider {
         }
     }
 
+    /***********************************************************************
+     * 
+     * The following methods are for registering the framework's post types
+     * 
+     ***********************************************************************/
+    /**
+     * Registers the framework's custom post types.
+     *
+     * @return void
+     */
+    private function registerPostTypes(): void {
+        // Register the Form post type.
+        $this->postTypes()->make(function ($postType) {
+            $postType->name('meros-form');
+            $postType->label('Forms');
+            $postType->description('A custom post type for managing Forms.');
+            $postType->menuIcon('dashicons-feedback');
+            $postType->public();
+
+            $postType->metabox([
+                'label'    => 'Form Builder',
+                'context'  => 'side',
+                'priority' => 'default',
+            ], function ($post) {
+                $button = $this->fields()->makeFrom('admin_button')
+                    ->label('Edit Form')
+                    ->link(home_url('toolbox/form-builder/?form=' . $post->ID), '_blank')
+                    ->attribute('style', 'width:100%;text-align:center;')
+                    ->attribute('title', 'Open the Form Builder in a new tab to edit this form.');
+                
+                echo '<div style="padding:2px 5px;">';
+                echo '<p>Manage this form\'s fields, settings and integrations in the Form Builder tool.</p>';
+                $button->render(false, false);
+                echo '</div>';
+            });
+        });
+    }
+
     /***************************************************************
      * 
      * The following methods are for settings management
      * 
      ***************************************************************/
+
     /**
      * Sets up core settings provided by the framework.
      *
@@ -607,6 +652,7 @@ final class Framework extends FeatureProvider {
      * The following methods are for Meros API endpoints
      * 
      ***************************************************************/
+
     /**
      * Registers REST API routes for the framework.
      *

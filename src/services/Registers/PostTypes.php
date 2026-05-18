@@ -25,7 +25,6 @@ class PostTypes extends Register {
             'handle'        => $props['handle'] ?? '',
             'singularLabel' => $props['singular'] ?? '',
             'pluralLabel'   => $props['plural'] ?? '',
-            'meta'          => $meta,
             'args'          => $args,
         ];
     }

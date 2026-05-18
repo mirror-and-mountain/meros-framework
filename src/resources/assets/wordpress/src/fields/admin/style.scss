@@ -1,5 +1,14 @@
 @use 'nice-forms.css/dist/nice-forms.css';
 
+.meros-field input[type="checkbox"] {
+    background-color: transparent !important;
+}
+
+.meros-repeater-column .meros-field input:not([type="checkbox"]):not([type="radio"]) {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
 .meros-settings-field:not([type="checkbox"]):not([type="radio"]) {
     width: 50% !important;
     max-width: 50% !important;

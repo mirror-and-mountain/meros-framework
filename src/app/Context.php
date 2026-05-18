@@ -146,6 +146,28 @@ final class Context {
         return $this->isAdmin;
     }
 
+    /**
+     * Returns whether the user is currently editing a post of the specified post type in WP Admin.
+     *
+     * @param string $postType
+     *
+     * @return bool True if the user is editing a post of the specified post type, false otherwise.
+     */
+    public function isEditingPostType(string $postType): bool {
+        if (!$this->isAdmin) {
+            return false;
+        }
+
+        if (!isset($this->params['post'])) {
+            return false;
+        }
+
+        $postId = $this->params['post'];
+        $post = get_post($postId);
+
+        return $post && $post->post_type === $postType;
+    }
+
      /**
      * Checks if the provider is installed by verifying if any associated table is installed.
      *

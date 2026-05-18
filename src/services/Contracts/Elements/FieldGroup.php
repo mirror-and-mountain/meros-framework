@@ -2,13 +2,18 @@
 
 namespace MM\Meros\Services\Contracts\Elements;
 
+use Closure;
 use Illuminate\Support\Str;
 
+use MM\Meros\Services\Contracts\PostMeta;
+use MM\Meros\Services\Contracts\Elements\Field;
 use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\Services\Contracts\FeatureDefinition;
 use MM\Meros\Services\Contracts\Elements\Interfaces\FieldParent;
 
 use MM\Meros\Services\Contracts\Elements\Concerns\CanAttachFields;
+
+use MM\Meros\App\Fields\Repeater;
 
 class FieldGroup extends FeatureDefinition implements FieldParent {
     /**
@@ -40,13 +45,22 @@ class FieldGroup extends FeatureDefinition implements FieldParent {
     protected ?Form $form = null;
 
     /**
+     * The parent meta object this field group belongs to, if any.
+     *
+     * @var PostMeta|null
+     */
+    protected ?PostMeta $parentMetaObject = null;
+
+    /**
      * The HTML tag to use when rendering the field group container.
      *
      * @var string
      */
     protected string $htmlTag = 'div';
 
-    use CanAttachFields;
+    use CanAttachFields {
+        CanAttachFields::field as traitField;
+    }
 
     public function __construct(
         FeatureProvider $provider,
@@ -105,6 +119,61 @@ class FieldGroup extends FeatureDefinition implements FieldParent {
         return $this;
     }
 
+    public function field(string $fieldIdOrClass, Closure|array|null $callback = null, array $props = []): Field {
+        $field = $this->traitField($fieldIdOrClass, $callback, $props);
+
+        if ($this->parentMetaObject !== null) {
+            $subItem = collect($this->parentMetaObject->getSubItems())->where('name', $field->getName())->first();
+            
+            if ($subItem === null) {
+                $dataType = $field->getDataType();
+                $newItem  = $this->parentMetaObject->add([
+                    'name'  => $field->getName(),
+                    'type'  => $dataType,
+                ]);
+
+                if ($field instanceof Repeater) {
+                    $subFields = $field->getFields();
+
+                    foreach ($subFields as $subField) {
+                        $newItem->itemType('object');
+
+                        $subItem = $newItem->add([
+                            'name' => $subField->getName(),
+                            'type' => $subField->getDataType(),
+                        ]);
+
+                        $subItem->field($subField);
+                        $subItem->label($subField->getLabel());
+                        $subItem->description($subField->getHelpText());
+
+                        $default = $subField->getDefault();
+
+                        if (gettype($default) === $dataType) {
+                            $subItem->default($default);
+                        }
+
+                        $subField->rootName($subItem->getRootName());
+                    }
+                }
+
+                $newItem->field($field);
+                $newItem->label($field->getLabel());
+                $newItem->description($field->getHelpText());
+
+                $default = $field->getDefault();
+
+                if (gettype($default) === $dataType) {
+                    $newItem->default($default);
+                }
+
+                $field->rootName($newItem->getRootName());
+            }
+        }
+
+        return $field;
+    }
+
     /**
      * Associates the field group with a form.
      *
@@ -115,6 +184,18 @@ class FieldGroup extends FeatureDefinition implements FieldParent {
     public function form(Form $form): self {
         $this->form = $form;
         $this->htmlTag = 'fieldset'; // Use fieldset when inside a form for better semantics
+        return $this;
+    }
+
+    /**
+     * Associates the field group with a parent meta object.
+     *
+     * @param PostMeta $meta
+     *
+     * @return self
+     */
+    public function parentMeta(PostMeta $meta): self {
+        $this->parentMetaObject = $meta;
         return $this;
     }
 

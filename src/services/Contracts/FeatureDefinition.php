@@ -116,6 +116,11 @@ abstract class FeatureDefinition {
                 continue;
             }
 
+            if ($key === 'autoQueue' || $key === 'auto_queue') {
+                $this->autoQueue = (bool) $value;
+                continue;
+            }
+
             if (property_exists($this, $key)) {
 
                 if (isset($this->$key) && !empty($this->$key)) {

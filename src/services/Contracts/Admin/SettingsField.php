@@ -118,7 +118,7 @@ final class SettingsField extends FeatureDefinition implements FieldParent {
      * @return void
      */
     protected function load(): void {
-        $field = $this->field;
+        $field   = $this->field;
 
         if ($this->section === 'default') {
             add_settings_section(
@@ -130,6 +130,8 @@ final class SettingsField extends FeatureDefinition implements FieldParent {
         }
 
         $render = function() use ($field) {
+            $field->value($this->setting->getValue());
+            $field->default($this->setting->getDefault());
             $field->render();
         };
 

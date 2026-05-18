@@ -5,9 +5,9 @@ namespace MM\Meros\App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 class Post extends Model {
-    protected $table = 'posts';
+    protected $table      = 'posts';
     protected $primaryKey = 'ID';
-    public $timestamps = false;
+    public    $timestamps =  false;
 
     protected $fillable = [
         'post_title',
