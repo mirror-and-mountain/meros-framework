@@ -8,6 +8,8 @@ use Illuminate\Support\Str;
 
 use Livewire\Component;
 
+use MM\Meros\App\Models\MerosForm;
+
 use MM\Meros\App\Toolbox\Helpers\FormStructureSerializer;
 use MM\Meros\App\Toolbox\Helpers\PayloadHydrator;
 use MM\Meros\App\Toolbox\Helpers\RowMutator;
@@ -25,6 +27,20 @@ use MM\Meros\Facades\FieldGroups as FieldGroupsRegister;
 use MM\Meros\Services\Contracts\Elements\Field;
 
 class FormBuilder extends Component {
+    /**
+     * The ID of the form being edited, if applicable.
+     *
+     * @var string|null
+     */
+    public ?string $formID = null;
+
+    /**
+     * The form model being edited, if applicable.
+     *
+     * @var MerosForm|null
+     */
+    public ?MerosForm $form = null;
+
     /**
      * Field classes available for the form builder.
      *
@@ -107,8 +123,10 @@ class FormBuilder extends Component {
      * 
      * @return void
      */
-    public function mount(): void {
+    public function mount(?string $formID = null): void {
         $this->elements = new Collection([]);
+
+        $this->formID = $formID;
 
         foreach (Fields::getRegistered() as $handle => $fieldType) {
             $this->fieldTypes[$handle] = $fieldType;
@@ -131,6 +149,21 @@ class FormBuilder extends Component {
         }
 
         $this->initialiseHelpers();
+
+        if ($formID) {
+            $this->form = MerosForm::find($formID);
+
+            if ($this->form) {
+                $meta      = $this->form->meta->where('meta_key', 'form_structure')->first();
+                $structure = $meta?->meta_value ?? $meta?->value;
+
+                if (is_string($structure) && trim($structure) !== '') {
+                    $this->loadRowsFromStructure($structure);
+                } else {
+                    $this->loadRowsFromStructure(self::defaultFormStructureJSONComplex());
+                }
+            }
+        }
     }
 
     /**
@@ -250,6 +283,126 @@ class FormBuilder extends Component {
     }
 
     /**
+     * Load builder rows from a persisted schema object/string.
+     *
+     * @param string|array $structure
+     *
+     * @return void
+     */
+    public function loadRowsFromStructure(string|array $structure): void {
+        $this->rows = $this->extractRowsFromStructure($structure);
+
+        if (isset($this->hydrator)) {
+            // Force instantiation pass so loaded schema fields are hydrated immediately.
+            $this->getHydratedRows();
+        }
+    }
+
+    /**
+     * Parse stored schema and convert rows to internal builder payload rows.
+     *
+     * @param string|array $structure
+     *
+     * @return array
+     */
+    private function extractRowsFromStructure(string|array $structure): array {
+        $decoded = is_array($structure) ? $structure : json_decode($structure, true);
+
+        if (!is_array($decoded) || !is_array($decoded['rows'] ?? null)) {
+            return [];
+        }
+
+        return $this->normaliseSchemaRows($decoded['rows']);
+    }
+
+    /**
+     * Accept schema rows and map them into row payloads expected by trait methods.
+     *
+     * @param array $rows
+     *
+     * @return array
+     */
+    private function normaliseSchemaRows(array $rows): array {
+        $normalisedRows = [];
+
+        foreach (array_values($rows) as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            if (RowMutator::isGroupRow($row)) {
+                $normalisedRows[] = $row;
+                continue;
+            }
+
+            if (($row['type'] ?? null) === 'group' && is_array($row['group'] ?? null)) {
+                $groupRows = [];
+
+                foreach (array_values($row['group']['rows'] ?? []) as $groupRow) {
+                    if (is_array($groupRow['fields'] ?? null)) {
+                        $groupRows[] = $this->normaliseFieldPayloads($groupRow['fields']);
+                        continue;
+                    }
+
+                    if (is_array($groupRow)) {
+                        $groupRows[] = $this->normaliseFieldPayloads($groupRow);
+                    }
+                }
+
+                $normalisedRows[] = [
+                    '_type' => 'group',
+                    'group' => [
+                        'id'          => $row['group']['id'] ?? Str::uuid()->toString(),
+                        'handle'      => $row['group']['handle'] ?? '',
+                        'title'       => $row['group']['title'] ?? 'Untitled Section',
+                        'description' => $row['group']['description'] ?? '',
+                        'rows'        => $groupRows,
+                    ],
+                ];
+
+                continue;
+            }
+
+            if (is_array($row['fields'] ?? null)) {
+                $normalisedRows[] = $this->normaliseFieldPayloads($row['fields']);
+                continue;
+            }
+
+            $normalisedRows[] = $this->normaliseFieldPayloads($row);
+        }
+
+        return $normalisedRows;
+    }
+
+    /**
+     * Normalise raw field payload arrays so hydration can instantiate by handle.
+     *
+     * @param array $fields
+     *
+     * @return array
+     */
+    private function normaliseFieldPayloads(array $fields): array {
+        $normalisedFields = [];
+
+        foreach (array_values($fields) as $fieldPayload) {
+            if (!is_array($fieldPayload)) {
+                continue;
+            }
+
+            $handle = $fieldPayload['handle'] ?? null;
+
+            if (!is_string($handle) || trim($handle) === '') {
+                continue;
+            }
+
+            $fieldPayload['id'] = $fieldPayload['id'] ?? Str::uuid()->toString();
+            $normalisedFields[] = $fieldPayload;
+        }
+
+        return $normalisedFields;
+    }
+
+    /**
      * Return the payload for a top-level or grouped field location.
      *
      * @param array<string, int|null> $location
@@ -340,5 +493,319 @@ class FormBuilder extends Component {
      */
     private function initialiseHelpers(): void {
         $this->hydrator = new PayloadHydrator($this->fieldTypes, $this->fieldGroups);
+    }
+
+    /**
+     * Default JSON structure for a simple contact form.
+     *
+     * @return string
+     */
+    public static function defaultFormStructureJson(): string {
+        return '{
+            "type": "form",
+            "elements": [],
+            "rows": [
+                {
+                    "position": 0,
+                    "type": "fields",
+                    "fields": [
+                        {
+                            "id": "first-name",
+                            "handle": "text",
+                            "label": "First Name",
+                            "name": "first_name",
+                            "helpText": "",
+                            "helpTextPosition": "bottom",
+                            "value": "",
+                            "required": true,
+                            "disabled": false,
+                            "style": "nice",
+                            "width": "half",
+                            "variation": ""
+                        },
+                        {
+                            "id": "last-name",
+                            "handle": "text",
+                            "label": "Last Name",
+                            "name": "last_name",
+                            "helpText": "",
+                            "helpTextPosition": "bottom",
+                            "value": "",
+                            "required": true,
+                            "disabled": false,
+                            "style": "nice",
+                            "width": "half",
+                            "variation": ""
+                        }
+                    ]
+                },
+                {
+                    "position": 1,
+                    "type": "fields",
+                    "fields": [
+                        {
+                            "id": "email",
+                            "handle": "text",
+                            "label": "Email",
+                            "name": "email",
+                            "helpText": "",
+                            "helpTextPosition": "bottom",
+                            "value": "",
+                            "required": true,
+                            "disabled": false,
+                            "style": "nice",
+                            "width": "full",
+                            "variation": ""
+                        }
+                    ]
+                },
+                {
+                    "position": 2,
+                    "type": "fields",
+                    "fields": [
+                        {
+                            "id": "message",
+                            "handle": "textarea",
+                            "label": "Message",
+                            "name": "message",
+                            "helpText": "",
+                            "helpTextPosition": "bottom",
+                            "value": "",
+                            "required": true,
+                            "disabled": false,
+                            "style": "nice",
+                            "width": "full",
+                            "variation": ""
+                        }
+                    ]
+                }
+            ]
+        }';
+    }
+
+    /**
+     * Default JSON structure for a complex test form with groups and repeaters.
+     *
+     * @return string
+     */
+    public static function defaultFormStructureJSONComplex(): string {
+        return '{
+            "type": "form",
+            "elements": [],
+            "rows": [
+                {
+                    "position": 0,
+                    "type": "fields",
+                    "fields": [
+                        {
+                            "id": "contact-first-name",
+                            "handle": "text",
+                            "label": "First Name",
+                            "name": "first_name",
+                            "helpText": "",
+                            "helpTextPosition": "bottom",
+                            "value": "",
+                            "required": true,
+                            "disabled": false,
+                            "style": "nice",
+                            "width": "half",
+                            "variation": ""
+                        },
+                        {
+                            "id": "contact-last-name",
+                            "handle": "text",
+                            "label": "Last Name",
+                            "name": "last_name",
+                            "helpText": "",
+                            "helpTextPosition": "bottom",
+                            "value": "",
+                            "required": true,
+                            "disabled": false,
+                            "style": "nice",
+                            "width": "half",
+                            "variation": ""
+                        }
+                    ]
+                },
+                {
+                    "position": 1,
+                    "type": "fields",
+                    "fields": [
+                        {
+                            "id": "contact-email",
+                            "handle": "text",
+                            "label": "Email",
+                            "name": "email",
+                            "helpText": "",
+                            "helpTextPosition": "bottom",
+                            "value": "",
+                            "required": true,
+                            "disabled": false,
+                            "style": "nice",
+                            "width": "full",
+                            "variation": ""
+                        }
+                    ]
+                },
+                {
+                    "position": 2,
+                    "type": "group",
+                    "group": {
+                        "id": "group-company-details",
+                        "handle": "",
+                        "title": "Company Details",
+                        "description": "Information about the organization.",
+                        "rows": [
+                            {
+                                "position": 0,
+                                "fields": [
+                                    {
+                                        "id": "company-name",
+                                        "handle": "text",
+                                        "label": "Company Name",
+                                        "name": "company_name",
+                                        "helpText": "",
+                                        "helpTextPosition": "bottom",
+                                        "value": "",
+                                        "required": false,
+                                        "disabled": false,
+                                        "style": "nice",
+                                        "width": "half",
+                                        "variation": ""
+                                    },
+                                    {
+                                        "id": "company-size",
+                                        "handle": "select",
+                                        "label": "Company Size",
+                                        "name": "company_size",
+                                        "helpText": "",
+                                        "helpTextPosition": "bottom",
+                                        "value": "",
+                                        "options": {
+                                            "1_10": "1-10",
+                                            "11_50": "11-50",
+                                            "51_200": "51-200",
+                                            "200_plus": "200+"
+                                        },
+                                        "required": false,
+                                        "disabled": false,
+                                        "style": "nice",
+                                        "width": "half",
+                                        "variation": ""
+                                    }
+                                ]
+                            },
+                            {
+                                "position": 1,
+                                "fields": [
+                                    {
+                                        "id": "company-about",
+                                        "handle": "textarea",
+                                        "label": "About Company",
+                                        "name": "company_about",
+                                        "helpText": "",
+                                        "helpTextPosition": "bottom",
+                                        "value": "",
+                                        "required": false,
+                                        "disabled": false,
+                                        "style": "nice",
+                                        "width": "full",
+                                        "variation": ""
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "position": 3,
+                    "type": "fields",
+                    "fields": [
+                        {
+                            "id": "project-history",
+                            "handle": "repeater",
+                            "label": "Project History",
+                            "name": "project_history",
+                            "helpText": "Add one or more past projects.",
+                            "helpTextPosition": "bottom",
+                            "value": [
+                                {
+                                    "project_name": "Website Refresh",
+                                    "project_notes": "Updated marketing pages"
+                                }
+                            ],
+                            "required": false,
+                            "disabled": false,
+                            "style": "nice",
+                            "width": "full",
+                            "variation": "",
+                            "fields": [
+                                {
+                                    "id": "project-name-field",
+                                    "handle": "text",
+                                    "label": "Project Name",
+                                    "name": "project_name",
+                                    "style": "nice",
+                                    "width": "half"
+                                },
+                                {
+                                    "id": "project-notes-field",
+                                    "handle": "textarea",
+                                    "label": "Notes",
+                                    "name": "project_notes",
+                                    "style": "nice",
+                                    "width": "half"
+                                }
+                            ],
+                            "defaultRows": [
+                                {
+                                    "project_name": "Website Refresh",
+                                    "project_notes": "Updated marketing pages"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "position": 4,
+                    "type": "fields",
+                    "fields": [
+                        {
+                            "id": "preferred-contact-method",
+                            "handle": "radio",
+                            "label": "Preferred Contact Method",
+                            "name": "preferred_contact_method",
+                            "helpText": "",
+                            "helpTextPosition": "bottom",
+                            "value": "email",
+                            "options": {
+                                "email": "Email",
+                                "phone": "Phone",
+                                "sms": "SMS"
+                            },
+                            "required": false,
+                            "disabled": false,
+                            "style": "nice",
+                            "width": "half",
+                            "variation": ""
+                        },
+                        {
+                            "id": "contact-consent",
+                            "handle": "checkbox",
+                            "label": "Consent to Contact",
+                            "name": "contact_consent",
+                            "helpText": "",
+                            "helpTextPosition": "bottom",
+                            "value": false,
+                            "required": false,
+                            "disabled": false,
+                            "style": "nice",
+                            "width": "half",
+                            "variation": ""
+                        }
+                    ]
+                }
+            ]
+        }';
     }
 }

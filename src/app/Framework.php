@@ -24,6 +24,7 @@ use MM\Meros\App\Fields\Text;
 use MM\Meros\App\Fields\Textarea;
 use MM\Meros\App\Fields\Time;
 use MM\Meros\App\Fields\Url;
+use MM\Meros\App\Toolbox\FormBuilder;
 
 use MM\Meros\App\Fields\Styles\DefaultFieldStyle;
 use MM\Meros\App\Fields\Styles\NiceFieldStyle;
@@ -260,6 +261,12 @@ final class Framework extends FeatureProvider {
             $postType->menuIcon('dashicons-feedback');
             $postType->public();
 
+            $postType->meta()->add(function ($meta) {
+                $meta->string('form_structure')
+                    ->label('Form Structure')
+                    ->description('The structure of the form, stored as a JSON string.');
+            });
+
             $postType->metabox([
                 'label'    => 'Form Builder',
                 'context'  => 'side',
@@ -267,7 +274,7 @@ final class Framework extends FeatureProvider {
             ], function ($post) {
                 $button = $this->fields()->makeFrom('admin_button')
                     ->label('Edit Form')
-                    ->link(home_url('toolbox/form-builder/?form=' . $post->ID), '_blank')
+                    ->link(home_url('toolbox/form-builder/' . $post->ID), '_blank')
                     ->attribute('style', 'width:100%;text-align:center;')
                     ->attribute('title', 'Open the Form Builder in a new tab to edit this form.');
                 
