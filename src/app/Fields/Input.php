@@ -70,4 +70,38 @@ class Input extends Field {
     public function getFieldComponent(): string {
         return 'meros::fields.input';
     }
+
+    /***************************
+     * Getters
+     ***************************/
+    /**
+     * Gets the placeholder text for the input field, if set.
+     *
+     * @return string
+     */
+    public function getPlaceholder(): string {
+        return $this->attributes['placeholder'] ?? '';
+    }
+
+    /**
+     * Converts the field's properties to an array format suitable for JSON serialization
+     * 
+     * @param boolean $asString Whether to return the JSON as a string or an array.
+     * @param string  ...$flags Optional flags to pass to json_encode if $asString is true.
+     *
+     * @return array|string
+     */
+    public function toJson(bool $asString = false, string ...$flags): array|string {
+        $json = parent::toJson();
+        
+        if ($this->supports('placeholder')) {
+            $json['properties']['placeholder'] = $this->getPlaceholder();
+        }
+        
+        if ($asString) {
+            return json_encode($json, ...$flags);
+        }
+
+        return $json;
+    }
 }

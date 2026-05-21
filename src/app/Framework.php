@@ -24,11 +24,10 @@ use MM\Meros\App\Fields\Text;
 use MM\Meros\App\Fields\Textarea;
 use MM\Meros\App\Fields\Time;
 use MM\Meros\App\Fields\Url;
-use MM\Meros\App\Toolbox\FormBuilder;
 
-use MM\Meros\App\Fields\Styles\DefaultFieldStyle;
-use MM\Meros\App\Fields\Styles\NiceFieldStyle;
-use MM\Meros\App\Fields\Styles\SettingsFieldStyle;
+use MM\Meros\App\Fields\Styles\SiteDefault;
+use MM\Meros\App\Fields\Styles\AdminSettings;
+use MM\Meros\App\Fields\Styles\AdminDefault;
 
 use MM\Meros\App\Admin\SettingsSections\Assets;
 use MM\Meros\App\Admin\SettingsSections\Blocks;
@@ -38,13 +37,13 @@ use MM\Meros\App\Admin\Templates\SimpleSettingsPage;
 use MM\Meros\App\Admin\Templates\TabbedSettingsPage;
 use MM\Meros\App\Admin\Templates\MerosFeaturesPage;
 
+use MM\Meros\App\Models\MerosForm;
+
 use MM\Meros\App\Theme;
 use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Packages as PackagesAccessor;
 use MM\Meros\Facades\Blocks as BlocksAccessor;
 use MM\Meros\Facades\AssetGroups as AssetGroupsAccessor;
-
-use MM\Meros\App\Models\MerosForm;
 
 final class Framework extends FeatureProvider {
     /**
@@ -90,11 +89,11 @@ final class Framework extends FeatureProvider {
         $this->fields()->register('password', Password::class);
 
         // Register framework field styles
-        $this->fieldStyles()->register('default', DefaultFieldStyle::class);
-        $this->fieldStyles()->register('nice', NiceFieldStyle::class);
+        $this->formStyles()->register('site_default', SiteDefault::class);
 
         // Register the Settings field style for admin settings pages
-        $this->fieldStyles()->register('settings', SettingsFieldStyle::class);
+        $this->formStyles()->register('admin_default', AdminDefault::class);
+        $this->formStyles()->register('admin_settings', AdminSettings::class);
 
         // Register framework settings sections
         $this->settingsSections()->register('meros-features-packages', Packages::class);
@@ -262,7 +261,7 @@ final class Framework extends FeatureProvider {
             $postType->public();
 
             $postType->meta()->add(function ($meta) {
-                $meta->string('form_structure')
+                $meta->string('schema')
                     ->label('Form Structure')
                     ->description('The structure of the form, stored as a JSON string.');
             });
@@ -283,6 +282,33 @@ final class Framework extends FeatureProvider {
                 $button->render(false, false);
                 echo '</div>';
             });
+        });
+
+        // Filter the form post type content for rendering
+        add_filter('the_content', function ($content) {
+            if (is_singular('meros-form') && in_the_loop() && is_main_query()) {
+                $post = get_post();
+
+                if (!$post) {
+                    return $content;
+                }
+
+                $form = MerosForm::find($post->ID);
+
+                if (!$form) {
+                    return $content;
+                }
+
+                $schema = $form->schema(true);
+
+                if (!$schema) {
+                    return $content;
+                }
+
+                return \Livewire\Livewire::mount('toolbox::site-form', ['schema' => $schema]);
+            
+            }
+            return $content;
         });
     }
 

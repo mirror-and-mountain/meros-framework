@@ -1,9 +1,11 @@
+import { extendFormDragWithRepeaterHandlers } from '../../../forms/repeaters/index.js';
+
 /**
  * Register an Alpine store that tracks the currently dragged field's type and label.
  * The store is used by the form builder sidebar (@dragstart) and canvas drop zones (@drop).
  */
 export function registerFormDragStore() {
-    Alpine.store('formDrag', {
+    const store = {
         isDragging: false,
         isCanvasDrag: false,
         itemKind: null,
@@ -195,22 +197,6 @@ export function registerFormDragStore() {
             }
 
             zoneElement.classList.remove('border-blue-400', 'bg-blue-50', 'text-blue-500');
-        },
-
-        showRepeaterColumnDropHighlight(zoneElement) {
-            if (!zoneElement || !this.canDropField()) {
-                return;
-            }
-
-            zoneElement.classList.add('border-blue-400', 'bg-blue-50', 'text-blue-600');
-        },
-
-        hideRepeaterColumnDropHighlight(zoneElement) {
-            if (!zoneElement) {
-                return;
-            }
-
-            zoneElement.classList.remove('border-blue-400', 'bg-blue-50', 'text-blue-600');
         },
 
         // -----------------------------------------------------------------
@@ -446,88 +432,7 @@ export function registerFormDragStore() {
             this.moveFieldIntoTopRow(wire, targetRowIndex, targetFieldIndex);
         },
 
-        // -----------------------------------------------------------------
-        // Repeater builder handlers
-        // Used in: src/resources/views/toolbox/form-builder/repeater-builder.blade.php
-        // -----------------------------------------------------------------
-        canDropOnRepeaterColumnGap(event) {
-            return this.canDropField() || this.hasDataTransferType(event, 'application/x-meros-repeater-column');
-        },
+    };
 
-        handleRepeaterColumnGapDragOver(event, gapElement) {
-            if (!this.canDropOnRepeaterColumnGap(event)) {
-                return;
-            }
-
-            this.showRowGap(gapElement);
-        },
-
-        handleRepeaterColumnDrop(zoneElement, wire, targetIndex) {
-            this.hideRepeaterColumnDropHighlight(zoneElement);
-
-            if (!this.canDropField()) {
-                return;
-            }
-
-            wire.addRepeaterColumnAt(targetIndex, this.itemHandle ?? '');
-        },
-
-        handleRepeaterColumnGapDrop(event, gapElement, wire, targetIndex) {
-            this.hideRowGap(gapElement);
-
-            if (this.canDropField()) {
-                wire.addRepeaterColumnAt(targetIndex, this.itemHandle ?? '');
-                return;
-            }
-
-            const sourceIndex = this.getDataTransferNumber(event, 'application/x-meros-repeater-column');
-
-            if (sourceIndex !== null) {
-                wire.moveRepeaterColumn(sourceIndex, targetIndex);
-            }
-        },
-
-        canDropOnRepeaterRowGap(event) {
-            return this.hasDataTransferType(event, 'application/x-meros-repeater-row');
-        },
-
-        handleRepeaterRowGapDragOver(event, gapElement) {
-            if (!this.canDropOnRepeaterRowGap(event)) {
-                return;
-            }
-
-            this.showRowGap(gapElement);
-        },
-
-        handleRepeaterRowGapDrop(event, gapElement, wire, targetIndex) {
-            this.hideRowGap(gapElement);
-
-            const sourceIndex = this.getDataTransferNumber(event, 'application/x-meros-repeater-row');
-
-            if (sourceIndex !== null) {
-                wire.moveRepeaterDefaultRow(sourceIndex, targetIndex);
-            }
-        },
-
-        // -----------------------------------------------------------------
-        // Field repeater handlers
-        // Used in: src/resources/views/fields/repeater.blade.php
-        // -----------------------------------------------------------------
-        handleFieldRepeaterRowGapDragOver(gapElement) {
-            this.showRowGap(gapElement);
-        },
-
-        handleFieldRepeaterRowGapDrop(event, gapElement, wire, rowIndex, fieldIndex, groupRowIndex, targetIndex) {
-            this.hideRowGap(gapElement);
-
-            const sourceIndex = this.getDataTransferNumberFromTypes(event, [
-                'application/x-meros-field-repeater-row',
-                'text/plain',
-            ]);
-
-            if (sourceIndex !== null) {
-                wire.moveFieldRepeaterRow(rowIndex, fieldIndex, groupRowIndex, sourceIndex, targetIndex);
-            }
-        },
-    });
+    Alpine.store('formDrag', extendFormDragWithRepeaterHandlers(store));
 }

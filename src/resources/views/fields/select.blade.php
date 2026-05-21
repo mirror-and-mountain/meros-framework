@@ -24,8 +24,8 @@
             value="{{ $value }}"
             @selected(
                 $field->allowsMultiple()
-                    ? (is_array($fieldValue) && in_array($value, $fieldValue))
-                    : ($fieldValue == $value)
+                    ? (is_array($fieldValue) && in_array($value, $fieldValue, true))
+                    : ($fieldValue !== null && (string) $fieldValue === (string) $value)
             )
         >
             {{ $label }}

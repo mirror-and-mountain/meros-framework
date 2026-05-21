@@ -13,6 +13,10 @@ class Post extends Model {
         'post_title',
         'post_content',
         'post_status',
+        'post_excerpt',
+        'post_date',
+        'post_modified',
+        'post_name',
         'post_type',
         'post_author',
     ];

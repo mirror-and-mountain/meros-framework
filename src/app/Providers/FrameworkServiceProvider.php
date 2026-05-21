@@ -20,7 +20,7 @@ use MM\Meros\Services\Registers\Blocks;
 use MM\Meros\Services\Registers\Forms;
 use MM\Meros\Services\Registers\Fields;
 use MM\Meros\Services\Registers\FieldGroups;
-use MM\Meros\Services\Registers\FieldStyles;
+use MM\Meros\Services\Registers\FormStyles;
 use MM\Meros\Services\Registers\Tables;
 use MM\Meros\Services\Registers\MenuPages;
 use MM\Meros\Services\Registers\MenuPageTemplates;
@@ -142,8 +142,8 @@ class FrameworkServiceProvider extends ServiceProvider {
             return new FieldGroups();
         });
 
-        $this->app->singleton(FieldStyles::class, function () {
-            return new FieldStyles();
+        $this->app->singleton(FormStyles::class, function () {
+            return new FormStyles();
         });
 
         $this->app->singleton(Tables::class, function () {
@@ -188,7 +188,7 @@ class FrameworkServiceProvider extends ServiceProvider {
         $this->app->alias(Forms::class, 'meros.registers.forms');
         $this->app->alias(Fields::class, 'meros.registers.fields');
         $this->app->alias(FieldGroups::class, 'meros.registers.field_groups');
-        $this->app->alias(FieldStyles::class, 'meros.registers.field_styles');
+        $this->app->alias(FormStyles::class, 'meros.registers.form_styles');
         $this->app->alias(Tables::class, 'meros.registers.tables');
         $this->app->alias(MenuPages::class, 'meros.registers.menu_pages');
         $this->app->alias(MenuPageTemplates::class, 'meros.registers.menu_page_templates');

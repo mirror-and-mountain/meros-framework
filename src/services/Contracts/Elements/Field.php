@@ -8,7 +8,8 @@ use MM\Meros\Services\Contracts\FeatureDefinition;
 use MM\Meros\Services\Contracts\Admin\SettingsField;
 use MM\Meros\Services\Contracts\Elements\Interfaces\FieldParent;
 
-use MM\Meros\Facades\FieldStyles;
+use MM\Meros\Facades\FormStyles;
+use MM\Meros\Facades\Context;
 
 use MM\Meros\App\Fields\Repeater;
 
@@ -34,6 +35,13 @@ abstract class Field extends FeatureDefinition {
      * @var string
      */
     public static string $icon = '';
+
+    /**
+     * Whether this field is available in the FormBuilder.
+     *
+     * @var boolean
+     */
+    public static bool $showInFormBuilder = true;
 
     /**
      * An array of data types that this field is compatible with.
@@ -68,7 +76,7 @@ abstract class Field extends FeatureDefinition {
      *
      * @var SettingsField|null
      */
-    protected ?SettingsField $settingsField = null;
+    public ?SettingsField $settingsField = null;
 
     /**
      * The field's name, which can be used for form submission and as a fallback for generating the label.
@@ -163,19 +171,13 @@ abstract class Field extends FeatureDefinition {
      */
     protected string $width = 'full';
 
-    /**
-     * The handle of the FieldStyle used to render the field, which determines the Blade view used for rendering.
-     *
-     * @var string
-     */
-    protected string $style = '';
 
     // These properties are set to true by default as fields don't use the setReady or load methods.
     final public bool $ready = true;
     final public bool $loaded = true;
 
     /**
-     * Renders the field using its designated FieldStyle.
+     * Renders the field using its designated FormStyle.
      * 
      * @param bool $showLabel Whether to show the field's label in the wrapper. Some styles may ignore this and always show the label, or never show the label.
      * @param bool $showHelp Whether to show the field's help text in the wrapper. Some styles may ignore this and always show the help text, or never show the help text.
@@ -183,9 +185,9 @@ abstract class Field extends FeatureDefinition {
      * @return void
      */
     public function render(bool $showLabel = true, bool $showHelp = true): void {
-        $view = $this->resolveStyle();
+        $wrapper = $this->resolveStyle();
 
-        echo view($view, [
+        echo view($wrapper, [
             'view'       => $this->getFieldComponent(),
             'field'      => $this,
             'showLabel'  => $showLabel,
@@ -391,18 +393,6 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
-     * Sets the style used to render the field.
-     *
-     * @param string $style The handle of the FieldStyle
-     *
-     * @return self
-     */
-    public function style(string $style): self {
-        $this->style = $style;
-        return $this;
-    }
-
-    /**
      * Sets the position of the field's help text.
      *
      * @param string $position Either 'top' or 'bottom'.
@@ -460,21 +450,22 @@ abstract class Field extends FeatureDefinition {
         $json = [
             'type'             => static::class,
             'handle'           => $this->handle,
-            'id'               => $this->getId(),
-            'name'             => $this->getName(),
-            'label'            => $this->getLabel(),
-            'helpText'         => $this->getHelpText(),
-            'helpTextPosition' => $this->getHelpTextPosition(),
-            'attributes'       => $this->attributes,
-            'classList'        => $this->classList,
-            'default'          => $this->default,
-            'value'            => $this->getValue(),
-            'required'         => $this->isRequired(),
-            'disabled'         => $this->isDisabled(),
-            'component'        => $this->getFieldComponent(),
-            'width'            => $this->width,
-            'style'            => $this->style,
-            'compatibleDataTypes' => $this->compatibleDataTypes,
+            'properties'       => [
+                'id'               => $this->getId(),
+                'name'             => $this->getName(),
+                'label'            => $this->getLabel(),
+                'helpText'         => $this->getHelpText(),
+                'helpTextPosition' => $this->getHelpTextPosition(),
+                'attributes'       => $this->attributes,
+                'classList'        => $this->classList,
+                'default'          => $this->default,
+                'value'            => $this->getValue(),
+                'required'         => $this->isRequired(),
+                'disabled'         => $this->isDisabled(),
+                'component'        => $this->getFieldComponent(),
+                'width'            => $this->width,
+                'compatibleDataTypes' => $this->compatibleDataTypes,
+            ]
         ];
 
         if ($asString) {
@@ -580,12 +571,13 @@ abstract class Field extends FeatureDefinition {
      * @return mixed
      */
     public function getValue(): mixed {
-        $value   = is_string($this->value) ? trim($this->value) : $this->value;
-        $default = is_string($this->default) ? trim($this->default) : $this->default;
+        $value = is_string($this->value) ? trim($this->value) : $this->value;
 
-        return empty($this->value) || $this->value === null 
-            ? $default 
-            : $value;
+        if ($this->value === null) {
+            return is_string($this->default) ? trim($this->default) : $this->default;
+        }
+
+        return $value;
     }
 
     /**
@@ -775,18 +767,27 @@ abstract class Field extends FeatureDefinition {
     abstract public function getFieldComponent(): string;
 
     /**
-     * Retrieves the Blade view path for the field's assigned style.
+     * Retrieves the Blade view path for the field's assigned form style.
      *
      * @return string
-     * @throws \RuntimeException If the specified FieldStyle is not found in the FieldStyles register.
      */
     protected function resolveStyle(): string {
-        // If no style is specified, use the default style view
-        if (empty($this->style)) {
-            return 'meros::fields.styles.default';
+        $hasSettingsField = 
+            $this->settingsField !== null || 
+            ($this->isSubField() && $this->parent->settingsField !== null);
+        
+        if ($hasSettingsField) {
+            $styleHandle = 'admin_settings';
+        } else {
+            $styleHandle = Context::isAdmin() ? 'admin_default' : 'site_default';
         }
 
-        $style = FieldStyles::checkout($this->provider)->makeFrom($this->style);
+        $style = FormStyles::checkout($this->provider)->makeFrom($styleHandle);
+
+        if ($styleHandle === 'admin_settings') {
+            $this->class('meros-settings-field');
+        }
+
         return $style->getView();
     }
 

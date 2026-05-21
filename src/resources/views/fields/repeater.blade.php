@@ -1,57 +1,65 @@
-<div class="{{ $field->classList() }} rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+<div class="{{ $field->classList() }} meros-repeater">
     @if($location)
         @php
             $rawRepeaterValue = is_array($field->getValue()) ? $field->getValue() : [];
-            $repeaterStateSignature = md5(json_encode([
-                'location' => $location,
-                'value' => $rawRepeaterValue,
-                'columns' => $field->getFieldNames(),
-            ]));
+            $repeaterLocationKey = is_int($location['groupRowIndex'] ?? null)
+                ? sprintf('group-%d-%d-%d', $location['groupRowIndex'], $location['rowIndex'] ?? -1, $location['fieldIndex'] ?? -1)
+                : sprintf('%d-%d', $location['rowIndex'] ?? -1, $location['fieldIndex'] ?? -1);
+            $livewireSyncEnabled = isset($this) && $this instanceof \MM\Meros\App\Toolbox\FormBuilder;
         @endphp
         <div
-            class="overflow-x-auto"
-            wire:key="canvas-repeater-{{ $location['groupRowIndex'] ?? 'top' }}-{{ $location['rowIndex'] ?? 'x' }}-{{ $location['fieldIndex'] ?? 'x' }}-{{ $repeaterStateSignature }}"
+            class="meros-repeater-scroll"
+            wire:key="canvas-repeater-{{ $location['groupRowIndex'] ?? 'top' }}-{{ $location['rowIndex'] ?? 'x' }}-{{ $location['fieldIndex'] ?? 'x' }}"
             x-data="{ isDraggingRow: false, draggingRowIndex: null }"
         >
-            <table class="meros-repeater-table min-w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
+            <table class="meros-repeater-table meros-repeater-table--interactive" data-repeater-location-key="{{ $repeaterLocationKey }}" data-livewire-sync-enabled="{{ $livewireSyncEnabled ? 'true' : 'false' }}">
+                <thead class="meros-repeater-head">
                     <tr>
-                        <th class="w-10 px-3 py-2 text-left text-xs font-semibold text-gray-500">Move</th>
+                        <th class="meros-repeater-head-cell meros-repeater-head-cell--move">Move</th>
                         @foreach($field->getFieldLabels() as $label)
-                            <th class="meros-repeater-data-header px-3 py-2 text-left text-xs font-semibold text-gray-500">{{ $label }}</th>
+                            <th class="meros-repeater-data-header meros-repeater-head-cell">{{ $label }}</th>
                         @endforeach
-                        <th class="w-24 px-3 py-2 text-right text-xs font-semibold text-gray-500">Actions</th>
+                        <th class="meros-repeater-head-cell meros-repeater-head-cell--actions">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
+                <tbody class="meros-repeater-body">
                     @if(!empty($rows))
                         <tr>
-                            <td colspan="{{ count($field->getFieldNames()) + 2 }}" class="p-0">
+                            <td colspan="{{ count($field->getFieldNames()) + 2 }}" class="meros-repeater-gap-cell">
                                 <div
-                                    class="h-0 rounded-sm transition-all duration-150"
-                                    :class="isDraggingRow ? 'h-2' : 'h-0'"
-                                    @dragover.prevent="$store.formDrag.handleFieldRepeaterRowGapDragOver($el)"
-                                    @dragleave="$store.formDrag.hideRowGap($el)"
-                                    @drop.prevent="$store.formDrag.handleFieldRepeaterRowGapDrop($event, $el, $wire, {{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }}, 0)"
+                                    class="meros-repeater-row-gap"
+                                    :class="isDraggingRow ? 'is-active' : ''"
+                                    @dragover.prevent="$store.repeaterField.handleRowGapDragOver($el)"
+                                    @dragleave="$store.repeaterField.hideRowGap($el)"
+                                    @drop.prevent="$store.repeaterField.handleRowGapDrop($event, $el, {{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }}, 0)"
                                 ></div>
                             </td>
                         </tr>
                     @endif
 
                     @forelse($rows as $rowIndex => $row)
+                        @php
+                            $rowKey = $rawRepeaterValue[$rowIndex]['__rowKey'] ?? null;
+                            $fallbackRowKey = is_array($rawRepeaterValue[$rowIndex] ?? null)
+                                ? ('hash-' . md5(json_encode($rawRepeaterValue[$rowIndex])))
+                                : ('idx-' . $rowIndex);
+                            $renderRowKey = is_string($rowKey) && $rowKey !== '' ? $rowKey : $fallbackRowKey;
+                        @endphp
                         <tr
-                            class="align-top"
-                            wire:key="repeater-row-{{ $rowIndex }}-{{ md5(json_encode($rawRepeaterValue[$rowIndex] ?? [])) }}"
-                            :class="draggingRowIndex === {{ $rowIndex }} ? 'opacity-40 bg-gray-50' : ''"
+                            class="meros-repeater-row"
+                            data-repeater-row-index="{{ $rowIndex }}"
+                            data-repeater-row-key="{{ $renderRowKey }}"
+                            wire:key="repeater-row-{{ $renderRowKey }}"
+                            :class="draggingRowIndex === {{ $rowIndex }} ? 'is-dragging' : ''"
                             @dragover.prevent
                         >
-                            <td class="px-3 py-3 text-gray-300 select-none text-center">
+                            <td class="meros-repeater-move-cell">
                                 <button
                                     type="button"
                                     draggable="true"
-                                    class="cursor-move text-gray-300 hover:text-gray-500 transition-colors"
+                                    class="meros-repeater-move-button"
                                     title="Drag to reorder row"
-                                    @dragstart="isDraggingRow = true; draggingRowIndex = {{ $rowIndex }}; $event.dataTransfer.effectAllowed = 'move'; $event.dataTransfer.setData('application/x-meros-field-repeater-row', '{{ $rowIndex }}'); $event.dataTransfer.setData('text/plain', '{{ $rowIndex }}')"
+                                    @dragstart="const rowIndex = Number($el.closest('tr')?.dataset.repeaterRowIndex ?? {{ $rowIndex }}); isDraggingRow = true; draggingRowIndex = rowIndex; $store.repeaterField.startRowDrag($event, rowIndex)"
                                     @dragend="isDraggingRow = false; draggingRowIndex = null"
                                 >
                                     ☰
@@ -59,22 +67,27 @@
                             </td>
                             @foreach($field->getFieldNames() as $fieldName)
                                 <td
-                                    class="meros-repeater-data-cell px-3 py-3 align-top"
-                                    @change="$wire.updateFieldRepeaterRowValue({{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }}, {{ $rowIndex }}, '{{ $fieldName }}', $event.target.type === 'checkbox' ? $event.target.checked : ($event.target.multiple ? Array.from($event.target.options).filter(o => o.selected).map(o => o.value) : $event.target.value))"
+                                    class="meros-repeater-data-cell"
+                                    data-location-row-index="{{ $location['rowIndex'] ?? 'null' }}"
+                                    data-location-field-index="{{ $location['fieldIndex'] ?? 'null' }}"
+                                    data-location-group-row-index="{{ $location['groupRowIndex'] ?? 'null' }}"
+                                    data-field-name="{{ $fieldName }}"
+                                    @change="$store.repeaterField.updateRowValue({{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }}, {{ $rowIndex }}, $el.dataset.fieldName, $el, $event)"
                                 >
                                     @php
                                         $subField = $row[$fieldName] ?? null;
                                     @endphp
                                     @if($subField)
-                                        {{ $subField->render(false, false) }}
+                                        {!! $subField->render(false, false) !!}
                                     @endif
                                 </td>
                             @endforeach
-                            <td class="px-3 py-3 text-right align-top">
+                            <td class="meros-repeater-actions-cell">
                                 <button
                                     type="button"
-                                    wire:click="removeFieldRepeaterRow({{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }}, {{ $rowIndex }})"
-                                    class="inline-flex items-center cursor-pointer rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                                    @click.stop="$store.repeaterField.removeRow({{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }}, {{ $rowIndex }})"
+                                    class="meros-repeater-button meros-repeater-button--danger"
+                                    title="Remove row"
                                 >
                                     Remove
                                 </button>
@@ -82,19 +95,19 @@
                         </tr>
 
                         <tr>
-                            <td colspan="{{ count($field->getFieldNames()) + 2 }}" class="p-0">
+                            <td colspan="{{ count($field->getFieldNames()) + 2 }}" class="meros-repeater-gap-cell">
                                 <div
-                                    class="h-0 rounded-sm transition-all duration-150"
-                                    :class="isDraggingRow ? 'h-2' : 'h-0'"
-                                    @dragover.prevent="$store.formDrag.handleFieldRepeaterRowGapDragOver($el)"
-                                    @dragleave="$store.formDrag.hideRowGap($el)"
-                                    @drop.prevent="$store.formDrag.handleFieldRepeaterRowGapDrop($event, $el, $wire, {{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }}, {{ $rowIndex + 1 }})"
+                                    class="meros-repeater-row-gap"
+                                    :class="isDraggingRow ? 'is-active' : ''"
+                                    @dragover.prevent="$store.repeaterField.handleRowGapDragOver($el)"
+                                    @dragleave="$store.repeaterField.hideRowGap($el)"
+                                    @drop.prevent="$store.repeaterField.handleRowGapDrop($event, $el, {{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }}, {{ $rowIndex + 1 }})"
                                 ></div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ count($field->getFieldNames()) + 2 }}" class="px-3 py-4 text-sm text-gray-500 text-center">
+                            <td colspan="{{ count($field->getFieldNames()) + 2 }}" class="meros-repeater-empty-state">
                                 No rows yet. Use "Add Row" to create repeater data.
                             </td>
                         </tr>
@@ -103,46 +116,47 @@
             </table>
         </div>
 
-        <div class="border-t border-gray-200 bg-gray-50 px-4 py-3">
+        <div class="meros-repeater-footer">
             <button
                 type="button"
-                wire:click="addFieldRepeaterRow({{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }})"
-                class="inline-flex items-center cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-gray-400 hover:bg-gray-100 hover:text-gray-900"
+                @click.stop="$store.repeaterField.addRow({{ $location['rowIndex'] ?? 'null' }}, {{ $location['fieldIndex'] ?? 'null' }}, {{ $location['groupRowIndex'] ?? 'null' }})"
+                class="meros-repeater-button meros-repeater-button--neutral"
+                title="Add new row"
             >
                 Add Row
             </button>
         </div>
     @else
-        <div class="overflow-x-auto">
-            <table class="meros-repeater-table min-w-full divide-y divide-gray-200 text-sm">
-                <thead class="bg-gray-50">
+        <div class="meros-repeater-scroll">
+            <table class="meros-repeater-table meros-repeater-table--readonly">
+                <thead class="meros-repeater-head">
                     <tr>
-                        <th class="w-10 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500"></th>
+                        <th class="meros-repeater-head-cell meros-repeater-head-cell--move"></th>
                         @foreach ($field->getFieldLabels() as $label)
-                            <th scope="col" class="meros-repeater-data-header px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $label }}</th>
+                            <th scope="col" class="meros-repeater-data-header meros-repeater-head-cell">{{ $label }}</th>
                         @endforeach
-                        <th class="w-24 px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Actions</th>
+                        <th class="meros-repeater-head-cell meros-repeater-head-cell--actions">Actions</th>
                     </tr>
                 </thead>
 
-                <tbody class="divide-y divide-gray-100 bg-white">
+                <tbody class="meros-repeater-body">
                     @foreach ($rows as $row)
-                        <tr draggable="false" class="align-top">
-                            <td class="px-3 py-3 text-gray-300 select-none">☰</td>
+                        <tr draggable="false" class="meros-repeater-row">
+                            <td class="meros-repeater-move-cell">☰</td>
                             @foreach ($field->getFieldNames() as $name)
-                                <td class="meros-repeater-data-cell px-3 py-3 align-top">
+                                <td class="meros-repeater-data-cell">
                                     @php
                                         $subField = $row[$name] ?? null;
                                     @endphp
                                     @if($subField)
-                                        {{ $subField->render(false, false) }}
+                                        {!! $subField->render(false, false) !!}
                                     @endif
                                 </td>
                             @endforeach
-                            <td class="px-3 py-3 text-right align-top">
+                            <td class="meros-repeater-actions-cell">
                                 <button
                                     type="button"
-                                    class="inline-flex items-center rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                                    class="meros-repeater-button meros-repeater-button--danger"
                                 >
                                     Remove
                                 </button>
@@ -153,10 +167,10 @@
             </table>
         </div>
 
-        <div class="border-t border-gray-200 bg-gray-50 px-4 py-3">
+        <div class="meros-repeater-footer">
             <button
                 type="button"
-                class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-gray-400 hover:bg-gray-100 hover:text-gray-900"
+                class="meros-repeater-button meros-repeater-button--neutral"
             >
                 Add Row
             </button>

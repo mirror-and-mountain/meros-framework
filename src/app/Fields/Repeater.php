@@ -63,9 +63,7 @@ class Repeater extends Field implements FieldParent {
      */
     protected bool $forceFullWidth = true;
 
-    use CanAttachFields {
-        style as public fieldStyle;
-    }
+    use CanAttachFields;
 
     /**
      * Converts the field's properties to an array format suitable for JSON serialization
@@ -103,9 +101,9 @@ class Repeater extends Field implements FieldParent {
      * @return void
      */
     public function render(bool $showLabel = true, bool $showHelp = true, ?array $location = null): void {
-        $view = $this->resolveStyle();
+        $wrapper = $this->resolveStyle();
 
-        echo view($view, [
+        echo view($wrapper, [
             'view'      => $this->getFieldComponent(),
             'field'     => $this,
             'rows'      => $this->buildRows(),
@@ -139,6 +137,7 @@ class Repeater extends Field implements FieldParent {
 
         foreach ($items as $index => $rowData) {
             $rowData = is_array($rowData) ? $rowData : [];
+            $rowToken = $this->resolveRowToken($rowData, $index);
             $row = [];
 
             foreach ($this->fields as $field) {
@@ -147,8 +146,8 @@ class Repeater extends Field implements FieldParent {
                 // Store the original field name before generating the indexed name
                 $baseFieldName = $fieldInstance->getName();
 
-                $fieldInstance->id($this->generateSubFieldId($fieldInstance, $index));
-                $fieldInstance->name($this->generateSubFieldName($fieldInstance, $index));
+                $fieldInstance->id($this->generateSubFieldId($fieldInstance, $rowToken));
+                $fieldInstance->name($this->generateSubFieldName($fieldInstance, $rowToken));
                 
                 // Look up value using the base field name, not the generated indexed name
                 $fieldInstance->value($rowData[$baseFieldName] ?? null);
@@ -163,19 +162,6 @@ class Repeater extends Field implements FieldParent {
         return $rows;
     }
 
-    /**
-     * Sets the style used to render the field. Overrides the Field method to apply the style to all sub-fields as well.
-     *
-     * @param string $style The handle of the FieldStyle
-     *
-     * @return self
-     */
-    public function style(string $style): self {
-        $this->style = $style;
-        $this->fieldStyle($style);
-        return $this;
-    }
-
     /********************
      * Helpers
      ********************/
@@ -183,35 +169,52 @@ class Repeater extends Field implements FieldParent {
      * Generates a unique name for a sub-field based on the repeater's root name, the repeater's name, the row index, and the sub-field's name.
      *
      * @param Field $field The sub-field for which to generate the name.
-     * @param int $index The index of the repeater row.
+     * @param string $rowToken Stable row token.
      *
      * @return string The generated sub-field name.
      */
-    protected function generateSubFieldName(Field $field, int $index): string {
+    protected function generateSubFieldName(Field $field, string $rowToken): string {
         $fieldName = $field->getName();
 
         if ($this->rootName === '') {
-            return "{$this->name}[{$index}][{$fieldName}]";
+            return "{$this->name}[{$rowToken}][{$fieldName}]";
         }
 
-        return "{$this->rootName}[{$this->name}][{$index}][{$fieldName}]";
+        return "{$this->rootName}[{$this->name}][{$rowToken}][{$fieldName}]";
     }
 
     /**
      * Generates a unique ID for a sub-field based on the repeater's root name, the repeater's ID, the row index, and the sub-field's ID.
      *
      * @param Field $field The sub-field for which to generate the ID.
-     * @param int $index The index of the repeater row.
+     * @param string $rowToken Stable row token.
      *
      * @return string The generated sub-field ID.
      */
-    protected function generateSubFieldId(Field $field, int $index): string {
+    protected function generateSubFieldId(Field $field, string $rowToken): string {
         $fieldId = Str::replace(['[', ']'], '_', $field->getId());
+        $idToken = preg_replace('/[^A-Za-z0-9_-]/', '_', $rowToken) ?? $rowToken;
 
         if ($this->rootName === '') {
-            return "{$this->id}_{$index}_{$fieldId}";
+            return "{$this->id}_{$idToken}_{$fieldId}";
         }
 
-        return "{$this->rootName}_{$this->id}_{$index}_{$fieldId}";
+        return "{$this->rootName}_{$this->id}_{$idToken}_{$fieldId}";
+    }
+
+    /**
+     * Resolve the repeater row token used for generated sub-field names/ids.
+     * Uses a stable row key in admin contexts to avoid radio group churn when reordering.
+     */
+    protected function resolveRowToken(array $rowData, int $index): string {
+        if (Context::isAdmin()) {
+            $rowKey = $rowData['__rowKey'] ?? null;
+
+            if (is_string($rowKey) && $rowKey !== '') {
+                return $rowKey;
+            }
+        }
+
+        return (string) $index;
     }
 }

@@ -5,10 +5,15 @@
     </div>
     <div class="flex items-center">
         <div class="flex">
-            <div class="py-2 px-6 hover:bg-gray-300 hover:text-black cursor-pointer"><span>Build</span></div>
-            <div class="py-2 px-6 border-l border-gray-300 hover:bg-gray-300 hover:text-black cursor-pointer"><span>Preview</span></div>
-            <div class="py-2 px-6 border-l border-gray-300 hover:bg-gray-300 hover:text-black cursor-pointer"><span>Settings</span></div>
-            <div class="py-2 px-6 border-l border-gray-300 hover:bg-gray-300 hover:text-black cursor-pointer"><span>Save</span></div>
+            @foreach($navItems as $item)
+                <div 
+                    class="py-2 px-6 hover:bg-gray-300 hover:text-black cursor-pointer" 
+                    :class="{ 'bg-gray-300 text-black': currentTab === '{{ strtolower($item) }}' }" 
+                    @click="currentTab = '{{ strtolower($item) }}'"
+                >
+                        <span>{{ $item }}</span>
+                </div>
+            @endforeach
         </div>
     </div>
 </header>

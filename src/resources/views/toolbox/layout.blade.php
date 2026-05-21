@@ -7,7 +7,9 @@
     @viteAssets('framework')
     @livewireStyles
 </head>
-<body>
+<body x-data="{
+        currentTab: 'canvas',
+    }">
     @include('meros::toolbox.partials.header')
     <main>
         {{ $slot }}

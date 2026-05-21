@@ -1,0 +1,195 @@
+.meros-repeater {
+	overflow: hidden;
+	border: 1px solid #d1d5db;
+	border-radius: 0.5rem;
+	background-color: #ffffff;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.meros-repeater-scroll {
+	overflow-x: auto;
+}
+
+.meros-repeater-table {
+	width: 100%;
+	min-width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	font-size: 0.875rem;
+}
+
+.meros-repeater-head {
+	background-color: #f9fafb;
+}
+
+.meros-repeater-head-cell {
+	padding: 0.5rem 0.75rem;
+	border-bottom: 1px solid #e5e7eb;
+	text-align: left;
+	font-size: 0.75rem;
+	font-weight: 600;
+	line-height: 1rem;
+	letter-spacing: 0.02em;
+	color: #6b7280;
+}
+
+.meros-repeater-head-cell--move {
+	width: 2.5rem;
+}
+
+.meros-repeater-head-cell--actions {
+	width: 6rem;
+	text-align: right;
+}
+
+.meros-repeater-body {
+	background-color: #ffffff;
+}
+
+.meros-repeater-body > tr + tr .meros-repeater-data-cell,
+.meros-repeater-body > tr + tr .meros-repeater-move-cell,
+.meros-repeater-body > tr + tr .meros-repeater-actions-cell {
+	border-top: 1px solid #f3f4f6;
+}
+
+.meros-repeater-row.is-dragging {
+	opacity: 0.4;
+	background-color: #f9fafb;
+}
+
+.meros-repeater-move-cell,
+.meros-repeater-data-cell,
+.meros-repeater-actions-cell {
+	padding: 0.75rem;
+	vertical-align: top;
+}
+
+.meros-repeater-move-cell {
+	width: 2.5rem;
+	text-align: center;
+	color: #9ca3af;
+	user-select: none;
+}
+
+.meros-repeater-actions-cell {
+	text-align: right;
+	width: 6rem;
+}
+
+.meros-repeater-move-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: #9ca3af;
+	cursor: move;
+	transition: color 0.15s ease;
+}
+
+.meros-repeater-move-button:hover {
+	color: #6b7280;
+}
+
+.meros-repeater-gap-cell {
+	padding: 0;
+}
+
+.meros-repeater-row-gap {
+	height: 0;
+	border-radius: 0.125rem;
+	transition: height 0.15s ease;
+}
+
+.meros-repeater-row-gap.is-active {
+	height: 0.5rem;
+}
+
+.meros-repeater-row-gap.bg-blue-200 {
+	background-color: #bfdbfe;
+}
+
+.meros-repeater-empty-state {
+	padding: 1rem 0.75rem;
+	text-align: center;
+	font-size: 0.875rem;
+	color: #6b7280;
+}
+
+.meros-repeater-footer {
+	padding: 0.75rem 1rem;
+	border-top: 1px solid #e5e7eb;
+	background-color: #f9fafb;
+}
+
+.meros-repeater-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.5rem 0.75rem;
+	border: 1px solid transparent;
+	border-radius: 0.375rem;
+	font-size: 0.875rem;
+	font-weight: 500;
+	line-height: 1.25rem;
+	cursor: pointer;
+	transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.meros-repeater-button--neutral {
+	border-color: #d1d5db;
+	background-color: #ffffff;
+	color: #374151;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.meros-repeater-button--neutral:hover {
+	border-color: #9ca3af;
+	background-color: #f3f4f6;
+	color: #111827;
+}
+
+.meros-repeater-button--danger {
+	border-color: #fecaca;
+	background-color: #ffffff;
+	color: #dc2626;
+}
+
+.meros-repeater-button--danger:hover {
+	border-color: #fca5a5;
+	background-color: #fef2f2;
+	color: #b91c1c;
+}
+
+.meros-repeater-table input[type='text'],
+.meros-repeater-table input[type='email'],
+.meros-repeater-table input[type='url'],
+.meros-repeater-table input[type='number'],
+.meros-repeater-table input[type='password'],
+.meros-repeater-table input[type='search'],
+.meros-repeater-table input[type='tel'],
+.meros-repeater-table select,
+.meros-repeater-table textarea {
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+.meros-repeater-table input[type='checkbox'],
+.meros-repeater-table input[type='radio'] {
+	width: auto;
+	max-width: none;
+	inline-size: 1rem;
+	block-size: 1rem;
+	min-inline-size: 1rem;
+	min-block-size: 1rem;
+	vertical-align: middle;
+}
+
+.meros-repeater-table .meros-site-field label,
+.meros-repeater-table .nice-form-group label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+}

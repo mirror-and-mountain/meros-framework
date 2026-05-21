@@ -1,0 +1,115 @@
+@use 'nice-forms.css/dist/nice-forms.css';
+
+.meros-site-form {
+	display: grid;
+	gap: 1rem;
+    padding: 2rem;
+}
+
+.meros-site-form-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	align-items: stretch;
+}
+
+.meros-site-form-row > * {
+	flex: 1 1 calc((100% - 1.5rem) / 3);
+	width: 100%;
+	min-width: 0;
+}
+
+.meros-site-form-field {
+	justify-self: stretch;
+	align-self: start;
+	width: 100%;
+	min-width: 0;
+}
+
+.meros-site-form-field > * {
+	display: block;
+	width: 100%;
+	min-width: 0;
+}
+
+.meros-site-form-group {
+	border: 1px solid #d1d5db;
+	border-radius: 0.5rem;
+	background-color: #f9fafb;
+	padding: 0.875rem;
+}
+
+.meros-site-form-group-header {
+	margin-bottom: 0.75rem;
+}
+
+.meros-site-form-group-header h3 {
+	margin: 0;
+	font-size: 1rem;
+	line-height: 1.3;
+	color: #1f2937;
+}
+
+.meros-site-form-group-header p {
+	margin: 0.25rem 0 0;
+	font-size: 0.875rem;
+	color: #4b5563;
+}
+
+.meros-site-form-group .meros-site-form-row + .meros-site-form-row {
+	margin-top: 0.75rem;
+}
+
+.meros-site-form .meros-site-field,
+.meros-site-form .nice-form-group {
+	display: block;
+	width: 100%;
+	margin: 0;
+}
+
+.meros-site-form .meros-site-field input[type="text"],
+.meros-site-form .meros-site-field input[type="email"],
+.meros-site-form .meros-site-field input[type="url"],
+.meros-site-form .meros-site-field input[type="number"],
+.meros-site-form .meros-site-field input[type="password"],
+.meros-site-form .meros-site-field input[type="search"],
+.meros-site-form .meros-site-field input[type="tel"],
+.meros-site-form .meros-site-field textarea,
+.meros-site-form .meros-site-field select {
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+.meros-site-form .meros-site-field input[type="checkbox"],
+.meros-site-form .meros-site-field input[type="radio"] {
+	width: auto;
+	max-width: none;
+	inline-size: 1rem;
+	block-size: 1rem;
+	min-inline-size: 1rem;
+	min-block-size: 1rem;
+	vertical-align: middle;
+}
+
+.meros-site-form .meros-site-field label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+@media (max-width: 980px) {
+	.meros-site-form-row > * {
+		flex-basis: calc((100% - 0.75rem) / 2);
+	}
+}
+
+@media (max-width: 640px) {
+	.meros-site-form-row > * {
+		flex-basis: 100%;
+	}
+
+	.meros-site-form-group {
+		padding: 0.75rem;
+	}
+}

@@ -66,9 +66,7 @@
         @if(($groupField->handle ?? null) === 'repeater')
             {!! $groupField->render(true, true, ['groupRowIndex' => $groupRowIndex, 'rowIndex' => $groupRowInnerIndex, 'fieldIndex' => $groupFieldIndex]) !!}
         @else
-            <div @change="$wire.updateFieldDefaultValue({{ $groupRowIndex }}, {{ $groupRowInnerIndex }}, {{ $groupFieldIndex }}, $event.target.multiple ? Array.from($event.target.options).filter(o => o.selected).map(o => o.value) : ($event.target.type === 'checkbox' ? $event.target.checked : $event.target.value))">
-                {!! $groupField->render() !!}
-            </div>
+            {!! $groupField->render() !!}
         @endif
     </div>
 @else
@@ -145,9 +143,7 @@
                 @if(($field->handle ?? null) === 'repeater')
                 {!! $field->render(true, true, ['groupRowIndex' => null, 'rowIndex' => $fieldRowIndex, 'fieldIndex' => $fieldIndex]) !!}
             @else
-                <div @change="$wire.updateFieldDefaultValue(null, {{ $fieldRowIndex }}, {{ $fieldIndex }}, $event.target.multiple ? Array.from($event.target.options).filter(o => o.selected).map(o => o.value) : ($event.target.type === 'checkbox' ? $event.target.checked : $event.target.value))">
-                    {!! $field->render() !!}
-                </div>
+                {!! $field->render() !!}
             @endif
         </div>
     </div>

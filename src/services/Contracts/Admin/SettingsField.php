@@ -210,7 +210,6 @@ final class SettingsField extends FeatureDefinition implements FieldParent {
         }
 
         $this->field = $field;
-        $this->field->class('meros-settings-field');
         $this->queue();
         return $this;
     }

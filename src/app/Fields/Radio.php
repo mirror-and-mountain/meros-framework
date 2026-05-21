@@ -40,6 +40,7 @@ class Radio extends Select {
         'multiple'       => false,
         'data-advanced'  => 'false',
         'data-allow-add' => 'false',
+        'type'           => 'radio',
     ];
 
     /**
@@ -61,6 +62,6 @@ class Radio extends Select {
      * @return string
      */
     public function getFieldComponent(): string {
-        return 'meros::fields.radio';
+        return 'meros::fields.choice';
     }
 }

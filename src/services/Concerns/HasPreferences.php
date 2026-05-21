@@ -45,9 +45,11 @@ trait HasPreferences {
             $this->defaultPreferences = [
                 ...$this->defaultPreferences,
                 'allow_installers_in_wp_admin' => true, // Whether to allow installation of packages and themes via WP Admin.
-                'default_site_field_style'     => 'nice', // The default field style for the site.
-                'default_admin_field_style'    => 'admin', // The default field style for the WP Admin.
-                'allow_field_style_override'   => true, // Whether to allow overriding the default field styles on a per-fieldgroup or per-form basis.
+
+                // Pending preferences to add for future releases:
+                // 'default_site_form_style'     => 'nice', // The default form style for the site.
+                // 'default_admin_form_style'    => 'admin', // The default form style for the WP Admin.
+                // 'allow_form_style_override'   => true, // Whether to allow overriding the default form styles on a per-form basis.
             ];
         }
     }

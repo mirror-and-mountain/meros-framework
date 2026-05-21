@@ -123,8 +123,7 @@ trait IsAdminFieldRegistrant {
     protected function makeFieldFrom(string $classOrId, array $props = []): Field {
         $field = Fields::checkout($this->provider)->makeFrom($classOrId, [
             'id'        => $this->name . '_field',
-            'name'      => $this->name,
-            'style'     => 'settings'
+            'name'      => $this->name
         ] + $props);
 
         $field->rootName($this->getRootName());
@@ -156,9 +155,7 @@ trait IsAdminFieldRegistrant {
         }
         
         $childFields = $this->getChildFields();
-
         $this->field->attach($childFields);
-        $this->field->style('settings');
     }
 
     /**

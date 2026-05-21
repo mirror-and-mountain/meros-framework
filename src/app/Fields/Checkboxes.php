@@ -33,6 +33,7 @@ class Checkboxes extends Select {
         'multiple'       => true,
         'data-advanced'  => 'false',
         'data-allow-add' => 'false',
+        'type'           => 'checkbox',
     ];
 
     /**
@@ -54,6 +55,6 @@ class Checkboxes extends Select {
      * @return string
      */
     public function getFieldComponent(): string {
-        return 'meros::fields.checkboxes';
+        return 'meros::fields.choice';
     }
 }

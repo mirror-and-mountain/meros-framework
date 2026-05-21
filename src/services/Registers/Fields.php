@@ -30,7 +30,6 @@ class Fields extends Register {
             'disabled'   => $props['disabled'] ?? false,
             'classList'  => $props['classList'] ?? [],
             'width'      => $props['width'] ?? 'full',
-            'style'      => $props['style'] ?? 'default',
         ];
     }
 }

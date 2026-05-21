@@ -1,4 +1,9 @@
-<input type="hidden" name="{{ $field->getName() }}" value="0">
+@php
+    $isSubField = $field->isSubField();
+    $name = $field->getName(!$isSubField);
+@endphp
+
+<input type="hidden" name="{{ $name }}" value="0">
 
 <input 
     type="checkbox"

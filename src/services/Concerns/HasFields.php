@@ -13,13 +13,13 @@ use MM\Meros\Services\Registers\Fields as FieldsRegister;
 use MM\Meros\Services\Contracts\Elements\FieldGroup;
 use MM\Meros\Services\Registers\FieldGroups as FieldGroupsRegister;
 
-use MM\Meros\Services\Contracts\Elements\FieldStyle;
-use MM\Meros\Services\Registers\FieldStyles as FieldStylesRegister;
+use MM\Meros\Services\Contracts\Elements\FormStyle;
+use MM\Meros\Services\Registers\FormStyles as FormStylesRegister;
 
 use MM\Meros\Facades\Forms;
 use MM\Meros\Facades\Fields;
 use MM\Meros\Facades\FieldGroups;
-use MM\Meros\Facades\FieldStyles;
+use MM\Meros\Facades\FormStyles;
 
 trait HasFields {
     /**
@@ -77,20 +77,20 @@ trait HasFields {
     }
 
     /**
-     * Retrieves a field style by handle or returns the field styles register if no handle is provided.
+     * Retrieves a form style by handle or returns the form styles register if no handle is provided.
      *
-     * @param string       $handle The handle of the field style to retrieve. If empty, the entire field styles register is returned.
+     * @param string       $handle The handle of the form style to retrieve. If empty, the entire form styles register is returned.
      * @param Closure|null $callback An optional callback used in the register's get() method.
      *
-     * @return FieldStyle|FieldStylesRegister|null The requested field style, the field styles register, or null if not found.
+     * @return FormStyle|FormStylesRegister|null The requested form style, the form styles register, or null if not found.
      */
-    protected function fieldStyles(string $handle = '', ?Closure $callback = null): FieldStyle|FieldStylesRegister|null {
+    protected function formStyles(string $handle = '', ?Closure $callback = null): FormStyle|FormStylesRegister|null {
         if (empty($handle)) {
-            return FieldStyles::checkout($this);
+            return FormStyles::checkout($this);
         }
 
         else {
-            return FieldStyles::checkout($this)->get($handle, $callback);
+            return FormStyles::checkout($this)->get($handle, $callback);
         }
     }
 
@@ -111,14 +111,14 @@ trait HasFields {
     }
 
     /**
-     * Alias of the fieldStyles() method for users who prefer the snake_case naming convention.
+     * Alias of the formStyles() method for users who prefer the snake_case naming convention.
      *
      * @param string       $handle
      * @param Closure|null $callback
      *
-     * @return FieldStyle|FieldStylesRegister|null
+     * @return FormStyle|FormStylesRegister|null
      */
-    protected function field_styles(string $handle = '', ?Closure $callback = null): FieldStyle|FieldStylesRegister|null {
-        return $this->fieldStyles($handle, $callback);
+    protected function form_styles(string $handle = '', ?Closure $callback = null): FormStyle|FormStylesRegister|null {
+        return $this->formStyles($handle, $callback);
     }
 }

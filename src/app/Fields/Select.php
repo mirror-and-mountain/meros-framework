@@ -243,10 +243,10 @@ class Select extends Field {
     public function toJson(bool $asString = false, string ...$flags): array|string {
         $json = parent::toJson();
         
-        $json['options']        = $this->getOptions();
-        $json['allowsMultiple'] = $this->allowsMultiple();
-        $json['allowsAdd']      = $this->allowsAdd();
-        $json['advanced']       = ($this->attributes['data-advanced'] ?? 'false') === 'true';
+        $json['properties']['options']        = $this->getOptions();
+        $json['properties']['allowsMultiple'] = $this->allowsMultiple();
+        $json['properties']['allowsAdd']      = $this->allowsAdd();
+        $json['properties']['advanced']       = ($this->attributes['data-advanced'] ?? 'false') === 'true';
         
         if ($asString) {
             return json_encode($json, ...$flags);

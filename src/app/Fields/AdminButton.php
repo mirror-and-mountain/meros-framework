@@ -12,12 +12,29 @@ class AdminButton extends Field {
      */
     public string $handle = 'admin_button';
 
+    /**
+     * The default classlist for the button.
+     *
+     * @var array
+     */
     protected array $classList = ['button', 'button-primary'];
 
+    /**
+     * Default attributes for the button.
+     *
+     * @var array
+     */
     protected array $attributes = [
         'href'   => '#',
         'target' => '_self',
     ];
+
+    /**
+     * Hide the button from the FormBuilder field list.
+     *
+     * @var boolean
+     */
+    final public static bool $showInFormBuilder = false;
 
 
     /***************************

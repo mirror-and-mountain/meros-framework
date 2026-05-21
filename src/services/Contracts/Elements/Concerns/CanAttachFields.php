@@ -17,13 +17,6 @@ trait CanAttachFields {
      */
     public array $fields = [];
 
-    /**
-     * The handle of the FieldStyle to use when rendering fields in this group.
-     *
-     * @var string
-     */
-    protected string $fieldStyle = 'nice';
-
     /***************************
      * Public Chainable methods
      ***************************/
@@ -48,7 +41,6 @@ trait CanAttachFields {
                     }
                 }
                 $field->parent($this);
-                $field->style($this->fieldStyle);
             });
 
         } else {
@@ -60,7 +52,6 @@ trait CanAttachFields {
                 }
             }
             $field->parent($this);
-            $field->style($this->fieldStyle);
             $this->fields[] = $field;
         }
 
@@ -170,22 +161,6 @@ trait CanAttachFields {
         return $this->field($fieldIdOrClass, $callback, $props);
     }
 
-    /**
-     * Sets the handle of the FieldStyle to use when rendering fields in this group.
-     *
-     * @param string $handle The handle of the FieldStyle (e.g. 'settings').
-     *
-     * @return self
-     */
-    public function style(string $handle): self {
-        $this->fieldStyle = $handle;
-
-        $this->walkFields(function(Field $field) use ($handle) {
-            $field->style($handle);
-        });
-
-        return $this;
-    }
         
     /***************************
      * Helpers
@@ -202,7 +177,6 @@ trait CanAttachFields {
                 // Instantiate the field if it's a string (class name)
                 $this->fields[$index] = FieldsRegister::checkout($this->provider)->makeFrom($field);
                 $this->fields[$index]->parent($this);
-                $this->fields[$index]->style($this->fieldStyle);
             }
         }
     }
