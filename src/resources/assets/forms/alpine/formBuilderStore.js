@@ -1,7 +1,18 @@
-export function registerFormBuilderStore() {
+import { merosHydrateQuillContent } from '../richtext.js';
+
+export default function registerFormBuilderStore() {
     const store = {
         rowsUpdater: null,
+        repeaterEditCallback: null,
+        repeaterFieldMoveCallback: null,
+        repeaterFieldAddCallback: null,
+        repeaterFieldUpdateCallback: null,
+        repeaterUpdateValueCallback: null,
+        repeaterID: null,
+        repeaterFieldID: null,
         rows: [],
+        richTextPayloads: [],
+        activeField: null,
         isDragging: false,
         isCanvasDrag: false,
         itemKind: null,
@@ -19,9 +30,35 @@ export function registerFormBuilderStore() {
             this.rowsUpdater = typeof updater === 'function' ? updater : null;
         },
 
+        // Callbacks for repeater field editing, moving, and adding
+        setRepeaterEditCallback(callback) {
+            this.repeaterEditCallback = typeof callback === 'function' ? callback : null;
+        },
+
+        setRepeaterFieldMoveCallback(callback) {
+            this.repeaterFieldMoveCallback = typeof callback === 'function' ? callback : null;
+        },
+
+        setRepeaterFieldAddCallback(callback) {
+            this.repeaterFieldAddCallback = typeof callback === 'function' ? callback : null;
+        },
+
+        setRepeaterFieldUpdateCallback(callback) {
+            this.repeaterFieldUpdateCallback = typeof callback === 'function' ? callback : null;
+        },
+
+        setRepeaterUpdateValueCallback(callback) {
+            this.repeaterUpdateValueCallback = typeof callback === 'function' ? callback : null;
+        },
+
         // Sets the rows object
         setRows(rows) {
             this.rows = rows;
+        },
+
+        // Sets the rich text payloads
+        setRichTextPayloads(payloads) {
+            this.richTextPayloads = payloads;
         },
 
         // Utility to create a deep clone of the rows for safe mutation
@@ -45,7 +82,7 @@ export function registerFormBuilderStore() {
             }
         },
 
-        // Commits y
+        // Commits mutated rows to Livewire and the store.
         commitRows(mutator) {
             const nextRows = this.cloneRows();
             mutator(nextRows);
@@ -56,14 +93,16 @@ export function registerFormBuilderStore() {
             }
         },
 
+        // Utility to generate unique IDs for fields and groups.
         makeId() {
             if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-                return crypto.randomUUID();
+                return `field_${crypto.randomUUID().substring(0, 8)}`;
             }
 
-            return `id-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+            return `field_${Date.now().toString().substring(0, 8)}`;
         },
 
+        // Utility to convert a handle into a human-readable label.
         humanizeHandle(handle) {
             return String(handle ?? '')
                 .replace(/[-_]+/g, ' ')
@@ -71,6 +110,7 @@ export function registerFormBuilderStore() {
                 .replace(/\b\w/g, letter => letter.toUpperCase());
         },
 
+        // Utility to convert a label into a slug suitable for field names.
         slugify(value) {
             return String(value ?? '')
                 .trim()
@@ -79,6 +119,7 @@ export function registerFormBuilderStore() {
                 .replace(/^_+|_+$/g, '');
         },
 
+        // Creates a new field payload based on the handle and current item label or field label.
         createFieldPayload(handle) {
             const safeHandle = String(handle ?? '').trim();
             const label = this.fieldLabel ?? this.itemLabel ?? this.humanizeHandle(safeHandle) ?? 'Field';
@@ -98,52 +139,41 @@ export function registerFormBuilderStore() {
                 },
             };
 
-            // Make a default field payload for repeaters.
-            if (safeHandle === 'repeater') {
-                payload.properties.rows = [];
-                payload.fields = [
-                    {
-                        handle: 'text', properties: {
-                            'label': 'Text',
-                            id: this.makeId(),
-                            name: 'text'
-                        }
-                    },
-                    {
-                        handle: 'number', properties: {
-                            'label': 'Number',
-                            id: this.makeId(),
-                            name: 'number'
-                        }
-                    },
-                    {
-                        handle: 'checkbox', properties: {
-                            'label': 'Checkbox',
-                            id: this.makeId(),
-                            name: 'checkbox'
-                        }
-                    }
-                ];
-            }
-
-            // Adjust payload for selection-based fields.
-            if (safeHandle === 'select' || safeHandle === 'radio' || safeHandle === 'checkboxes' || safeHandle === 'multiselect') {
-                payload.properties.options = [];
+            // Adjust payload for choice fields.
+            if (this.isChoiceField(safeHandle)) {
+                payload.properties.options = {};
             }
 
             // Adjust payload for multi-value fields.
-            if (safeHandle === 'multiselect' || safeHandle === 'checkboxes') {
+            if (this.isMultipleChoiceField(safeHandle)) {
                 payload.properties.value = [];
             }
 
             // Adjust payload for text-based fields.
-            if (safeHandle === 'text' || safeHandle === 'email' || safeHandle === 'tel' || safeHandle === 'url' || safeHandle === 'number') {
+            if (this.isInputField(safeHandle)) {
                 payload.properties.placeholder = '';
             }
 
             return payload;
         },
 
+        isInputField(handle) {
+            return ['text', 'email', 'tel', 'url', 'number'].includes(handle);
+        },
+
+        isChoiceField(handle) {
+            return ['select', 'radio', 'checkboxes', 'multi_select'].includes(handle);
+        },
+
+        isSingleChoiceField(handle) {
+            return ['select', 'radio'].includes(handle);
+        },
+
+        isMultipleChoiceField(handle) {
+            return ['checkboxes', 'multi_select'].includes(handle);
+        },
+
+        // Utility to create a new top-level fields row with optional initial fields.
         createFieldsRow(fields = []) {
             return {
                 _type: 'fields',
@@ -151,6 +181,7 @@ export function registerFormBuilderStore() {
             };
         },
 
+        // Utility to create a new group row with an optional handle to generate the title from.
         createGroupRow(handle = '') {
             const title = this.itemLabel ?? this.humanizeHandle(handle);
 
@@ -166,6 +197,7 @@ export function registerFormBuilderStore() {
             };
         },
 
+        // Retrieves the top-level fields row at the specified index, ensuring it has the correct structure.
         getTopRow(rows, rowIndex) {
             const row = rows[rowIndex];
 
@@ -182,6 +214,7 @@ export function registerFormBuilderStore() {
             return row;
         },
 
+        // Retrieves the group row at the specified index, ensuring it has the correct structure.
         getGroup(rows, groupRowIndex) {
             const row = rows[groupRowIndex];
 
@@ -196,6 +229,7 @@ export function registerFormBuilderStore() {
             return row.group;
         },
 
+        // Resolves a requested index against a length, ensuring it's a valid integer within bounds, and falling back to a default if not.
         resolveIndex(length, requestedIndex, fallback = length) {
             if (!Number.isInteger(requestedIndex)) {
                 return fallback;
@@ -212,6 +246,7 @@ export function registerFormBuilderStore() {
             return requestedIndex;
         },
 
+        // Ensures the specified inner row exists within a group, creating it if necessary.
         ensureGroupInnerRow(group, innerRowIndex) {
             const insertIndex = this.resolveIndex(group.rows.length, innerRowIndex, group.rows.length);
 
@@ -229,6 +264,7 @@ export function registerFormBuilderStore() {
             };
         },
 
+        // Extracts a field from a top-level row, returning the extracted field and metadata about its original location.
         extractTopField(rows, rowIndex, fieldIndex) {
             const row = this.getTopRow(rows, rowIndex);
 
@@ -261,6 +297,7 @@ export function registerFormBuilderStore() {
             };
         },
 
+        // Extracts a field from a group row, returning the extracted field and metadata about its original location.
         extractGroupField(rows, groupRowIndex, innerRowIndex, fieldIndex) {
             const group = this.getGroup(rows, groupRowIndex);
 
@@ -300,11 +337,62 @@ export function registerFormBuilderStore() {
             };
         },
 
+        // Finds a top-level field without mutating rows.
+        findTopField(rows, rowIndex, fieldIndex) {
+            const row = this.getTopRow(rows, rowIndex);
+
+            if (!row) {
+                return null;
+            }
+
+            if (!Number.isInteger(fieldIndex) || fieldIndex < 0 || fieldIndex >= row.fields.length) {
+                return null;
+            }
+
+            return row.fields[fieldIndex] ?? null;
+        },
+
+        // Finds a group field without mutating rows.
+        findGroupField(rows, groupRowIndex, innerRowIndex, fieldIndex) {
+            const group = this.getGroup(rows, groupRowIndex);
+
+            if (!group) {
+                return null;
+            }
+
+            const innerRow = group.rows[innerRowIndex];
+
+            if (!innerRow || !Array.isArray(innerRow.fields)) {
+                return null;
+            }
+
+            if (!Number.isInteger(fieldIndex) || fieldIndex < 0 || fieldIndex >= innerRow.fields.length) {
+                return null;
+            }
+
+            return innerRow.fields[fieldIndex] ?? null;
+        },
+
+        // Normalises nested repeater sub-fields so lookups tolerate array-like payloads.
+        getRepeaterSubFields(field) {
+            if (Array.isArray(field?.fields)) {
+                return field.fields;
+            }
+
+            if (field?.fields && typeof field.fields === 'object') {
+                return Object.values(field.fields).filter(Boolean);
+            }
+
+            return [];
+        },
+
+        // Inserts a field as a new top-level row at the specified index.
         insertFieldAsNewTopRow(rows, targetRowIndex, field) {
             const insertIndex = this.resolveIndex(rows.length, (targetRowIndex ?? -1) + 1, rows.length);
             rows.splice(insertIndex, 0, this.createFieldsRow([field]));
         },
 
+        // Inserts a field as a new row within the target group at the specified group and inner row indices.
         insertFieldAsNewGroupRow(rows, targetGroupRowIndex, targetInnerRowIndex, field) {
             const targetGroup = this.getGroup(rows, targetGroupRowIndex);
 
@@ -316,6 +404,7 @@ export function registerFormBuilderStore() {
             targetGroup.rows.splice(insertIndex, 0, { fields: [field] });
         },
 
+        // Inserts a field into an existing row within the target group at the specified group, inner row, and field indices.
         insertFieldIntoGroupRow(rows, targetGroupRowIndex, targetInnerRowIndex, targetFieldIndex, field) {
             const targetGroup = this.getGroup(rows, targetGroupRowIndex);
 
@@ -328,6 +417,21 @@ export function registerFormBuilderStore() {
             targetInnerRow.fields.splice(insertIndex, 0, field);
         },
 
+        // Adjust target group index when extracting a top-level field removes its source row.
+        adjustTargetGroupRowIndexAfterTopExtraction(extracted, sourceRowIndex, targetGroupRowIndex) {
+            if (
+                extracted?.removedSourceRow
+                && Number.isInteger(sourceRowIndex)
+                && Number.isInteger(targetGroupRowIndex)
+                && sourceRowIndex < targetGroupRowIndex
+            ) {
+                return targetGroupRowIndex - 1;
+            }
+
+            return targetGroupRowIndex;
+        },
+
+        // Inserts a field into an existing top-level row at the specified row and field indices.
         insertFieldIntoTopRow(rows, targetRowIndex, targetFieldIndex, field) {
             let targetRow = this.getTopRow(rows, targetRowIndex);
 
@@ -348,12 +452,13 @@ export function registerFormBuilderStore() {
         // -----------------------------------------------------------------
         // Drag lifecycle handlers
         // -----------------------------------------------------------------
-        startDrag(kind, handle, label) {
+        startDrag(kind, handle, label, repeaterId = null) {
             this.isDragging = true;
             this.isCanvasDrag = false;
             this.itemKind = kind;
             this.itemHandle = handle;
             this.itemLabel = label;
+            this.repeaterID = repeaterId;
             this.fieldType = kind === 'field' ? handle : null;
             this.fieldLabel = label;
             this.sourceRowIndex = null;
@@ -390,6 +495,15 @@ export function registerFormBuilderStore() {
             this.sourceGroupInnerRowIndex = rowIndex;
         },
 
+        startRepeaterFieldCanvasDrag(repeaterId, fieldId, fieldIndex) {
+            this.isDragging = true;
+            this.isCanvasDrag = true;
+            this.itemKind = 'field';
+            this.repeaterID = repeaterId;
+            this.repeaterFieldID = fieldId;
+            this.sourceFieldIndex = fieldIndex;
+        },
+
         endDrag() {
             this.isDragging = false;
             this.isCanvasDrag = false;
@@ -402,6 +516,7 @@ export function registerFormBuilderStore() {
             this.sourceFieldIndex = null;
             this.sourceGroupRowIndex = null;
             this.sourceGroupInnerRowIndex = null;
+            this.repeaterID = null;
         },
 
         // -----------------------------------------------------------------
@@ -530,6 +645,18 @@ export function registerFormBuilderStore() {
             });
         },
 
+        handleEmptyRepeaterCanvasDrop(zoneElement) {
+            this.hideEmptyCanvasHighlight(zoneElement);
+
+            if (!this.repeaterID || !this.fieldType || !this.canDropField()) {
+                return;
+            }
+
+            if (this.repeaterFieldAddCallback) {
+                this.repeaterFieldAddCallback(this.repeaterID, this.fieldType, 0);
+            }
+        },
+
         // Determine if the currently dragged item can be dropped on a canvas row gap.
         canDropOnCanvasRowGap(event) {
             return this.itemKind === 'group'
@@ -641,6 +768,22 @@ export function registerFormBuilderStore() {
             this.moveFieldToCanvasNewRow(fieldRowIndex);
         },
 
+        handleRepeaterFieldGapDrop(event, gapElement, newIndex) {
+            this.hideRowGap(gapElement);
+
+            if (!this.canDropField()) {
+                return;
+            }
+
+            if (this.repeaterFieldMoveCallback && this.repeaterID && this.repeaterFieldID) {
+                this.repeaterFieldMoveCallback(this.repeaterID, this.repeaterFieldID, newIndex);
+            } 
+            
+            else if (this.repeaterFieldAddCallback && this.repeaterID && this.fieldType) {
+                this.repeaterFieldAddCallback(this.repeaterID, this.fieldType, newIndex);
+            }
+        },
+
         // -----------------------------------------------------------------
         // Group row handlers
         // -----------------------------------------------------------------
@@ -706,7 +849,13 @@ export function registerFormBuilderStore() {
                         return;
                     }
 
-                    this.insertFieldAsNewGroupRow(rows, targetGroupRowIndex, targetInnerRowIndex, extracted.field);
+                    const adjustedTargetGroupRowIndex = this.adjustTargetGroupRowIndexAfterTopExtraction(
+                        extracted,
+                        this.sourceRowIndex,
+                        targetGroupRowIndex,
+                    );
+
+                    this.insertFieldAsNewGroupRow(rows, adjustedTargetGroupRowIndex, targetInnerRowIndex, extracted.field);
                 });
                 return;
             }
@@ -816,7 +965,19 @@ export function registerFormBuilderStore() {
                         return;
                     }
 
-                    this.insertFieldIntoGroupRow(rows, targetGroupRowIndex, targetInnerRowIndex, targetFieldIndex, extracted.field);
+                    const adjustedTargetGroupRowIndex = this.adjustTargetGroupRowIndexAfterTopExtraction(
+                        extracted,
+                        this.sourceRowIndex,
+                        targetGroupRowIndex,
+                    );
+
+                    this.insertFieldIntoGroupRow(
+                        rows,
+                        adjustedTargetGroupRowIndex,
+                        targetInnerRowIndex,
+                        targetFieldIndex,
+                        extracted.field,
+                    );
                 });
                 return;
             }
@@ -867,7 +1028,7 @@ export function registerFormBuilderStore() {
 
                     let adjustedTargetRowIndex = targetRowIndex;
 
-                    if (this.sourceRowIndex < adjustedTargetRowIndex) {
+                    if (extracted.removedSourceRow && this.sourceRowIndex < adjustedTargetRowIndex) {
                         adjustedTargetRowIndex -= 1;
                     }
 
@@ -917,6 +1078,12 @@ export function registerFormBuilderStore() {
 
         // Remove a top-level group row.
         removeGroup(groupRowIndex) {
+            if (!confirm('Are you sure you want to delete this group and all of its fields? This action cannot be undone.')) {
+                return;
+            }
+
+            this.activeField = null;
+
             this.commitRows(rows => {
                 if (!Number.isInteger(groupRowIndex) || groupRowIndex < 0 || groupRowIndex >= rows.length) {
                     return;
@@ -934,6 +1101,16 @@ export function registerFormBuilderStore() {
         
         // Handle field removals from the canvas or groups.
         removeField(sourceRowIndex, sourceFieldIndex, sourceGroupRowIndex = null, sourceGroupInnerRowIndex = null) {
+            if (!confirm('Are you sure you want to delete this field? This action cannot be undone.')) {
+                return;
+            }
+
+            const field = this.findTopField(this.rows, sourceRowIndex, sourceFieldIndex);
+            
+            if (field && this.activeField?.id === field.properties.id) {
+                this.activeField = null;
+            }
+
             this.commitRows(rows => {
                 if (sourceGroupRowIndex !== null && sourceGroupInnerRowIndex !== null) {
                     this.extractGroupField(rows, sourceGroupRowIndex, sourceGroupInnerRowIndex, sourceFieldIndex);
@@ -942,356 +1119,219 @@ export function registerFormBuilderStore() {
                 }
             });
         },
-    };
 
-    Alpine.store('formBuilder', store);
-}
+        // -----------------------------------------------------------------
+        // Field / Group editing handlers
+        // -----------------------------------------------------------------
 
-export function registerRepeaterFieldStore() {
-    const store = {
-        parseIndex(value) {
-            if (value === null || value === undefined || value === '' || value === 'null') {
+        // Set the currently editing field to a group, opening the field setting panel for that group.
+        editGroup(groupRowIndex) {
+            const group = this.getGroup(this.rows, groupRowIndex);
+
+            if (!group) {
+                return;
+            }
+
+            this.activeField = {
+                handle: 'group',
+                title: group.title,
+                description: group.description,
+                sourceGroupRowIndex: groupRowIndex,
+            };
+
+            const descriptionEditorEl = document.getElementById('group-description-editor');
+
+            if (descriptionEditorEl) {
+                const description = group.description || '';
+                merosHydrateQuillContent(descriptionEditorEl, description === '' ? JSON.stringify([{ insert: '\n' }]) : description);
+            }
+        },
+
+        // Set the currently editing field, opening the field setting panel for that field (or group)
+        editField(sourceRowIndex, sourceFieldIndex, sourceGroupRowIndex = null, sourceGroupInnerRowIndex = null) {
+            let field = null;
+
+            if (sourceGroupRowIndex !== null && sourceGroupInnerRowIndex !== null) {
+                field = this.findGroupField(this.rows, sourceGroupRowIndex, sourceGroupInnerRowIndex, sourceFieldIndex);
+            } else {
+                field = this.findTopField(this.rows, sourceRowIndex, sourceFieldIndex);
+            }
+
+            if (!field) {
+                return;
+            }
+
+            if (field.handle === 'repeater') {
+                if (this.repeaterEditCallback) {
+                    this.activeField = null;
+                    this.repeaterEditCallback(field.properties.id);
+                }
+                return;
+            }
+
+            this.activeField = {
+                handle: field.handle,
+                ...field.properties,
+                sourceRowIndex,
+                sourceFieldIndex,
+                sourceGroupRowIndex,
+                sourceGroupInnerRowIndex,
+            };
+        },
+
+        // Sets the active field to a nested repeater field.
+        editRepeaterField(repeaterId, fieldId, fieldIndex) {
+            this.repeaterID = repeaterId;
+            this.repeaterFieldID = fieldId;
+
+            const field = this.getRepeaterField(repeaterId, fieldId);
+            
+            if (!field) {
+                return;
+            }
+
+            this.activeField = {
+                handle: field.handle,
+                ...field.properties,
+                repeaterID: repeaterId,
+                repeaterFieldID: fieldId,
+                sourceFieldIndex: fieldIndex,
+            };
+        },
+
+        // Updates the default value of a repeater.
+        updateRepeaterDefaultValue(repeaterId) {
+            this.repeaterID = repeaterId;
+            const repeaterEl = document.getElementById(repeaterId);
+            
+            if (!repeaterEl || !this.repeaterUpdateValueCallback) {
+                return;
+            }
+
+            const value = Alpine.store('repeaterField').getRepeaterValue(repeaterEl);
+
+            if (value === false || !Array.isArray(value)) {
+                return;
+            }
+
+            this.repeaterUpdateValueCallback(this.repeaterID, value);
+        },
+
+        // Retrieves a nested field from a given repeater by its ID.
+        getRepeaterField(repeaterId, fieldId) {
+            if (this.rows.length === 0) {
                 return null;
             }
 
-            const parsedValue = Number(value);
+            for (const row of this.rows) {
+                if (row._type === 'group') {
+                    const group = row.group;
+                    for (const innerRow of group.rows) {
+                        if (!innerRow.fields || !Array.isArray(innerRow.fields)) {
+                            continue;
+                        }
 
-            return Number.isInteger(parsedValue) ? parsedValue : null;
-        },
+                        for (const field of innerRow.fields) {
+                            if (field.handle === 'repeater' && field.properties.id === repeaterId) {
+                                const targetField = this.getRepeaterSubFields(field).find(f => f?.properties?.id === fieldId);
 
-        getFormBuilderStore() {
-            return Alpine.store('formBuilder') ?? null;
-        },
+                                if (targetField) {
+                                    return targetField;
+                                }
+                            }
+                        }
+                    }
+                } else if (row._type === 'fields') {
+                    for (const field of row.fields) {
+                        if (field.handle === 'repeater' && field.properties.id === repeaterId) {
+                            const targetField = this.getRepeaterSubFields(field).find(f => f?.properties?.id === fieldId);
 
-        showRowGap(gapElement) {
-            if (!gapElement) {
-                return;
-            }
-
-            gapElement.style.height = '2rem';
-            gapElement.classList.add('bg-blue-200');
-        },
-
-        hideRowGap(gapElement) {
-            if (!gapElement) {
-                return;
-            }
-
-            gapElement.style.height = '';
-            gapElement.classList.remove('bg-blue-200');
-        },
-
-        startRowDrag(event, rowIndex) {
-            const safeRowIndex = this.parseIndex(rowIndex);
-
-            if (!event?.dataTransfer || safeRowIndex === null) {
-                return;
-            }
-
-            event.dataTransfer.effectAllowed = 'move';
-            event.dataTransfer.setData('application/x-meros-field-repeater-row', String(safeRowIndex));
-            event.dataTransfer.setData('text/plain', String(safeRowIndex));
-        },
-
-        getRowIndexFromTransfer(event) {
-            if (!event?.dataTransfer) {
-                return null;
-            }
-
-            const transferTypes = [
-                'application/x-meros-field-repeater-row',
-                'text/plain',
-            ];
-
-            for (const type of transferTypes) {
-                const value = Number(event.dataTransfer.getData(type));
-
-                if (!Number.isNaN(value)) {
-                    return value;
+                            if (targetField) {
+                                return targetField;
+                            }
+                        }
+                    }
                 }
             }
 
             return null;
         },
 
-        normalizeLocation(rowIndex, fieldIndex, groupRowIndex) {
-            return {
-                rowIndex: this.parseIndex(rowIndex),
-                fieldIndex: this.parseIndex(fieldIndex),
-                groupRowIndex: this.parseIndex(groupRowIndex),
-            };
-        },
-
-        resolveRepeaterField(rows, location) {
-            const { rowIndex, fieldIndex, groupRowIndex } = location;
-
-            if (fieldIndex === null) {
-                return null;
-            }
-
-            let fieldPayload = null;
-
-            if (groupRowIndex !== null) {
-                const topRow = rows[groupRowIndex];
-
-                if (!topRow || topRow._type !== 'group' || !topRow.group || !Array.isArray(topRow.group.rows)) {
-                    return null;
-                }
-
-                if (rowIndex === null) {
-                    return null;
-                }
-
-                const groupInnerRow = topRow.group.rows[rowIndex];
-
-                if (!groupInnerRow || !Array.isArray(groupInnerRow.fields)) {
-                    return null;
-                }
-
-                fieldPayload = groupInnerRow.fields[fieldIndex] ?? null;
-            } else {
-                if (rowIndex === null) {
-                    return null;
-                }
-
-                const topRow = rows[rowIndex];
-
-                if (!topRow || topRow._type === 'group' || !Array.isArray(topRow.fields)) {
-                    return null;
-                }
-
-                fieldPayload = topRow.fields[fieldIndex] ?? null;
-            }
-
-            if (!fieldPayload || fieldPayload.handle !== 'repeater') {
-                return null;
-            }
-
-            if (!fieldPayload.properties || typeof fieldPayload.properties !== 'object') {
-                fieldPayload.properties = {};
-            }
-
-            if (!Array.isArray(fieldPayload.properties.value)) {
-                fieldPayload.properties.value = [];
-            }
-
-            return fieldPayload;
-        },
-
-        extractRowValue(cellElement, event) {
-            const target = event?.target;
-
-            if (!target) {
-                return null;
-            }
-
-            if (target.type === 'checkbox') {
-                const checkboxInputs = cellElement
-                    ? Array.from(cellElement.querySelectorAll('input[type="checkbox"]'))
-                    : [];
-
-                if (checkboxInputs.length > 1) {
-                    return checkboxInputs
-                        .filter(checkboxInput => checkboxInput.checked)
-                        .map(checkboxInput => checkboxInput.value);
-                }
-
-                return target.checked;
-            }
-
-            if (target.type === 'radio') {
-                const checkedRadio = cellElement
-                    ? cellElement.querySelector('input[type="radio"]:checked')
-                    : null;
-
-                return checkedRadio ? checkedRadio.value : null;
-            }
-
-            if (target.multiple) {
-                return Array.from(target.options)
-                    .filter(option => option.selected)
-                    .map(option => option.value);
-            }
-
-            return target.value;
-        },
-
-        createRowKey() {
-            if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-                return `rk-${crypto.randomUUID()}`;
-            }
-
-            return `rk-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
-        },
-
-        createEmptyRepeaterRow(fieldPayload) {
-            const row = {
-                __rowKey: this.createRowKey(),
-            };
-
-            const columns = Array.isArray(fieldPayload.fields) ? fieldPayload.fields : [];
-
-            columns.forEach(column => {
-                const columnName = column?.properties?.name;
-
-                if (typeof columnName === 'string' && columnName.trim() !== '') {
-                    row[columnName] = null;
-                }
-            });
-
-            return row;
-        },
-
-        addRow(rowIndex, fieldIndex, groupRowIndex = null) {
-            const formBuilder = this.getFormBuilderStore();
-
-            if (!formBuilder) {
+        updateActiveGroupProperty(property, value) {
+            if (!this.activeField || this.activeField.handle !== 'group') {
                 return;
             }
 
-            const location = this.normalizeLocation(rowIndex, fieldIndex, groupRowIndex);
+            if (property !== 'title' && property !== 'description') {
+                return;
+            }
 
-            formBuilder.commitRows(rows => {
-                const repeaterField = this.resolveRepeaterField(rows, location);
+            const nextValue = Array.isArray(value)
+                ? [...value]
+                : (value && typeof value === 'object' ? { ...value } : value);
 
-                if (!repeaterField) {
+            this.activeField[property] = nextValue;
+
+            const { sourceGroupRowIndex } = this.activeField;
+
+            this.commitRows(rows => {
+                const group = this.getGroup(rows, sourceGroupRowIndex);
+
+                if (!group) {
                     return;
                 }
 
-                repeaterField.properties.value.push(this.createEmptyRepeaterRow(repeaterField));
+                group[property] = nextValue;
             });
         },
 
-        removeRow(rowIndex, fieldIndex, groupRowIndex = null, repeaterRowIndex = null) {
-            const formBuilder = this.getFormBuilderStore();
-
-            if (!formBuilder) {
+        // Updates a property in the current active field.
+        updateActiveFieldProperty(property, value) {
+            if (!this.activeField) {
                 return;
             }
 
-            const location = this.normalizeLocation(rowIndex, fieldIndex, groupRowIndex);
-            const safeRepeaterRowIndex = this.parseIndex(repeaterRowIndex);
+            const nextValue = Array.isArray(value)
+                ? [...value]
+                : (value && typeof value === 'object' ? { ...value } : value);
 
-            if (safeRepeaterRowIndex === null) {
+            this.activeField[property] = nextValue;
+
+            if (this.repeaterID && this.repeaterFieldID && this.repeaterFieldUpdateCallback) {
+                this.repeaterFieldUpdateCallback(this.repeaterID, this.repeaterFieldID, property, nextValue);
                 return;
             }
 
-            formBuilder.commitRows(rows => {
-                const repeaterField = this.resolveRepeaterField(rows, location);
+            const {
+                sourceRowIndex,
+                sourceFieldIndex,
+                sourceGroupRowIndex,
+                sourceGroupInnerRowIndex,
+            } = this.activeField;
 
-                if (!repeaterField) {
+            this.commitRows(rows => {
+                let field = null;
+
+                if (sourceGroupRowIndex !== null && sourceGroupInnerRowIndex !== null) {
+                    field = this.findGroupField(rows, sourceGroupRowIndex, sourceGroupInnerRowIndex, sourceFieldIndex);
+                } else {
+                    field = this.findTopField(rows, sourceRowIndex, sourceFieldIndex);
+                }
+
+                if (!field) {
                     return;
                 }
 
-                if (safeRepeaterRowIndex < 0 || safeRepeaterRowIndex >= repeaterField.properties.value.length) {
-                    return;
+                if (typeof field.properties !== 'object' || field.properties === null) {
+                    field.properties = {};
                 }
 
-                repeaterField.properties.value.splice(safeRepeaterRowIndex, 1);
+                field.properties[property] = Array.isArray(nextValue)
+                    ? [...nextValue]
+                    : (nextValue && typeof nextValue === 'object' ? { ...nextValue } : nextValue);
             });
-        },
-
-        updateRowValue(rowIndex, fieldIndex, groupRowIndex = null, repeaterRowIndex = null, fieldName = '', cellElement = null, event = null) {
-            const formBuilder = this.getFormBuilderStore();
-
-            if (!formBuilder) {
-                return;
-            }
-
-            const location = this.normalizeLocation(rowIndex, fieldIndex, groupRowIndex);
-            const safeRepeaterRowIndex = this.parseIndex(repeaterRowIndex);
-
-            if (safeRepeaterRowIndex === null || typeof fieldName !== 'string' || fieldName.trim() === '') {
-                return;
-            }
-
-            const value = this.extractRowValue(cellElement, event);
-
-            formBuilder.commitRows(rows => {
-                const repeaterField = this.resolveRepeaterField(rows, location);
-
-                if (!repeaterField) {
-                    return;
-                }
-
-                const repeaterRows = repeaterField.properties.value;
-
-                if (safeRepeaterRowIndex < 0 || safeRepeaterRowIndex >= repeaterRows.length) {
-                    return;
-                }
-
-                const existingRow = repeaterRows[safeRepeaterRowIndex];
-
-                if (!existingRow || typeof existingRow !== 'object') {
-                    return;
-                }
-
-                existingRow[fieldName] = value;
-            });
-        },
-
-        handleRowGapDragOver(gapElement) {
-            this.showRowGap(gapElement);
-        },
-
-        handleRowGapDrop(event, gapElement, rowIndex, fieldIndex, groupRowIndex = null, targetIndex = null) {
-            this.hideRowGap(gapElement);
-
-            const sourceIndex = this.getRowIndexFromTransfer(event);
-            const safeTargetIndex = this.parseIndex(targetIndex);
-
-            if (sourceIndex === null || safeTargetIndex === null) {
-                return;
-            }
-
-            this.moveRow(rowIndex, fieldIndex, groupRowIndex, sourceIndex, safeTargetIndex);
-        },
-
-        moveRow(rowIndex, fieldIndex, groupRowIndex = null, sourceIndex = null, targetIndex = null) {
-            const formBuilder = this.getFormBuilderStore();
-
-            if (!formBuilder) {
-                return;
-            }
-
-            const location = this.normalizeLocation(rowIndex, fieldIndex, groupRowIndex);
-            const safeSourceIndex = this.parseIndex(sourceIndex);
-            const safeTargetIndex = this.parseIndex(targetIndex);
-
-            if (safeSourceIndex === null || safeTargetIndex === null) {
-                return;
-            }
-
-            formBuilder.commitRows(rows => {
-                const repeaterField = this.resolveRepeaterField(rows, location);
-
-                if (!repeaterField) {
-                    return;
-                }
-
-                const repeaterRows = repeaterField.properties.value;
-
-                if (safeSourceIndex < 0 || safeSourceIndex >= repeaterRows.length) {
-                    return;
-                }
-
-                const [movingRow] = repeaterRows.splice(safeSourceIndex, 1);
-
-                if (!movingRow) {
-                    return;
-                }
-
-                let insertAt = Math.max(0, Math.min(safeTargetIndex, repeaterRows.length + 1));
-
-                if (safeTargetIndex > safeSourceIndex) {
-                    insertAt -= 1;
-                }
-
-                insertAt = Math.max(0, Math.min(insertAt, repeaterRows.length));
-                repeaterRows.splice(insertAt, 0, movingRow);
-            });
-        },
+        }
     };
 
-    Alpine.store('repeaterField', store);
+    Alpine.store('formBuilder', store);
 }

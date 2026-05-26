@@ -11,6 +11,13 @@ class Radio extends Select {
     public string $handle = 'radio';
 
     /**
+     * Whether to show the choices horizontally or vertically in the UI.
+     *
+     * @var string
+     */
+    protected string $layout = '';
+
+    /**
      * The category for the field, used for grouping in the UI.
      *
      * @var string
@@ -51,6 +58,15 @@ class Radio extends Select {
     protected array $compatibleDataTypes = [
         'string'
     ];
+
+    /**
+     * Retrieves the layout for the field, defaulting to 'vertical' if not set.
+     *
+     * @return string
+     */
+    public function getLayout(): string {
+        return empty($this->layout) ? 'vertical' : $this->layout;
+    }
 
 
     /***************************

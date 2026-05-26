@@ -4,7 +4,7 @@ namespace MM\Meros\App\Toolbox\Forms\Helpers;
 
 use Illuminate\Support\Str;
 
-class Normaliser {
+class Utilities {
     /**
      * Normalises a form schema's rows as compatible row payloads.
      *
@@ -20,7 +20,7 @@ class Normaliser {
                 continue;
             }
 
-            if (Hydrator::isGroupRow($row, 'type')) {
+            if (self::isGroupRow($row, 'type')) {
                 $normalisedRows[] = [
                     '_type' => 'group',
                     'group' => self::normaliseGroupPayload($row['group'])
@@ -38,6 +38,18 @@ class Normaliser {
     }
 
     /**
+     * Helper to determine if a given row payload is a group row.
+     *
+     * @param array  $rowPayload
+     * @param string $key
+     *
+     * @return boolean
+     */
+    public static function isGroupRow(array $rowPayload, string $key = '_type'): bool {
+        return ($rowPayload[$key] ?? null ) === 'group' && is_array($rowPayload['group'] ?? null);
+    }
+
+    /**
      * Normalises a group payload.
      *
      * @param array $group The group payload to normalise.
@@ -52,7 +64,7 @@ class Normaliser {
         }
 
         $normalisedGroup = [
-            'id'          => $group['id'] ?? Str::uuid()->toString(),
+            'id'          => $group['id'] ?? 'field_' . Str::substr(Str::uuid()->toString(), 0, 8),
             'handle'      => $group['handle'] ?? '',
             'title'       => $group['title'] ?? 'Untitled Section',
             'description' => $group['description'] ?? '',
@@ -94,40 +106,11 @@ class Normaliser {
                 !is_string($field['properties']['id']) || // Check ID is a string
                 trim($field['properties']['id']) === '' // Check ID is not empty
             ) {
-                $field['properties']['id'] = Str::uuid()->toString();
+                $field['properties']['id'] = 'field_' . Str::substr(Str::uuid()->toString(), 0, 8);
             }
 
             // Normalise repeater sub-fields if this is a repeater field.
             if ($handle === 'repeater') {
-                if (empty($field['fields']) || !is_array($field['fields'])) {
-                    // Create some default sub-fields
-                    $field['fields'][] = [
-                        'handle' => 'text',
-                        'properties' => [
-                            'name'  => 'text',
-                            'label' => 'Text',
-                            'id'    => Str::uuid()->toString()
-                        ]
-                    ];
-
-                    $field['fields'][] = [
-                        'handle' => 'number',
-                        'properties' => [
-                            'name'  => 'number',
-                            'label' => 'Number',
-                            'id'    => Str::uuid()->toString()
-                        ]
-                    ];
-
-                    $field['fields'][] = [
-                        'handle' => 'checkbox',
-                        'properties' => [
-                            'name'  => 'checkbox',
-                            'label' => 'Checkbox',
-                            'id'    => Str::uuid()->toString()
-                        ]
-                    ];
-                }
 
                 $field['fields'] = self::normaliseFieldPayloads($field['fields'] ?? []);
                 $field['properties']['value'] = self::normaliseRepeaterValueRows($field['properties']['value'] ?? []);

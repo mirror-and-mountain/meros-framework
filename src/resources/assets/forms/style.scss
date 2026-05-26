@@ -1,9 +1,23 @@
 @use 'nice-forms.css/dist/nice-forms.css';
+@use 'tom-select/dist/css/tom-select.css';
+@use 'repeaters.scss';
+
+.meros-site-form-container {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+}
+
+.meros-site-form-header {
+	.meros-site-form-description {
+		font-size: 1rem;
+		color: #4b5563;
+	}
+}
 
 .meros-site-form {
 	display: grid;
 	gap: 1rem;
-    padding: 2rem;
 }
 
 .meros-site-form-row {
@@ -11,6 +25,7 @@
 	flex-wrap: wrap;
 	gap: 0.75rem;
 	align-items: stretch;
+	margin-bottom: 1.5rem;
 }
 
 .meros-site-form-row > * {
@@ -40,7 +55,16 @@
 }
 
 .meros-site-form-group-header {
-	margin-bottom: 0.75rem;
+	margin-bottom: 1.25rem;
+
+	a {
+		color: #3b82f6;
+		text-decoration: underline;
+
+		&:hover {
+			color: #2563eb;
+		}
+	}
 }
 
 .meros-site-form-group-header h3 {
@@ -60,29 +84,24 @@
 	margin-top: 0.75rem;
 }
 
-.meros-site-form .meros-site-field,
-.meros-site-form .nice-form-group {
-	display: block;
-	width: 100%;
-	margin: 0;
-}
-
-.meros-site-form .meros-site-field input[type="text"],
-.meros-site-form .meros-site-field input[type="email"],
-.meros-site-form .meros-site-field input[type="url"],
-.meros-site-form .meros-site-field input[type="number"],
-.meros-site-form .meros-site-field input[type="password"],
-.meros-site-form .meros-site-field input[type="search"],
-.meros-site-form .meros-site-field input[type="tel"],
-.meros-site-form .meros-site-field textarea,
-.meros-site-form .meros-site-field select {
+.meros-site-form .meros-field input[type="text"],
+.meros-site-form .meros-field input[type="email"],
+.meros-site-form .meros-field input[type="url"],
+.meros-site-form .meros-field input[type="number"],
+.meros-site-form .meros-field input[type="password"],
+.meros-site-form .meros-field input[type="search"],
+.meros-site-form .meros-field input[type="tel"],
+.meros-site-form .meros-field input[type="date"],
+.meros-site-form .meros-field input[type="time"],
+.meros-site-form .meros-field textarea,
+.meros-site-form .meros-field select {
 	width: 100%;
 	max-width: 100%;
 	box-sizing: border-box;
 }
 
-.meros-site-form .meros-site-field input[type="checkbox"],
-.meros-site-form .meros-site-field input[type="radio"] {
+.meros-site-form .meros-field input[type="checkbox"],
+.meros-site-form .meros-field input[type="radio"] {
 	width: auto;
 	max-width: none;
 	inline-size: 1rem;
@@ -90,12 +109,6 @@
 	min-inline-size: 1rem;
 	min-block-size: 1rem;
 	vertical-align: middle;
-}
-
-.meros-site-form .meros-site-field label {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.5rem;
 }
 
 @media (max-width: 980px) {

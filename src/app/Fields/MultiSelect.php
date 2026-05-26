@@ -38,4 +38,19 @@ class MultiSelect extends Select {
         'data-advanced'  => 'true',
         'data-allow-add' => 'true',
     ];
+
+    /**
+     * Retrieves the field's value, ensuring it's returned as an array.
+     *
+     * @return mixed
+     */
+    public function getValue(): mixed {
+        $value = parent::getValue();
+        
+        if (is_string($value)) {
+            return array_map('trim', explode(',', $value));
+        }
+
+        return $value;
+    }
 }

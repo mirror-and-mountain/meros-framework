@@ -3,11 +3,11 @@
         @include('meros::toolbox.partials.wordpress')
         <h1 class="text-xl font-bold">Toolbox | Form Builder</h1>
     </div>
-    <div class="flex items-center">
-        <div class="flex">
+    <div class="flex h-full">
+        <div class="flex h-full">
             @foreach($navItems as $item)
                 <div 
-                    class="py-2 px-6 hover:bg-gray-300 hover:text-black cursor-pointer" 
+                    class="flex items-center justify-center px-6 hover:bg-gray-300 hover:text-black cursor-pointer h-full" 
                     :class="{ 'bg-gray-300 text-black': currentTab === '{{ strtolower($item) }}' }" 
                     @click="currentTab = '{{ strtolower($item) }}'"
                 >

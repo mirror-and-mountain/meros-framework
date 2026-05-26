@@ -8,14 +8,27 @@
 
 .meros-repeater-scroll {
 	overflow-x: auto;
+	overflow-y: visible;
 }
 
 .meros-repeater-table {
-	width: 100%;
+	width: max-content;
 	min-width: 100%;
 	border-collapse: separate;
 	border-spacing: 0;
 	font-size: 0.875rem;
+}
+
+.meros-repeater-table .meros-repeater-data-header,
+.meros-repeater-table .meros-repeater-data-cell {
+	min-width: 16rem;
+}
+
+.meros-repeater-table .meros-repeater-data-cell .meros-field,
+.meros-repeater-table .meros-repeater-data-cell .meros-field input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='color']),
+.meros-repeater-table .meros-repeater-data-cell .meros-field select,
+.meros-repeater-table .meros-repeater-data-cell .meros-field textarea {
+	min-width: 100%;
 }
 
 .meros-repeater-head {
@@ -62,6 +75,11 @@
 .meros-repeater-actions-cell {
 	padding: 0.75rem;
 	vertical-align: top;
+}
+
+.meros-repeater-data-cell {
+	position: relative;
+	overflow: visible !important;
 }
 
 .meros-repeater-move-cell {
@@ -192,4 +210,18 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 0.5rem;
+}
+
+/* Keep teleported TomSelect dropdown above repeater/table wrappers. */
+.ts-dropdown {
+	z-index: 999999 !important;
+}
+
+/* Prevent clipped dropdowns in overflow wrappers used around repeaters. */
+.meros-repeater .overflow-x-auto {
+	overflow-y: visible !important;
+}
+
+.meros-repeater .overflow-x-auto > div {
+	overflow-y: visible !important;
 }

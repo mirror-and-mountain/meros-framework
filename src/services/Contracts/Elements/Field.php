@@ -83,7 +83,7 @@ abstract class Field extends FeatureDefinition {
      *
      * @var string
      */
-    protected string $name = '';
+    public string $name = '';
 
     /**
      * The field's unique ID, which can be used for HTML attributes and as a fallback for generating the name.
@@ -115,11 +115,11 @@ abstract class Field extends FeatureDefinition {
     protected string $helpText = '';
 
     /**
-     * Whether to display the field's help text above the field (true) or below it (false).
+     * The position of the field's help text, which can be 'top' or 'bottom'.
      *
-     * @var bool
+     * @var string
      */
-    protected bool $helpTextTop = false;
+    protected string $helpTextPosition = '';
 
     /**
      * The field's default value, used when no explicit value is set.
@@ -274,7 +274,7 @@ abstract class Field extends FeatureDefinition {
      *
      * @return self
      */
-    public function helpText(string $helpText, string $position = 'bottom'): self {
+    public function helpText(string $helpText, string $position = 'top'): self {
         $this->helpText = $helpText;
         $this->helpTextPosition($position);
         return $this;
@@ -288,7 +288,7 @@ abstract class Field extends FeatureDefinition {
      *
      * @return self
      */
-    public function help(string $helpText, string $position = 'bottom'): self {
+    public function help(string $helpText, string $position = 'top'): self {
         return $this->helpText($helpText, $position);
     }
 
@@ -401,7 +401,7 @@ abstract class Field extends FeatureDefinition {
      */
     public function helpTextPosition(string $position): self {
         if (in_array($position, ['top', 'bottom'])) {
-            $this->helpTextTop = $position === 'top';
+            $this->helpTextPosition = $position;
         }
 
         return $this;
@@ -459,7 +459,6 @@ abstract class Field extends FeatureDefinition {
                 'attributes'       => $this->attributes,
                 'classList'        => $this->classList,
                 'default'          => $this->default,
-                'value'            => $this->getValue(),
                 'required'         => $this->isRequired(),
                 'disabled'         => $this->isDisabled(),
                 'component'        => $this->getFieldComponent(),
@@ -559,10 +558,10 @@ abstract class Field extends FeatureDefinition {
     /**
      * Retrieves the position of the field's help text.
      *
-     * @return bool
+     * @return string
      */
     public function getHelpTextPosition(): string {
-        return $this->helpTextTop ? 'top' : 'bottom';
+        return empty($this->helpTextPosition) ? 'top' : $this->helpTextPosition;
     }
 
     /**
@@ -573,7 +572,7 @@ abstract class Field extends FeatureDefinition {
     public function getValue(): mixed {
         $value = is_string($this->value) ? trim($this->value) : $this->value;
 
-        if ($this->value === null) {
+        if ($value === null || $value === '' || $value === []) {
             return is_string($this->default) ? trim($this->default) : $this->default;
         }
 

@@ -13,6 +13,13 @@ class Input extends Field {
     public string $handle = 'input';
 
     /**
+     * The placeholder text for the input field.
+     *
+     * @var string
+     */
+    protected string $placeholder = '';
+
+    /**
      * Supported attributes for the input field.
      *
      * @var array
@@ -54,7 +61,7 @@ class Input extends Field {
      */
     public function placeholder(string $placeholder): self {
         if ($this->supports('placeholder')) {
-            $this->attribute('placeholder', $placeholder);
+            $this->placeholder = $placeholder;
         }
         return $this;
     }
@@ -80,7 +87,7 @@ class Input extends Field {
      * @return string
      */
     public function getPlaceholder(): string {
-        return $this->attributes['placeholder'] ?? '';
+        return $this->placeholder;
     }
 
     /**

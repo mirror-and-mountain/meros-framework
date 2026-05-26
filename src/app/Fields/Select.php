@@ -91,15 +91,15 @@ class Select extends Field {
      */
     public function default(mixed $default): self {
         if (is_array($default)) {
+            $this->default = [];
             foreach ($default as $value) {
                 $value = (string) $value;
-                $value = Str::slug($value);    
+                $value = Str::snake($value);    
 
                 if (!array_key_exists($value, $this->options)) {
                     $this->options[$value] = Str::title(str_replace(['-', '_'], ' ', $value));
                 }
 
-                $this->default = [];
                 $this->default[] = $value;
             }
 
@@ -124,7 +124,7 @@ class Select extends Field {
     public function options(array $options): self {
         foreach ($options as $value => $label) {
             if (is_int($value)) {
-                $value = Str::slug($label);
+                $value = Str::snake($label);
             }
 
             if (!array_key_exists($value, $this->options)) {

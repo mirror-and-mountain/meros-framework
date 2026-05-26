@@ -6,14 +6,28 @@ use Illuminate\Support\Str;
 
 class Serializer {
     /**
+     * The Hydrator instance used to resolve field types during serialization.
+     *
+     * @var Hydrator
+     */
+    private Hydrator $hydrator;
+
+    private function __construct(Hydrator $hydrator) {
+        $this->hydrator   = $hydrator;
+    }
+
+    public static function make(Hydrator $hydrator): self {
+        return new self($hydrator);
+     }
+
+    /**
      * Serializes an array of row payloads into a format suitable for storage.
      *
      * @param array $rowPayloads
-     * @param array $fieldTypes
      * 
      * @return array
      */
-    public static function serializeFormSchema(array $rowPayloads, array $fieldTypes): array {
+    public function serializeFormSchema(array $rowPayloads): array {
         $serializedRows = [];
 
         foreach ($rowPayloads as $rowPayload) {
@@ -21,17 +35,17 @@ class Serializer {
                 continue;
             }
 
-            if (Hydrator::isGroupRow($rowPayload)) {
+            if (Utilities::isGroupRow($rowPayload)) {
                 $serializedRows[] = [
                     'type'  => 'group',
-                    'group' => self::serializeGroupPayload($rowPayload['group'] ?? [], $fieldTypes)
+                    'group' => $this->serializeGroupPayload($rowPayload['group'] ?? [])
                 ];
                 continue;
             }
 
             $serializedRows[] = [
                 'type'   => 'fields',
-                'fields' => self::serializeFieldPayloads($rowPayload['fields'] ?? [], $fieldTypes)
+                'fields' => $this->serializeFieldPayloads($rowPayload['fields'] ?? [])
             ];
         }
 
@@ -42,13 +56,12 @@ class Serializer {
      * Serializes a group payload into a format suitable for storage.
      *
      * @param array $groupPayload
-     * @param array $fieldTypes
      *
      * @return array
      */
-    private static function serializeGroupPayload(array $groupPayload, array $fieldTypes): array {
+    private function serializeGroupPayload(array $groupPayload): array {
         $serializedGroup = [
-            'id'          => $groupPayload['id'] ?? Str::uuid()->toString(),
+            'id'          => $groupPayload['id'] ?? 'field_' . Str::substr(Str::uuid()->toString(), 0, 8),
             'handle'      => $groupPayload['handle'] ?? '',
             'title'       => $groupPayload['title'] ?? 'Untitled Section',
             'description' => $groupPayload['description'] ?? '',
@@ -57,7 +70,7 @@ class Serializer {
 
         foreach ($groupPayload['rows'] ?? [] as $groupRow) {
             $serializedGroup['rows'][] = [
-                'fields' => self::serializeFieldPayloads($groupRow['fields'] ?? [], $fieldTypes)
+                'fields' => $this->serializeFieldPayloads($groupRow['fields'] ?? [])
             ];
         }
 
@@ -68,11 +81,10 @@ class Serializer {
      * Serializes an array of field payloads into a format suitable for storage.
      *
      * @param array $fieldPayloads
-     * @param array $fieldTypes
      *
      * @return array
      */
-    private static function serializeFieldPayloads(array $fieldPayloads, array $fieldTypes): array {
+    private function serializeFieldPayloads(array $fieldPayloads): array {
         $serializedFields = [];
 
         foreach ($fieldPayloads as $fieldPayload) {
@@ -80,7 +92,7 @@ class Serializer {
                 continue;
             }
 
-            $serializedField = self::serializeFieldPayload($fieldPayload, $fieldTypes);
+            $serializedField = $this->serializeFieldPayload($fieldPayload);
 
             if (!is_array($serializedField)) {
                 continue;
@@ -95,7 +107,7 @@ class Serializer {
     /**
      * Serializes a single field payload and recursively hydrates repeater sub-fields.
      */
-    private static function serializeFieldPayload(array $fieldPayload, array $fieldTypes): ?array {
+    private function serializeFieldPayload(array $fieldPayload): ?array {
         $handle = $fieldPayload['handle'] ?? null;
 
         if (!is_string($handle) || trim($handle) === '') {
@@ -103,7 +115,7 @@ class Serializer {
         }
 
         if ($handle === 'repeater') {
-            $repeaterInstance = Hydrator::hydrateFieldPayload($fieldPayload, $fieldTypes);
+            $repeaterInstance = $this->hydrator->hydrateFieldPayload($fieldPayload);
 
             if ($repeaterInstance === null) {
                 return null;
@@ -116,27 +128,27 @@ class Serializer {
                     continue;
                 }
 
-                $serializedSubField = self::serializeFieldPayload($subFieldPayload, $fieldTypes);
+                $serializedSubField = $this->serializeFieldPayload($subFieldPayload);
 
                 if (!is_array($serializedSubField)) {
                     continue;
                 }
 
-                $subFieldInstance = Hydrator::hydrateFieldPayload($serializedSubField, $fieldTypes);
+                $subFieldInstance = $this->hydrator->hydrateFieldPayload($serializedSubField);
 
                 if ($subFieldInstance !== null) {
                     $hydratedSubFields[] = $subFieldInstance;
                 }
             }
 
-            if (method_exists($repeaterInstance, 'attach')) {
-                $repeaterInstance->attach($hydratedSubFields);
+            if (method_exists($repeaterInstance, 'refresh')) {
+                $repeaterInstance->refresh($hydratedSubFields);
             }
 
             return $repeaterInstance->toJson();
         }
 
-        $fieldInstance = Hydrator::hydrateFieldPayload($fieldPayload, $fieldTypes);
+        $fieldInstance = $this->hydrator->hydrateFieldPayload($fieldPayload);
 
         if ($fieldInstance === null) {
             return null;

@@ -11,6 +11,13 @@ class Checkboxes extends Select {
     public string $handle = 'checkboxes';
 
     /**
+     * Whether to show the choices horizontally or vertically in the UI.
+     *
+     * @var string
+     */
+    protected string $layout = '';
+
+    /**
      * The icon for the field, used in the form builder UI.
      *
      * @var string
@@ -44,6 +51,30 @@ class Checkboxes extends Select {
     protected array $compatibleDataTypes = [
         'array.scalar'
     ];
+
+    /**
+     * Retrieves the field's value, ensuring it's returned as an array.
+     *
+     * @return mixed
+     */
+    public function getValue(): mixed {
+        $value = parent::getValue();
+        
+        if (is_string($value)) {
+            return array_map('trim', explode(',', $value));
+        }
+
+        return $value;
+    }
+
+    /**
+     * Retrieves the layout for the field, defaulting to 'vertical' if not set.
+     *
+     * @return string
+     */
+    public function getLayout(): string {
+        return empty($this->layout) ? 'vertical' : $this->layout;
+    }
 
 
     /***************************

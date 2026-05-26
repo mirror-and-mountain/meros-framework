@@ -1,6 +1,4 @@
-import { bindRepeaterCellChangeDelegation, ensureRepeaterHandlersOnFormDragStore } from '../../../../forms/repeaters/index.js';
-import { initTomSelects } from '../../../../forms/tom-select/index.js';
-import './forms.scss';
+import '../../../../forms/style.scss';
 
 document.addEventListener('DOMContentLoaded', () => {
 	initTomSelects();

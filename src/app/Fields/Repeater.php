@@ -96,11 +96,10 @@ class Repeater extends Field implements FieldParent {
      * 
      * @param bool $showLabel Whether to show the field's label in the wrapper. Some styles may ignore this and always show the label, or never show the label.
      * @param bool $showHelp Whether to show the field's help text in the wrapper. Some styles may ignore this and always show the help text, or never show the help text.
-     * @param array|null $location Optional location context for form builder integration (groupRowIndex, rowIndex, fieldIndex).
      *
      * @return void
      */
-    public function render(bool $showLabel = true, bool $showHelp = true, ?array $location = null): void {
+    public function render(bool $showLabel = true, bool $showHelp = true): void {
         $wrapper = $this->resolveStyle();
 
         echo view($wrapper, [
@@ -108,8 +107,7 @@ class Repeater extends Field implements FieldParent {
             'field'     => $this,
             'rows'      => $this->buildRows(),
             'showLabel' => $showLabel,
-            'showHelp'  => $showHelp,
-            'location'  => $location,
+            'showHelp'  => $showHelp
         ]);
     }
 
@@ -131,7 +129,7 @@ class Repeater extends Field implements FieldParent {
         $value = $this->getValue();
         $items = is_array($value) && !empty($value)
             ? $value
-            : [[]];
+            : [];
 
         $rows = [];
 
@@ -146,6 +144,9 @@ class Repeater extends Field implements FieldParent {
                 // Store the original field name before generating the indexed name
                 $baseFieldName = $fieldInstance->getName();
 
+                $fieldInstance->attribute('data-row-index', $rowToken);
+                $fieldInstance->attribute('data-base-field-name', $baseFieldName);
+
                 $fieldInstance->id($this->generateSubFieldId($fieldInstance, $rowToken));
                 $fieldInstance->name($this->generateSubFieldName($fieldInstance, $rowToken));
                 
@@ -157,6 +158,31 @@ class Repeater extends Field implements FieldParent {
             }
 
             $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Builds a hidden template row for the empty-state repeater UI.
+     *
+     * @return array
+     */
+    public function buildTemplateRow(): array {
+        $rows = [];
+        $rowToken = $this->resolveRowToken([], 0);
+
+        foreach ($this->fields as $field) {
+            $fieldInstance = clone $field;
+            $baseFieldName = $fieldInstance->getName();
+
+            $fieldInstance->attribute('data-row-index', $rowToken);
+            $fieldInstance->attribute('data-base-field-name', $baseFieldName);
+
+            $fieldInstance->id($this->generateSubFieldId($fieldInstance, $rowToken));
+            $fieldInstance->name($this->generateSubFieldName($fieldInstance, $rowToken));
+
+            $rows[$baseFieldName] = $fieldInstance;
         }
 
         return $rows;

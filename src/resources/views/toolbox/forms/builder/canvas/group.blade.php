@@ -5,20 +5,30 @@
         @dragstart="$store.formBuilder.endDrag(); $event.dataTransfer.effectAllowed = 'move'; $event.dataTransfer.setData('application/x-meros-group-row', '{{ $groupRowIndex }}')"
         @dragend="$store.formBuilder.endDrag()"
     >
-        <div>
+        <div class="meros-site-form-group-header">
             <div class="font-semibold text-gray-800">⠿ {{ $groupPayload['title'] }}</div>
             @if(!empty($groupPayload['description']))
-                <div class="text-xs text-gray-500 mt-0.5">{{ $groupPayload['description'] }}</div>
+                <div class="mt-2 text-gray-700">{!! $this->renderQuillContent($groupPayload['description']) !!}</div>
             @endif
         </div>
-        <button
-            type="button"
-            @click.stop="$store.formBuilder.removeGroup({{ $groupRowIndex }})"
-            class="text-sm text-red-500 hover:text-red-700 cursor-pointer"
-            title="Remove section"
-        >
-            Remove section
-        </button>
+        <div class="flex items-center gap-2">
+            <button
+                type="button"
+                class="shrink-0 text-gray-300 hover:text-blue-500 transition-colors text-xl leading-none cursor-pointer"
+                @click.stop="$store.formBuilder.editGroup({{ $groupRowIndex }})"
+                title="Edit section"
+            >
+                @include('meros::toolbox.svgs.settings')
+            </button>
+            <button
+                type="button"
+                class="shrink-0 text-gray-300 hover:text-red-500 transition-colors text-xl leading-none cursor-pointer"
+                @click.stop="$store.formBuilder.removeGroup({{ $groupRowIndex }})"
+                title="Remove section"
+            >
+                @include('meros::toolbox.svgs.remove')
+            </button>
+        </div>
     </div>
 
     <div class="p-3">
@@ -36,6 +46,7 @@
             {{-- Group row gap before first row --}}
             @include('meros::toolbox.forms.builder.canvas.row-drop-zone', [
                 'isGroupRow'         => true,
+                'isRepeaterField'    => false,
                 'groupRowIndex'      => $groupRowIndex,
                 'groupRowInnerIndex' => -1,
             ])
@@ -61,6 +72,7 @@
                 {{-- Group row gap after current row --}}
                 @include('meros::toolbox.forms.builder.canvas.row-drop-zone', [
                     'isGroupRow'         => true,
+                    'isRepeaterField'    => false,
                     'groupRowIndex'      => $groupRowIndex,
                     'groupRowInnerIndex' => $groupRowInnerIndex,
                 ])

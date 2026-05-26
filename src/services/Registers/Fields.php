@@ -18,18 +18,6 @@ class Fields extends Register {
      * @return array
      */
     protected function parseProperties(array $props): array {
-        return [
-            'handle'     => $props['handle'] ?? '',
-            'id'         => $props['id'] ?? '',
-            'name'       => $props['name'] ?? '',
-            'label'      => $props['label'] ?? '',
-            'help_text'  => $props['help_text'] ?? '',
-            'default'    => $props['default'] ?? null,
-            'value'      => $props['value'] ?? null,
-            'required'   => $props['required'] ?? false,
-            'disabled'   => $props['disabled'] ?? false,
-            'classList'  => $props['classList'] ?? [],
-            'width'      => $props['width'] ?? 'full',
-        ];
+        return $props; // No special parsing needed for fields at this time.
     }
 }

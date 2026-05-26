@@ -40,41 +40,43 @@
         <h2 class="text-lg font-bold mb-4">Form Elements</h2>
     </div>
 
-    <div class="mb-6 border-b border-gray-300 pb-4">
-        <h3 class="text-md font-semibold mb-2">Form Groups</h3>
+    @if(!$editingRepeater)
+        <div class="mb-6 border-b border-gray-300 pb-4">
+            <h3 class="text-md font-semibold mb-2">Form Groups</h3>
 
-        <div
-            class="mb-2 p-2 bg-white rounded shadow cursor-grab active:cursor-grabbing flex items-center select-none"
-            draggable="true"
-            data-item-kind="group"
-            data-item-handle=""
-            data-item-label="Untitled Section"
-            @dragstart="$store.formBuilder.startDrag($el.dataset.itemKind, $el.dataset.itemHandle, $el.dataset.itemLabel); $event.dataTransfer.effectAllowed = 'copy'; $event.dataTransfer.setData('text/plain', 'group:blank')"
-            @dragend="$store.formBuilder.endDrag()"
-        >
-            <div class="flex justify-between items-center w-full">
-                Blank Section
-                <span class="drag-handle">⠿</span>
-            </div>
-        </div>
-
-        @foreach ($fieldGroups as $group)
             <div
                 class="mb-2 p-2 bg-white rounded shadow cursor-grab active:cursor-grabbing flex items-center select-none"
                 draggable="true"
                 data-item-kind="group"
-                data-item-handle="{{ $group['handle'] }}"
-                data-item-label="{{ $group['label'] }}"
-                @dragstart="$store.formBuilder.startDrag($el.dataset.itemKind, $el.dataset.itemHandle, $el.dataset.itemLabel); $event.dataTransfer.effectAllowed = 'copy'; $event.dataTransfer.setData('text/plain', 'group:{{ $group['handle'] }}')"
+                data-item-handle=""
+                data-item-label="Untitled Section"
+                @dragstart="$store.formBuilder.startDrag($el.dataset.itemKind, $el.dataset.itemHandle, $el.dataset.itemLabel); $event.dataTransfer.effectAllowed = 'copy'; $event.dataTransfer.setData('text/plain', 'group:blank')"
                 @dragend="$store.formBuilder.endDrag()"
             >
                 <div class="flex justify-between items-center w-full">
-                    {{ $group['label'] }}
+                    Blank Section
                     <span class="drag-handle">⠿</span>
                 </div>
             </div>
-        @endforeach
-    </div>
+
+            @foreach ($fieldGroups as $group)
+                <div
+                    class="mb-2 p-2 bg-white rounded shadow cursor-grab active:cursor-grabbing flex items-center select-none"
+                    draggable="true"
+                    data-item-kind="group"
+                    data-item-handle="{{ $group['handle'] }}"
+                    data-item-label="{{ $group['label'] }}"
+                    @dragstart="$store.formBuilder.startDrag($el.dataset.itemKind, $el.dataset.itemHandle, $el.dataset.itemLabel); $event.dataTransfer.effectAllowed = 'copy'; $event.dataTransfer.setData('text/plain', 'group:{{ $group['handle'] }}')"
+                    @dragend="$store.formBuilder.endDrag()"
+                >
+                    <div class="flex justify-between items-center w-full">
+                        {{ $group['label'] }}
+                        <span class="drag-handle">⠿</span>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    @endif
 
     <div id="field-types">
         @foreach($fieldCategories as $category => $fields)
@@ -97,25 +99,39 @@
                 :class="openCategory === '{{ $category }}' ? 'max-h-96' : 'max-h-0'"
             >
                 @foreach ($fields as $field)
-                    <div 
-                        class="mb-2 p-2 bg-white rounded shadow cursor-grab active:cursor-grabbing flex items-center select-none"
-                        draggable="true"
-                        data-item-kind="field"
-                        data-item-handle="{{ $field['handle'] }}"
-                        data-item-label="{{ $field['label'] }}"
-                        @dragstart="$store.formBuilder.startDrag($el.dataset.itemKind, $el.dataset.itemHandle, $el.dataset.itemLabel); $event.dataTransfer.effectAllowed = 'copy'; $event.dataTransfer.setData('text/plain', 'field:{{ $field['handle'] }}')"
-                        @dragend="$store.formBuilder.endDrag()"
-                    >
-                        @if ($field['icon'] !== '')
-                            <span class="mr-2">
-                                @include('meros::toolbox.forms.field-icons.' . $field['icon'])
-                            </span>
-                        @endif
-                        <div class="flex justify-between items-center w-full">
-                            {{ $field['label'] }}
-                            <span class="drag-handle">⠿</span>
+                    @if(($editingRepeater && $field['handle'] !== 'repeater') || !$editingRepeater)
+                        @php
+                            $dragStartArgs = [
+                                '$el.dataset.itemKind',
+                                '$el.dataset.itemHandle',
+                                '$el.dataset.itemLabel'
+                            ];
+
+                            if ($editingRepeater) {
+                                $dragStartArgs[] = '"' . $editingRepeaterID . '"';
+                            }
+                        @endphp
+                        <div 
+                            class="mb-2 p-2 bg-white rounded shadow cursor-grab active:cursor-grabbing flex items-center select-none"
+                            draggable="true"
+                            data-item-kind="field"
+                            data-item-handle="{{ $field['handle'] }}"
+                            data-item-label="{{ $field['label'] }}"
+                            @dragstart="$store.formBuilder.startDrag({{ implode(', ', $dragStartArgs) }}); $event.dataTransfer.effectAllowed = 'copy'; $event.dataTransfer.setData('text/plain', 'field:{{ $field['handle'] }}')"
+                            @dragend="$store.formBuilder.endDrag()"
+                            wire:key="field-type-{{ $field['handle'] }}"
+                        >
+                            @if ($field['icon'] !== '')
+                                <span class="mr-2">
+                                    @include('meros::toolbox.forms.field-icons.' . $field['icon'])
+                                </span>
+                            @endif
+                            <div class="flex justify-between items-center w-full">
+                                {{ $field['label'] }}
+                                <span class="drag-handle">⠿</span>
+                            </div>
                         </div>
-                    </div>
+                    @endif
                 @endforeach
             </div>
         @endforeach

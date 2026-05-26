@@ -2,6 +2,7 @@
 
 namespace MM\Meros\App\Toolbox\Forms\Helpers;
 
+use MM\Meros\App\Toolbox\Forms\Builder;
 use MM\Meros\Services\Contracts\Elements\Field;
 
 use MM\Meros\Facades\Framework;
@@ -10,30 +11,47 @@ use MM\Meros\Facades\FieldGroups;
 
 class Hydrator {
     /**
+     * An array of valid field types.
+     *
+     * @var array
+     */
+    private array $fieldTypes = [];
+
+    private ?Builder $builder = null;
+
+    private function __construct(array $fieldTypes, ?Builder $builder = null) {
+        $this->fieldTypes = $fieldTypes;
+        $this->builder    = $builder;
+    }
+
+    public static function make(array $fieldTypes, ?Builder $builder = null): self {
+        return new self($fieldTypes, $builder);
+    }
+
+    /**
      * Hydrates an array of row payloads with Field instances.
      *
      * @param array $rowPayloads
-     * @param array $fieldTypes
      *
      * @return array
      */
-    public static function hydrateRowPayloads(array $rowPayloads, array $fieldTypes): array {
+    public function hydrateRowPayloads(array $rowPayloads): array {
         foreach ($rowPayloads as $index => $rowPayload) {
             if (!is_array($rowPayload)) {
                 continue;
             }
 
-            if (self::isGroupRow($rowPayload)) {
+            if (Utilities::isGroupRow($rowPayload)) {
                 $rowPayloads[$index] = [
                     '_type' => 'group',
-                    'group' => self::hydrateGroupPayload($rowPayload['group'], $fieldTypes)
+                    'group' => $this->hydrateGroupPayload($rowPayload['group'])
                 ];
                 continue;
             }
 
             $rowPayloads[$index] = [
                 '_type'  => 'fields',
-                'fields' => self::hydrateFieldPayloads($rowPayload['fields'] ?? [], $fieldTypes)
+                'fields' => $this->hydrateFieldPayloads($rowPayload['fields'] ?? [])
             ];
         }
 
@@ -44,15 +62,14 @@ class Hydrator {
      * Hydrates a group payload with Field instances.
      *
      * @param array $groupPayload
-     * @param array $fieldTypes
      *
      * @return array
      */
-    private static function hydrateGroupPayload(array $groupPayload, array $fieldTypes): array {
+    private function hydrateGroupPayload(array $groupPayload): array {
         $groupRows = [];
 
         foreach ($groupPayload['rows'] ?? [] as $index => $groupRow) {
-            $groupRows[$index]['fields'] = self::hydrateFieldPayloads($groupRow['fields'] ?? [], $fieldTypes);
+            $groupRows[$index]['fields'] = $this->hydrateFieldPayloads($groupRow['fields'] ?? []);
         }
 
         $groupPayload['rows'] = $groupRows;
@@ -64,11 +81,10 @@ class Hydrator {
      * Hydrates an array of field payloads with Field instances.
      *
      * @param array $fieldPayloads
-     * @param array $fieldTypes
      *
      * @return array
      */
-    private static function hydrateFieldPayloads(array $fieldPayloads, array $fieldTypes): array {
+    private function hydrateFieldPayloads(array $fieldPayloads): array {
         foreach ($fieldPayloads as $index => $fieldPayload) {
             if (!is_array($fieldPayload)) {
                 continue;
@@ -80,28 +96,7 @@ class Hydrator {
                 continue;
             }
 
-            if ($handle === 'repeater') {
-                $repeaterField = self::hydrateFieldPayload($fieldPayload, $fieldTypes);
-
-                if ($repeaterField === null) {
-                    $fieldPayloads[$index] = null;
-                    continue;
-                }
-
-                $subFields = array_filter(
-                    self::hydrateFieldPayloads($fieldPayload['fields'] ?? [], $fieldTypes),
-                    fn($field): bool => $field instanceof Field,
-                );
-
-                if (method_exists($repeaterField, 'attach')) {
-                    $repeaterField->attach($subFields);
-                }
-
-                $fieldPayloads[$index] = $repeaterField;
-                continue;
-            }
-
-            $fieldPayloads[$index] = self::hydrateFieldPayload($fieldPayload, $fieldTypes);
+            $fieldPayloads[$index] = $this->hydrateFieldPayload($fieldPayload);
         }
 
         return $fieldPayloads;
@@ -111,11 +106,10 @@ class Hydrator {
      * Hydrates a field payload with a Field instance.
      *
      * @param array $fieldPayload
-     * @param array $fieldTypes
      *
      * @return Field|null
      */
-    public static function hydrateFieldPayload(array $fieldPayload, array $fieldTypes): ?Field {
+    public function hydrateFieldPayload(array $fieldPayload): ?Field {
         $handle = $fieldPayload['handle'] ?? null;
         $id     = $fieldPayload['properties']['id'] ?? null;
 
@@ -124,7 +118,34 @@ class Hydrator {
             return null;
         }
 
-        return self::makeFieldInstance($handle, $fieldPayload['properties'] ?? [], $fieldTypes);
+        $instance = $this->makeFieldInstance($handle, $fieldPayload['properties'] ?? []);
+
+        if ($fieldPayload['handle'] === 'repeater') {
+            $fields = $fieldPayload['fields'] ?? [];
+            $hydratedSubFields = [];
+
+            foreach ($fields as $subFieldPayload) {
+                if (!is_array($subFieldPayload)) {
+                    continue;
+                }
+
+                $hydratedSubField = $this->hydrateFieldPayload($subFieldPayload);
+
+                if ($hydratedSubField !== null) {
+                    $hydratedSubFields[] = $hydratedSubField;
+                }
+            }
+
+            if (method_exists($instance, 'refresh')) {
+                $instance->refresh($hydratedSubFields);
+            }
+        }
+
+        if ($this->builder) {
+            $this->builder->addElement($instance);
+        }
+
+        return $instance;
     }
 
     /**
@@ -132,12 +153,11 @@ class Hydrator {
      *
      * @param string $handle
      * @param array  $properties
-     * @param array  $fieldTypes
      *
      * @return Field|null
      */
-    private static function makeFieldInstance(string $handle, array $properties, array $fieldTypes): ?Field {
-        $fieldType = $fieldTypes[$handle] ?? null;
+    private function makeFieldInstance(string $handle, array $properties): ?Field {
+        $fieldType = $this->fieldTypes[$handle] ?? null;
         
         if (!$fieldType) {
             return null;
@@ -147,17 +167,5 @@ class Hydrator {
             ->makeFrom($fieldType, $properties);
 
         return $fieldInstance;
-    }
-
-    /**
-     * Helper to determine if a given row payload is a group row.
-     *
-     * @param array  $rowPayload
-     * @param string $key
-     *
-     * @return boolean
-     */
-    public static function isGroupRow(array $rowPayload, string $key = '_type'): bool {
-        return ($rowPayload[$key] ?? null ) === 'group' && is_array($rowPayload['group'] ?? null);
     }
 }

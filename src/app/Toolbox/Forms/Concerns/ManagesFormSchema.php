@@ -135,4 +135,81 @@ trait ManagesFormSchema {
 
         return $decoded;
     }
+
+    public function getRichTextPayloads(): array {
+        $richTextObjects = [];
+
+        foreach ($this->rowPayloads as $rowIndex => $row) {
+            if ($row['_type'] === 'group') {
+                $group = $row['group'] ?? null;
+                if ($group && !empty($group['description'])) {
+                    $richTextObjects[] = [
+                        'rt_id'   => $rowIndex,
+                        'content' => $group['description'],
+                    ];
+                }
+
+                $groupFields = $group['fields'] ?? [];
+                foreach ($groupFields as $groupFieldIndex => $groupField) {
+                    if (($groupField['handle'] ?? '') === 'rich_text') {
+                        $richTextObjects[] = [
+                            'rt_id'   => "{$rowIndex}_{$groupFieldIndex}",
+                            'content' => $groupField['value'] ?? '',
+                        ];
+                    }
+                }
+            }
+
+            else {
+                foreach ($row['fields'] as $fieldIndex => $field) {
+                    if (($field['handle'] ?? '') === 'rich_text') {
+                        $richTextObjects[] = [
+                            'rt_id'   => "{$rowIndex}_{$fieldIndex}",
+                            'content' => $field['value'] ?? '',
+                        ];
+                    }
+                }
+            }
+        }
+
+        return $richTextObjects;
+    }
+
+    public function renderQuillContent(string $deltaJson): string {
+        $ops = json_decode($deltaJson, true) ?? [];
+        $html = '';
+
+        foreach ($ops as $op) {
+            $text = $op['insert'] ?? '';
+            $attrs = $op['attributes'] ?? [];
+
+            // Escape HTML
+            $text = e($text);
+
+            if (!empty($attrs['bold'])) {
+                $text = "<strong>{$text}</strong>";
+            }
+            if (!empty($attrs['underline'])) {
+                $text = "<u>{$text}</u>";
+            }
+            if (!empty($attrs['link'])) {
+                $url = htmlspecialchars($attrs['link'], ENT_QUOTES, 'UTF-8');
+                $text = "<a href=\"{$url}\" target=\"_blank\" rel=\"noopener\">{$text}</a>";
+            }
+            if (!empty($attrs['italic'])) {
+                $text = "<em>{$text}</em>";
+            }
+
+            // Handle newlines (Quill uses "\n" as a separate insert)
+            if ($text === "\n") {
+                // If you are wrapping in <p>, you might skip this or use <br>
+                // For a single root element, we often skip standalone newlines
+                continue; 
+            }
+
+            $html .= $text;
+        }
+
+        return nl2br($html); // Convert newlines to <br> for HTML output
+    }
 }

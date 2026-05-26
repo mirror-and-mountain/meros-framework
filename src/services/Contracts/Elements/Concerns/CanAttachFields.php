@@ -25,35 +25,50 @@ trait CanAttachFields {
      * Adds a field instance to the item's fields array. 
      *
      * @param Field|array<Field> $field A single Field instance or an array of Field instances to add to the group.
+     * @param int                $position The position in the fields array to insert the field(s) at. Defaults to -1, which appends to the end of the array.
      *
      * @return self
      */
-    public function attach(Field|array $field): self {
-        if (is_array($field)) {
-            $this->fields = array_merge($this->fields, $field);
-
-            $this->walkFields(function(Field $field) {
-                $existingParent = $field->getParent();
-                if ($existingParent !== null) {
-                    // Detach from existing parent if it's different from the current parent
-                    if ($existingParent !== $this) {
-                        $existingParent->detach($field);
-                    }
-                }
-                $field->parent($this);
-            });
-
-        } else {
-            $existingParent = $field->getParent();
-            if ($existingParent !== null) {
-                // Detach from existing parent if it's different from the current parent
-                if ($existingParent !== $this) {
-                    $existingParent->detach($field);
-                }
+    public function attach(Field|array $field, int $position = -1): self {
+        $fieldsToAttach = is_array($field) ? $field : [$field];
+        
+        // Detach from existing parents
+        foreach ($fieldsToAttach as $f) {
+            $existingParent = $f->getParent();
+            if ($existingParent !== null && $existingParent !== $this) {
+                $existingParent->detach($f);
             }
-            $field->parent($this);
-            $this->fields[] = $field;
         }
+        
+        // Insert at the correct position
+        if ($position === -1) {
+            $this->fields = array_merge($this->fields, $fieldsToAttach);
+        } elseif ($position === 0) {
+            $this->fields = array_merge($fieldsToAttach, $this->fields);
+        } else {
+            array_splice($this->fields, $position, 0, $fieldsToAttach);
+        }
+        
+        // Set parent for all attached fields
+        $this->walkFields(function(Field $field) {
+            $field->parent($this);
+        });
+
+        return $this;
+    }
+
+    /**
+     * Replaces the current fields array with a new array of field instances.
+     *
+     * @param array<Field> $fields
+     *
+     * @return self
+     */
+    public function refresh(array $fields): self {
+        $this->fields = $fields;
+        $this->walkFields(function(Field $field) {
+            $field->parent($this);
+        });
 
         return $this;
     }

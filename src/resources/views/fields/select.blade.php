@@ -1,9 +1,9 @@
 @php 
     $fieldValue = $field->getValue();
     $isSubField = $field->isSubField();
-    $name = $field->getName(!$isSubField);
-    $options = $field->getOptions();
-    $classList = trim('meros-select-field ' . $field->classList());
+    $name       = $field->getName(!$isSubField);
+    $options    = $field->getOptions();
+    $classList  = trim('meros-select-field ' . $field->classList());
     $isAdvanced = $field->isAdvanced();
 @endphp
 
@@ -11,11 +11,8 @@
     name="{{ $field->allowsMultiple() ? $name . '[]' : $name }}"
     class="{{ $classList }}"
     {!! $field->attributes(['name', 'class']) !!}
-    @if($isAdvanced)
-        wire:ignore
-    @endif
 >
-    @if(empty($options))
+    @if(empty($options) && !$isAdvanced)
         <option value="" disabled @selected(true)>No options configured</option>
     @endif
 

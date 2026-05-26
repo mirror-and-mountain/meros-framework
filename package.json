@@ -12,6 +12,7 @@
         "@wordpress/i18n": "^5.20.0",
         "@wordpress/scripts": "^30.13.0",
         "nice-forms.css": "^0.1.7",
+        "quill": "^2.0.3",
         "tailwindcss": "^4.3.0",
         "tom-select": "^2.5.2",
         "vite": "^8.0.11"
