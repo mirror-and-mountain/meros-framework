@@ -19,7 +19,9 @@
                     this.initMultiSelect();
                 }
 
-               
+                if (activeField?.handle === 'rich_text') {
+                    this.hydrateQuillContent();
+                }
             }
 
             else if (!activeField) {
@@ -191,22 +193,17 @@
         },
 
         {{-- Hydrate the content of a Quill editor --}}
-        hydrateQuillContent(container) {
-            if (!container || !container._quill) {
+        hydrateQuillContent() {
+            const defaultValueEditor = document.querySelector('.meros-rich-text-default-value');
+
+            if (!defaultValueEditor) {
                 return;
             }
 
-            const richTextPayloads = $store.formBuilder.richTextPayloads || [];
-            const rtId = container.dataset.rtId;
-
-            if (!rtId) {
+            const currentDefaultValue = $store.formBuilder.activeField?.default;
+            if (typeof currentDefaultValue === 'string') {
+                defaultValueEditor._quill.setContents(JSON.parse(currentDefaultValue));
                 return;
-            }
-
-            const payload = richTextPayloads.find(payload => Number(payload.rt_id) === Number(rtId));
-
-            if (payload && payload.content) {
-                container._quill.setContents(JSON.parse(payload.content));
             }
         },
 

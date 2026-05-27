@@ -5,11 +5,12 @@
     $helpTextPosition = $hasHelpText ? $field->getHelpTextPosition() : null;
     $showLabel        = $showLabel;
     $isFieldSet       = in_array($field->handle, ['radio', 'checkboxes']);
+    $wireIgnore       = (method_exists($field, 'isAdvanced') && $field->isAdvanced()) || $field->handle === 'rich_text' ? 'wire:ignore' : '';
 @endphp
 
 <div 
     class="meros-field nice-form-group" {{ $showLabel === false ? 'style=margin-top:0;' : '' }}
-    {{ method_exists($field, 'isAdvanced') && $field->isAdvanced() ? 'wire:ignore' : '' }}
+    {{ $wireIgnore }}
 >
     @if ($showLabel && $field->handle !== 'repeater')
         @if (!$isFieldSet)

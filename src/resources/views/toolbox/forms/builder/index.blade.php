@@ -9,7 +9,8 @@
             window.dispatchEvent(new CustomEvent('meros-form-builder-schema-updated', {
                 detail: {
                     rows: schema[0].rows,
-                    advancedSelects: schema[0].advancedSelects
+                    richTextPayloads: schema[0].richTextPayloads,
+                    ignoredFields: schema[0].ignoredFields
                 }
             }));
 
@@ -58,6 +59,7 @@
 
             getRichTextPayloads().then(payloads => {
                 $store.formBuilder.setRichTextPayloads(payloads);
+  
                 window.dispatchEvent(new CustomEvent('meros-form-builder-rich-text-updated', {
                     detail: {
                         richTextPayloads: payloads

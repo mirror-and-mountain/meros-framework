@@ -18,6 +18,7 @@ use MM\Meros\App\Fields\MultiSelect;
 use MM\Meros\App\Fields\Number;
 use MM\Meros\App\Fields\Radio;
 use MM\Meros\App\Fields\Repeater;
+use MM\Meros\App\Fields\RichText;
 use MM\Meros\App\Fields\Password;
 use MM\Meros\App\Fields\Select;
 use MM\Meros\App\Fields\Text;
@@ -81,6 +82,7 @@ final class Framework extends FeatureProvider {
         $this->fields()->register('number', Number::class);
         $this->fields()->register('radio', Radio::class);
         $this->fields()->register('repeater', Repeater::class);
+        $this->fields()->register('rich_text', RichText::class);
         $this->fields()->register('select', Select::class);
         $this->fields()->register('text', Text::class);
         $this->fields()->register('textarea', Textarea::class);
@@ -305,7 +307,7 @@ final class Framework extends FeatureProvider {
                     return $content;
                 }
 
-                return \Livewire\Livewire::mount('toolbox::site-form', ['schema' => $schema]);
+                return \Livewire\Livewire::mount('toolbox::forms.form', ['formID' => $post->ID]);
             
             }
             return $content;

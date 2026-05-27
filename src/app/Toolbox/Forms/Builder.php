@@ -538,12 +538,18 @@ class Builder extends Component {
      * @return void
      */
     private function dispatchSchemaUpdate(): void {
-        $advancedSelects = $this->getAdvancedSelectFields($this->rowPayloads);
+        $advancedSelectPayloads = $this->getAdvancedSelectFields($this->rowPayloads);
+        $richTextPayloads = $this->getRichTextPayloads();
+
+        $ignoredFields = array_merge(
+            $advancedSelectPayloads,
+            $richTextPayloads
+        );
 
         $this->dispatch('schema-updated', [
             'rows'             => $this->rowPayloads,
-            'richTextPayloads' => $this->getRichTextPayloads(),
-            'advancedSelects'  => $advancedSelects
+            'richTextPayloads' => $richTextPayloads,
+            'ignoredFields'    => $ignoredFields
         ]);
     }
 
@@ -579,84 +585,5 @@ class Builder extends Component {
 
         $this->editingRepeaterField = $repeater;
         return $repeater;
-    }
-
-    /**
-     * Retrieves advanced select fields from the form schema's row payloads.
-     *
-     * @param array $rows
-     *
-     * @return array
-     */
-    private function getAdvancedSelectFields(array $rows): array {
-        $advancedSelects = [];
-
-        foreach ($rows as $row) {
-            if ($row['group'] ?? null) {
-                foreach ($row['group']['rows'] ?? [] as $groupRow) {
-                    $advancedSelects = array_merge(
-                        $advancedSelects,
-                        $this->extractAdvancedSelects($groupRow['fields'] ?? [])
-                    );
-                }
-            } else {
-                $advancedSelects = array_merge(
-                    $advancedSelects,
-                    $this->extractAdvancedSelects($row['fields'] ?? [])
-                );
-            }
-        }
-
-        return $advancedSelects;
-    }
-
-    /**
-     * Extracts advanced select fields from the schema rows.
-     *
-     * @param array $fields
-     *
-     * @return array
-     */
-    private function extractAdvancedSelects(array $fields): array {
-        $advancedSelects = [];
-
-        foreach ($fields as $field) {
-            if (in_array($field['handle'], ['select', 'multi_select']) && 
-                ($field['properties']['advanced'] ?? null) === true) 
-            {
-                $advancedSelects[] = $this->buildAdvancedSelectConfig($field['properties']);
-            } 
-            
-            else if ($field['handle'] === 'repeater') {
-                foreach ($field['fields'] ?? [] as $repeaterField) {
-                    if (in_array($repeaterField['handle'], ['select', 'multi_select']) && 
-                        ($repeaterField['properties']['advanced'] ?? null) === true) 
-                    {
-                        $advancedSelects[] = $this->buildAdvancedSelectConfig($repeaterField['properties']);
-                    }
-                }
-            }
-        }
-
-        return $advancedSelects;
-    }
-
-    /**
-     * Builds an advanced select configuration from field properties.
-     *
-     * @param array $properties
-     *
-     * @return array
-     */
-    private function buildAdvancedSelectConfig(array $properties): array {
-        return [
-            'id'               => $properties['id'],
-            'label'            => $properties['label'] ?? '',
-            'name'             => $properties['name'] ?? '',
-            'helpText'         => $properties['helpText'] ?? '',
-            'helpTextPosition' => $properties['helpTextPosition'] ?? 'top',
-            'required'         => $properties['required'] ?? false,
-            'disabled'         => $properties['disabled'] ?? false
-        ];
     }
 }

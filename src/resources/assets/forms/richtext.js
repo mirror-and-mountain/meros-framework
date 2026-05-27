@@ -57,7 +57,7 @@ export function merosHydrateQuillContent(container, content = null) {
             return;
         }
 
-        const payload = richTextPayloads.find(payload => Number(payload.rt_id) === Number(rtId));
+        const payload = richTextPayloads.find(payload => payload.rt_id  === rtId);
 
         if (payload && payload.content) {
             container._quill.setContents(JSON.parse(payload.content));
@@ -65,7 +65,6 @@ export function merosHydrateQuillContent(container, content = null) {
     }
 
     else {
-        console.log('Hydrating quill with content', content);
         container._quill.setContents(JSON.parse(content));
     }
 }
@@ -82,8 +81,6 @@ export function initRichTextEditors(richTextPayloads = []) {
             return;
         }
 
-        const isGroupDescription = editor.classList.contains('meros-form-group-description');
-
         const quill = new Quill(editor, {
             theme: 'snow',
             modules: {
@@ -98,11 +95,27 @@ export function initRichTextEditors(richTextPayloads = []) {
         quill.root.addEventListener('blur', () => {            
             const deltaOps = quill.getContents().ops;
 
-            if (deltaOps?.length === 0 || (deltaOps?.length === 1 && deltaOps[0].insert === '\n')) {
-                Alpine.store('formBuilder').updateActiveFieldProperty('description', '');
+            const isGroupDescription = editor.classList.contains('meros-form-group-description');
+            const isRichTextDefault = editor.classList.contains('meros-rich-text-default-value');
+
+            if (isRichTextDefault) {
+
+                if (deltaOps?.length === 0 || (deltaOps?.length === 1 && deltaOps[0].insert === '\n')) {
+                    Alpine.store('formBuilder').updateActiveFieldProperty('default', '');
+                } 
+
+                else {
+                    Alpine.store('formBuilder').updateActiveFieldProperty('default', JSON.stringify(deltaOps));
+
+                    const field = document.getElementById(editor.dataset.rtId);
+
+                    if (field && field._quill) {
+                        field._quill.setContents(deltaOps);
+                    }
+                }
             }
-            
-            if (isGroupDescription) {
+
+            else if (isGroupDescription) {
                 Alpine.store('formBuilder').updateActiveGroupProperty('description', JSON.stringify(deltaOps));
             }
         });

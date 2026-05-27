@@ -1,7 +1,8 @@
 import registerFormBuilderStore from '../../forms/alpine/formBuilderStore.js';
 import registerRepeaterFieldStore from '../../forms/alpine/repeaterFieldStore.js';
 import { initRichTextEditors } from '../../forms/richtext.js';
-import { initTomSelects, updateTomSelectWrapperElements } from '../../forms/tom-select/index.js';
+import { initTomSelects } from '../../forms/tom-select/index.js';
+import { updateIgnoredFieldWrapperElements } from '../../forms/utils.js';
 
 import './style.css';
 
@@ -14,10 +15,11 @@ document.addEventListener('livewire:initialized', initTomSelects);
 
 // Listen for updates to the form builder schema to reinitialise js components as needed
 window.addEventListener('meros-form-builder-schema-updated', (event) => {
-    const { advancedSelects } = event.detail;
+    const { ignoredFields, richTextPayloads } = event.detail;
 
-    updateTomSelectWrapperElements(advancedSelects);
+    updateIgnoredFieldWrapperElements(ignoredFields);
     initTomSelects();
+    initRichTextEditors(richTextPayloads);
 });
 
 // Listen for updates to rich text content to reinitialise rich text editors as needed

@@ -66,7 +66,19 @@
         ></textarea>
     </div>
 
+    {{-- Field Default Value - Rich Text --}}
+    <div class="nice-form-group meros-rich-textarea-wrapper" wire:ignore>
+        <label for="field-default-value-rich-text" class="form-label">Default value</label>
+        <small class="whitespace-normal">The field's default value</small>
+        <div
+            id="field-default-value-rich-text"
+            class="meros-rich-textarea meros-rich-text-default-value"
+            :data-rt-id="activeField?.id"
+        ></div>
+    </div>
+
     {{-- Field Default Value - Single Choice --}}
+
     <div x-show="open && $store.formBuilder.isSingleChoiceField(activeField.handle)" class="nice-form-group">
         <label for="field-default-value-select" class="form-label">Default value</label>
         <small class="whitespace-normal">The field's default value (must match one of the option values)</small>
@@ -116,6 +128,7 @@
     </div>
 
     {{-- Help Text --}}
+
     <div x-show="open" class="nice-form-group">
         <label for="field-help-text" class="form-label">Help text</label>
         <small class="whitespace-normal">Additional help text to assist the user filling out the field</small>

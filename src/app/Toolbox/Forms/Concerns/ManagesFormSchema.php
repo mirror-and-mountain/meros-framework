@@ -81,6 +81,51 @@ trait ManagesFormSchema {
     public array $settings = [];
 
     /**
+     * Renders Quill delta content to HTML, handling basic formatting and links.
+     *
+     * @param string $deltaJson
+     *
+     * @return string
+     */
+    public function renderQuillContent(string $deltaJson): string {
+        $ops = json_decode($deltaJson, true) ?? [];
+        $html = '';
+
+        foreach ($ops as $op) {
+            $text = $op['insert'] ?? '';
+            $attrs = $op['attributes'] ?? [];
+
+            // Escape HTML
+            $text = e($text);
+
+            if (!empty($attrs['bold'])) {
+                $text = "<strong>{$text}</strong>";
+            }
+            if (!empty($attrs['underline'])) {
+                $text = "<u>{$text}</u>";
+            }
+            if (!empty($attrs['link'])) {
+                $url = htmlspecialchars($attrs['link'], ENT_QUOTES, 'UTF-8');
+                $text = "<a href=\"{$url}\" target=\"_blank\" rel=\"noopener\">{$text}</a>";
+            }
+            if (!empty($attrs['italic'])) {
+                $text = "<em>{$text}</em>";
+            }
+
+            // Handle newlines (Quill uses "\n" as a separate insert)
+            if ($text === "\n") {
+                // If you are wrapping in <p>, you might skip this or use <br>
+                // For a single root element, we often skip standalone newlines
+                continue; 
+            }
+
+            $html .= $text;
+        }
+
+        return nl2br($html); // Convert newlines to <br> for HTML output
+    }
+
+    /**
      * Retrieves available field types from the Fields register 
      * and sets available field categories.
      *
@@ -136,12 +181,18 @@ trait ManagesFormSchema {
         return $decoded;
     }
 
+    /**
+     * Retrieves rich text payloads from the form schema's row payloads.
+     *
+     * @return array
+     */
     public function getRichTextPayloads(): array {
         $richTextObjects = [];
 
         foreach ($this->rowPayloads as $rowIndex => $row) {
             if ($row['_type'] === 'group') {
                 $group = $row['group'] ?? null;
+
                 if ($group && !empty($group['description'])) {
                     $richTextObjects[] = [
                         'rt_id'   => $rowIndex,
@@ -149,13 +200,21 @@ trait ManagesFormSchema {
                     ];
                 }
 
-                $groupFields = $group['fields'] ?? [];
-                foreach ($groupFields as $groupFieldIndex => $groupField) {
-                    if (($groupField['handle'] ?? '') === 'rich_text') {
-                        $richTextObjects[] = [
-                            'rt_id'   => "{$rowIndex}_{$groupFieldIndex}",
-                            'content' => $groupField['value'] ?? '',
-                        ];
+                $groupRows = $group['rows'] ?? [];
+                foreach ($groupRows as $groupRow) {
+                    $rowFields = $groupRow['fields'] ?? [];
+                    foreach ($rowFields as $groupFieldIndex => $groupField) {
+                        if (($groupField['handle'] ?? '') === 'rich_text') {
+                            $richTextObjects[] = [
+                                'id'               => $groupField['properties']['id'] ?? "{$rowIndex}_{$groupFieldIndex}",
+                                'name'             => $groupField['properties']['name'] ?? '',
+                                'label'            => $groupField['properties']['label'] ?? '',
+                                'helpText'         => $groupField['properties']['helpText'] ?? '',
+                                'helpTextPosition' => $groupField['properties']['helpTextPosition'] ?? '',
+                                'rt_id'            => $groupField['properties']['id'] ?? "{$rowIndex}_{$groupFieldIndex}",
+                                'content'          => $groupField['properties']['value'] ?? $groupField['properties']['default'] ?? '',
+                            ];
+                        }
                     }
                 }
             }
@@ -164,8 +223,13 @@ trait ManagesFormSchema {
                 foreach ($row['fields'] as $fieldIndex => $field) {
                     if (($field['handle'] ?? '') === 'rich_text') {
                         $richTextObjects[] = [
-                            'rt_id'   => "{$rowIndex}_{$fieldIndex}",
-                            'content' => $field['value'] ?? '',
+                            'id'               => $field['properties']['id'] ?? "{$rowIndex}_{$fieldIndex}",
+                            'name'             => $field['properties']['name'] ?? '',
+                            'label'            => $field['properties']['label'] ?? '',
+                            'helpText'         => $field['properties']['helpText'] ?? '',
+                            'helpTextPosition' => $field['properties']['helpTextPosition'] ?? '',
+                            'rt_id'            => $field['properties']['id'] ?? "{$rowIndex}_{$fieldIndex}",
+                            'content'          => $field['properties']['value'] ?? $field['properties']['default'] ?? '',
                         ];
                     }
                 }
@@ -175,41 +239,82 @@ trait ManagesFormSchema {
         return $richTextObjects;
     }
 
-    public function renderQuillContent(string $deltaJson): string {
-        $ops = json_decode($deltaJson, true) ?? [];
-        $html = '';
+    /**
+     * Retrieves advanced select fields from the form schema's row payloads.
+     *
+     * @param array $rows
+     *
+     * @return array
+     */
+    private function getAdvancedSelectFields(array $rows): array {
+        $advancedSelects = [];
 
-        foreach ($ops as $op) {
-            $text = $op['insert'] ?? '';
-            $attrs = $op['attributes'] ?? [];
-
-            // Escape HTML
-            $text = e($text);
-
-            if (!empty($attrs['bold'])) {
-                $text = "<strong>{$text}</strong>";
+        foreach ($rows as $row) {
+            if ($row['group'] ?? null) {
+                foreach ($row['group']['rows'] ?? [] as $groupRow) {
+                    $advancedSelects = array_merge(
+                        $advancedSelects,
+                        $this->extractAdvancedSelects($groupRow['fields'] ?? [])
+                    );
+                }
+            } else {
+                $advancedSelects = array_merge(
+                    $advancedSelects,
+                    $this->extractAdvancedSelects($row['fields'] ?? [])
+                );
             }
-            if (!empty($attrs['underline'])) {
-                $text = "<u>{$text}</u>";
-            }
-            if (!empty($attrs['link'])) {
-                $url = htmlspecialchars($attrs['link'], ENT_QUOTES, 'UTF-8');
-                $text = "<a href=\"{$url}\" target=\"_blank\" rel=\"noopener\">{$text}</a>";
-            }
-            if (!empty($attrs['italic'])) {
-                $text = "<em>{$text}</em>";
-            }
-
-            // Handle newlines (Quill uses "\n" as a separate insert)
-            if ($text === "\n") {
-                // If you are wrapping in <p>, you might skip this or use <br>
-                // For a single root element, we often skip standalone newlines
-                continue; 
-            }
-
-            $html .= $text;
         }
 
-        return nl2br($html); // Convert newlines to <br> for HTML output
+        return $advancedSelects;
+    }
+
+    /**
+     * Extracts advanced select fields from the schema rows.
+     *
+     * @param array $fields
+     *
+     * @return array
+     */
+    private function extractAdvancedSelects(array $fields): array {
+        $advancedSelects = [];
+
+        foreach ($fields as $field) {
+            if (in_array($field['handle'], ['select', 'multi_select']) && 
+                ($field['properties']['advanced'] ?? null) === true) 
+            {
+                $advancedSelects[] = $this->buildAdvancedSelectConfig($field['properties']);
+            } 
+            
+            else if ($field['handle'] === 'repeater') {
+                foreach ($field['fields'] ?? [] as $repeaterField) {
+                    if (in_array($repeaterField['handle'], ['select', 'multi_select']) && 
+                        ($repeaterField['properties']['advanced'] ?? null) === true) 
+                    {
+                        $advancedSelects[] = $this->buildAdvancedSelectConfig($repeaterField['properties']);
+                    }
+                }
+            }
+        }
+
+        return $advancedSelects;
+    }
+
+    /**
+     * Builds an advanced select configuration from field properties.
+     *
+     * @param array $properties
+     *
+     * @return array
+     */
+    private function buildAdvancedSelectConfig(array $properties): array {
+        return [
+            'id'               => $properties['id'],
+            'label'            => $properties['label'] ?? '',
+            'name'             => $properties['name'] ?? '',
+            'helpText'         => $properties['helpText'] ?? '',
+            'helpTextPosition' => $properties['helpTextPosition'] ?? 'top',
+            'required'         => $properties['required'] ?? false,
+            'disabled'         => $properties['disabled'] ?? false
+        ];
     }
 }

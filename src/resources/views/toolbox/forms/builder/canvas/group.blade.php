@@ -6,9 +6,9 @@
         @dragend="$store.formBuilder.endDrag()"
     >
         <div class="meros-site-form-group-header">
-            <div class="font-semibold text-gray-800">⠿ {{ $groupPayload['title'] }}</div>
+            <h3 class="font-semibold text-gray-800">⠿ {{ $groupPayload['title'] }}</h3>
             @if(!empty($groupPayload['description']))
-                <div class="mt-2 text-gray-700">{!! $this->renderQuillContent($groupPayload['description']) !!}</div>
+                <p>{!! $this->renderQuillContent($groupPayload['description']) !!}</p>
             @endif
         </div>
         <div class="flex items-center gap-2">

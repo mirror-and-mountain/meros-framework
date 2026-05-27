@@ -131,7 +131,7 @@ export default function registerFormBuilderStore() {
                     label,
                     name: this.slugify(label) || this.slugify(safeHandle) || this.makeId(),
                     helpText: '',
-                    helpTextPosition: 'bottom',
+                    helpTextPosition: 'top',
                     value: '',
                     required: false,
                     disabled: false,
