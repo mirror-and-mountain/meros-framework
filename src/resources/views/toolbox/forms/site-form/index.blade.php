@@ -1,7 +1,9 @@
 <div class="meros-site-form-container">
 	<div class="meros-site-form-header">
-		<h1 class="meros-site-form-title">{{ $formTitle }}</h1>
-		@if(!empty($formDescription))
+		@if($showTitle)
+			<h1 class="meros-site-form-title">{{ $formTitle }}</h1>
+		@endif
+		@if($showDescription && !empty($formDescription))
 			<div class="meros-site-form-description">{!! $formDescription !!}</div>
 		@endif
 	</div>

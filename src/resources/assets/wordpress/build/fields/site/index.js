@@ -1,1 +1,0 @@
-(()=>{"use strict";document.addEventListener("DOMContentLoaded",()=>{initTomSelects(),bindRepeaterCellChangeDelegation()}),window.addEventListener("load",()=>{Livewire.hook("morphed",()=>{initTomSelects()})}),document.addEventListener("alpine:init",ensureRepeaterHandlersOnFormDragStore),window.Alpine&&ensureRepeaterHandlersOnFormDragStore()})();

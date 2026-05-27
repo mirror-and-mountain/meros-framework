@@ -50,6 +50,14 @@ export function merosHydrateQuillContent(container, content = null) {
 
     if (!content) {
 
+        const isFormDescription = container.classList.contains('meros-form-description');
+
+        if (isFormDescription) {
+            const formDescription = Alpine.store('formBuilder').formDescription || '';
+            container._quill.root.innerHTML = formDescription;
+            return;
+        }
+
         const richTextPayloads = Alpine.store('formBuilder').richTextPayloads || [];
         const rtId = container.dataset.rtId;
 
@@ -95,6 +103,7 @@ export function initRichTextEditors(richTextPayloads = []) {
         quill.root.addEventListener('blur', () => {            
             const deltaOps = quill.getContents().ops;
 
+            const isFormDescription = editor.classList.contains('meros-form-description');
             const isGroupDescription = editor.classList.contains('meros-form-group-description');
             const isRichTextDefault = editor.classList.contains('meros-rich-text-default-value');
 
@@ -117,6 +126,11 @@ export function initRichTextEditors(richTextPayloads = []) {
 
             else if (isGroupDescription) {
                 Alpine.store('formBuilder').updateActiveGroupProperty('description', JSON.stringify(deltaOps));
+            }
+
+            else if (isFormDescription) {
+                const content = quill.root.innerHTML;
+                Alpine.store('formBuilder').setFormDescription(content);
             }
         });
     });

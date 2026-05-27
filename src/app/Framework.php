@@ -39,7 +39,7 @@ use MM\Meros\App\Admin\Templates\TabbedSettingsPage;
 use MM\Meros\App\Admin\Templates\MerosFeaturesPage;
 
 use MM\Meros\App\Models\MerosForm;
-
+use MM\Meros\App\Support\PostType;
 use MM\Meros\App\Theme;
 use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Packages as PackagesAccessor;
@@ -259,8 +259,10 @@ final class Framework extends FeatureProvider {
             $postType->name('meros-form');
             $postType->label('Forms');
             $postType->description('A custom post type for managing Forms.');
+            $postType->supports(['title']);
             $postType->menuIcon('dashicons-feedback');
             $postType->public();
+            $postType->rewrite(['slug' => 'forms']);
 
             $postType->meta()->add(function ($meta) {
                 $meta->string('schema')
@@ -284,6 +286,24 @@ final class Framework extends FeatureProvider {
                 $button->render(false, false);
                 echo '</div>';
             });
+        });
+
+        // Filter the edit post link
+        add_filter('get_edit_post_link', function ($link, $postId, $context) {
+            if ($context === 'display' && get_post_type($postId) === 'meros-form') {
+                return home_url('toolbox/form-builder/' . $postId);
+            }
+            return $link;
+        }, 10, 3);
+
+        // Redirect the new link
+        add_action('admin_init', function () {
+            global $pagenow;
+
+            if ($pagenow === 'post-new.php' && isset($_GET['post_type']) && $_GET['post_type'] === 'meros-form') {
+                wp_safe_redirect(home_url('toolbox/form-builder'));
+                exit;
+            }
         });
 
         // Filter the form post type content for rendering

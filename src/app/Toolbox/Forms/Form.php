@@ -12,14 +12,18 @@ use MM\Meros\App\Toolbox\Forms\Helpers\Serializer;
 use MM\Meros\App\Toolbox\Forms\Helpers\Utilities;
 
 class Form extends Component {
+    public bool $showTitle = false;
+    public bool $showDescription = true;
 
     use ManagesFormSchema;
 
-    public function mount($formID) {
+    public function mount(string|int $formID, bool $showTitle = false, bool $showDescription = true) {
         $this->initialiseFields();
         $this->initialiseFieldGroups();
 
         $this->formID = $formID;
+        $this->showTitle = $showTitle;
+        $this->showDescription = $showDescription;
 
         if ($this->formID) {
             $this->form = FormModel::find($formID);
@@ -43,6 +47,8 @@ class Form extends Component {
 
         return view('meros::toolbox.forms.site-form.index', [
             'formRows' => $hydratedRows,
+            'showTitle' => $this->showTitle,
+            'showDescription' => $this->showDescription,
         ]);
     }
 }

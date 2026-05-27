@@ -39,6 +39,27 @@ trait ManagesFormSchema {
     public string $formDescription = '';
 
     /**
+     * The slug of the form being built or edited.
+     *
+     * @var string
+     */
+    public string $formSlug = '';
+
+    /**
+     * The status of the form being built or edited.
+     *
+     * @var string
+     */
+    public string $formStatus = '';
+
+    /**
+     * The form actions associated with the current form.
+     *
+     * @var array
+     */
+    public array $actionPayloads = [];
+
+    /**
      * The available field types for the form.
      *
      * @var array
@@ -72,58 +93,6 @@ trait ManagesFormSchema {
      * @var array
      */
     public array $rowPayloads = [];
-
-    /**
-     * The form's settings
-     *
-     * @var array
-     */
-    public array $settings = [];
-
-    /**
-     * Renders Quill delta content to HTML, handling basic formatting and links.
-     *
-     * @param string $deltaJson
-     *
-     * @return string
-     */
-    public function renderQuillContent(string $deltaJson): string {
-        $ops = json_decode($deltaJson, true) ?? [];
-        $html = '';
-
-        foreach ($ops as $op) {
-            $text = $op['insert'] ?? '';
-            $attrs = $op['attributes'] ?? [];
-
-            // Escape HTML
-            $text = e($text);
-
-            if (!empty($attrs['bold'])) {
-                $text = "<strong>{$text}</strong>";
-            }
-            if (!empty($attrs['underline'])) {
-                $text = "<u>{$text}</u>";
-            }
-            if (!empty($attrs['link'])) {
-                $url = htmlspecialchars($attrs['link'], ENT_QUOTES, 'UTF-8');
-                $text = "<a href=\"{$url}\" target=\"_blank\" rel=\"noopener\">{$text}</a>";
-            }
-            if (!empty($attrs['italic'])) {
-                $text = "<em>{$text}</em>";
-            }
-
-            // Handle newlines (Quill uses "\n" as a separate insert)
-            if ($text === "\n") {
-                // If you are wrapping in <p>, you might skip this or use <br>
-                // For a single root element, we often skip standalone newlines
-                continue; 
-            }
-
-            $html .= $text;
-        }
-
-        return nl2br($html); // Convert newlines to <br> for HTML output
-    }
 
     /**
      * Retrieves available field types from the Fields register 
@@ -172,6 +141,11 @@ trait ManagesFormSchema {
      * @return array
      */
     private function loadFormSchema(string|array $schema): array {
+        $this->formTitle       = $this->form->post_title ?? '';
+        $this->formDescription = $this->form->post_content ?? '';
+        $this->formSlug        = $this->form->post_name ?? '';
+        $this->formStatus      = $this->form->post_status ?? '';
+
         $decoded = is_array($schema) ? $schema : json_decode($schema, true);
 
         if (!is_array($decoded)) {
@@ -316,5 +290,50 @@ trait ManagesFormSchema {
             'required'         => $properties['required'] ?? false,
             'disabled'         => $properties['disabled'] ?? false
         ];
+    }
+
+    /**
+     * Renders Quill delta content to HTML, handling basic formatting and links.
+     *
+     * @param string $deltaJson
+     *
+     * @return string
+     */
+    public function renderQuillContent(string $deltaJson): string {
+        $ops = json_decode($deltaJson, true) ?? [];
+        $html = '';
+
+        foreach ($ops as $op) {
+            $text = $op['insert'] ?? '';
+            $attrs = $op['attributes'] ?? [];
+
+            // Escape HTML
+            $text = e($text);
+
+            if (!empty($attrs['bold'])) {
+                $text = "<strong>{$text}</strong>";
+            }
+            if (!empty($attrs['underline'])) {
+                $text = "<u>{$text}</u>";
+            }
+            if (!empty($attrs['link'])) {
+                $url = htmlspecialchars($attrs['link'], ENT_QUOTES, 'UTF-8');
+                $text = "<a href=\"{$url}\" target=\"_blank\" rel=\"noopener\">{$text}</a>";
+            }
+            if (!empty($attrs['italic'])) {
+                $text = "<em>{$text}</em>";
+            }
+
+            // Handle newlines (Quill uses "\n" as a separate insert)
+            if ($text === "\n") {
+                // If you are wrapping in <p>, you might skip this or use <br>
+                // For a single root element, we often skip standalone newlines
+                continue; 
+            }
+
+            $html .= $text;
+        }
+
+        return nl2br($html); // Convert newlines to <br> for HTML output
     }
 }

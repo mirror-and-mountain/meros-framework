@@ -2,6 +2,11 @@ import { merosHydrateQuillContent } from '../richtext.js';
 
 export default function registerFormBuilderStore() {
     const store = {
+        formTitle: '',
+        formDescription: '',
+        formSlug: '',
+        formStatus: '',
+        settingsUpdater: null,
         rowsUpdater: null,
         repeaterEditCallback: null,
         repeaterFieldMoveCallback: null,
@@ -25,9 +30,40 @@ export default function registerFormBuilderStore() {
         sourceGroupRowIndex: null,
         sourceGroupInnerRowIndex: null,
 
+        // Sets the form settings updater callback
+        setSettingsUpdater(updater) {
+            this.settingsUpdater = typeof updater === 'function' ? updater : null;
+        },
+
         // Sets the row updater callback
         setRowsUpdater(updater) {
             this.rowsUpdater = typeof updater === 'function' ? updater : null;
+        },
+
+        // Sets the form title
+        setFormTitle(title) {
+            this.formTitle = title;
+            this.settingsUpdater?.('formTitle', this.formTitle);
+        },
+
+        // Sets the form description
+        setFormDescription(description) {
+            this.formDescription = description;
+            this.settingsUpdater?.('formDescription', this.formDescription);
+        },
+
+        // Sets the form slug
+        setFormSlug(slug) {
+            const formatted = String(slug ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            
+            this.formSlug = formatted;
+            this.settingsUpdater?.('formSlug', this.formSlug);
+        },
+
+        // Sets the form status
+        setFormStatus(status) {
+            this.formStatus = status;
+            this.settingsUpdater?.('formStatus', this.formStatus);
         },
 
         // Callbacks for repeater field editing, moving, and adding

@@ -12,6 +12,8 @@ use MM\Meros\Services\Contracts\Elements\Field;
 use MM\Meros\Services\Contracts\Elements\FieldGroup;
 
 use MM\Meros\App\Models\MerosForm as Form;
+use MM\Meros\App\Models\PostMeta as FormMeta;
+
 use MM\Meros\App\Toolbox\Forms\Concerns\ManagesFormSchema;
 
 use MM\Meros\App\Toolbox\Forms\Helpers\Hydrator;
@@ -19,7 +21,6 @@ use MM\Meros\App\Toolbox\Forms\Helpers\Serializer;
 use MM\Meros\App\Toolbox\Forms\Helpers\Utilities;
 
 class Builder extends Component {
-
     /**
      * The current screen of the form-builder ui.
      *
@@ -53,32 +54,39 @@ class Builder extends Component {
      *
      * @var array
      */
-    public array $navItems = [
-        'Canvas', 
-        'Preview', 
-        'Settings', 
-    ];
+    public array $navItems = [];
 
-    public bool $test = false;
-
-    private array $hydratedRows = [];
+    /**
+     * The url to return to when clicking the wordpress link in the header.
+     *
+     * @var string
+     */
+    public string $returnUrl = '';
 
     use ManagesFormSchema;
 
-    public function mount($formID = null) {
+    public function mount(string|int|null $formID = null) {
         $this->initialiseFields();
         $this->initialiseFieldGroups();
 
         if ($formID) {
             $this->formID = $formID;
             $this->form   = Form::find($formID);
+
+            $this->navItems = [
+                0 => 'Settings',
+                1 => 'Canvas',
+                'Preview' => get_preview_post_link($formID)
+            ];
+
+            $this->returnUrl = admin_url('edit.php?post_type=meros-form');
+        } else {
+            $this->makeNewForm();
         }
 
         $rawSchema = '';
 
         if ($this->form) {
-            $this->formTitle = $this->form->post_title;
-            $this->formDescription = $this->form->post_content;
             $rawSchema = $this->loadFormSchema($this->form->schema());
         } else {
             $rawSchema = $this->loadFormSchema(static::defaultFormStructureJson());
@@ -86,27 +94,58 @@ class Builder extends Component {
 
         $this->schema = [
             'rows'     => Utilities::normaliseRowPayloads($rawSchema['rows'] ?? []),
-            'settings' => $rawSchema['settings'] ?? []
+            'actions'  => $rawSchema['actions'] ?? []
         ];
 
-        $this->settings    = $this->schema['settings'] ?? [];
-        $this->rowPayloads = $this->schema['rows'] ?? [];
-        
+        $this->rowPayloads    = $this->schema['rows'] ?? [];
+        $this->actionPayloads = $this->schema['actions'] ?? [];
     }
 
     public function render() {
         $hydrator = Hydrator::make($this->fieldTypes, $this);
         $hydratedRows = $hydrator->hydrateRowPayloads($this->rowPayloads);
-        $this->hydratedRows = $hydratedRows;
 
         return view('meros::toolbox.forms.builder.index', [
-            'formID' => $this->formID,
-            'canvasRows' => $hydratedRows,
+            'formID'          => $this->formID,
+            'formTitle'       => $this->formTitle,
+            'formDescription' => $this->formDescription,
+            'canvasRows'      => $hydratedRows,
             'editingRepeater' => $this->editingRepeaterField
         ])
             ->layout('meros::toolbox.layout', [
-                'navItems' => $this->navItems
+                'navItems'  => $this->navItems,
+                'returnUrl' => $this->returnUrl
             ]);
+    }
+
+    /**
+     * Updates a specific setting of the form being edited and dispatches a schema update event.
+     *
+     * @param string $settingKey
+     * @param mixed  $settingValue
+     *
+     * @return void
+     */
+    public function updateSettings(string $settingKey, mixed $settingValue): void {
+        if (property_exists($this, $settingKey)) {
+            $this->{$settingKey} = $settingValue;
+        }
+
+        $this->dispatchSchemaUpdate();
+    }
+
+    /**
+     * Updates the form actions and dispatches a schema update event.
+     *
+     * @param array $actions
+     *
+     * @return void
+     */
+    public function updateActions(array $actions): void {
+        $this->schema['actions'] = $actions;
+        $this->actionPayloads = $actions;
+
+        $this->dispatchSchemaUpdate();
     }
 
     /**
@@ -116,11 +155,34 @@ class Builder extends Component {
      *
      * @return void
      */
-    public function updateSchemaRows(array $updatedSchemaRows): void {
+    public function updateRows(array $updatedSchemaRows): void {
         $this->schema['rows'] = $updatedSchemaRows;
         $this->rowPayloads    = $updatedSchemaRows;
 
         $this->dispatchSchemaUpdate();
+    }
+
+    /**
+     * Retrieves the form's settings as an array.
+     *
+     * @return array
+     */
+    public function getFormSettings(): array {
+        return [
+            'title'       => $this->formTitle,
+            'description' => $this->formDescription,
+            'slug'        => $this->formSlug,
+            'status'      => $this->formStatus
+        ];
+    }
+
+    /**
+     * Retrieves the form's actions as an array.
+     *
+     * @return array
+     */
+    public function getFormActions(): array {
+        return $this->schema['actions'] ?? [];
     }
 
     /**
@@ -131,16 +193,6 @@ class Builder extends Component {
     #[Renderless]
     public function getRows(): array {
         return $this->schema['rows'] ?? [];
-    }
-
-    /**
-     * Retrieves the form settings for rendering in the settings panel.
-     *
-     * @return array
-     */
-    #[Renderless]
-    public function getSettings(): array {
-        return $this->schema['settings'] ?? [];
     }
 
     /**
@@ -390,6 +442,10 @@ class Builder extends Component {
      * @return void
      */
     public function saveForm(): void {
+        if (!$this->form) {
+            return;
+        }
+
         $serializer = Serializer::make(Hydrator::make($this->fieldTypes, $this));
 
         $serializedSchema = [
@@ -397,23 +453,11 @@ class Builder extends Component {
             'rows'     => $serializer->serializeFormSchema($this->rowPayloads ?? [])
         ];
         
-        if (!$this->form) {
-            $this->formID = wp_insert_post([
-                'post_title'   => $this->formTitle ?: 'Untitled Form',
-                'post_content' => '',
-                'post_status'  => 'publish',
-                'post_type'    => 'meros-form',
-            ]);
-
-            $this->form = Form::find($this->formID);
-        } 
-        
-        else {
-            $this->form->update([
-                'post_title'   => $this->formTitle ?: 'Untitled Form',
-                'post_content' => '',
-            ]);
-        }
+        $this->form->update([
+            'post_title'   => $this->formTitle ?: 'Untitled Form',
+            'post_name'    => Str::slug($this->formSlug ?: $this->formTitle ?: 'untitled-form'),
+            'post_content' => wp_kses_post($this->formDescription ?: ''),
+        ]);
 
         $this->form->meta()->updateOrCreate(
             ['meta_key'   => '_meros_form_meta'],
@@ -585,5 +629,38 @@ class Builder extends Component {
 
         $this->editingRepeaterField = $repeater;
         return $repeater;
+    }
+
+    /**
+     * Creates a new form post and redirects to its builder page.
+     *
+     * @return void
+     */
+    private function makeNewForm(): void {
+        $newFormId = wp_insert_post([
+            'post_title'   => 'Untitled Form',
+            'post_content' => '',
+            'post_status'  => 'draft',
+            'post_type'    => 'meros-form',
+        ]);
+
+        $defaultMeta = [
+            'schema' => [
+                'settings' => [],
+                'rows' => []
+            ]
+        ];
+
+        FormMeta::create([
+            'post_id' => $newFormId,
+            'meta_key' => '_meros_form_meta',
+            'meta_value' => json_encode($defaultMeta)
+        ]);
+
+        if (!is_int($newFormId)) {
+            abort(500, 'Failed to create new form.');
+        }
+
+        $this->redirect(route('meros.toolbox.form-builder.edit', ['formID' => $newFormId]));
     }
 }

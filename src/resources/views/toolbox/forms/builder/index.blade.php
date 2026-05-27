@@ -1,6 +1,11 @@
 <div>
     @include('meros::toolbox.forms.builder.canvas.index')
-    @include('meros::toolbox.forms.builder.preview')
+    @include('meros::toolbox.forms.builder.settings.index', [
+        'formID'          => $formID,
+        'formTitle'       => $formTitle,
+        'formDescription' => $formDescription,
+        'formSlug'        => $formSlug
+    ])
 </div>
 
 @script
@@ -18,6 +23,10 @@
         });
 
         document.addEventListener('livewire:initialized', () => {
+            const getFormSettings = async () => {
+                return await $wire.getFormSettings();
+            }
+
             const getSchemaRows = async () => {
                 return await $wire.getRows();
             }
@@ -30,7 +39,8 @@
             $store.repeaterField.setIsEditor(true);
 
             // Set up the form builder store
-            $store.formBuilder.setRowsUpdater((rows) => $wire.updateSchemaRows(rows));
+            $store.formBuilder.setSettingsUpdater((key, value) => $wire.updateSettings(key, value));
+            $store.formBuilder.setRowsUpdater((rows) => $wire.updateRows(rows));
 
             // Callbacks for repeater field editing
             $store.formBuilder.setRepeaterEditCallback((repeaterId) =>
@@ -52,6 +62,13 @@
             $store.formBuilder.setRepeaterUpdateValueCallback((repeaterId, value) =>
                 $wire.updateRepeaterDefaultValue(repeaterId, value)
             );
+
+            getFormSettings().then(settings => {
+                $store.formBuilder.formTitle = settings.title;
+                $store.formBuilder.formDescription = settings.description;
+                $store.formBuilder.formSlug = settings.slug;
+                $store.formBuilder.formStatus = settings.status;
+            });
             
             getSchemaRows().then(rows => {
                 $store.formBuilder.setRows(rows);
