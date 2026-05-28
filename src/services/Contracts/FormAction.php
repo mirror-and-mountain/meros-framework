@@ -62,4 +62,20 @@ abstract class FormAction extends FeatureDefinition {
     public function getDescription(): string {
         return $this->description;
     }
+
+    /***************************
+     * Abstract methods
+     ***************************/
+
+    /**
+     * Renders the configuration dialogue for the form action, 
+     * which will be displayed in the admin interface when 
+     * configuring the form action for a form. 
+     * 
+     * This should return an HTML string containing the form 
+     * fields for configuring the action's settings.
+     *
+     * @return string
+     */
+    abstract public function renderConfigurationDialogue(): string;
 }

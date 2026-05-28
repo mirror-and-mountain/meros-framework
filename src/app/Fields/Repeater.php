@@ -89,7 +89,7 @@ class Repeater extends Field implements FieldParent {
 
     /**
      * Whether to allow configuring rows in the repeater. 
-     * If null, will default to false.
+     * If null, will default to true.
      *
      * @var boolean|null
      */
@@ -229,7 +229,7 @@ class Repeater extends Field implements FieldParent {
      * @return boolean
      */
     public function allowsConfigure(): bool {
-        return $this->allowConfigure ?? true; // For testing
+        return $this->allowConfigure ?? true;
     }
 
     /**

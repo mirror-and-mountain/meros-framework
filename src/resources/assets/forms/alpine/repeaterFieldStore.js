@@ -155,6 +155,153 @@ export default function registerRepeaterFieldStore() {
             });
         },
 
+        // Returns the current repeater row payload as an object keyed by field name.
+        getRepeaterRowValue(anchorElement) {
+            const rowElement = anchorElement?.closest?.('tr.meros-repeater-row') ?? null;
+
+            if (!rowElement || rowElement.classList.contains('meros-repeater-template-row')) {
+                return {};
+            }
+
+            const rowValue = {};
+
+            rowElement.querySelectorAll('td[data-field-name]').forEach(fieldCellElement => {
+                const fieldName = fieldCellElement.getAttribute('data-field-name');
+
+                if (!fieldName) {
+                    return;
+                }
+
+                rowValue[fieldName] = this.getFieldCellValue(fieldCellElement);
+            });
+
+            return rowValue;
+        },
+
+        // Resolve a configured callback name to an executable function.
+        resolveConfigureCallback(callbackName) {
+            if (typeof callbackName !== 'string' || callbackName.trim() === '') {
+                return null;
+            }
+
+            const trimmedName = callbackName.trim();
+
+            if (trimmedName.startsWith('$store.')) {
+                const storePath = trimmedName.replace(/^\$store\./, '');
+                const segments = storePath.split('.').filter(Boolean);
+                const storeName = segments.shift();
+
+                if (!storeName) {
+                    return null;
+                }
+
+                let owner = Alpine.store(storeName);
+                let value = owner;
+
+                for (const segment of segments) {
+                    owner = value;
+                    value = value?.[segment];
+                }
+
+                if (typeof value === 'function') {
+                    return value.bind(owner);
+                }
+
+                return null;
+            }
+
+            if (typeof window[trimmedName] === 'function') {
+                return window[trimmedName].bind(window);
+            }
+
+            const segments = trimmedName.split('.').filter(Boolean);
+            let owner = window;
+            let value = window;
+
+            for (const segment of segments) {
+                owner = value;
+                value = value?.[segment];
+            }
+
+            return typeof value === 'function' ? value.bind(owner) : null;
+        },
+
+        // Invoke a repeater row configure callback with row payload context.
+        configureRow(anchorElement, callbackName) {
+            if (this.shouldDisableConfigureButton(anchorElement)) {
+                return;
+            }
+
+            const params = {
+                triggerElement: anchorElement,
+                rowValue: this.getRepeaterRowValue(anchorElement),
+            };
+
+            const fallbackCallback = window.merosDefaultRepeaterRowConfig;
+            const callback = this.resolveConfigureCallback(callbackName);
+
+            if (typeof callback !== 'function') {
+                if (typeof fallbackCallback === 'function') {
+                    fallbackCallback(params);
+                }
+                return;
+            }
+
+            callback(params);
+        },
+
+        // Determines whether a value should be treated as empty for configure-button gating.
+        isEmptyConfigureValue(value) {
+            if (value === null || value === undefined) {
+                return true;
+            }
+
+            if (Array.isArray(value)) {
+                return value.length === 0 || value.every(item => String(item ?? '').trim() === '');
+            }
+
+            if (typeof value === 'string') {
+                return value.trim() === '';
+            }
+
+            return false;
+        },
+
+        // Configure is disabled when a row has exactly one data cell and that cell has no value.
+        shouldDisableConfigureButton(anchorElement) {
+            const rowElement = anchorElement?.closest?.('tr.meros-repeater-row') ?? null;
+
+            if (!rowElement) {
+                return false;
+            }
+
+            const dataCells = Array.from(rowElement.querySelectorAll('td[data-field-name]'));
+
+            if (dataCells.length !== 1) {
+                return false;
+            }
+
+            const rowValue = this.getFieldCellValue(dataCells[0]);
+
+            return this.isEmptyConfigureValue(rowValue);
+        },
+
+        // Refreshes configure button disabled state for all rows in a repeater.
+        syncConfigureButtonState(anchorElement) {
+            const repeaterRoot = this.getRepeaterRoot(anchorElement);
+
+            if (!repeaterRoot) {
+                return;
+            }
+
+            repeaterRoot.querySelectorAll('tr.meros-repeater-row .meros-repeater-button--configure').forEach(configureButton => {
+                const shouldDisable = this.shouldDisableConfigureButton(configureButton);
+
+                configureButton.disabled = shouldDisable;
+                configureButton.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
+            });
+        },
+
         // Retrieves advanced select elements within a repeater root.
         getTomSelectElements(anchorElement) {
             return Array.from(this.getRepeaterRoot(anchorElement)?.querySelectorAll('select.meros-select-field[data-advanced="true"]') ?? []);
@@ -366,6 +513,24 @@ export default function registerRepeaterFieldStore() {
                 });
             });
 
+            repeaterRoot.querySelectorAll('tr.meros-repeater-row .meros-repeater-button--configure').forEach(configureButton => {
+                if (configureButton.dataset.boundRowConfigure === 'true') {
+                    return;
+                }
+
+                configureButton.dataset.boundRowConfigure = 'true';
+
+                const rowElement = configureButton.closest('tr.meros-repeater-row');
+                const syncState = () => {
+                    this.syncConfigureButtonState(configureButton);
+                };
+
+                rowElement?.querySelectorAll('input, select, textarea').forEach(control => {
+                    control.addEventListener('input', syncState);
+                    control.addEventListener('change', syncState);
+                });
+            });
+
             repeaterRoot.querySelectorAll('tr.meros-repeater-gap-row .meros-repeater-row-gap').forEach(gapElement => {
                 if (gapElement.dataset.boundGapDrop === 'true') {
                     return;
@@ -388,6 +553,8 @@ export default function registerRepeaterFieldStore() {
                     this.setRepeaterDragging(gapElement, false);
                 });
             });
+
+            this.syncConfigureButtonState(repeaterRoot);
         },
 
         // Toggles drag-active UI state for all row gaps in the current repeater.
@@ -416,12 +583,14 @@ export default function registerRepeaterFieldStore() {
             if (containerElement.dataset) {
                 delete containerElement.dataset.boundRowDrag;
                 delete containerElement.dataset.boundRowRemove;
+                delete containerElement.dataset.boundRowConfigure;
                 delete containerElement.dataset.boundGapDrop;
             }
 
-            containerElement.querySelectorAll('[data-bound-row-drag], [data-bound-row-remove], [data-bound-gap-drop]').forEach(element => {
+            containerElement.querySelectorAll('[data-bound-row-drag], [data-bound-row-remove], [data-bound-row-configure], [data-bound-gap-drop]').forEach(element => {
                 delete element.dataset.boundRowDrag;
                 delete element.dataset.boundRowRemove;
+                delete element.dataset.boundRowConfigure;
                 delete element.dataset.boundGapDrop;
             });
         },

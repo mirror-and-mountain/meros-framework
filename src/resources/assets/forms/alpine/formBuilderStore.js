@@ -1,4 +1,5 @@
 import { merosHydrateQuillContent } from '../richtext.js';
+import { openRepeaterDialogFromHtml } from '../repeaters.js';
 
 export default function registerFormBuilderStore() {
     const store = {
@@ -12,10 +13,11 @@ export default function registerFormBuilderStore() {
         actionPayloads: [],
         richTextPayloads: [],
 
-        // Updaters
+        // Updaters/callbacks
         settingsUpdater: null,
         rowsUpdater: null,
         actionsUpdater: null,
+        actionConfigCallback: null,
 
         // Repeater properties
         repeaterEditCallback: null,
@@ -99,6 +101,11 @@ export default function registerFormBuilderStore() {
         // Sets the actions updater callback
         setActionsUpdater(updater) {
             this.actionsUpdater = typeof updater === 'function' ? updater : null;
+        },
+
+        // Sets the action configuration callback
+        setActionConfigCallback(callback) {
+            this.actionConfigCallback = typeof callback === 'function' ? callback : null;
         },
 
         // Callbacks for repeater field editing, moving, and adding
@@ -1318,6 +1325,7 @@ export default function registerFormBuilderStore() {
             return null;
         },
 
+        // Updates a property in the current active group.
         updateActiveGroupProperty(property, value) {
             if (!this.activeField || this.activeField.handle !== 'group') {
                 return;
@@ -1391,7 +1399,41 @@ export default function registerFormBuilderStore() {
                     ? [...nextValue]
                     : (nextValue && typeof nextValue === 'object' ? { ...nextValue } : nextValue);
             });
-        }
+        },
+
+        // -----------------------------------------------------------------
+        // Action configuration handlers
+        // -----------------------------------------------------------------
+
+        // Retrieves the configuration dialogue content for a given action handle, using the configured callback.
+        async getActionConfigurationDialogue(params = null) {
+            if (typeof this.actionConfigCallback !== 'function') {
+                return;
+            }
+
+            const resolvedActionHandle = typeof params === 'string'
+                ? params
+                : params?.rowValue?.action_type;
+
+            if (typeof resolvedActionHandle !== 'string' || resolvedActionHandle.trim() === '') {
+                return;
+            }
+
+            const dialogueContent = await this.actionConfigCallback(resolvedActionHandle);
+
+            const html = typeof dialogueContent === 'string'
+                ? dialogueContent
+                : (typeof dialogueContent?.html === 'string' ? dialogueContent.html : '');
+
+            if (typeof html !== 'string' || html.trim() === '') {
+                return;
+            }
+
+            openRepeaterDialogFromHtml(html, async ({ dialog, shell, body }) => {
+                console.log('Dialogue updated!', { dialog, shell, body });
+                return true;
+            });
+        },
     };
 
     Alpine.store('formBuilder', store);

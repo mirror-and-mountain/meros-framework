@@ -237,4 +237,18 @@ final class SendEmailWithTemplate extends FormAction {
     public function getConfig(): array {
         return $this->config;
     }
+
+    /**
+     * Renders the configuration dialogue for the form action, 
+     * which will be displayed in the admin interface when 
+     * configuring the form action for a form. 
+     * 
+     * This should return an HTML string containing the form 
+     * fields for configuring the action's settings.
+     *
+     * @return string
+     */
+    public function renderConfigurationDialogue(): string {
+        return '<div>Hi There</div>';
+    }
 }

@@ -48,6 +48,162 @@ function focusFirstField(container) {
 }
 
 /**
+ * Prevents the page from scrolling while the repeater configuration dialog is open.
+ *
+ * @returns {() => void}
+ */
+function lockPageScroll() {
+	const scrollY = window.scrollY || window.pageYOffset || 0;
+	const html = document.documentElement;
+	const body = document.body;
+	const previousHtmlOverflow = html.style.overflow;
+	const previousBodyOverflow = body.style.overflow;
+	const previousBodyPosition = body.style.position;
+	const previousBodyTop = body.style.top;
+	const previousBodyLeft = body.style.left;
+	const previousBodyRight = body.style.right;
+	const previousBodyWidth = body.style.width;
+
+	html.style.overflow = 'hidden';
+	body.style.overflow = 'hidden';
+	body.style.position = 'fixed';
+	body.style.top = `-${scrollY}px`;
+	body.style.left = '0';
+	body.style.right = '0';
+	body.style.width = '100%';
+
+	return function () {
+		html.style.overflow = previousHtmlOverflow;
+		body.style.overflow = previousBodyOverflow;
+		body.style.position = previousBodyPosition;
+		body.style.top = previousBodyTop;
+		body.style.left = previousBodyLeft;
+		body.style.right = previousBodyRight;
+		body.style.width = previousBodyWidth;
+		window.scrollTo(0, scrollY);
+	};
+}
+
+/**
+ * Builds a repeater modal shell and injects the provided HTML into the default
+ * dialog body while keeping the shared header/footer chrome.
+ *
+ * @param {string} bodyHtml
+ * @param {(context: { dialog: HTMLDialogElement, shell: HTMLDivElement, body: HTMLDivElement }) => (boolean | void | Promise<boolean | void>) | null} onUpdate
+ * @returns {{ dialog: HTMLDialogElement, shell: HTMLDivElement, body: HTMLDivElement }}
+ */
+export function buildRepeaterDialogFromHtml(bodyHtml = '', onUpdate = null) {
+	const dialog = document.createElement('dialog');
+	dialog.className = 'meros-repeater-config-dialog';
+
+	const shell = document.createElement('div');
+	shell.className = 'meros-repeater-config-dialog__shell';
+
+	const header = document.createElement('div');
+	header.className = 'meros-repeater-config-dialog__header';
+
+	const title = document.createElement('h2');
+	title.className = 'meros-repeater-config-dialog__title';
+	title.textContent = 'Configure';
+
+	const dismissButton = document.createElement('button');
+	dismissButton.type = 'button';
+	dismissButton.className = 'meros-repeater-config-dialog__dismiss';
+	dismissButton.setAttribute('aria-label', 'Close dialog');
+	dismissButton.textContent = 'x';
+	dismissButton.addEventListener('click', function () {
+		dialog.close();
+	});
+
+	const body = document.createElement('div');
+	body.className = 'meros-repeater-config-dialog__body';
+	body.innerHTML = typeof bodyHtml === 'string' ? bodyHtml : '';
+
+	const footer = document.createElement('div');
+	footer.className = 'meros-repeater-config-dialog__footer';
+
+	const updateButton = document.createElement('button');
+	updateButton.type = 'button';
+	updateButton.className = 'button meros-repeater-config-dialog__close';
+	updateButton.textContent = 'Update';
+	updateButton.addEventListener('click', async function () {
+		let shouldClose = true;
+
+		if (typeof onUpdate === 'function') {
+			const result = await onUpdate({ dialog, shell, body });
+			shouldClose = result !== false;
+		}
+
+		if (shouldClose) {
+			dialog.close();
+		}
+	});
+
+	header.appendChild(title);
+	header.appendChild(dismissButton);
+	shell.appendChild(header);
+	shell.appendChild(body);
+	footer.appendChild(updateButton);
+	shell.appendChild(footer);
+
+	dialog.addEventListener('click', function (event) {
+		const bounds = dialog.getBoundingClientRect();
+		const clickedBackdrop =
+			event.clientX < bounds.left ||
+			event.clientX > bounds.right ||
+			event.clientY < bounds.top ||
+			event.clientY > bounds.bottom;
+
+		if (clickedBackdrop) {
+			dialog.close();
+		}
+	});
+
+	dialog.appendChild(shell);
+
+	return { dialog, shell, body };
+}
+
+/**
+ * Builds and opens a repeater modal from a raw HTML string.
+ * Handles body scroll locking and cleanup when the dialog closes.
+ *
+ * @param {string} shellHtml
+ * @param {(context: { dialog: HTMLDialogElement, shell: HTMLDivElement, body: HTMLDivElement }) => (boolean | void | Promise<boolean | void>) | null} onUpdate
+ * @returns {HTMLDialogElement}
+ */
+export function openRepeaterDialogFromHtml(shellHtml = '', onUpdate = null) {
+	const existingDialog = document.querySelector('dialog.meros-repeater-config-dialog[open]');
+
+	if (existingDialog instanceof HTMLDialogElement) {
+		existingDialog.close();
+	}
+
+	const { dialog, body } = buildRepeaterDialogFromHtml(shellHtml, onUpdate);
+	const unlockPageScroll = lockPageScroll();
+
+	const cleanup = function () {
+		unlockPageScroll();
+		dialog.removeEventListener('close', cleanup);
+		dialog.remove();
+	};
+
+	dialog.addEventListener('close', cleanup);
+
+	document.body.appendChild(dialog);
+
+	try {
+		dialog.showModal();
+	} catch (error) {
+		dialog.setAttribute('open', 'open');
+	}
+
+	focusFirstField(body);
+
+	return dialog;
+}
+
+/**
  * Builds the default repeater configuration dialog and temporarily moves the
  * row's field contents into it until the dialog is closed.
  *
@@ -67,34 +223,12 @@ function buildRepeaterConfigureDialog(triggerElement) {
 		return null;
 	}
 
-	const dialog = document.createElement('dialog');
-	dialog.className = 'meros-repeater-config-dialog';
+	const defaultUpdateHandler = function () {
+		// Row controls remain bound to the original inputs while in the modal.
+		return true;
+	};
 
-	const shell = document.createElement('div');
-	shell.className = 'meros-repeater-config-dialog__shell';
-
-	const header = document.createElement('div');
-	header.className = 'meros-repeater-config-dialog__header';
-
-	const title = document.createElement('h2');
-	title.className = 'meros-repeater-config-dialog__title';
-	title.textContent = 'Configure row';
-
-	const closeButton = document.createElement('button');
-	closeButton.type = 'button';
-	closeButton.className = 'button';
-	closeButton.textContent = 'Update';
-	closeButton.addEventListener('click', function () {
-		dialog.close();
-	});
-
-	header.appendChild(title);
-	header.appendChild(closeButton);
-	shell.appendChild(header);
-
-	const body = document.createElement('div');
-	body.className = 'meros-repeater-config-dialog__body';
-	shell.appendChild(body);
+	const { dialog, body } = buildRepeaterDialogFromHtml('', defaultUpdateHandler);
 
 	const transfers = cells.map(function (cell) {
 		const placeholder = document.createComment('meros-repeater-config-placeholder');
@@ -143,31 +277,18 @@ function buildRepeaterConfigureDialog(triggerElement) {
 	};
 
 	dialog.addEventListener('close', restore, { once: true });
-	dialog.addEventListener('click', function (event) {
-		const bounds = dialog.getBoundingClientRect();
-		const clickedBackdrop =
-			event.clientX < bounds.left ||
-			event.clientX > bounds.right ||
-			event.clientY < bounds.top ||
-			event.clientY > bounds.bottom;
-
-		if (clickedBackdrop) {
-			dialog.close();
-		}
-	});
-
-	dialog.appendChild(shell);
-
 	return { dialog, body };
 }
 
 /**
  * Default global callback used by repeater Configure actions.
  *
- * @param {Element} triggerElement
+ * @param {{ triggerElement?: Element, rowValue?: Record<string, unknown> } | Element} payload
  * @returns {void}
  */
-window.merosDefaultRepeaterRowConfig = function (triggerElement) {
+window.merosDefaultRepeaterRowConfig = function (payload) {
+	const triggerElement = payload?.triggerElement ?? payload;
+
 	if (!(triggerElement instanceof Element)) {
 		return;
 	}
@@ -184,6 +305,14 @@ window.merosDefaultRepeaterRowConfig = function (triggerElement) {
 	if (!parts) {
 		return;
 	}
+
+	const unlockPageScroll = lockPageScroll();
+	const restoreScroll = function () {
+		unlockPageScroll();
+		parts.dialog.removeEventListener('close', restoreScroll);
+	};
+
+	parts.dialog.addEventListener('close', restoreScroll);
 
 	document.body.appendChild(parts.dialog);
 	parts.dialog.showModal();

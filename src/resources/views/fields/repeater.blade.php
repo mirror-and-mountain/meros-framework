@@ -105,8 +105,9 @@
                                 @if($field->allowsConfigure())
                                     <button
                                         type="button"
-                                        @click.stop="window['{{ $configurationCallback }}']?.($el)"
-                                        class="meros-repeater-button meros-repeater-button--neutral"
+                                        @click.stop="$store.repeaterField.configureRow($el, '{{ $configurationCallback }}')"
+                                        data-configure-callback="{{ $configurationCallback }}"
+                                        class="meros-repeater-button meros-repeater-button--neutral meros-repeater-button--configure"
                                         title="Configure row"
                                     >
                                         Configure
@@ -194,7 +195,9 @@
                             @if($field->allowsConfigure())
                                 <button
                                     type="button"
-                                    class="meros-repeater-button meros-repeater-button--neutral"
+                                    @click.stop="$store.repeaterField.configureRow($el, '{{ $configurationCallback }}')"
+                                    data-configure-callback="{{ $configurationCallback }}"
+                                    class="meros-repeater-button meros-repeater-button--neutral meros-repeater-button--configure"
                                     title="Configure row"
                                 >
                                     Configure

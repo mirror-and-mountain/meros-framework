@@ -12,6 +12,10 @@ use MM\Meros\Services\Contracts\FormAction;
 use MM\Meros\Services\Contracts\Elements\Field;
 use MM\Meros\Services\Contracts\Elements\FieldGroup;
 
+use MM\Meros\Facades\Fields;
+use MM\Meros\Facades\Framework;
+use MM\Meros\Facades\FormActions;
+
 use MM\Meros\App\Models\MerosForm as Form;
 use MM\Meros\App\Models\PostMeta as FormMeta;
 
@@ -222,6 +226,55 @@ class Builder extends Component {
     // =========================================================================
     // Action Management
     // =========================================================================
+
+    /**
+     * Retrieves the repeater field instance used for managing form actions in the builder.
+     *
+     * @return Field
+     */
+    public function getActionsRepeaterField(): Field {
+        $this->initialiseFormActions();
+
+        $field = Fields::checkout(Framework::get())->makeFrom(
+            'repeater', [
+                'id'                    => 'meros-form-actions-repeater',
+                'label'                 => 'Form Actions',
+                'name'                  => 'form_actions',
+                'helpText'              => 'Add actions to be performed when the form is submitted.',
+                'configurationCallback' => '$store.formBuilder.getActionConfigurationDialogue'
+            ]
+        );
+
+        $field->subField('select', function($select) {
+            $select->label('Action Type');
+            $select->name('action_type');
+            
+            $options = [];
+            foreach($this->actionPayloads as $handle => $payload) {
+                $options[$handle] = $payload['label'];
+            }
+
+            $select->options($options);
+        });
+
+        return $field;
+    }
+
+    public function getActionConfigurationDialogue(string $actionHandle): string {
+        $this->initialiseFormActions();
+
+        if (!in_array($actionHandle, array_keys($this->actionPayloads))) {
+            return '';
+        }
+
+        $actionInstance = FormActions::checkout(Framework::get())->makeFrom($actionHandle);
+
+        if (!$actionInstance) {
+            return '';
+        }
+
+        return $actionInstance->renderConfigurationDialogue();
+    }
 
     // =========================================================================
     // Repeater Management
