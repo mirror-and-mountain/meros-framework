@@ -449,7 +449,7 @@ class Builder extends Component {
         $serializer = Serializer::make(Hydrator::make($this->fieldTypes, $this));
 
         $serializedSchema = [
-            'settings' => $this->schema['settings'] ?? [],
+            'actions'  => [],
             'rows'     => $serializer->serializeFormSchema($this->rowPayloads ?? [])
         ];
         
@@ -457,6 +457,7 @@ class Builder extends Component {
             'post_title'   => $this->formTitle ?: 'Untitled Form',
             'post_name'    => Str::slug($this->formSlug ?: $this->formTitle ?: 'untitled-form'),
             'post_content' => wp_kses_post($this->formDescription ?: ''),
+            'post_status'  => $this->formStatus ?: 'draft'
         ]);
 
         $this->form->meta()->updateOrCreate(

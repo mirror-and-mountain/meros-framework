@@ -23,7 +23,13 @@ class MerosForm extends Post {
      */
     public function schema(bool $asArray = false): string|array {
         $schema = null;
-        $meta   = $this->meta->where('meta_key', '_meros_form_meta')->first();
+        $meta = null;
+
+        try {
+            $meta = $this->meta->where('meta_key', '_meros_form_meta')->first();
+        } catch (\Exception $e) {
+            return $asArray ? [] : json_encode([]);
+        }
 
         if ($meta !== null) {
             $schema = json_decode($meta->meta_value, true)['schema'] ?? null;

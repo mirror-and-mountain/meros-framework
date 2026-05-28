@@ -39,12 +39,13 @@ use MM\Meros\App\Admin\Templates\TabbedSettingsPage;
 use MM\Meros\App\Admin\Templates\MerosFeaturesPage;
 
 use MM\Meros\App\Models\MerosForm;
-use MM\Meros\App\Support\PostType;
 use MM\Meros\App\Theme;
 use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Packages as PackagesAccessor;
 use MM\Meros\Facades\Blocks as BlocksAccessor;
 use MM\Meros\Facades\AssetGroups as AssetGroupsAccessor;
+
+use MM\Meros\App\Models\MerosEmailTemplate as EmailTemplate;
 
 final class Framework extends FeatureProvider {
     /**
@@ -58,8 +59,36 @@ final class Framework extends FeatureProvider {
         // Set framework preferences
         $this->setPreference('livewire_namespace', 'MM\\Meros\\App\\Livewire');
 
+        if (getenv('MEROS_ENVIRONMENT') && getenv('MEROS_ENVIRONMENT') === 'true') {
+            $this->configureLocalMailTransport();
+        }
+
         $this->load();
         $this->configure();
+
+        // add_action('meros_providers_registered', function () {
+        //     $mailError = null;
+        //     add_action('wp_mail_failed', function ($error) use (&$mailError) {
+        //         $mailError = $error;
+        //     });
+
+        //     $email = EmailTemplate::find(57);
+        //     $test = $email->sendWithTags([
+        //         'to' => 'toby@tmw.dev',
+        //         'subject' => 'Test Email With Link',
+        //         'tagMap' => [
+        //             'first_name' => 'Toby',
+        //             'last_name' => 'Wilson',
+        //         ],
+        //     ]);
+
+        //     dd([
+        //         'sent' => $test,
+        //         'mail_error_message' => $mailError?->get_error_message(),
+        //         'mail_error_data' => $mailError?->get_error_data(),
+        //     ]);
+        // }, 50);
+
         return $this;
     }
 
@@ -111,6 +140,27 @@ final class Framework extends FeatureProvider {
         if ($this->context->isAdmin) {
             $this->initAdminAjaxHandlers();
         }
+    }
+
+    /**
+     * Configures wp_mail to use Mailpit SMTP for local development without relying on SMTP plugins.
+     *
+     * Set MEROS_MAIL_HOST / MEROS_MAIL_PORT to override defaults.
+     *
+     * @return void
+     */
+    private function configureLocalMailTransport(): void {
+        add_action('phpmailer_init', function ($phpmailer) {
+            $host = getenv('MEROS_MAIL_HOST') ?: 'mailpit';
+            $port = (int) (getenv('MEROS_MAIL_PORT') ?: 1025);
+
+            $phpmailer->isSMTP();
+            $phpmailer->Host = $host;
+            $phpmailer->Port = $port;
+            $phpmailer->SMTPAuth = false;
+            $phpmailer->SMTPSecure = '';
+            $phpmailer->SMTPAutoTLS = false;
+        });
     }
 
     /**
@@ -254,6 +304,271 @@ final class Framework extends FeatureProvider {
      * @return void
      */
     private function registerPostTypes(): void {
+        $this->registerFormPostType();
+        $this->registerEmailTemplatePostType();
+    }
+
+    /**
+     * Registers the email template post type with associated hooks for handling.
+     *
+     * @return void
+     */
+    private function registerEmailTemplatePostType(): void {
+        // Create block variations for email template building
+        add_filter('get_block_type_variations', function ($variations, $blockType) {
+            if ($blockType->name === 'core/group') {
+                $variations[] = [
+                    'name'        => 'email_header',
+                    'title'       => 'Email Header',
+                    'description' => 'An area to build the header of an email template',
+                    'scope'       => ['block'],
+                    'isDefault'   => false,
+                    'isActive'    => ['className'],
+                    'attributes'  => [
+                        'className' => 'meros-email-header',
+                        'style'     => [
+                            'color'   => [
+                                'background' => '#f3f4f6',
+                            ],
+                            'spacing' => [
+                                'padding' => [
+                                    'top'    => '24px',
+                                    'right'  => '24px',
+                                    'bottom' => '24px',
+                                    'left'   => '24px',
+                                ],
+                            ],
+                        ],
+                    ],
+                ];
+
+                $variations[] = [
+                    'name'        => 'email_body',
+                    'title'       => 'Email Body',
+                    'description' => 'An area to build the body of an email template',
+                    'scope'       => ['block'],
+                    'isDefault'   => false,
+                    'isActive'    => ['className'],
+                    'attributes'  => [
+                        'className' => 'meros-email-body',
+                        'style'     => [
+                            'spacing' => [
+                                'padding' => [
+                                    'top'    => '24px',
+                                    'right'  => '24px',
+                                    'bottom' => '24px',
+                                    'left'   => '24px',
+                                ],
+                            ],
+                        ],
+                    ],
+                ];
+
+                $variations[] = [
+                    'name'        => 'email_footer',
+                    'title'       => 'Email Footer',
+                    'description' => 'An area to build the footer of an email template',
+                    'scope'       => ['block'],
+                    'isDefault'   => false,
+                    'isActive'    => ['className'],
+                    'attributes'  => [
+                        'className' => 'meros-email-footer',
+                        'style'     => [
+                            'color'   => [
+                                'background' => '#f3f4f6',
+                            ],
+                            'spacing' => [
+                                'padding' => [
+                                    'top'    => '24px',
+                                    'right'  => '24px',
+                                    'bottom' => '24px',
+                                    'left'   => '24px',
+                                ],
+                            ],
+                        ],
+                    ],
+                ];
+            }
+            return $variations;
+        }, 10, 2);
+
+        // Register the email template post type.
+        $this->postTypes()->make(function ($postType) {
+            $postType->name('meros-email-template');
+            $postType->label('Email Templates');
+            $postType->description('A custom post type for managing Email Templates.');
+            $postType->menuIcon('dashicons-email');
+            $postType->public();
+            $postType->rewrite(['slug' => 'email-templates']);
+            $postType->supports(['title', 'editor']);
+            $postType->useBlocks();
+
+            // Set the allowed blocks.
+            $postType->allowedBlocks([
+                'core/group',
+                'core/columns',
+                'core/spacer',
+                'core/heading', 
+                'core/paragraph', 
+                'core/image', 
+                'core/button'
+            ]);
+
+            // Set the template
+            $postType->template([
+                [
+                    'core/group',
+                    [
+                        'className' => 'meros-email-header',
+                        'layout'    => 'constrained',
+                        'style'     => [
+                            'color'   => [
+                                'background' => '#f3f4f6',
+                            ],
+                            'spacing' => [
+                                'padding' => [
+                                    'top'    => '24px',
+                                    'right'  => '24px',
+                                    'bottom' => '24px',
+                                    'left'   => '24px',
+                                ],
+                            ],
+                        ],
+                        'lock'      => [
+                            'move'   => true,
+                            'remove' => true,
+                        ],
+                    ],
+                    [
+                        [
+                            'core/heading',
+                            [
+                                'content' => 'Email Header',
+                                'level'   => 2,
+                            ],
+                        ],
+                    ]
+                ],
+                [
+                    'core/group',
+                    [
+                        'className' => 'meros-email-body',
+                        'layout'    => 'constrained',
+                        'style'     => [
+                            'spacing' => [
+                                'padding' => [
+                                    'top'    => '24px',
+                                    'right'  => '24px',
+                                    'bottom' => '24px',
+                                    'left'   => '24px',
+                                ],
+                            ],
+                        ],
+                        'lock'      => [
+                            'move'   => true,
+                            'remove' => true,
+                        ],
+                    ],
+                    [
+                        [
+                            'core/paragraph',
+                            [
+                                'content' => 'Email Body'
+                            ],
+                        ],
+                    ]
+                ],
+                [
+                    'core/group',
+                    [
+                        'className' => 'meros-email-footer',
+                        'layout'    => 'constrained',
+                        'style'     => [
+                            'color'   => [
+                                'background' => '#f3f4f6',
+                            ],
+                            'spacing' => [
+                                'padding' => [
+                                    'top'    => '24px',
+                                    'right'  => '24px',
+                                    'bottom' => '24px',
+                                    'left'   => '24px',
+                                ],
+                            ],
+                        ],
+                        'lock'      => [
+                            'move'   => true,
+                            'remove' => true,
+                        ],
+                    ],
+                    [
+                        [
+                            'core/heading',
+                            [
+                                'content' => 'Email Footer',
+                                'level'   => 2,
+                            ],
+                        ],
+                    ]
+                ]
+            ]);
+
+            // Register meta to store merge tags for this email template
+            $postType->meta()->add(function ($meta) {
+                $meta->string('merge_tags')
+                    ->label('Merge Tags')
+                    ->description('The available merge tags for this email template, stored as a JSON string.');
+            });
+        });
+
+        // Save merge tags as meta
+        add_action('save_post_meros-email-template', function ($postId) {
+            if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+                return;
+            }
+
+            if (wp_is_post_revision($postId)) {
+                return;
+            }
+
+            $post = get_post($postId);
+
+            if (!$post) {
+                return;
+            }
+
+            // Get post content and extract merge tags
+            $content = $post->post_content;
+
+            // Merge tags are in the format {{merge_tag}}.
+            preg_match_all('/{{(.*?)}}/', $content, $matches);
+
+            $mergeTags = array_values(array_unique($matches[1] ?? []));
+
+            // Save into the post type's meta container
+            $metaKey  = '_meros_email_template_meta';
+            $existing = get_post_meta($postId, $metaKey, true);
+
+            if (is_string($existing) && $existing !== '') {
+                $decoded = json_decode($existing, true);
+                $meta    = is_array($decoded) ? $decoded : [];
+            } else {
+                $meta = is_array($existing) ? $existing : [];
+            }
+
+            // merge_tags is registered as a string subfield in the default meta object.
+            $meta['merge_tags'] = json_encode($mergeTags);
+
+            update_post_meta($postId, $metaKey, $meta);
+        }, 100);
+    }
+
+    /**
+     * Registers the form post type.
+     *
+     * @return void
+     */
+    private function registerFormPostType(): void {
         // Register the Form post type.
         $this->postTypes()->make(function ($postType) {
             $postType->name('meros-form');
@@ -268,23 +583,6 @@ final class Framework extends FeatureProvider {
                 $meta->string('schema')
                     ->label('Form Structure')
                     ->description('The structure of the form, stored as a JSON string.');
-            });
-
-            $postType->metabox([
-                'label'    => 'Form Builder',
-                'context'  => 'side',
-                'priority' => 'default',
-            ], function ($post) {
-                $button = $this->fields()->makeFrom('admin_button')
-                    ->label('Edit Form')
-                    ->link(home_url('toolbox/form-builder/' . $post->ID), '_blank')
-                    ->attribute('style', 'width:100%;text-align:center;')
-                    ->attribute('title', 'Open the Form Builder in a new tab to edit this form.');
-                
-                echo '<div style="padding:2px 5px;">';
-                echo '<p>Manage this form\'s fields, settings and integrations in the Form Builder tool.</p>';
-                $button->render(false, false);
-                echo '</div>';
             });
         });
 

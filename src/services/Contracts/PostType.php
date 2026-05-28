@@ -638,6 +638,26 @@ class PostType extends FeatureDefinition {
     }
 
     /**
+     * Adds a filter to restrict the block types allowed in the post type editor.
+     *
+     * @param array $blocks
+     *
+     * @return self
+     */
+    public function allowedBlocks(array $blocks): self {
+        add_filter('allowed_block_types_all', function ($allowedBlocks, $editorContext) use ($blocks) {
+            if ($editorContext->post->post_type === $this->handle) {
+                return $blocks;
+            }
+
+            return $allowedBlocks;
+        }, 10, 2);
+
+        $this->queue();
+        return $this;
+    }
+
+    /**
      * Sets the REST API base route for the post type.
      *
      * @param string $restBase
