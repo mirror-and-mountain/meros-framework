@@ -8,6 +8,7 @@ use MM\Meros\App\Models\MerosForm as Form;
 
 use MM\Meros\Facades\Fields;
 use MM\Meros\Facades\FieldGroups;
+use MM\Meros\Facades\FormActions;
 
 trait ManagesFormSchema {
     /**
@@ -129,6 +130,21 @@ trait ManagesFormSchema {
                 'handle' => $handle,
                 'class'  => $fieldGroup,
                 'label'  => Str::title(Str::replace(['-', '_'], ' ', $handle))
+            ];
+        }
+    }
+
+    /**
+     * Retrieves available form actions from the FormActions register.
+     *
+     * @return void
+     */
+    private function initialiseFormActions(): void {
+        foreach (FormActions::getRegistered() as $handle => $action) {
+            $this->actionPayloads[ $handle ] = [
+                'handle' => $handle,
+                'class'  => $action,
+                'label'  => Str::title(Str::replace(['-', '_'], ' ', $handle)),
             ];
         }
     }

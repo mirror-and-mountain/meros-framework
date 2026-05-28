@@ -8,6 +8,7 @@ use Livewire\Attributes\Renderless;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
+use MM\Meros\Services\Contracts\FormAction;
 use MM\Meros\Services\Contracts\Elements\Field;
 use MM\Meros\Services\Contracts\Elements\FieldGroup;
 
@@ -21,27 +22,6 @@ use MM\Meros\App\Toolbox\Forms\Helpers\Serializer;
 use MM\Meros\App\Toolbox\Forms\Helpers\Utilities;
 
 class Builder extends Component {
-    /**
-     * The current screen of the form-builder ui.
-     *
-     * @var string
-     */
-    public string $screen = 'preview';
-
-    /**
-     * The field currently being edited (if any).
-     *
-     * @var string|null
-     */
-    public ?string $editingRepeaterID = null;
-
-    /**
-     * The repeater field instance currently being edited (if any).
-     *
-     * @var Field|null
-     */
-    private ?Field $editingRepeaterField = null;
-
     /**
      * A collection of hydrated elements used in the schema.
      *
@@ -63,11 +43,26 @@ class Builder extends Component {
      */
     public string $returnUrl = '';
 
+    /**
+     * The repeater field currently being edited (if any).
+     *
+     * @var string|null
+     */
+    public ?string $editingRepeaterID = null;
+
+    /**
+     * The repeater field instance currently being edited (if any).
+     *
+     * @var Field|null
+     */
+    private ?Field $editingRepeaterField = null;
+
     use ManagesFormSchema;
 
     public function mount(string|int|null $formID = null) {
         $this->initialiseFields();
         $this->initialiseFieldGroups();
+        $this->initialiseFormActions();
 
         if ($formID) {
             $this->formID = $formID;
@@ -194,6 +189,15 @@ class Builder extends Component {
     }
 
     /**
+     * Retrieves the form's available action payloads as an array.
+     *
+     * @return array
+     */
+    public function getActionPayloads(): array {
+        return $this->actionPayloads ?? [];
+    }
+
+    /**
      * Retrieves the form schema rows for rendering in the canvas.
      *
      * @return array
@@ -214,6 +218,10 @@ class Builder extends Component {
         $this->elements = $this->elements ?? collect([]);
         $this->elements->push($element);
     }
+
+    // =========================================================================
+    // Action Management
+    // =========================================================================
 
     // =========================================================================
     // Repeater Management

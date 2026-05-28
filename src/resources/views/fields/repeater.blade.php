@@ -3,6 +3,12 @@
     $value = $field->getValue();
     $rawRepeaterValue = is_array($value) ? $value : [];
     $templateRow = $field->buildTemplateRow();
+    $showsMoveColumn = $field->allowsReorder();
+    $showsActionsColumn = $field->allowsConfigure() || $field->allowsRemove();
+    $columnCount = count($field->getFieldNames())
+        + ($showsMoveColumn ? 1 : 0)
+        + ($showsActionsColumn ? 1 : 0);
+    $configurationCallback = $field->getConfigurationCallback();
 @endphp
 <div id="{{ $id }}" class="{{ $field->classList() }} meros-repeater">
     <div
@@ -12,7 +18,9 @@
         <table class="meros-repeater-table meros-repeater-table--interactive">
             <thead class="meros-repeater-head">
                 <tr>
-                    <th class="meros-repeater-head-cell meros-repeater-head-cell--move">Move</th>
+                    @if($showsMoveColumn)
+                        <th class="meros-repeater-head-cell meros-repeater-head-cell--move">Move</th>
+                    @endif
                     @foreach($field->getFieldNames() as $fieldIndex => $fieldName)
                         <th
                             class="meros-repeater-data-header meros-repeater-head-cell"
@@ -21,12 +29,14 @@
                             {{ $field->getFieldLabels()[$fieldIndex] ?? $fieldName }}
                         </th>
                     @endforeach
-                    <th class="meros-repeater-head-cell meros-repeater-head-cell--actions">Actions</th>
+                    @if($showsActionsColumn)
+                        <th class="meros-repeater-head-cell meros-repeater-head-cell--actions">Actions</th>
+                    @endif
                 </tr>
             </thead>
             <tbody class="meros-repeater-body">
                 <tr class="meros-repeater-gap-row">
-                    <td colspan="{{ count($field->getFieldNames()) + 2 }}" class="meros-repeater-gap-cell">
+                    <td colspan="{{ $columnCount }}" class="meros-repeater-gap-cell">
                         <div
                             class="meros-repeater-row-gap"
                             :class="isDraggingRow ? 'is-active' : ''"
@@ -53,18 +63,20 @@
                         :class="draggingRowIndex === {{ $rowIndex }} ? 'is-dragging' : ''"
                         @dragover.prevent
                     >
-                        <td class="meros-repeater-move-cell">
-                            <button
-                                type="button"
-                                draggable="true"
-                                class="meros-repeater-move-button"
-                                title="Drag to reorder row"
-                                @dragstart="const rowIndex = Number($el.closest('tr')?.dataset.repeaterRowIndex ?? {{ $rowIndex }}); isDraggingRow = true; draggingRowIndex = rowIndex; $store.repeaterField.startRowDrag($event, rowIndex)"
-                                @dragend="isDraggingRow = false; draggingRowIndex = null"
-                            >
-                                ☰
-                            </button>
-                        </td>
+                        @if($field->allowsReorder())
+                            <td class="meros-repeater-move-cell">
+                                <button
+                                    type="button"
+                                    draggable="true"
+                                    class="meros-repeater-move-button"
+                                    title="Drag to reorder row"
+                                    @dragstart="const rowIndex = Number($el.closest('tr')?.dataset.repeaterRowIndex ?? {{ $rowIndex }}); isDraggingRow = true; draggingRowIndex = rowIndex; $store.repeaterField.startRowDrag($event, rowIndex)"
+                                    @dragend="isDraggingRow = false; draggingRowIndex = null"
+                                >
+                                    ☰
+                                </button>
+                            </td>
+                        @endif
                         @foreach($field->getFieldNames() as $fieldName)
                             <td
                                 class="meros-repeater-data-cell"
@@ -88,20 +100,34 @@
                                 @endif
                             </td>
                         @endforeach
-                        <td class="meros-repeater-actions-cell">
-                            <button
-                                type="button"
-                                @click.stop="$store.repeaterField.removeRow($el)"
-                                class="meros-repeater-button meros-repeater-button--danger"
-                                title="Remove row"
-                            >
-                                Remove
-                            </button>
-                        </td>
+                        @if($showsActionsColumn)
+                            <td class="meros-repeater-actions-cell">
+                                @if($field->allowsConfigure())
+                                    <button
+                                        type="button"
+                                        @click.stop="window['{{ $configurationCallback }}']?.($el)"
+                                        class="meros-repeater-button meros-repeater-button--neutral"
+                                        title="Configure row"
+                                    >
+                                        Configure
+                                    </button>
+                                @endif
+                                @if($field->allowsRemove())
+                                    <button
+                                        type="button"
+                                        @click.stop="$store.repeaterField.removeRow($el)"
+                                        class="meros-repeater-button meros-repeater-button--danger"
+                                        title="Remove row"
+                                    >
+                                        Remove
+                                    </button>
+                                @endif
+                            </td>
+                        @endif
                     </tr>
 
                     <tr class="meros-repeater-gap-row">
-                        <td colspan="{{ count($field->getFieldNames()) + 2 }}" class="meros-repeater-gap-cell">
+                        <td colspan="{{ $columnCount }}" class="meros-repeater-gap-cell">
                             <div
                                 class="meros-repeater-row-gap"
                                 :class="isDraggingRow ? 'is-active' : ''"
@@ -112,23 +138,33 @@
                         </td>
                     </tr>
                 @empty
+                @if($field->allowsAdd())
                     <tr>
-                        <td colspan="{{ count($field->getFieldNames()) + 2 }}" class="meros-repeater-empty-state">
+                        <td colspan="{{ $columnCount }}" class="meros-repeater-empty-state">
                             No rows yet. Use "Add Row" to create repeater data.
                         </td>
                     </tr>
+                @else
+                    <tr>
+                        <td colspan="{{ $columnCount }}" class="meros-repeater-empty-state">
+                            No data.
+                        </td>
+                    </tr>
+                @endif
                 @endforelse
                 <tr id="meros-repeater-template-row-{{ $field->getID() }}" class="meros-repeater-row meros-repeater-template-row" style="display: none;">
-                    <td class="meros-repeater-move-cell">
-                        <button
-                            type="button"
-                            draggable="true"
-                            class="meros-repeater-move-button"
-                            title="Drag to reorder row"
-                        >
-                            ☰
-                        </button>
-                    </td>
+                    @if($field->allowsReorder())
+                        <td class="meros-repeater-move-cell">
+                            <button
+                                type="button"
+                                draggable="true"
+                                class="meros-repeater-move-button"
+                                title="Drag to reorder row"
+                            >
+                                ☰
+                            </button>
+                        </td>
+                    @endif
                     @foreach($field->getFieldNames() as $fieldName)
                         @php
                             $subField = $templateRow[$fieldName] ?? null;
@@ -153,28 +189,43 @@
                             @endif
                         </td>
                     @endforeach
-                    <td class="meros-repeater-actions-cell">
-                        <button
-                            type="button"
-                            class="meros-repeater-button meros-repeater-button--danger"
-                            title="Remove row"
-                        >
-                            Remove
-                        </button>
-                    </td>
+                    @if($showsActionsColumn)
+                        <td class="meros-repeater-actions-cell">
+                            @if($field->allowsConfigure())
+                                <button
+                                    type="button"
+                                    class="meros-repeater-button meros-repeater-button--neutral"
+                                    title="Configure row"
+                                >
+                                    Configure
+                                </button>
+                            @endif
+                            @if($field->allowsRemove())
+                                <button
+                                    type="button"
+                                    class="meros-repeater-button meros-repeater-button--danger"
+                                    title="Remove row"
+                                >
+                                    Remove
+                                </button>
+                            @endif
+                        </td>
+                    @endif
                 </tr>
             </tbody>
         </table>
     </div>
 
     <div class="meros-repeater-footer">
-        <button
-            type="button"
-            @click.stop="$store.repeaterField.addRow($el)"
-            class="meros-repeater-button meros-repeater-button--neutral"
-            title="Add new row"
-        >
-            Add Row
-        </button>
+        @if($field->allowsAdd())
+            <button
+                type="button"
+                @click.stop="$store.repeaterField.addRow($el)"
+                class="meros-repeater-button meros-repeater-button--neutral"
+                title="Add new row"
+            >
+                Add Row
+            </button>
+        @endif
     </div>
 </div>

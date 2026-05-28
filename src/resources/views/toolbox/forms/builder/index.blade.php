@@ -36,6 +36,10 @@
                 return await $wire.getActions();
             }
 
+            const getActionPayloads = async () => {
+                return await $wire.getActionPayloads();
+            }
+
             const getRichTextPayloads = async () => {
                 return await $wire.getRichTextPayloads();
             }
@@ -47,7 +51,7 @@
             $store.formBuilder.setSettingsUpdater((key, value) => $wire.updateSettings(key, value));
             $store.formBuilder.setRowsUpdater((rows) => $wire.updateRows(rows));
             $store.formBuilder.setActionsUpdater((actions) => $wire.updateActions(actions));
-            
+
             getSettings().then(settings => {
                 $store.formBuilder.formTitle = settings.title;
                 $store.formBuilder.formDescription = settings.description;
@@ -61,6 +65,10 @@
 
             getActions().then(actions => {
                 $store.formBuilder.setActions(actions);
+            });
+
+            getActionPayloads().then(payloads => {
+                $store.formBuilder.setActionPayloads(payloads);
             });
 
             getRichTextPayloads().then(payloads => {

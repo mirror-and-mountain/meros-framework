@@ -192,10 +192,10 @@ final class SendEmailWithTemplate extends FormAction {
      * This method will replace any merge tags in the template content with 
      * values from the 'tagMap' configuration before sending the email.
      *
-     * @return void
+     * @return bool True if the email was sent successfully, false otherwise.
      * @throws \RuntimeException if the email template is not set or the recipient email address(es) are not set.
      */
-    public function send(): void {
+    public function send(): bool {
         if (!$this->template) {
             throw new \RuntimeException("Email template not set. Please set the template using the template() method before sending the email.");
         }
@@ -204,7 +204,7 @@ final class SendEmailWithTemplate extends FormAction {
             throw new \RuntimeException("Recipient email address(es) not set. Please set the recipient(s) using the to() method before sending the email.");
         }
 
-        $this->template->send($this->config);
+        return $this->template->send($this->config);
     }
 
     /***************************

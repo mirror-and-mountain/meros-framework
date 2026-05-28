@@ -76,7 +76,6 @@ class MerosEmailTemplate extends Post {
             $content = str_replace($placeholder, $value, $content);
         }
 
-
         // Parse blocks
         $blocks = parse_blocks($content);
 

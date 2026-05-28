@@ -1,3 +1,4 @@
+import '../../../../forms/repeaters.js';
 import './repeaters.scss';
 
 function escapeRegex(value) {
@@ -83,7 +84,7 @@ function initRepeater(repeater) {
 	const addButton = repeater.querySelector('.meros-add-row');
 	const repeaterFieldName = repeater.getAttribute('data-field') || '';
 
-	if (!table || !tbody || !addButton) {
+	if (!table || !tbody) {
 		return;
 	}
 
@@ -94,38 +95,40 @@ function initRepeater(repeater) {
 	indicator.innerHTML = `<td colspan="${columnCount}"></td>`;
 
 	// Add row by cloning the last one, clearing values, and reindexing all names/ids.
-	addButton.addEventListener('click', function () {
-		const rows = tbody.querySelectorAll('tr:not(.meros-drop-indicator)');
-		const lastRow = rows[rows.length - 1];
+	if (addButton) {
+		addButton.addEventListener('click', function () {
+			const rows = tbody.querySelectorAll('tr:not(.meros-drop-indicator)');
+			const lastRow = rows[rows.length - 1];
 
-		if (!lastRow) {
-			return;
-		}
-
-		const newRow = lastRow.cloneNode(true);
-
-		newRow.querySelectorAll('input, select, textarea').forEach(function (el) {
-			if (el.type === 'checkbox') {
-				el.checked = false;
-
-				// Keep hidden checkbox fallback in sync for unchecked submissions.
-				let hidden = el.parentNode.querySelector('input[type="hidden"][data-checkbox-fallback]');
-				if (!hidden) {
-					hidden = document.createElement('input');
-					hidden.type = 'hidden';
-					hidden.setAttribute('data-checkbox-fallback', 'true');
-					hidden.name = el.name;
-					hidden.value = '0';
-					el.parentNode.insertBefore(hidden, el);
-				}
-			} else {
-				el.value = '';
+			if (!lastRow) {
+				return;
 			}
-		});
 
-		tbody.appendChild(newRow);
-		reindexRows(tbody, repeaterFieldName);
-	});
+			const newRow = lastRow.cloneNode(true);
+
+			newRow.querySelectorAll('input, select, textarea').forEach(function (el) {
+				if (el.type === 'checkbox') {
+					el.checked = false;
+
+					// Keep hidden checkbox fallback in sync for unchecked submissions.
+					let hidden = el.parentNode.querySelector('input[type="hidden"][data-checkbox-fallback]');
+					if (!hidden) {
+						hidden = document.createElement('input');
+						hidden.type = 'hidden';
+						hidden.setAttribute('data-checkbox-fallback', 'true');
+						hidden.name = el.name;
+						hidden.value = '0';
+						el.parentNode.insertBefore(hidden, el);
+					}
+				} else {
+					el.value = '';
+				}
+			});
+
+			tbody.appendChild(newRow);
+			reindexRows(tbody, repeaterFieldName);
+		});
+	}
 
 	// Remove row via delegation, then collapse indexes to avoid sparse arrays server-side.
 	tbody.addEventListener('click', function (e) {

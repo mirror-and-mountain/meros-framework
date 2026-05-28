@@ -9,6 +9,7 @@ export default function registerFormBuilderStore() {
         formStatus: '',
         rows: [],
         actions: [],
+        actionPayloads: [],
         richTextPayloads: [],
 
         // Updaters
@@ -73,6 +74,11 @@ export default function registerFormBuilderStore() {
         // Sets the actions object
         setActions(actions) {
             this.actions = actions;
+        },
+
+        // Sets the action payloads
+        setActionPayloads(payloads) {
+            this.actionPayloads = payloads;
         },
 
         // Sets the rich text payloads

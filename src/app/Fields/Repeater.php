@@ -63,6 +63,47 @@ class Repeater extends Field implements FieldParent {
      */
     protected bool $forceFullWidth = true;
 
+    /**
+     * Whether to allow adding/removing/reordering rows in the repeater. 
+     * If null, will default to true.
+     *
+     * @var boolean|null
+     */
+    protected ?bool $allowRemove = null;
+
+    /**
+     * Whether to allow adding new rows in the repeater. 
+     * If null, will default to true.
+     *
+     * @var boolean|null
+     */
+    protected ?bool $allowAdd = null;
+
+    /**
+     * Whether to allow reordering rows in the repeater. 
+     * If null, will default to true.
+     *
+     * @var boolean|null
+     */
+    protected ?bool $allowReorder = null;
+
+    /**
+     * Whether to allow configuring rows in the repeater. 
+     * If null, will default to false.
+     *
+     * @var boolean|null
+     */
+    protected ?bool $allowConfigure = null;
+
+    /**
+     * The name of a js callback function to use for configuring the repeater's row.
+     * If unset and allowConfigure is true, a default callback will be used that opens a
+     * modal with the row's fields for configuration.
+     *
+     * @var string
+     */
+    protected string $configurationCallback = '';
+
     use CanAttachFields;
 
     /**
@@ -85,6 +126,121 @@ class Repeater extends Field implements FieldParent {
         }
 
         return $json;
+    }
+
+    /********************
+     * Fluent Setters
+     ********************/
+
+    /**
+     * Sets whether to allow adding new rows in the repeater.
+     *
+     * @param boolean $allowAdd
+     *
+     * @return static
+     */
+    public function allowAdd(bool $allowAdd = true): static {
+        $this->allowAdd = $allowAdd;
+        return $this;
+    }
+
+    /**
+     * Sets whether to allow removing rows in the repeater.
+     *
+     * @param boolean $allowRemove
+     *
+     * @return static
+     */
+    public function allowRemove(bool $allowRemove = true): static {
+        $this->allowRemove = $allowRemove;
+        return $this;
+    }
+
+    /**
+     * Sets whether to allow reordering rows in the repeater.
+     *
+     * @param boolean $allowReorder
+     *
+     * @return static
+     */
+    public function allowReorder(bool $allowReorder = true): static {
+        $this->allowReorder = $allowReorder;
+        return $this;
+    }
+
+    /**
+     * Sets whether to allow configuring rows in the repeater.
+     *
+     * @param boolean $allowConfigure
+     *
+     * @return static
+     */
+    public function allowConfigure(bool $allowConfigure = true): static {
+        $this->allowConfigure = $allowConfigure;
+        return $this;
+    }
+
+    /**
+     * Sets the name of a js callback function to use for configuring the repeater's row.
+     *
+     * @param string $callback
+     *
+     * @return static
+     */
+    public function configurationCallback(string $callback): static {
+        $this->configurationCallback = $callback;
+        return $this;
+    }
+
+    /********************
+     * Getters
+     ********************/
+
+    /**
+     * Gets whether the repeater allows adding new rows.
+     *
+     * @return boolean
+     */
+    public function allowsAdd(): bool {
+        return $this->allowAdd ?? true;
+    }
+
+    /**
+     * Gets whether the repeater allows removing rows.
+     *
+     * @return boolean
+     */
+    public function allowsRemove(): bool {
+        return $this->allowRemove ?? true;
+    }
+
+    /**
+     * Gets whether the repeater allows reordering rows.
+     *
+     * @return boolean
+     */
+    public function allowsReorder(): bool {
+        return $this->allowReorder ?? true;
+    }
+
+    /**
+     * Gets whether the repeater allows configuring rows.
+     * 
+     * @return boolean
+     */
+    public function allowsConfigure(): bool {
+        return $this->allowConfigure ?? true; // For testing
+    }
+
+    /**
+     * Gets the name of the js callback function used for configuring the repeater's row.
+     *
+     * @return string
+     */
+    public function getConfigurationCallback(): string {
+        return empty($this->configurationCallback) && $this->allowsConfigure()
+            ? 'merosDefaultRepeaterRowConfig'
+            : $this->configurationCallback;
     }
 
     /***************************

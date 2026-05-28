@@ -31,4 +31,35 @@ abstract class FormAction extends FeatureDefinition {
     protected function queue(): void {
         // No need to queue actions, as they will be executed directly when processing the form submission.
     }
+
+    /***************************
+     * Getters
+     ***************************/
+
+    /**
+     * Gets the unique handle of the form action.
+     *
+     * @return string
+     */
+    public function getHandle(): string {
+        return $this->handle;
+    }
+
+    /**
+     * Gets the human-readable label of the form action.
+     *
+     * @return string
+     */
+    public function getLabel(): string {
+        return $this->label;
+    }
+
+    /**
+     * Gets the description of the form action.
+     *
+     * @return string
+     */
+    public function getDescription(): string {
+        return $this->description;
+    }
 }
