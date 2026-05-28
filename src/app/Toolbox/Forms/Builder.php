@@ -118,6 +118,10 @@ class Builder extends Component {
             ]);
     }
 
+    // =========================================================================
+    // Schema Update Methods
+    // =========================================================================
+
     /**
      * Updates a specific setting of the form being edited and dispatches a schema update event.
      *
@@ -162,12 +166,16 @@ class Builder extends Component {
         $this->dispatchSchemaUpdate();
     }
 
+    // =========================================================================
+    // Schema retrieval and element management methods
+    // =========================================================================
+
     /**
      * Retrieves the form's settings as an array.
      *
      * @return array
      */
-    public function getFormSettings(): array {
+    public function getSettings(): array {
         return [
             'title'       => $this->formTitle,
             'description' => $this->formDescription,
@@ -181,7 +189,7 @@ class Builder extends Component {
      *
      * @return array
      */
-    public function getFormActions(): array {
+    public function getActions(): array {
         return $this->schema['actions'] ?? [];
     }
 
@@ -206,6 +214,10 @@ class Builder extends Component {
         $this->elements = $this->elements ?? collect([]);
         $this->elements->push($element);
     }
+
+    // =========================================================================
+    // Repeater Management
+    // =========================================================================
 
     /**
      * Sets the ID of the repeater currently being edited.
@@ -436,6 +448,10 @@ class Builder extends Component {
         session()->flash('updateStatus', 'Repeater updated!');
     }
 
+    // =========================================================================
+    // Saving and Default Schema
+    // =========================================================================
+
     /**
      * Saves the form and its configuration to the database.
      *
@@ -576,6 +592,10 @@ class Builder extends Component {
             ]
         }';
     }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
 
     /**
      * Dispatches a schema update event with the current row payloads and advanced select field configurations.

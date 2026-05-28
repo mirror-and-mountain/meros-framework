@@ -30,6 +30,8 @@ use MM\Meros\App\Fields\Styles\SiteDefault;
 use MM\Meros\App\Fields\Styles\AdminSettings;
 use MM\Meros\App\Fields\Styles\AdminDefault;
 
+use MM\Meros\App\FormActions\SendEmailWithTemplate;
+
 use MM\Meros\App\Admin\SettingsSections\Assets;
 use MM\Meros\App\Admin\SettingsSections\Blocks;
 use MM\Meros\App\Admin\SettingsSections\Packages;
@@ -44,8 +46,6 @@ use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Packages as PackagesAccessor;
 use MM\Meros\Facades\Blocks as BlocksAccessor;
 use MM\Meros\Facades\AssetGroups as AssetGroupsAccessor;
-
-use MM\Meros\App\Models\MerosEmailTemplate as EmailTemplate;
 
 final class Framework extends FeatureProvider {
     /**
@@ -65,29 +65,6 @@ final class Framework extends FeatureProvider {
 
         $this->load();
         $this->configure();
-
-        // add_action('meros_providers_registered', function () {
-        //     $mailError = null;
-        //     add_action('wp_mail_failed', function ($error) use (&$mailError) {
-        //         $mailError = $error;
-        //     });
-
-        //     $email = EmailTemplate::find(57);
-        //     $test = $email->sendWithTags([
-        //         'to' => 'toby@tmw.dev',
-        //         'subject' => 'Test Email With Link',
-        //         'tagMap' => [
-        //             'first_name' => 'Toby',
-        //             'last_name' => 'Wilson',
-        //         ],
-        //     ]);
-
-        //     dd([
-        //         'sent' => $test,
-        //         'mail_error_message' => $mailError?->get_error_message(),
-        //         'mail_error_data' => $mailError?->get_error_data(),
-        //     ]);
-        // }, 50);
 
         return $this;
     }
@@ -125,6 +102,9 @@ final class Framework extends FeatureProvider {
         // Register the Settings field style for admin settings pages
         $this->formStyles()->register('admin_default', AdminDefault::class);
         $this->formStyles()->register('admin_settings', AdminSettings::class);
+
+        // Register framework form actions
+        $this->formActions()->register('send_email_with_template', SendEmailWithTemplate::class);
 
         // Register framework settings sections
         $this->settingsSections()->register('meros-features-packages', Packages::class);
@@ -298,6 +278,7 @@ final class Framework extends FeatureProvider {
      * The following methods are for registering the framework's post types
      * 
      ***********************************************************************/
+    
     /**
      * Registers the framework's custom post types.
      *

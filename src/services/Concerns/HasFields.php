@@ -16,9 +16,13 @@ use MM\Meros\Services\Registers\FieldGroups as FieldGroupsRegister;
 use MM\Meros\Services\Contracts\Elements\FormStyle;
 use MM\Meros\Services\Registers\FormStyles as FormStylesRegister;
 
+use MM\Meros\Services\Contracts\FormAction;
+use MM\Meros\Services\Registers\FormActions as FormActionsRegister;
+
 use MM\Meros\Facades\Forms;
 use MM\Meros\Facades\Fields;
 use MM\Meros\Facades\FieldGroups;
+use MM\Meros\Facades\FormActions;
 use MM\Meros\Facades\FormStyles;
 
 trait HasFields {
@@ -94,6 +98,24 @@ trait HasFields {
         }
     }
 
+    /**
+     * Retrieves a form action by handle or returns the form actions register if no handle is provided.
+     *
+     * @param string       $handle   The handle of the form action to retrieve. If empty, the entire form actions register is returned.
+     * @param Closure|null $callback An optional callback used in the register's get() method.
+     *
+     * @return FormAction|FormActionsRegister|null
+     */
+    protected function formActions(string $handle = '', ?Closure $callback = null): FormAction|FormActionsRegister|null {
+        if (empty($handle)) {
+            return FormActions::checkout($this);
+        }
+
+        else {
+            return FormActions::checkout($this)->get($handle, $callback);
+        }
+    }
+
     /*********************
      * Aliases
      *********************/
@@ -120,5 +142,17 @@ trait HasFields {
      */
     protected function form_styles(string $handle = '', ?Closure $callback = null): FormStyle|FormStylesRegister|null {
         return $this->formStyles($handle, $callback);
+    }
+
+    /**
+     * Alias of the formActions() method for users who prefer the snake_case naming convention.
+     *
+     * @param string       $handle
+     * @param Closure|null $callback
+     *
+     * @return FormAction|FormActionsRegister|null
+     */
+    protected function form_actions(string $handle = '', ?Closure $callback = null): FormAction|FormActionsRegister|null {
+        return $this->formActions($handle, $callback);
     }
 }

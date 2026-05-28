@@ -6,8 +6,6 @@ use Closure;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
-use MM\Meros\Services\Contracts\FeatureDefinition;
-
 final class Asset extends FeatureDefinition {
     /**
      * The unique handle for the asset, used as the identifier when enqueuing in WordPress.

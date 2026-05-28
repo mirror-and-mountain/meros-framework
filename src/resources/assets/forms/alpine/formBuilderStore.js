@@ -2,12 +2,21 @@ import { merosHydrateQuillContent } from '../richtext.js';
 
 export default function registerFormBuilderStore() {
     const store = {
+        // Schema properties
         formTitle: '',
         formDescription: '',
         formSlug: '',
         formStatus: '',
+        rows: [],
+        actions: [],
+        richTextPayloads: [],
+
+        // Updaters
         settingsUpdater: null,
         rowsUpdater: null,
+        actionsUpdater: null,
+
+        // Repeater properties
         repeaterEditCallback: null,
         repeaterFieldMoveCallback: null,
         repeaterFieldAddCallback: null,
@@ -15,8 +24,8 @@ export default function registerFormBuilderStore() {
         repeaterUpdateValueCallback: null,
         repeaterID: null,
         repeaterFieldID: null,
-        rows: [],
-        richTextPayloads: [],
+        
+        // State properties
         activeField: null,
         isDragging: false,
         isCanvasDrag: false,
@@ -29,16 +38,6 @@ export default function registerFormBuilderStore() {
         sourceFieldIndex: null,
         sourceGroupRowIndex: null,
         sourceGroupInnerRowIndex: null,
-
-        // Sets the form settings updater callback
-        setSettingsUpdater(updater) {
-            this.settingsUpdater = typeof updater === 'function' ? updater : null;
-        },
-
-        // Sets the row updater callback
-        setRowsUpdater(updater) {
-            this.rowsUpdater = typeof updater === 'function' ? updater : null;
-        },
 
         // Sets the form title
         setFormTitle(title) {
@@ -66,6 +65,36 @@ export default function registerFormBuilderStore() {
             this.settingsUpdater?.('formStatus', this.formStatus);
         },
 
+        // Sets the rows object
+        setRows(rows) {
+            this.rows = rows;
+        },
+
+        // Sets the actions object
+        setActions(actions) {
+            this.actions = actions;
+        },
+
+        // Sets the rich text payloads
+        setRichTextPayloads(payloads) {
+            this.richTextPayloads = payloads;
+        },
+
+        // Sets the form settings updater callback
+        setSettingsUpdater(updater) {
+            this.settingsUpdater = typeof updater === 'function' ? updater : null;
+        },
+
+        // Sets the row updater callback
+        setRowsUpdater(updater) {
+            this.rowsUpdater = typeof updater === 'function' ? updater : null;
+        },
+
+        // Sets the actions updater callback
+        setActionsUpdater(updater) {
+            this.actionsUpdater = typeof updater === 'function' ? updater : null;
+        },
+
         // Callbacks for repeater field editing, moving, and adding
         setRepeaterEditCallback(callback) {
             this.repeaterEditCallback = typeof callback === 'function' ? callback : null;
@@ -85,16 +114,6 @@ export default function registerFormBuilderStore() {
 
         setRepeaterUpdateValueCallback(callback) {
             this.repeaterUpdateValueCallback = typeof callback === 'function' ? callback : null;
-        },
-
-        // Sets the rows object
-        setRows(rows) {
-            this.rows = rows;
-        },
-
-        // Sets the rich text payloads
-        setRichTextPayloads(payloads) {
-            this.richTextPayloads = payloads;
         },
 
         // Utility to create a deep clone of the rows for safe mutation

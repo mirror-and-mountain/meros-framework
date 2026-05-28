@@ -57,7 +57,7 @@ class MerosEmailTemplate extends Post {
      *
      * @return boolean
      */
-    public function sendWithTags(array $config): bool {
+    public function send(array $config): bool {
         // Check we have the required 'to' field
         $to = $config['to'] ?? '';
         

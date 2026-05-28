@@ -1,11 +1,12 @@
+{{-- div root element --}}
 <div>
-    @include('meros::toolbox.forms.builder.canvas.index')
     @include('meros::toolbox.forms.builder.settings.index', [
         'formID'          => $formID,
         'formTitle'       => $formTitle,
         'formDescription' => $formDescription,
         'formSlug'        => $formSlug
     ])
+    @include('meros::toolbox.forms.builder.canvas.index')
 </div>
 
 @script
@@ -23,12 +24,16 @@
         });
 
         document.addEventListener('livewire:initialized', () => {
-            const getFormSettings = async () => {
-                return await $wire.getFormSettings();
+            const getSettings = async () => {
+                return await $wire.getSettings();
             }
 
-            const getSchemaRows = async () => {
+            const getRows = async () => {
                 return await $wire.getRows();
+            }
+
+            const getActions = async () => {
+                return await $wire.getActions();
             }
 
             const getRichTextPayloads = async () => {
@@ -41,8 +46,34 @@
             // Set up the form builder store
             $store.formBuilder.setSettingsUpdater((key, value) => $wire.updateSettings(key, value));
             $store.formBuilder.setRowsUpdater((rows) => $wire.updateRows(rows));
+            $store.formBuilder.setActionsUpdater((actions) => $wire.updateActions(actions));
+            
+            getSettings().then(settings => {
+                $store.formBuilder.formTitle = settings.title;
+                $store.formBuilder.formDescription = settings.description;
+                $store.formBuilder.formSlug = settings.slug;
+                $store.formBuilder.formStatus = settings.status;
+            });
+            
+            getRows().then(rows => {
+                $store.formBuilder.setRows(rows);
+            });
 
-            // Callbacks for repeater field editing
+            getActions().then(actions => {
+                $store.formBuilder.setActions(actions);
+            });
+
+            getRichTextPayloads().then(payloads => {
+                $store.formBuilder.setRichTextPayloads(payloads);
+  
+                window.dispatchEvent(new CustomEvent('meros-form-builder-rich-text-updated', {
+                    detail: {
+                        richTextPayloads: payloads
+                    }
+                }));
+            });
+
+            // Set callbacks for repeater field editing
             $store.formBuilder.setRepeaterEditCallback((repeaterId) =>
                 $wire.setEditingRepeaterID(repeaterId)
             );
@@ -62,27 +93,6 @@
             $store.formBuilder.setRepeaterUpdateValueCallback((repeaterId, value) =>
                 $wire.updateRepeaterDefaultValue(repeaterId, value)
             );
-
-            getFormSettings().then(settings => {
-                $store.formBuilder.formTitle = settings.title;
-                $store.formBuilder.formDescription = settings.description;
-                $store.formBuilder.formSlug = settings.slug;
-                $store.formBuilder.formStatus = settings.status;
-            });
-            
-            getSchemaRows().then(rows => {
-                $store.formBuilder.setRows(rows);
-            });
-
-            getRichTextPayloads().then(payloads => {
-                $store.formBuilder.setRichTextPayloads(payloads);
-  
-                window.dispatchEvent(new CustomEvent('meros-form-builder-rich-text-updated', {
-                    detail: {
-                        richTextPayloads: payloads
-                    }
-                }));
-            });
         });
     </script>
 @endscript
