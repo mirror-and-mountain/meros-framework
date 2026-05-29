@@ -195,6 +195,20 @@ abstract class Field extends FeatureDefinition {
         ]);
     }
 
+    /**
+     * Renders the field and returns the HTML as a string.
+     *
+     * @param bool $showLabel Whether to show the field's label in the wrapper. Some styles may ignore this and always show the label, or never show the label.
+     * @param bool $showHelp Whether to show the field's help text in the wrapper. Some styles may ignore this and always show the help text, or never show the help text.
+     *
+     * @return string The rendered HTML of the field.
+     */
+    public function html(bool $showLabel = true, bool $showHelp = true): string {
+        ob_start();
+        $this->render($showLabel, $showHelp);
+        return ob_get_clean();
+    }
+
     /***************************
      * Feature Contract Methods
      ***************************/

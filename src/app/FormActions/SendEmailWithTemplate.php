@@ -6,6 +6,7 @@ use MM\Meros\Services\Contracts\FormAction;
 use MM\Meros\App\Models\MerosEmailTemplate as EmailTemplate;
 
 use MM\Meros\Facades\Fields;
+use MM\Meros\Facades\Framework;
 
 final class SendEmailWithTemplate extends FormAction {
     /**
@@ -251,6 +252,11 @@ final class SendEmailWithTemplate extends FormAction {
      * @return string
      */
     public function renderConfigurationDialogue(): string {
-        return '<div>Hi There</div>';
+        $tagsRepeater = Fields::checkout(Framework::get())->makeFrom('repeater', [
+            'id' => 'meros-email-template-tag-map',
+            'label' => 'Merge Tags',
+        ]);
+
+        return $tagsRepeater->html();
     }
 }
