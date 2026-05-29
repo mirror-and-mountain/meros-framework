@@ -9,6 +9,7 @@
         + ($showsMoveColumn ? 1 : 0)
         + ($showsActionsColumn ? 1 : 0);
     $configurationCallback = $field->getConfigurationCallback();
+    $templateFieldIdSuffix = '--template';
 @endphp
 <div id="{{ $id }}" class="{{ $field->classList() }} meros-repeater">
     <div
@@ -184,6 +185,9 @@
                                         }
                                         $subField->attribute('data-default-value', $default);
                                     }
+
+                                    // Keep template field ids unique in the live DOM.
+                                    $subField->id($subField->getID() . $templateFieldIdSuffix);
                                     $subField->attribute('disabled', true);
                                 @endphp
                                 {!! $subField->render(false, false) !!}

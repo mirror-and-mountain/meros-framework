@@ -77,5 +77,5 @@ abstract class FormAction extends FeatureDefinition {
      *
      * @return string
      */
-    abstract public function renderConfigurationDialogue(): string;
+    abstract public function renderConfigurationDialog(): string;
 }

@@ -1404,8 +1404,8 @@ export default function registerFormBuilderStore() {
         // Action configuration handlers
         // -----------------------------------------------------------------
 
-        // Retrieves the configuration dialogue content for a given action handle, using the configured callback.
-        async getActionConfigurationDialogue(params = null) {
+        // Retrieves the configuration dialog content for a given action handle, using the configured callback.
+        async getActionConfigurationDialog(params = null) {
             if (typeof this.actionConfigCallback !== 'function') {
                 return;
             }
@@ -1418,11 +1418,11 @@ export default function registerFormBuilderStore() {
                 return;
             }
 
-            const dialogueContent = await this.actionConfigCallback(resolvedActionHandle);
+            const dialogContent = await this.actionConfigCallback(resolvedActionHandle);
 
-            const html = typeof dialogueContent === 'string'
-                ? dialogueContent
-                : (typeof dialogueContent?.html === 'string' ? dialogueContent.html : '');
+            const html = typeof dialogContent === 'string'
+                ? dialogContent
+                : (typeof dialogContent?.html === 'string' ? dialogContent.html : '');
 
             if (typeof html !== 'string' || html.trim() === '') {
                 return;
@@ -1435,7 +1435,7 @@ export default function registerFormBuilderStore() {
             }
 
             repeaterFieldStore.openRepeaterDialogFromHtml(html, async ({ dialog, shell, body }) => {
-                console.log('Dialogue updated!', { dialog, shell, body });
+                console.log('dialog updated!', { dialog, shell, body });
                 return true;
             });
         },

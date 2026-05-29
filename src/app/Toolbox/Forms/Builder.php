@@ -241,7 +241,7 @@ class Builder extends Component {
                 'label'                 => 'Form Actions',
                 'name'                  => 'form_actions',
                 'helpText'              => 'Add actions to be performed when the form is submitted.',
-                'configurationCallback' => '$store.formBuilder.getActionConfigurationDialogue'
+                'configurationCallback' => '$store.formBuilder.getActionConfigurationDialog'
             ]
         );
 
@@ -260,7 +260,7 @@ class Builder extends Component {
         return $field;
     }
 
-    public function getActionConfigurationDialogue(string $actionHandle): string {
+    public function getActionConfigurationDialog(string $actionHandle): string {
         $this->initialiseFormActions();
 
         if (!in_array($actionHandle, array_keys($this->actionPayloads))) {
@@ -273,7 +273,7 @@ class Builder extends Component {
             return '';
         }
 
-        return $actionInstance->renderConfigurationDialogue();
+        return $actionInstance->renderConfigurationDialog();
     }
 
     // =========================================================================

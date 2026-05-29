@@ -251,9 +251,9 @@ final class SendEmailWithTemplate extends FormAction {
      *
      * @return string
      */
-    public function renderConfigurationDialogue(): string {
+    public function renderConfigurationDialog(): string {
         $tagsRepeater = Fields::checkout(Framework::get())->makeFrom('repeater', [
-            'id' => 'meros-email-template-tag-map',
+            'id'    => 'meros-email-template-tag-map',
             'label' => 'Merge Tags',
         ]);
 

@@ -1138,6 +1138,27 @@ export default function registerRepeaterFieldStore() {
             });
         },
 
+        // Removes template-only id/for suffixes before a clone becomes a real row.
+        stripTemplateFieldIdSuffix(rowElement) {
+            if (!rowElement) {
+                return;
+            }
+
+            const templateIdSuffix = '--template';
+
+            rowElement.querySelectorAll('[id], [for]').forEach(node => {
+                ['id', 'for'].forEach(attribute => {
+                    const value = node.getAttribute(attribute);
+
+                    if (!value || !value.endsWith(templateIdSuffix)) {
+                        return;
+                    }
+
+                    node.setAttribute(attribute, value.slice(0, -templateIdSuffix.length));
+                });
+            });
+        },
+
         // Rewrites repeater field names, ids, and label targets so they match the current row index.
         rewriteRowFieldAttributes(rowElement, rowIndex) {
             if (!rowElement) {
@@ -1265,6 +1286,7 @@ export default function registerRepeaterFieldStore() {
             clonedRow.removeAttribute('style');
             clonedRow.classList.remove('meros-repeater-template-row');
             this.clearRowInputs(clonedRow);
+            this.stripTemplateFieldIdSuffix(clonedRow);
 
             clonedRow.querySelectorAll('input, select, textarea, button').forEach(control => {
                 control.removeAttribute('disabled');
