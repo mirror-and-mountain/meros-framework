@@ -1,7 +1,6 @@
 import Quill from 'quill';
 import registerRepeaterFieldStore from '../../../../forms/alpine/repeaterFieldStore.js';
 import { initTomSelects } from '../../../../forms/tom-select/index.js';
-import '../../../../forms/repeaters.js';
 import './style.scss';
 
 // Initialise the alpine repeaterField store

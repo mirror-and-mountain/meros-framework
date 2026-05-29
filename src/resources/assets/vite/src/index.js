@@ -3,8 +3,6 @@ import registerRepeaterFieldStore from '../../forms/alpine/repeaterFieldStore.js
 import { initRichTextEditors } from '../../forms/richtext.js';
 import { initTomSelects } from '../../forms/tom-select/index.js';
 import { updateIgnoredFieldWrapperElements } from '../../forms/utils.js';
-
-import '../../forms/repeaters.js';
 import './style.css';
 
 // Initialise the alpine formBuilder store

@@ -104,6 +104,13 @@ class Repeater extends Field implements FieldParent {
      */
     protected string $configurationCallback = '';
 
+    /**
+     * Default callback path for row configure actions.
+     *
+     * @var string
+     */
+    protected string $defaultConfigurationCallback = '$store.repeaterField.defaultConfigureRowModal';
+
     use CanAttachFields;
 
     /**
@@ -239,7 +246,7 @@ class Repeater extends Field implements FieldParent {
      */
     public function getConfigurationCallback(): string {
         return empty($this->configurationCallback) && $this->allowsConfigure()
-            ? 'merosDefaultRepeaterRowConfig'
+            ? $this->defaultConfigurationCallback
             : $this->configurationCallback;
     }
 

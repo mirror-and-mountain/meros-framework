@@ -1,5 +1,4 @@
 import { merosHydrateQuillContent } from '../richtext.js';
-import { openRepeaterDialogFromHtml } from '../repeaters.js';
 
 export default function registerFormBuilderStore() {
     const store = {
@@ -1429,7 +1428,13 @@ export default function registerFormBuilderStore() {
                 return;
             }
 
-            openRepeaterDialogFromHtml(html, async ({ dialog, shell, body }) => {
+            const repeaterFieldStore = Alpine.store('repeaterField');
+
+            if (typeof repeaterFieldStore?.openRepeaterDialogFromHtml !== 'function') {
+                return;
+            }
+
+            repeaterFieldStore.openRepeaterDialogFromHtml(html, async ({ dialog, shell, body }) => {
                 console.log('Dialogue updated!', { dialog, shell, body });
                 return true;
             });

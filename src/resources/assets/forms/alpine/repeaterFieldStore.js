@@ -239,6 +239,310 @@ export default function registerRepeaterFieldStore() {
             return controls[0]?.value ?? null;
         },
 
+        // ======================================
+        // Repeater Configure Modal Helpers
+        // ======================================
+
+        // Returns repeater row cells that should be configurable in the modal.
+        getRepeaterConfigureCells(rowElement) {
+            return Array.from(rowElement?.querySelectorAll?.('td') ?? []).filter(cellElement => {
+                return !(
+                    cellElement.classList.contains('meros-col-handle')
+                    || cellElement.classList.contains('meros-repeater-actions')
+                    || cellElement.classList.contains('meros-repeater-move-cell')
+                    || cellElement.classList.contains('meros-repeater-actions-cell')
+                );
+            });
+        },
+
+        // Returns a modal field label based on the matching table header.
+        getRepeaterConfigureLabel(tableElement, cellElement) {
+            if (typeof cellElement?.cellIndex !== 'number') {
+                return 'Field';
+            }
+
+            const headerElement = tableElement?.querySelector?.(`thead th:nth-child(${cellElement.cellIndex + 1})`);
+            const label = headerElement ? headerElement.textContent.trim() : '';
+
+            return label || 'Field';
+        },
+
+        // Focuses the first interactive control inside a modal container.
+        focusFirstRepeaterModalField(containerElement) {
+            const firstFieldElement = containerElement?.querySelector?.('input, select, textarea, button');
+
+            if (firstFieldElement instanceof HTMLElement) {
+                firstFieldElement.focus();
+            }
+        },
+
+        // Locks page scroll while a repeater modal is open.
+        lockRepeaterModalPageScroll() {
+            const scrollY = window.scrollY || window.pageYOffset || 0;
+            const htmlElement = document.documentElement;
+            const bodyElement = document.body;
+            const previousHtmlOverflow = htmlElement.style.overflow;
+            const previousBodyOverflow = bodyElement.style.overflow;
+            const previousBodyPosition = bodyElement.style.position;
+            const previousBodyTop = bodyElement.style.top;
+            const previousBodyLeft = bodyElement.style.left;
+            const previousBodyRight = bodyElement.style.right;
+            const previousBodyWidth = bodyElement.style.width;
+
+            htmlElement.style.overflow = 'hidden';
+            bodyElement.style.overflow = 'hidden';
+            bodyElement.style.position = 'fixed';
+            bodyElement.style.top = `-${scrollY}px`;
+            bodyElement.style.left = '0';
+            bodyElement.style.right = '0';
+            bodyElement.style.width = '100%';
+
+            return () => {
+                htmlElement.style.overflow = previousHtmlOverflow;
+                bodyElement.style.overflow = previousBodyOverflow;
+                bodyElement.style.position = previousBodyPosition;
+                bodyElement.style.top = previousBodyTop;
+                bodyElement.style.left = previousBodyLeft;
+                bodyElement.style.right = previousBodyRight;
+                bodyElement.style.width = previousBodyWidth;
+                window.scrollTo(0, scrollY);
+            };
+        },
+
+        // Builds a reusable repeater modal shell.
+        buildRepeaterDialogFromHtml(bodyHtml = '', onUpdate = null) {
+            const dialogElement = document.createElement('dialog');
+            dialogElement.className = 'meros-repeater-config-dialog';
+
+            const shellElement = document.createElement('div');
+            shellElement.className = 'meros-repeater-config-dialog__shell';
+
+            const headerElement = document.createElement('div');
+            headerElement.className = 'meros-repeater-config-dialog__header';
+
+            const titleElement = document.createElement('h2');
+            titleElement.className = 'meros-repeater-config-dialog__title';
+            titleElement.textContent = 'Configure';
+
+            const dismissButton = document.createElement('button');
+            dismissButton.type = 'button';
+            dismissButton.className = 'meros-repeater-config-dialog__dismiss';
+            dismissButton.setAttribute('aria-label', 'Close dialog');
+            dismissButton.textContent = 'x';
+            dismissButton.addEventListener('click', () => {
+                dialogElement.close();
+            });
+
+            const bodyElement = document.createElement('div');
+            bodyElement.className = 'meros-repeater-config-dialog__body';
+            bodyElement.innerHTML = typeof bodyHtml === 'string' ? bodyHtml : '';
+
+            const footerElement = document.createElement('div');
+            footerElement.className = 'meros-repeater-config-dialog__footer';
+
+            const updateButton = document.createElement('button');
+            updateButton.type = 'button';
+            updateButton.className = 'button meros-repeater-config-dialog__close';
+            updateButton.textContent = 'Update';
+            updateButton.addEventListener('click', async () => {
+                let shouldClose = true;
+
+                if (typeof onUpdate === 'function') {
+                    const result = await onUpdate({
+                        dialog: dialogElement,
+                        shell: shellElement,
+                        body: bodyElement,
+                    });
+
+                    shouldClose = result !== false;
+                }
+
+                if (shouldClose) {
+                    dialogElement.close();
+                }
+            });
+
+            headerElement.appendChild(titleElement);
+            headerElement.appendChild(dismissButton);
+            shellElement.appendChild(headerElement);
+            shellElement.appendChild(bodyElement);
+            footerElement.appendChild(updateButton);
+            shellElement.appendChild(footerElement);
+
+            dialogElement.addEventListener('click', event => {
+                const bounds = dialogElement.getBoundingClientRect();
+                const clickedBackdrop = event.clientX < bounds.left
+                    || event.clientX > bounds.right
+                    || event.clientY < bounds.top
+                    || event.clientY > bounds.bottom;
+
+                if (clickedBackdrop) {
+                    dialogElement.close();
+                }
+            });
+
+            dialogElement.appendChild(shellElement);
+
+            return {
+                dialog: dialogElement,
+                shell: shellElement,
+                body: bodyElement,
+            };
+        },
+
+        // Opens a generic repeater modal from raw HTML and handles cleanup.
+        openRepeaterDialogFromHtml(shellHtml = '', onUpdate = null) {
+            const existingDialog = document.querySelector('dialog.meros-repeater-config-dialog[open]');
+
+            if (existingDialog instanceof HTMLDialogElement) {
+                existingDialog.close();
+            }
+
+            const { dialog, body } = this.buildRepeaterDialogFromHtml(shellHtml, onUpdate);
+            const unlockPageScroll = this.lockRepeaterModalPageScroll();
+
+            const cleanup = () => {
+                unlockPageScroll();
+                dialog.removeEventListener('close', cleanup);
+                dialog.remove();
+            };
+
+            dialog.addEventListener('close', cleanup);
+            document.body.appendChild(dialog);
+
+            try {
+                dialog.showModal();
+            } catch (error) {
+                dialog.setAttribute('open', 'open');
+            }
+
+            this.focusFirstRepeaterModalField(body);
+
+            return dialog;
+        },
+
+        // Builds the default configure modal by temporarily moving row field controls into it.
+        buildRepeaterConfigureDialog(triggerElement) {
+            const rowElement = triggerElement?.closest?.('tr');
+            const tableElement = rowElement?.closest?.('table') ?? null;
+
+            if (!rowElement || !tableElement) {
+                return null;
+            }
+
+            const cellElements = this.getRepeaterConfigureCells(rowElement);
+
+            if (cellElements.length === 0) {
+                return null;
+            }
+
+            const { dialog, body } = this.buildRepeaterDialogFromHtml('', () => true);
+
+            const transfers = cellElements.map(cellElement => {
+                const placeholder = document.createComment('meros-repeater-config-placeholder');
+                const fieldWrapper = document.createElement('div');
+                fieldWrapper.className = 'meros-repeater-config-dialog__field-input';
+
+                const nodes = Array.from(cellElement.childNodes);
+                cellElement.appendChild(placeholder);
+                nodes.forEach(node => {
+                    fieldWrapper.appendChild(node);
+                });
+
+                const fieldElement = document.createElement('section');
+                fieldElement.className = 'meros-repeater-config-dialog__field';
+
+                const labelElement = document.createElement('h3');
+                labelElement.className = 'meros-repeater-config-dialog__field-label';
+                labelElement.textContent = this.getRepeaterConfigureLabel(tableElement, cellElement);
+
+                fieldElement.appendChild(labelElement);
+                fieldElement.appendChild(fieldWrapper);
+                body.appendChild(fieldElement);
+
+                return {
+                    cell: cellElement,
+                    placeholder,
+                    fieldWrapper,
+                };
+            });
+
+            let restored = false;
+            const restore = () => {
+                if (restored) {
+                    return;
+                }
+
+                restored = true;
+
+                transfers.forEach(transfer => {
+                    while (transfer.fieldWrapper.firstChild) {
+                        transfer.cell.insertBefore(transfer.fieldWrapper.firstChild, transfer.placeholder);
+                    }
+
+                    if (transfer.placeholder.parentNode) {
+                        transfer.placeholder.remove();
+                    }
+                });
+
+                dialog.remove();
+            };
+
+            dialog.addEventListener('close', restore, { once: true });
+
+            return {
+                dialog,
+                body,
+            };
+        },
+
+        // Opens the default configure modal used by repeater row configure actions.
+        defaultConfigureRowModal(payload) {
+            const triggerElement = payload?.triggerElement ?? payload;
+
+            if (!(triggerElement instanceof Element)) {
+                return;
+            }
+
+            if (typeof HTMLDialogElement === 'undefined') {
+                const rowElement = triggerElement.closest('tr');
+
+                if (rowElement instanceof HTMLElement) {
+                    this.focusFirstRepeaterModalField(rowElement);
+                }
+
+                return;
+            }
+
+            const parts = this.buildRepeaterConfigureDialog(triggerElement);
+
+            if (!parts) {
+                return;
+            }
+
+            const unlockPageScroll = this.lockRepeaterModalPageScroll();
+
+            const restoreScroll = () => {
+                unlockPageScroll();
+                parts.dialog.removeEventListener('close', restoreScroll);
+            };
+
+            parts.dialog.addEventListener('close', restoreScroll);
+            document.body.appendChild(parts.dialog);
+
+            try {
+                parts.dialog.showModal();
+            } catch (error) {
+                parts.dialog.setAttribute('open', 'open');
+            }
+
+            this.focusFirstRepeaterModalField(parts.body);
+        },
+
+        // ======================================
+        // Repeater Configure Callback Helpers
+        // ======================================
+
         // Resolve a configured callback name to an executable function.
         resolveConfigureCallback(callbackName) {
             if (typeof callbackName !== 'string' || callbackName.trim() === '') {
@@ -298,18 +602,20 @@ export default function registerRepeaterFieldStore() {
                 rowValue: this.getRepeaterRowValue(anchorElement),
             };
 
-            const fallbackCallback = window.merosDefaultRepeaterRowConfig;
+            const fallbackCallback = this.defaultConfigureRowModal.bind(this);
             const callback = this.resolveConfigureCallback(callbackName);
 
             if (typeof callback !== 'function') {
-                if (typeof fallbackCallback === 'function') {
-                    fallbackCallback(params);
-                }
+                fallbackCallback(params);
                 return;
             }
 
             callback(params);
         },
+
+        // ======================================
+        // Repeater Configure Button State
+        // ======================================
 
         // Determines whether a value should be treated as empty for configure-button gating.
         isEmptyConfigureValue(value) {
@@ -362,6 +668,10 @@ export default function registerRepeaterFieldStore() {
                 configureButton.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
             });
         },
+
+        // ======================================
+        // Repeater TomSelect Helpers
+        // ======================================
 
         // Retrieves advanced select elements within a repeater root.
         getTomSelectElements(anchorElement) {
@@ -532,6 +842,10 @@ export default function registerRepeaterFieldStore() {
             this.pendingTomSelectValuesByElement = null;
         },
 
+        // ======================================
+        // Repeater DOM Interaction Binding
+        // ======================================
+
         // Ensures cloned row and gap directives remain interactive after manual DOM replacement.
         bindRepeaterInteractions(anchorElement) {
             const repeaterRoot = this.getRepeaterRoot(anchorElement);
@@ -656,6 +970,10 @@ export default function registerRepeaterFieldStore() {
             });
         },
 
+        // ======================================
+        // Repeater Drag and Drop Helpers
+        // ======================================
+
         // Retrieves the gap element immediately following a row element, if it exists
         getGapAfterRow(rowElement) {
             const nextSibling = rowElement?.nextElementSibling ?? null;
@@ -684,6 +1002,10 @@ export default function registerRepeaterFieldStore() {
 
             return targetIndex;
         },
+
+        // ======================================
+        // Repeater Row Value and Clone Helpers
+        // ======================================
 
         // Clears the input values within a repeater row element, resetting them to their default empty state
         clearRowInputs(rowElement) {
@@ -853,6 +1175,10 @@ export default function registerRepeaterFieldStore() {
             rowElement.dataset.repeaterRowIndex = rowIndexValue;
             rowElement.setAttribute('wire:key', `repeater-row-${rowIndexValue}`);
         },
+
+        // ======================================
+        // Repeater Row Structure Helpers
+        // ======================================
 
         // Rebuilds the repeater tbody so rows and gaps stay in a stable alternating structure.
         rebuildRepeaterBody(anchorElement, rowElements = null) {
@@ -1032,6 +1358,10 @@ export default function registerRepeaterFieldStore() {
             return row;
         },
 
+        // ======================================
+        // Repeater Row Mutations
+        // ======================================
+
         // Adds a new row to the repeater field
         addRow(anchorElement) {
             const rowElements = this.getRowElements(anchorElement);
@@ -1162,4 +1492,10 @@ export default function registerRepeaterFieldStore() {
     };
 
     Alpine.store('repeaterField', store);
+
+    if (typeof window !== 'undefined' && typeof window.merosDefaultRepeaterRowConfig !== 'function') {
+        window.merosDefaultRepeaterRowConfig = payload => {
+            store.defaultConfigureRowModal(payload);
+        };
+    }
 }

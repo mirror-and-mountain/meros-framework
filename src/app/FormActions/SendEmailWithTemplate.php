@@ -5,6 +5,8 @@ namespace MM\Meros\App\FormActions;
 use MM\Meros\Services\Contracts\FormAction;
 use MM\Meros\App\Models\MerosEmailTemplate as EmailTemplate;
 
+use MM\Meros\Facades\Fields;
+
 final class SendEmailWithTemplate extends FormAction {
     /**
      * The unique handle of the form action.
