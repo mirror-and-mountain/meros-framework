@@ -21,6 +21,73 @@ export default function registerRepeaterFieldStore() {
             return Number.isInteger(parsedValue) ? parsedValue : null;
         },
 
+        // ======================================
+        // Repeater Get Helpers
+        // ======================================
+
+        // Alias helper that resolves a repeater from an element anchor or a repeater id string.
+        getRepeater(anchorOrRepeaterId) {
+            return this.resolveRepeater(anchorOrRepeaterId);
+        },
+
+        // Returns the current repeater payload as an array of row objects keyed by field name.
+        getRepeaterValue(anchorOrRepeaterId) {
+            const repeaterRoot = this.resolveRepeater(anchorOrRepeaterId);
+
+            if (!repeaterRoot) {
+                alert('Cannot get repeater value: Repeater element not found.');
+                return false;
+            }
+
+            const rowElements = this.getRowElements(repeaterRoot);
+            const templateRow = this.getTemplateRowElement(repeaterRoot);
+
+            const hasRows = rowElements.length > 0;
+            const hasFields = templateRow?.querySelector('.meros-repeater-data-cell') !== null;
+
+            if (!hasFields || !hasRows) {
+                alert('Cannot get repeater value: No field cells found in the repeater template row.');
+                return false;
+            }
+
+            return rowElements.map(rowElement => {
+                return this.buildRepeaterRowValue(rowElement);
+            });
+        },
+
+        // Returns the current repeater row payload as an object keyed by field name.
+        getRepeaterRowValue(anchorOrRepeaterId, rowIndex = null) {
+            // Backward-compatible mode: an anchor element inside a row.
+            if (rowIndex === null || rowIndex === undefined) {
+                const rowElement = anchorOrRepeaterId?.closest?.('tr.meros-repeater-row') ?? null;
+                return this.buildRepeaterRowValue(rowElement);
+            }
+
+            return this.buildRepeaterRowValue(this.getRepeaterRowElement(anchorOrRepeaterId, rowIndex));
+        },
+
+        // Returns a single repeater cell value by repeater id + row index + cell index.
+        getRepeaterCellValue(anchorOrRepeaterId, rowIndex = null, cellIndex = null) {
+            // Backward-compatible mode: an anchor element inside a field cell.
+            if (rowIndex === null || rowIndex === undefined) {
+                const fieldCellElement = anchorOrRepeaterId?.closest?.('td[data-field-name]') ?? null;
+                return this.getFieldCellValue(fieldCellElement);
+            }
+
+            const safeCellIndex = this.parseIndex(cellIndex);
+
+            if (safeCellIndex === null || safeCellIndex < 0) {
+                return null;
+            }
+
+            const rowElement = this.getRepeaterRowElement(anchorOrRepeaterId, rowIndex);
+            const fieldCellElement = rowElement?.querySelectorAll('td[data-field-name]')?.[safeCellIndex] ?? null;
+
+            return this.getFieldCellValue(fieldCellElement);
+        },
+
+        // Internal utilities for repeater getter APIs.
+
         // Retrieves the root repeater element based on the provided anchor element (e.g. a button within the row)
         getRepeaterRoot(anchorElement) {
             if (anchorElement?.classList?.contains('meros-repeater')) {
@@ -33,6 +100,21 @@ export default function registerRepeaterFieldStore() {
         // Retrieves the repeater body element which contains the rows, based on the provided anchor element
         getRepeaterBody(anchorElement) {
             return this.getRepeaterRoot(anchorElement)?.querySelector('.meros-repeater-body') ?? null;
+        },
+
+        // Resolves a repeater from an element anchor or a repeater id string.
+        resolveRepeater(anchorOrRepeaterId) {
+            if (typeof anchorOrRepeaterId === 'string' && anchorOrRepeaterId.trim() !== '') {
+                const elementById = document.getElementById(anchorOrRepeaterId.trim());
+
+                if (elementById?.classList?.contains('meros-repeater')) {
+                    return elementById;
+                }
+
+                return elementById?.closest?.('.meros-repeater') ?? null;
+            }
+
+            return this.getRepeaterRoot(anchorOrRepeaterId);
         },
 
         // Retrieves a reusable gap-row template from the current repeater DOM.
@@ -48,6 +130,38 @@ export default function registerRepeaterFieldStore() {
         // Retrieves the hidden template row used when the repeater has no rows yet.
         getTemplateRowElement(anchorElement) {
             return this.getRepeaterBody(anchorElement)?.querySelector('tr.meros-repeater-template-row') ?? null;
+        },
+
+        // Retrieves a repeater row element by index.
+        getRepeaterRowElement(anchorOrRepeaterId, rowIndex) {
+            const safeRowIndex = this.parseIndex(rowIndex);
+
+            if (safeRowIndex === null || safeRowIndex < 0) {
+                return null;
+            }
+
+            return this.getRowElements(anchorOrRepeaterId)[safeRowIndex] ?? null;
+        },
+
+        // Builds a row payload object keyed by field name.
+        buildRepeaterRowValue(rowElement) {
+            if (!rowElement || rowElement.classList.contains('meros-repeater-template-row')) {
+                return {};
+            }
+
+            const rowValue = {};
+
+            rowElement.querySelectorAll('td[data-field-name]').forEach(fieldCellElement => {
+                const fieldName = fieldCellElement.getAttribute('data-field-name');
+
+                if (!fieldName) {
+                    return;
+                }
+
+                rowValue[fieldName] = this.getFieldCellValue(fieldCellElement);
+            });
+
+            return rowValue;
         },
 
         // Extracts a normalised value for a repeater field cell.
@@ -123,59 +237,6 @@ export default function registerRepeaterFieldStore() {
             }
 
             return controls[0]?.value ?? null;
-        },
-
-        // Returns the current repeater payload as an array of row objects keyed by field name.
-        getRepeaterValue(anchorElement) {
-            const rowElements = this.getRowElements(anchorElement);
-            const templateRow = this.getTemplateRowElement(anchorElement);
-
-            const hasRows = rowElements.length > 0;
-            const hasFields = templateRow?.querySelector('.meros-repeater-data-cell') !== null;
-
-            if (!hasFields || !hasRows) {
-                alert('Cannot get repeater value: No field cells found in the repeater template row.');
-                return false;
-            }
-
-            return rowElements.map(rowElement => {
-                const rowValue = {};
-
-                rowElement.querySelectorAll('td[data-field-name]').forEach(fieldCellElement => {
-                    const fieldName = fieldCellElement.getAttribute('data-field-name');
-
-                    if (!fieldName) {
-                        return;
-                    }
-
-                    rowValue[fieldName] = this.getFieldCellValue(fieldCellElement);
-                });
-
-                return rowValue;
-            });
-        },
-
-        // Returns the current repeater row payload as an object keyed by field name.
-        getRepeaterRowValue(anchorElement) {
-            const rowElement = anchorElement?.closest?.('tr.meros-repeater-row') ?? null;
-
-            if (!rowElement || rowElement.classList.contains('meros-repeater-template-row')) {
-                return {};
-            }
-
-            const rowValue = {};
-
-            rowElement.querySelectorAll('td[data-field-name]').forEach(fieldCellElement => {
-                const fieldName = fieldCellElement.getAttribute('data-field-name');
-
-                if (!fieldName) {
-                    return;
-                }
-
-                rowValue[fieldName] = this.getFieldCellValue(fieldCellElement);
-            });
-
-            return rowValue;
         },
 
         // Resolve a configured callback name to an executable function.

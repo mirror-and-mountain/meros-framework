@@ -1,3 +1,5 @@
+// Pass the repeater instance to the onUpdate callbacks
+
 /**
  * Gets the cells from a repeater row that should be used for configuration.
  * 
