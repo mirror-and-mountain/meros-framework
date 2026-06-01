@@ -26,9 +26,9 @@ use MM\Meros\App\Fields\Textarea;
 use MM\Meros\App\Fields\Time;
 use MM\Meros\App\Fields\Url;
 
-use MM\Meros\App\Fields\Styles\SiteDefault;
-use MM\Meros\App\Fields\Styles\AdminSettings;
-use MM\Meros\App\Fields\Styles\AdminDefault;
+use MM\Meros\App\FieldWrappers\SiteDefault;
+use MM\Meros\App\FieldWrappers\AdminSettings;
+use MM\Meros\App\FieldWrappers\AdminDefault;
 
 use MM\Meros\App\FormActions\SendEmailWithTemplate;
 
@@ -97,12 +97,12 @@ final class Framework extends FeatureProvider {
         $this->fields()->register('url', Url::class);
         $this->fields()->register('password', Password::class);
 
-        // Register framework field styles
-        $this->formStyles()->register('site_default', SiteDefault::class);
+        // Register framework field wrappers
+        $this->fieldWrappers()->register('site_default', SiteDefault::class);
 
-        // Register the Settings field style for admin settings pages
-        $this->formStyles()->register('admin_default', AdminDefault::class);
-        $this->formStyles()->register('admin_settings', AdminSettings::class);
+        // Register the Settings field wrapper for admin settings pages
+        $this->fieldWrappers()->register('admin_default', AdminDefault::class);
+        $this->fieldWrappers()->register('admin_settings', AdminSettings::class);
 
         // Register framework form actions
         $this->formActions()->register('send_email_with_template', SendEmailWithTemplate::class);
@@ -287,7 +287,105 @@ final class Framework extends FeatureProvider {
      */
     private function registerPostTypes(): void {
         $this->registerFormPostType();
+        $this->registerFieldGroupPostType();
         $this->registerEmailTemplatePostType();
+    }
+
+    /**
+     * Registers the form post type.
+     *
+     * @return void
+     */
+    private function registerFormPostType(): void {
+        // Register the Form post type.
+        $this->postTypes()->make(function ($postType) {
+            $postType->name('meros-form');
+            $postType->label('Forms');
+            $postType->description('A custom post type for managing Forms.');
+            $postType->supports(['title']);
+            $postType->menuIcon('dashicons-feedback');
+            $postType->public();
+            $postType->rewrite(['slug' => 'forms']);
+
+            $postType->meta()->add(function ($meta) {
+                $meta->string('schema')
+                    ->label('Form Structure')
+                    ->description('The structure of the form, stored as a JSON string.')
+                    ->default(json_encode([
+                        'rows'    => [],
+                        'actions' => []
+                    ]));
+            });
+        });
+
+        // Filter the edit post link
+        add_filter('get_edit_post_link', function ($link, $postId, $context) {
+            if ($context === 'display' && get_post_type($postId) === 'meros-form') {
+                return home_url('toolbox/form-builder/' . $postId);
+            }
+            return $link;
+        }, 10, 3);
+
+        // Redirect the new link
+        add_action('admin_init', function () {
+            global $pagenow;
+
+            if ($pagenow === 'post-new.php' && isset($_GET['post_type']) && $_GET['post_type'] === 'meros-form') {
+                wp_safe_redirect(home_url('toolbox/form-builder'));
+                exit;
+            }
+        });
+
+        // Filter the form post type content for rendering
+        add_filter('the_content', function ($content) {
+            if (is_singular('meros-form') && in_the_loop() && is_main_query()) {
+                $post = get_post();
+
+                if (!$post) {
+                    return $content;
+                }
+
+                $form = MerosForm::find($post->ID);
+
+                if (!$form) {
+                    return $content;
+                }
+
+                $schema = $form->schema(true);
+
+                if (!$schema) {
+                    return $content;
+                }
+
+                return \Livewire\Livewire::mount('toolbox::forms.form', ['formID' => $post->ID]);
+            
+            }
+            return $content;
+        });
+    }
+
+    /**
+     * Registers the field group post type.
+     *
+     * @return void
+     */
+    private function registerFieldGroupPostType(): void {
+        // Register the Field Group post type.
+        $this->postTypes()->make(function ($postType) {
+            $postType->name('meros-field-group');
+            $postType->label('Field Groups');
+            $postType->description('A custom post type for managing Field Groups.');
+            $postType->supports(['title']);
+            $postType->menuIcon('dashicons-feedback');
+            $postType->public();
+            $postType->rewrite(['slug' => 'field-groups']);
+
+            $postType->meta()->add(function ($meta) {
+                $meta->string('schema')
+                    ->label('Field Group Structure')
+                    ->description('The structure of the field group, stored as a JSON string.');
+            });
+        });
     }
 
     /**
@@ -543,75 +641,6 @@ final class Framework extends FeatureProvider {
 
             update_post_meta($postId, $metaKey, $meta);
         }, 100);
-    }
-
-    /**
-     * Registers the form post type.
-     *
-     * @return void
-     */
-    private function registerFormPostType(): void {
-        // Register the Form post type.
-        $this->postTypes()->make(function ($postType) {
-            $postType->name('meros-form');
-            $postType->label('Forms');
-            $postType->description('A custom post type for managing Forms.');
-            $postType->supports(['title']);
-            $postType->menuIcon('dashicons-feedback');
-            $postType->public();
-            $postType->rewrite(['slug' => 'forms']);
-
-            $postType->meta()->add(function ($meta) {
-                $meta->string('schema')
-                    ->label('Form Structure')
-                    ->description('The structure of the form, stored as a JSON string.');
-            });
-        });
-
-        // Filter the edit post link
-        add_filter('get_edit_post_link', function ($link, $postId, $context) {
-            if ($context === 'display' && get_post_type($postId) === 'meros-form') {
-                return home_url('toolbox/form-builder/' . $postId);
-            }
-            return $link;
-        }, 10, 3);
-
-        // Redirect the new link
-        add_action('admin_init', function () {
-            global $pagenow;
-
-            if ($pagenow === 'post-new.php' && isset($_GET['post_type']) && $_GET['post_type'] === 'meros-form') {
-                wp_safe_redirect(home_url('toolbox/form-builder'));
-                exit;
-            }
-        });
-
-        // Filter the form post type content for rendering
-        add_filter('the_content', function ($content) {
-            if (is_singular('meros-form') && in_the_loop() && is_main_query()) {
-                $post = get_post();
-
-                if (!$post) {
-                    return $content;
-                }
-
-                $form = MerosForm::find($post->ID);
-
-                if (!$form) {
-                    return $content;
-                }
-
-                $schema = $form->schema(true);
-
-                if (!$schema) {
-                    return $content;
-                }
-
-                return \Livewire\Livewire::mount('toolbox::forms.form', ['formID' => $post->ID]);
-            
-            }
-            return $content;
-        });
     }
 
     /***************************************************************

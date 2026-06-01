@@ -2,7 +2,7 @@
 
 namespace MM\Meros\Services\Contracts\Interfaces;
 
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Forms\Field;
 
 interface AdminFieldRegistrant {
     /**

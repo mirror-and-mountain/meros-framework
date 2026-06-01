@@ -51,7 +51,7 @@
             $store.formBuilder.setSettingsUpdater((key, value) => $wire.updateSettings(key, value));
             $store.formBuilder.setRowsUpdater((rows) => $wire.updateRows(rows));
             $store.formBuilder.setActionsUpdater((actions) => $wire.updateActions(actions));
-            $store.formBuilder.setActionConfigCallback((actionHandle) => $wire.getActionConfigurationDialog(actionHandle));
+            $store.formBuilder.setActionConfigCallback((actionHandle, fields) => $wire.getActionConfigurationDialog(actionHandle, fields));
 
             getSettings().then(settings => {
                 $store.formBuilder.formTitle = settings.title;

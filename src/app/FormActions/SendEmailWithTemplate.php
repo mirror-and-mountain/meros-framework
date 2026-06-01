@@ -2,7 +2,7 @@
 
 namespace MM\Meros\App\FormActions;
 
-use MM\Meros\Services\Contracts\FormAction;
+use MM\Meros\Services\Contracts\Forms\FormAction;
 use MM\Meros\App\Models\MerosEmailTemplate as EmailTemplate;
 
 use MM\Meros\Facades\Fields;
@@ -248,15 +248,39 @@ final class SendEmailWithTemplate extends FormAction {
      * 
      * This should return an HTML string containing the form 
      * fields for configuring the action's settings.
+     * 
+     * @param array $formFields An array of the form's fields, which can be used to populate options in the configuration dialogue if needed.
      *
      * @return string
      */
-    public function renderConfigurationDialog(): string {
-        $tagsRepeater = Fields::checkout(Framework::get())->makeFrom('repeater', [
+    public function renderConfigurationDialog(array $formFields): string {
+        $html = '';
+
+        $templateOptions = EmailTemplate::all()
+            ->where('post_status', 'publish')
+            ->pluck('post_title', 'ID')
+            ->toArray();
+
+        $templateField = Fields::checkout(Framework::get())->makeFrom('select', [
+            'id'      => 'meros-email-template',
+            'label'   => 'Email Template',
+            'options' => $templateOptions,
+        ]);
+
+        $html .= $templateField->html();
+
+        $tagsRepeaterField = Fields::checkout(Framework::get())->makeFrom('repeater', [
             'id'    => 'meros-email-template-tag-map',
             'label' => 'Merge Tags',
         ]);
 
-        return $tagsRepeater->html();
+        $tagsRepeaterField->subField('select', function ($select) use ($formFields) {
+            $select->label('Form Field');
+            $select->options($formFields);
+        });
+
+        $html .= $tagsRepeaterField->html();
+
+        return $html;
     }
 }

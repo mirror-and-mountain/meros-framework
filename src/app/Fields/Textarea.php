@@ -2,7 +2,7 @@
 
 namespace MM\Meros\App\Fields;
 
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Forms\Field;
 
 class Textarea extends Field {
     /**
@@ -70,6 +70,6 @@ class Textarea extends Field {
      * @return string
      */
     public function getFieldComponent(): string {
-        return 'meros::fields.textarea';
+        return 'meros::forms.fields.textarea';
     }
 }

@@ -2,14 +2,13 @@
 
 namespace MM\Meros\Services\Contracts\Admin;
 
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Forms\Field;
 use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\Services\Contracts\FeatureDefinition;
-use MM\Meros\Services\Contracts\Elements\Interfaces\FieldParent;
 
 use MM\Meros\Facades\SettingsSections;
 
-final class SettingsField extends FeatureDefinition implements FieldParent {
+final class SettingsField extends FeatureDefinition {
     /**
      * The MenuPage instance that this field belongs to, if set.
      *
@@ -204,7 +203,7 @@ final class SettingsField extends FeatureDefinition implements FieldParent {
      * @return self
      * @throws \InvalidArgumentException if an array of fields is passed instead of a single Field instance.
      */
-    public function attach(Field|array $field): self {
+    public function attachField(Field|array $field): self {
         if (is_array($field)) {
             throw new \InvalidArgumentException('Only a single Field instance can be attached to a SettingsField.');
         }

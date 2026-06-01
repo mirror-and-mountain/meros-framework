@@ -6,8 +6,8 @@ use Closure;
 use Illuminate\Support\Str;
 use MM\Meros\Services\Contracts\FeatureDefinition;
 
-use MM\Meros\Services\Contracts\Elements\Field;
-use MM\Meros\Services\Contracts\Elements\FieldGroup;
+use MM\Meros\Services\Contracts\Forms\Field;
+use MM\Meros\Services\Contracts\Forms\FieldGroup;
 
 use MM\Meros\Services\Contracts\Interfaces\DataRegistrant;
 use MM\Meros\Services\Contracts\Interfaces\AdminFieldRegistrant;
@@ -139,7 +139,7 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
                 }
 
                 add_action('add_meta_boxes', function() {
-                    $fields = $this->fieldGroup->getFields();
+                    $fields = $this->fieldGroup->getFields(true);
                     $postID = get_post()->ID;
                     $value  = $this->getValue($postID) ?? [];
 
@@ -308,10 +308,7 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
      */
     final public function field(Field|string|null $type = null, array $props = [], array $args = []): Field {
         $this->makeField($type, $props, $args);
-
-        if ($this->field->getParent() === null) {
-            $this->getFieldGroup()->attach($this->field);
-        }
+        $this->getFieldGroup()->field($this->field);
 
         return $this->field;
     }

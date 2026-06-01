@@ -2,7 +2,7 @@
 
 namespace MM\Meros\App\Fields;
 
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Forms\Field;
 
 class RichText extends Field {
     /**
@@ -38,6 +38,6 @@ class RichText extends Field {
      * @return string
      */
     public function getFieldComponent(): string {
-        return 'meros::fields.rich-text';
+        return 'meros::forms.fields.rich-text';
     }
 }

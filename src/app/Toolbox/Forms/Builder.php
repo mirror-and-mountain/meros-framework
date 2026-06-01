@@ -8,15 +8,15 @@ use Livewire\Attributes\Renderless;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
-use MM\Meros\Services\Contracts\FormAction;
-use MM\Meros\Services\Contracts\Elements\Field;
-use MM\Meros\Services\Contracts\Elements\FieldGroup;
+use MM\Meros\Services\Contracts\Forms\Field;
+use MM\Meros\Services\Contracts\Forms\FieldGroup;
+use MM\Meros\Services\Contracts\Forms\FormAction;
 
 use MM\Meros\Facades\Fields;
 use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\FormActions;
 
-use MM\Meros\App\Models\MerosForm as Form;
+use MM\Meros\App\Models\Form;
 use MM\Meros\App\Models\PostMeta as FormMeta;
 
 use MM\Meros\App\Toolbox\Forms\Concerns\ManagesFormSchema;
@@ -26,13 +26,6 @@ use MM\Meros\App\Toolbox\Forms\Helpers\Serializer;
 use MM\Meros\App\Toolbox\Forms\Helpers\Utilities;
 
 class Builder extends Component {
-    /**
-     * A collection of hydrated elements used in the schema.
-     *
-     * @var Collection|null
-     */
-    private ?Collection $elements = null;
-
     /**
      * Nav Items to be rendered in the builder's navigation bar.
      *
@@ -61,6 +54,13 @@ class Builder extends Component {
      */
     private ?Field $editingRepeaterField = null;
 
+    /**
+     * A collection of hydrated elements used in the schema.
+     *
+     * @var Collection|null
+     */
+    private ?Collection $elements = null;
+
     use ManagesFormSchema;
 
     public function mount(string|int|null $formID = null) {
@@ -83,13 +83,14 @@ class Builder extends Component {
             $this->makeNewForm();
         }
 
-        $rawSchema = '';
+        $rawSchema = [
+            'rows'    => [],
+            'actions' => []
+        ];
 
         if ($this->form) {
-            $rawSchema = $this->loadFormSchema($this->form->schema());
-        } else {
-            $rawSchema = $this->loadFormSchema(static::defaultFormStructureJson());
-        }
+            $rawSchema = $this->loadFormSchema($this->form->schema);
+        } 
 
         $this->schema = [
             'rows'     => Utilities::normaliseRowPayloads($rawSchema['rows'] ?? []),
@@ -260,7 +261,15 @@ class Builder extends Component {
         return $field;
     }
 
-    public function getActionConfigurationDialog(string $actionHandle): string {
+    /**
+     * Retrieves the configuration dialog for a specific form action type, rendered as an HTML string.
+     *
+     * @param string $actionHandle
+     * @param array  $formFields
+     *
+     * @return string
+     */
+    public function getActionConfigurationDialog(string $actionHandle, array $formFields): string {
         $this->initialiseFormActions();
 
         if (!in_array($actionHandle, array_keys($this->actionPayloads))) {
@@ -273,11 +282,11 @@ class Builder extends Component {
             return '';
         }
 
-        return $actionInstance->renderConfigurationDialog();
+        return $actionInstance->renderConfigurationDialog($formFields);
     }
 
     // =========================================================================
-    // Repeater Management
+    // Repeater Fields Management
     // =========================================================================
 
     /**
@@ -333,7 +342,9 @@ class Builder extends Component {
             ]
         );
 
-        $repeater->attach([$instance], $position);
+        $repeater->field($instance, [
+            'position' => $position
+        ]);
 
         $this->saveRepeater($repeater);
     }
@@ -434,8 +445,8 @@ class Builder extends Component {
         $field = $fields[$fieldIndex];
         $fields->splice($fieldIndex, 1);
         $fields->splice($newPosition, 0, [$field]);
-        $repeater->refresh($fields->all());
 
+        $repeater->refreshFields($fields->all());
         $this->saveRepeater($repeater);
     }
 
@@ -458,6 +469,28 @@ class Builder extends Component {
     }
 
     /**
+     * Retrieves the repeater field instance currently being edited.
+     *
+     * @param string $repeaterID The ID of the repeater field to retrieve.
+     *
+     * @return Field|null
+     */
+    private function getEditingRepeaterField(string $repeaterID): ?Field {
+        $match = $this->findFirstFormField($this->rowPayloads, function($field) use ($repeaterID) {
+            return ($field['handle'] ?? null) === 'repeater'
+                && ($field['properties']['id'] ?? null) === $repeaterID;
+        });
+
+        $repeater = null;
+        if ($match) {
+            $repeater = Hydrator::make($this->fieldTypes, $this)->hydrateFieldPayload($match['field']);
+        }
+
+        $this->editingRepeaterField = $repeater;
+        return $repeater;
+    }
+
+    /**
      * Saves the updated repeater field back into the form schema.
      *
      * @param Field $updatedRepeater The updated repeater field instance to save.
@@ -466,38 +499,17 @@ class Builder extends Component {
      */
     private function saveRepeater(Field $updatedRepeater): void {
         $payload = $updatedRepeater->toJson();
-        
-        $existing = null;
-        foreach ($this->rowPayloads as $rowIndex => $row) {
-            if (($row['_type'] ?? null) === 'fields') {
-                foreach ($row['fields'] ?? [] as $fieldIndex => $field) {
-                    if (($field['handle'] ?? null) === 'repeater' && ($field['properties']['id'] ?? null) === $payload['properties']['id']) {
-                        $existing = [
-                            'rowIndex' => $rowIndex,
-                            'fieldIndex' => $fieldIndex
-                        ];
-                        break 2;
-                    }
-                }
-            } elseif (($row['_type'] ?? null) === 'group') {
-                foreach ($row['group']['rows'] ?? [] as $groupRowIndex => $groupRow) {
-                    foreach ($groupRow['fields'] ?? [] as $fieldIndex => $field) {
-                        if (($field['handle'] ?? null) === 'repeater' && ($field['properties']['id'] ?? null) === $payload['properties']['id']) {
-                            $existing = [
-                                'rowIndex' => $rowIndex,
-                                'groupRowIndex' => $groupRowIndex,
-                                'fieldIndex' => $fieldIndex
-                            ];
-                            break 3;
-                        }
-                    }
-                }
-            }
-        }
 
-        if (!$existing) {
+        $match = $this->findFirstFormField($this->rowPayloads, function($field) use ($payload) {
+            return ($field['handle'] ?? null) === 'repeater'
+                && ($field['properties']['id'] ?? null) === ($payload['properties']['id'] ?? null);
+        });
+
+        if (!$match) {
             return;
         }
+
+        $existing = $match['location'];
 
         if (isset($existing['groupRowIndex'])) {
             $this->rowPayloads[$existing['rowIndex']]['group']['rows'][$existing['groupRowIndex']]['fields'][$existing['fieldIndex']] = $payload;
@@ -507,6 +519,172 @@ class Builder extends Component {
 
         $this->dispatchSchemaUpdate();
         session()->flash('updateStatus', 'Repeater updated!');
+    }
+
+    // =========================================================================
+    // TomSelect Fields Management
+    // =========================================================================
+
+    /**
+     * Retrieves advanced select fields from the form schema's row payloads.
+     *
+     * @param array $rows
+     *
+     * @return array
+     */
+    private function getAdvancedSelectFields(array $rows): array {
+        $advancedSelects = [];
+
+        $this->walkFormFields($rows, function($field) use (&$advancedSelects) {
+            $advancedSelects = array_merge(
+                $advancedSelects,
+                $this->extractAdvancedSelects([$field])
+            );
+        });
+
+        return $advancedSelects;
+    }
+
+    /**
+     * Extracts advanced select fields from the schema rows.
+     *
+     * @param array $fields
+     *
+     * @return array
+     */
+    private function extractAdvancedSelects(array $fields): array {
+        $advancedSelects = [];
+
+        foreach ($fields as $field) {
+            if (in_array($field['handle'], ['select', 'multi_select']) && 
+                ($field['properties']['advanced'] ?? null) === true) 
+            {
+                $advancedSelects[] = $this->buildAdvancedSelectConfig($field['properties']);
+            } 
+            
+            else if ($field['handle'] === 'repeater') {
+                foreach ($field['fields'] ?? [] as $repeaterField) {
+                    if (in_array($repeaterField['handle'], ['select', 'multi_select']) && 
+                        ($repeaterField['properties']['advanced'] ?? null) === true) 
+                    {
+                        $advancedSelects[] = $this->buildAdvancedSelectConfig($repeaterField['properties']);
+                    }
+                }
+            }
+        }
+
+        return $advancedSelects;
+    }
+
+    /**
+     * Builds an advanced select configuration from field properties.
+     *
+     * @param array $properties
+     *
+     * @return array
+     */
+    private function buildAdvancedSelectConfig(array $properties): array {
+        return [
+            'id'               => $properties['id'],
+            'label'            => $properties['label'] ?? '',
+            'name'             => $properties['name'] ?? '',
+            'helpText'         => $properties['helpText'] ?? '',
+            'helpTextPosition' => $properties['helpTextPosition'] ?? 'top',
+            'required'         => $properties['required'] ?? false,
+            'disabled'         => $properties['disabled'] ?? false
+        ];
+    }
+
+    // =========================================================================
+    // Rich Text Fields Management
+    // =========================================================================
+
+    /**
+     * Retrieves rich text payloads from the form schema's row payloads.
+     *
+     * @return array
+     */
+    public function getRichTextPayloads(): array {
+        $richTextObjects = [];
+
+        foreach ($this->rowPayloads as $rowIndex => $row) {
+            if ($row['type'] === 'group') {
+                $group = $row['group'] ?? null;
+
+                if ($group && !empty($group['description'])) {
+                    $richTextObjects[] = [
+                        'rt_id'   => $rowIndex,
+                        'content' => $group['description'],
+                    ];
+                }
+            }
+        }
+
+        $this->walkFormFields($this->rowPayloads, function($field, $location) use (&$richTextObjects) {
+            if (($field['handle'] ?? '') !== 'rich_text') {
+                return;
+            }
+
+            $properties = $field['properties'] ?? [];
+            $fallbackID = "{$location['rowIndex']}_{$location['fieldIndex']}";
+
+            $richTextObjects[] = [
+                'id'               => $properties['id'] ?? $fallbackID,
+                'name'             => $properties['name'] ?? '',
+                'label'            => $properties['label'] ?? '',
+                'helpText'         => $properties['helpText'] ?? '',
+                'helpTextPosition' => $properties['helpTextPosition'] ?? '',
+                'rt_id'            => $properties['id'] ?? $fallbackID,
+                'content'          => $properties['value'] ?? $properties['default'] ?? '',
+            ];
+        });
+
+        return $richTextObjects;
+    }
+
+    /**
+     * Renders Quill delta content to HTML, handling basic formatting and links.
+     *
+     * @param string $deltaJson
+     *
+     * @return string
+     */
+    public function renderQuillContent(string $deltaJson): string {
+        $ops = json_decode($deltaJson, true) ?? [];
+        $html = '';
+
+        foreach ($ops as $op) {
+            $text = $op['insert'] ?? '';
+            $attrs = $op['attributes'] ?? [];
+
+            // Escape HTML
+            $text = e($text);
+
+            if (!empty($attrs['bold'])) {
+                $text = "<strong>{$text}</strong>";
+            }
+            if (!empty($attrs['underline'])) {
+                $text = "<u>{$text}</u>";
+            }
+            if (!empty($attrs['link'])) {
+                $url = htmlspecialchars($attrs['link'], ENT_QUOTES, 'UTF-8');
+                $text = "<a href=\"{$url}\" target=\"_blank\" rel=\"noopener\">{$text}</a>";
+            }
+            if (!empty($attrs['italic'])) {
+                $text = "<em>{$text}</em>";
+            }
+
+            // Handle newlines (Quill uses "\n" as a separate insert)
+            if ($text === "\n") {
+                // If you are wrapping in <p>, you might skip this or use <br>
+                // For a single root element, we often skip standalone newlines
+                continue; 
+            }
+
+            $html .= $text;
+        }
+
+        return nl2br($html); // Convert newlines to <br> for HTML output
     }
 
     // =========================================================================
@@ -552,108 +730,6 @@ class Builder extends Component {
         session()->flash('updateStatus', 'Form successfully saved!');
     }
 
-    /**
-     * Default JSON structure for a simple contact form.
-     *
-     * @return string
-     */
-    public static function defaultFormStructureJson(): string {
-        return '{
-            "type": "form",
-            "elements": [],
-            "rows": [
-                {
-                    "position": 0,
-                    "type": "group",
-                    "group": {
-                        "id": "group-1",
-                        "handle": "test-group",
-                        "title": "Test Group",
-                        "description": "This is a test group.",
-                        "rows": []
-                    }
-                },
-                {
-                    "position": 1,
-                    "type": "fields",
-                    "fields": [
-                        {
-                            "handle": "text",
-                            "properties": {
-                                "id": "first-name",
-                                "label": "First Name",
-                                "name": "first_name",
-                                "helpText": "",
-                                "helpTextPosition": "bottom",
-                                "value": "",
-                                "required": true,
-                                "disabled": false,
-                                "width": "half"
-                            }
-                        },
-                        {
-                            "handle": "text",
-                            "properties": {
-                                "id": "last-name",
-                                "handle": "text",
-                                "label": "Last Name",
-                                "name": "last_name",
-                                "helpText": "",
-                                "helpTextPosition": "bottom",
-                                "value": "",
-                                "required": true,
-                                "disabled": false,
-                                "width": "half"
-                            }
-                        }
-                    ]
-                },
-                {
-                    "position": 2,
-                    "type": "fields",
-                    "fields": [
-                        {
-                            "handle": "text",
-                            "properties": {
-                                "id": "email",
-                                "handle": "text",
-                                "label": "Email",
-                                "name": "email",
-                                "helpText": "",
-                                "helpTextPosition": "bottom",
-                                "value": "",
-                                "required": true,
-                                "disabled": false,
-                                "width": "full"
-                            }
-                        }
-                    ]
-                },
-                {
-                    "position": 3,
-                    "type": "fields",
-                    "fields": [
-                        {
-                            "handle": "textarea",
-                            "properties": {
-                                "id": "message",
-                                "handle": "textarea",
-                                "label": "Message",
-                                "name": "message",
-                                "helpText": "",
-                                "helpTextPosition": "bottom",
-                                "value": "",
-                                "required": true,
-                                "disabled": false,
-                                "width": "full"
-                            }
-                        }
-                    ]
-                }
-            ]
-        }';
-    }
-
     // =========================================================================
     // Helpers
     // =========================================================================
@@ -677,40 +753,6 @@ class Builder extends Component {
             'richTextPayloads' => $richTextPayloads,
             'ignoredFields'    => $ignoredFields
         ]);
-    }
-
-    /**
-     * Retrieves the repeater field instance currently being edited.
-     *
-     * @param string $repeaterID The ID of the repeater field to retrieve.
-     *
-     * @return Field|null
-     */
-    private function getEditingRepeaterField(string $repeaterID): ?Field {
-        $repeater = null;
-
-        foreach($this->rowPayloads as $row) {
-            if (($row['_type'] ?? null) === 'fields') {
-                foreach ($row['fields'] ?? [] as $field) {
-                    if (($field['handle'] ?? null) === 'repeater' && ($field['properties']['id'] ?? null) === $repeaterID) {
-                        $repeater = Hydrator::make($this->fieldTypes, $this)->hydrateFieldPayload($field);
-                        break 2;
-                    }
-                }
-            } elseif (($row['_type'] ?? null) === 'group') {
-                foreach ($row['group']['rows'] ?? [] as $groupRow) {
-                    foreach ($groupRow['fields'] ?? [] as $field) {
-                        if (($field['handle'] ?? null) === 'repeater' && ($field['properties']['id'] ?? null) === $repeaterID) {
-                            $repeater = Hydrator::make($this->fieldTypes, $this)->hydrateFieldPayload($field);
-                            break 3;
-                        }
-                    }
-                }
-            }
-        }
-
-        $this->editingRepeaterField = $repeater;
-        return $repeater;
     }
 
     /**
@@ -744,5 +786,68 @@ class Builder extends Component {
         }
 
         $this->redirect(route('meros.toolbox.form-builder.edit', ['formID' => $newFormId]));
+    }
+
+    /**
+     * Walk each field in the provided rows, including nested fields inside group rows.
+     *
+     * @param array    $rows
+     * @param callable $callback Receives ($field, $location)
+     *
+     * @return void
+     */
+    private function walkFormFields(array $rows, callable $callback): void {
+        foreach ($rows as $rowIndex => $row) {
+            if (($row['type'] ?? null) === 'fields') {
+                foreach ($row['fields'] ?? [] as $fieldIndex => $field) {
+                    $callback($field, [
+                        'rowIndex'      => $rowIndex,
+                        'groupRowIndex' => null,
+                        'fieldIndex'    => $fieldIndex,
+                        'rowType'       => 'fields',
+                    ]);
+                }
+            }
+
+            if (($row['type'] ?? null) === 'group') {
+                foreach ($row['group']['rows'] ?? [] as $groupRowIndex => $groupRow) {
+                    foreach ($groupRow['fields'] ?? [] as $fieldIndex => $field) {
+                        $callback($field, [
+                            'rowIndex'      => $rowIndex,
+                            'groupRowIndex' => $groupRowIndex,
+                            'fieldIndex'    => $fieldIndex,
+                            'rowType'       => 'group',
+                        ]);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Finds the first field matching a predicate.
+     *
+     * @param array    $rows
+     * @param callable $predicate Receives ($field, $location)
+     *
+     * @return array|null
+     */
+    private function findFirstFormField(array $rows, callable $predicate): ?array {
+        $match = null;
+
+        $this->walkFormFields($rows, function($field, $location) use ($predicate, &$match) {
+            if ($match !== null) {
+                return;
+            }
+
+            if ($predicate($field, $location) === true) {
+                $match = [
+                    'field'    => $field,
+                    'location' => $location,
+                ];
+            }
+        });
+
+        return $match;
     }
 }

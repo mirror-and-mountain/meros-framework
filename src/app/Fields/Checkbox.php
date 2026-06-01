@@ -2,7 +2,7 @@
 
 namespace MM\Meros\App\Fields;
 
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Forms\Field;
 
 class Checkbox extends Field {
     /**
@@ -59,6 +59,6 @@ class Checkbox extends Field {
      * @return string
      */
     public function getFieldComponent(): string {
-        return 'meros::fields.checkbox';
+        return 'meros::forms.fields.checkbox';
     }
 }

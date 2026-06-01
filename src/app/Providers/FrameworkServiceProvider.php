@@ -17,11 +17,14 @@ use MM\Meros\Support\ClassInfo;
 use MM\Meros\Services\Registers\Assets;
 use MM\Meros\Services\Registers\AssetGroups;
 use MM\Meros\Services\Registers\Blocks;
+
 use MM\Meros\Services\Registers\Forms;
+use MM\Meros\Services\Registers\FormRows;
 use MM\Meros\Services\Registers\Fields;
 use MM\Meros\Services\Registers\FieldGroups;
 use MM\Meros\Services\Registers\FormActions;
-use MM\Meros\Services\Registers\FormStyles;
+use MM\Meros\Services\Registers\FieldWrappers;
+
 use MM\Meros\Services\Registers\Tables;
 use MM\Meros\Services\Registers\MenuPages;
 use MM\Meros\Services\Registers\MenuPageTemplates;
@@ -135,6 +138,10 @@ class FrameworkServiceProvider extends ServiceProvider {
             return new Forms();
         });
 
+        $this->app->singleton(FormRows::class, function () {
+            return new FormRows();
+        });
+
         $this->app->singleton(Fields::class, function () {
             return new Fields();
         });
@@ -147,8 +154,8 @@ class FrameworkServiceProvider extends ServiceProvider {
             return new FormActions();
         });
 
-        $this->app->singleton(FormStyles::class, function () {
-            return new FormStyles();
+        $this->app->singleton(FieldWrappers::class, function () {
+            return new FieldWrappers();
         });
 
         $this->app->singleton(Tables::class, function () {
@@ -191,10 +198,11 @@ class FrameworkServiceProvider extends ServiceProvider {
         $this->app->alias(Assets::class, 'meros.registers.assets');
         $this->app->alias(Blocks::class, 'meros.registers.blocks');
         $this->app->alias(Forms::class, 'meros.registers.forms');
+        $this->app->alias(FormRows::class, 'meros.registers.form_rows');
         $this->app->alias(Fields::class, 'meros.registers.fields');
         $this->app->alias(FieldGroups::class, 'meros.registers.field_groups');
         $this->app->alias(FormActions::class, 'meros.registers.form_actions');
-        $this->app->alias(FormStyles::class, 'meros.registers.form_styles');
+        $this->app->alias(FieldWrappers::class, 'meros.registers.field_wrappers');
         $this->app->alias(Tables::class, 'meros.registers.tables');
         $this->app->alias(MenuPages::class, 'meros.registers.menu_pages');
         $this->app->alias(MenuPageTemplates::class, 'meros.registers.menu_page_templates');

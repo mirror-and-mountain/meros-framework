@@ -41,6 +41,10 @@ export default function registerFormBuilderStore() {
         sourceGroupRowIndex: null,
         sourceGroupInnerRowIndex: null,
 
+        // ======================================
+        // Form Builder Property Setters
+        // ======================================
+
         // Sets the form title
         setFormTitle(title) {
             this.formTitle = title;
@@ -128,6 +132,10 @@ export default function registerFormBuilderStore() {
             this.repeaterUpdateValueCallback = typeof callback === 'function' ? callback : null;
         },
 
+        // ======================================
+        // Form Builder Data Utilities
+        // ======================================
+
         // Utility to create a deep clone of the rows for safe mutation
         cloneRows() {
             if (typeof structuredClone === 'function') {
@@ -186,6 +194,10 @@ export default function registerFormBuilderStore() {
                 .replace(/^_+|_+$/g, '');
         },
 
+        // ======================================
+        // Field Payload Utilities
+        // ======================================
+
         // Creates a new field payload based on the handle and current item label or field label.
         createFieldPayload(handle) {
             const safeHandle = String(handle ?? '').trim();
@@ -240,10 +252,14 @@ export default function registerFormBuilderStore() {
             return ['checkboxes', 'multi_select'].includes(handle);
         },
 
+        // ======================================
+        // Row and Group Structure Utilities
+        // ======================================
+
         // Utility to create a new top-level fields row with optional initial fields.
         createFieldsRow(fields = []) {
             return {
-                _type: 'fields',
+                type: 'fields',
                 fields,
             };
         },
@@ -253,7 +269,7 @@ export default function registerFormBuilderStore() {
             const title = this.itemLabel ?? this.humanizeHandle(handle);
 
             return {
-                _type: 'group',
+                type: 'group',
                 group: {
                     id: this.makeId(),
                     handle,
@@ -268,7 +284,7 @@ export default function registerFormBuilderStore() {
         getTopRow(rows, rowIndex) {
             const row = rows[rowIndex];
 
-            if (!row || row._type === 'group') {
+            if (!row || row.type === 'group') {
                 return null;
             }
 
@@ -276,7 +292,7 @@ export default function registerFormBuilderStore() {
                 row.fields = [];
             }
 
-            row._type = 'fields';
+            row.type = 'fields';
 
             return row;
         },
@@ -285,7 +301,7 @@ export default function registerFormBuilderStore() {
         getGroup(rows, groupRowIndex) {
             const row = rows[groupRowIndex];
 
-            if (!row || row._type !== 'group' || typeof row.group !== 'object' || row.group === null) {
+            if (!row || row.type !== 'group' || typeof row.group !== 'object' || row.group === null) {
                 return null;
             }
 
@@ -453,6 +469,45 @@ export default function registerFormBuilderStore() {
             return [];
         },
 
+        // Collects field labels keyed by field id, including nested repeater fields.
+        getFieldLabelsById() {
+            const labelsById = {};
+
+            const collectFieldLabels = fields => {
+                if (!Array.isArray(fields)) {
+                    return;
+                }
+
+                fields.forEach(field => {
+                    const fieldId = field?.properties?.id;
+                    const fieldLabel = field?.properties?.label;
+
+                    if (typeof fieldId === 'string' && fieldId.trim() !== '') {
+                        labelsById[fieldId] = typeof fieldLabel === 'string' ? fieldLabel : '';
+                    }
+
+                    if (field?.handle === 'repeater') {
+                        collectFieldLabels(this.getRepeaterSubFields(field));
+                    }
+                });
+            };
+
+            (this.rows ?? []).forEach(row => {
+                if (row?.type === 'group') {
+                    (row.group?.rows ?? []).forEach(innerRow => {
+                        collectFieldLabels(innerRow?.fields ?? []);
+                    });
+                    return;
+                }
+
+                if (row?.type === 'fields') {
+                    collectFieldLabels(row.fields ?? []);
+                }
+            });
+
+            return labelsById;
+        },
+
         // Inserts a field as a new top-level row at the specified index.
         insertFieldAsNewTopRow(rows, targetRowIndex, field) {
             const insertIndex = this.resolveIndex(rows.length, (targetRowIndex ?? -1) + 1, rows.length);
@@ -516,9 +571,9 @@ export default function registerFormBuilderStore() {
             targetRow.fields.splice(insertIndex, 0, field);
         },
 
-        // -----------------------------------------------------------------
-        // Drag lifecycle handlers
-        // -----------------------------------------------------------------
+        // ======================================
+        // Drag Lifecycle Handlers
+        // ======================================
         startDrag(kind, handle, label, repeaterId = null) {
             this.isDragging = true;
             this.isCanvasDrag = false;
@@ -586,9 +641,9 @@ export default function registerFormBuilderStore() {
             this.repeaterID = null;
         },
 
-        // -----------------------------------------------------------------
-        // Drag/Drop parsing helpers
-        // -----------------------------------------------------------------
+        // ======================================
+        // Drag and Drop Parsing Helpers
+        // ======================================
 
         canDropField() {
             return this.itemKind === 'field';
@@ -608,9 +663,9 @@ export default function registerFormBuilderStore() {
             return value;
         },
 
-        // -----------------------------------------------------------------
-        // Visual helpers
-        // -----------------------------------------------------------------
+        // ======================================
+        // Visual Helpers
+        // ======================================
 
         showInsertMarker(zoneElement) {
             const marker = zoneElement?.firstElementChild;
@@ -688,9 +743,9 @@ export default function registerFormBuilderStore() {
             zoneElement.classList.remove('border-blue-400', 'bg-blue-50', 'text-blue-500');
         },
 
-        // -----------------------------------------------------------------
-        // Canvas insertion handlers
-        // -----------------------------------------------------------------
+        // ======================================
+        // Canvas Insertion Handlers
+        // ======================================
 
         // Handle drops on an empty canvas (no rows).
         handleEmptyCanvasDrop(zoneElement) {
@@ -813,7 +868,7 @@ export default function registerFormBuilderStore() {
 
                         const sourceRow = rows[sourceGroupRow];
 
-                        if (!sourceRow || sourceRow._type !== 'group') {
+                          if (!sourceRow || sourceRow.type !== 'group') {
                             return;
                         }
 
@@ -851,9 +906,9 @@ export default function registerFormBuilderStore() {
             }
         },
 
-        // -----------------------------------------------------------------
-        // Group row handlers
-        // -----------------------------------------------------------------
+        // ======================================
+        // Group Row Handlers
+        // ======================================
         
         // Utility to move a field into a new row inside a target group
         moveFieldToGroupNewRow(targetGroupRowIndex, targetInnerRowIndex) {
@@ -955,9 +1010,9 @@ export default function registerFormBuilderStore() {
             this.moveFieldToGroupNewRow(targetGroupRowIndex, targetInnerRowIndex);
         },
 
-        // -----------------------------------------------------------------
-        // Field insertion handlers
-        // -----------------------------------------------------------------
+        // ======================================
+        // Field Insertion Handlers
+        // ======================================
         
         // Utility to move or add a field into a group's row-gap target.
         moveFieldIntoGroupRow(targetGroupRowIndex, targetInnerRowIndex, targetFieldIndex) {
@@ -1139,9 +1194,9 @@ export default function registerFormBuilderStore() {
             this.moveFieldIntoTopRow(targetRowIndex, targetFieldIndex);
         },
 
-        // -----------------------------------------------------------------
-        // Field removal handlers
-        // -----------------------------------------------------------------
+        // ======================================
+        // Field Removal Handlers
+        // ======================================
 
         // Remove a top-level group row.
         removeGroup(groupRowIndex) {
@@ -1158,7 +1213,7 @@ export default function registerFormBuilderStore() {
 
                 const row = rows[groupRowIndex];
 
-                if (!row || row._type !== 'group') {
+                  if (!row || row.type !== 'group') {
                     return;
                 }
 
@@ -1187,9 +1242,9 @@ export default function registerFormBuilderStore() {
             });
         },
 
-        // -----------------------------------------------------------------
-        // Field / Group editing handlers
-        // -----------------------------------------------------------------
+        // ======================================
+        // Field and Group Editing Handlers
+        // ======================================
 
         // Set the currently editing field to a group, opening the field setting panel for that group.
         editGroup(groupRowIndex) {
@@ -1291,7 +1346,7 @@ export default function registerFormBuilderStore() {
             }
 
             for (const row of this.rows) {
-                if (row._type === 'group') {
+                  if (row.type === 'group') {
                     const group = row.group;
                     for (const innerRow of group.rows) {
                         if (!innerRow.fields || !Array.isArray(innerRow.fields)) {
@@ -1308,7 +1363,7 @@ export default function registerFormBuilderStore() {
                             }
                         }
                     }
-                } else if (row._type === 'fields') {
+                  } else if (row.type === 'fields') {
                     for (const field of row.fields) {
                         if (field.handle === 'repeater' && field.properties.id === repeaterId) {
                             const targetField = this.getRepeaterSubFields(field).find(f => f?.properties?.id === fieldId);
@@ -1400,9 +1455,9 @@ export default function registerFormBuilderStore() {
             });
         },
 
-        // -----------------------------------------------------------------
-        // Action configuration handlers
-        // -----------------------------------------------------------------
+        // ======================================
+        // Action Configuration Handlers
+        // ======================================
 
         // Retrieves the configuration dialog content for a given action handle, using the configured callback.
         async getActionConfigurationDialog(params = null) {
@@ -1418,7 +1473,7 @@ export default function registerFormBuilderStore() {
                 return;
             }
 
-            const dialogContent = await this.actionConfigCallback(resolvedActionHandle);
+            const dialogContent = await this.actionConfigCallback(resolvedActionHandle, this.getFieldLabelsById());
 
             const html = typeof dialogContent === 'string'
                 ? dialogContent

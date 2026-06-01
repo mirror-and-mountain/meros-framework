@@ -3,15 +3,15 @@
 namespace MM\Meros\Services\Registers;
 
 use MM\Meros\Services\Contracts\Register;
-use MM\Meros\Services\Contracts\Elements\FormStyle;
+use MM\Meros\Services\Contracts\Forms\FieldWrapper;
 
-class FormStyles extends Register {
+class FieldWrappers extends Register {
     protected string $identifier = 'handle';
-    protected string $definition = FormStyle::class;
+    protected string $definition = FieldWrapper::class;
     protected array  $rejects = ['make'];
 
     /**
-     * Parses properties for the form style's constructor.
+     * Parses properties for the field wrapper's constructor.
      *
      * @param array $props
      *

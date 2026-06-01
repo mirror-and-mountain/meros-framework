@@ -4,26 +4,26 @@ namespace MM\Meros\Services\Concerns;
 
 use Closure;
 
-use MM\Meros\Services\Contracts\Elements\Form;
+use MM\Meros\Services\Contracts\Forms\Form;
 use MM\Meros\Services\Registers\Forms as FormsRegister;
 
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Forms\Field;
 use MM\Meros\Services\Registers\Fields as FieldsRegister;
 
-use MM\Meros\Services\Contracts\Elements\FieldGroup;
+use MM\Meros\Services\Contracts\Forms\FieldGroup;
 use MM\Meros\Services\Registers\FieldGroups as FieldGroupsRegister;
 
-use MM\Meros\Services\Contracts\Elements\FormStyle;
-use MM\Meros\Services\Registers\FormStyles as FormStylesRegister;
+use MM\Meros\Services\Contracts\Forms\FieldWrapper;
+use MM\Meros\Services\Registers\FieldWrappers as FieldWrappersRegister;
 
-use MM\Meros\Services\Contracts\FormAction;
+use MM\Meros\Services\Contracts\Forms\FormAction;
 use MM\Meros\Services\Registers\FormActions as FormActionsRegister;
 
 use MM\Meros\Facades\Forms;
 use MM\Meros\Facades\Fields;
 use MM\Meros\Facades\FieldGroups;
 use MM\Meros\Facades\FormActions;
-use MM\Meros\Facades\FormStyles;
+use MM\Meros\Facades\FieldWrappers;
 
 trait HasFields {
     /**
@@ -86,15 +86,15 @@ trait HasFields {
      * @param string       $handle The handle of the form style to retrieve. If empty, the entire form styles register is returned.
      * @param Closure|null $callback An optional callback used in the register's get() method.
      *
-     * @return FormStyle|FormStylesRegister|null The requested form style, the form styles register, or null if not found.
+     * @return FieldWrapper|FieldWrappersRegister|null The requested field wrapper, the field wrappers register, or null if not found.
      */
-    protected function formStyles(string $handle = '', ?Closure $callback = null): FormStyle|FormStylesRegister|null {
+    protected function fieldWrappers(string $handle = '', ?Closure $callback = null): FieldWrapper|FieldWrappersRegister|null {
         if (empty($handle)) {
-            return FormStyles::checkout($this);
+            return FieldWrappers::checkout($this);
         }
 
         else {
-            return FormStyles::checkout($this)->get($handle, $callback);
+            return FieldWrappers::checkout($this)->get($handle, $callback);
         }
     }
 
@@ -133,15 +133,15 @@ trait HasFields {
     }
 
     /**
-     * Alias of the formStyles() method for users who prefer the snake_case naming convention.
+     * Alias of the fieldWrappers() method for users who prefer the snake_case naming convention.
      *
      * @param string       $handle
      * @param Closure|null $callback
      *
-     * @return FormStyle|FormStylesRegister|null
+     * @return FieldWrapper|FieldWrappersRegister|null
      */
-    protected function form_styles(string $handle = '', ?Closure $callback = null): FormStyle|FormStylesRegister|null {
-        return $this->formStyles($handle, $callback);
+    protected function field_wrappers(string $handle = '', ?Closure $callback = null): FieldWrapper|FieldWrappersRegister|null {
+        return $this->fieldWrappers($handle, $callback);
     }
 
     /**

@@ -1,5 +1,6 @@
 @php 
     $id         = $field->getId();
+    $fieldType  = $field->getType();
     $classList  = $field->classList();
     $isSubField = $field->isSubField();
     $fieldValue = $field->getValue();
@@ -9,7 +10,7 @@
     $fieldSetClass    = $isSubField ? 'nice-form-group !-mt-2.5' : 'nice-form-group';
 @endphp
 
-<fieldset x-data="{ layout: '{{ $layout }}' }" class="{{ $fieldSetClass }}">
+<fieldset id="{{ $id }}" class="{{ $fieldSetClass }}" data-field-type="{{ $fieldType }}" x-data="{ layout: '{{ $layout }}' }">
     @if(!$isSubField)
         <legend>{{ $field->getLabel() }}</legend>
     
@@ -31,7 +32,7 @@
             @endphp
             <input 
                 id="{{ $id }}_{{ $value }}" 
-                {!! $field->attributes(['id', 'name']) !!} 
+                {!! $field->attributes(['id', 'name', 'data-field-type']) !!} 
                 name="{{ $field->getName(!$isSubField) . ($field->allowsMultiple() ? '[]' : '') }}"
                 data-option-value="{{ $value }}"
                 @checked($checked) 

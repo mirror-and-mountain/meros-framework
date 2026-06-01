@@ -2,7 +2,7 @@
 
 namespace MM\Meros\App\Fields;
 
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Forms\Field;
 
 class Input extends Field {
     /**
@@ -75,7 +75,7 @@ class Input extends Field {
      * @return string
      */
     public function getFieldComponent(): string {
-        return 'meros::fields.input';
+        return 'meros::forms.fields.input';
     }
 
     /***************************

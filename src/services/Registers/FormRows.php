@@ -3,14 +3,15 @@
 namespace MM\Meros\Services\Registers;
 
 use MM\Meros\Services\Contracts\Register;
-use MM\Meros\Services\Contracts\Forms\FieldGroup;
+use MM\Meros\Services\Contracts\Forms\FormRow;
 
-class FieldGroups extends Register {
+class FormRows extends Register {
     protected string $identifier = 'handle';
-    protected string $definition = FieldGroup::class;
+    protected string $definition = FormRow::class;
+    protected array $rejects     = ['makeFrom'];
 
     /**
-     * Parses properties for the field group's constructor.
+     * Parses properties for the form row's constructor.
      *
      * @param array $props
      *
@@ -19,9 +20,6 @@ class FieldGroups extends Register {
     protected function parseProperties(array $props): array {
         return [
             'handle'      => $props['handle'] ?? '',
-            'id'          => $props['id'] ?? 0,
-            'title'       => $props['title'] ?? '',
-            'description' => $props['description'] ?? ''
         ];
     }
 }

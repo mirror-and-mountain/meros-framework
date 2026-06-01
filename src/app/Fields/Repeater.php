@@ -2,16 +2,16 @@
 
 namespace MM\Meros\App\Fields;
 
+use Closure;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 
-use MM\Meros\Services\Contracts\Elements\Field;
-use MM\Meros\Services\Contracts\Elements\Interfaces\FieldParent;
-
-use MM\Meros\Services\Contracts\Elements\Concerns\CanAttachFields;
+use MM\Meros\Services\Contracts\Forms\Field;
+use MM\Meros\Facades\Fields as FieldsRegister;
 
 use MM\Meros\Facades\Context;
 
-class Repeater extends Field implements FieldParent {
+class Repeater extends Field {
     /**
      * The unique identifier for the field, used for resolution.
      *
@@ -111,7 +111,12 @@ class Repeater extends Field implements FieldParent {
      */
     protected string $defaultConfigurationCallback = '$store.repeaterField.defaultConfigureRowModal';
 
-    use CanAttachFields;
+    /**
+     * The fields that belong to this repeater.
+     *
+     * @var array<Field>
+     */
+    public array $fields = [];
 
     /**
      * Converts the field's properties to an array format suitable for JSON serialization
@@ -199,6 +204,67 @@ class Repeater extends Field implements FieldParent {
         return $this;
     }
 
+    /**
+     * Creates a new field instance, adds it to the repeater's fields array, and returns it for chaining.
+     *
+     * @param Field|string       $field The field handle or instance to add as a sub-field.
+     * @param Closure|array|null $callback An optional callback function or array of properties to apply to the field instance after creation.
+     * @param array              $props Additional configuration options for the field instance.
+     *
+     * @return Field The created field instance.
+     */
+    public function field(Field|string $field, Closure|array|null $callback = null, array $props = []): Field {
+       $params = func_num_args();
+    
+        if ($params === 2 && is_array($callback)) {
+            $props    = $callback;
+            $callback = null;
+        }
+
+        if (is_string($field)) {
+            $field = FieldsRegister::checkout($this->provider)->makeFrom($field, $callback, $props);
+        } else {
+            FieldsRegister::checkout($this->provider)->attach($field);
+        }
+
+        $position = $props['position'] ?? -1;
+
+        if ($position === -1 || $position >= count($this->fields)) {
+            $this->fields[] = $field;
+        } else {
+            array_splice($this->fields, $position, 0, [$field]);
+        }
+
+        $field->repeater($this);
+
+        return $field;
+    }
+
+    /**
+     * Creates a new field instance, adds it to the repeater's fields array, and returns it for chaining.
+     * Alias for field() method.
+     *
+     * @param string             $fieldIdOrClass The class name of the field to instantiate.
+     * @param Closure|array|null $callback An optional callback function or array of properties to apply to the field instance after creation.
+     * @param array              $props Additional configuration options for the field instance.
+     *
+     * @return Field The created field instance.
+     */
+    public function subField(string $fieldIdOrClass, Closure|array|null $callback = null, array $props = []): Field {
+        return $this->field($fieldIdOrClass, $callback, $props);
+    }
+
+    /**
+     * Refreshes the repeater's fields with a new array of field instances.
+     *
+     * @param array $fields<Field>
+     *
+     * @return void
+     */
+    public function refreshFields(array $fields): void {
+        $this->fields = $fields;
+    }
+
     /********************
      * Getters
      ********************/
@@ -250,6 +316,39 @@ class Repeater extends Field implements FieldParent {
             : $this->configurationCallback;
     }
 
+    /**
+     * Returns the fields that belong to this repeater as a collection.
+     * 
+     * @param bool $asArray Whether to return the fields as an array or a collection.
+     *
+     * @return Collection|array 
+     */
+    public function getFields(bool $asArray = false): Collection|array {
+        return $asArray ? $this->fields : collect($this->fields);
+    }
+
+    /**
+     * Returns the names of all sub-items defined for the repeater field.
+     *
+     * @return array
+     */
+    public function getFieldNames(): array {
+        return collect($this->fields)
+            ->map(fn($field) => $field->getName())
+            ->toArray();
+    }
+
+    /**
+     * Returns the labels of all sub-items defined for the repeater field.
+     *
+     * @return array
+     */
+    public function getFieldLabels(): array {
+        return collect($this->fields)
+            ->map(fn($field) => $field->getLabel())
+            ->toArray();
+    }
+
     /***************************
      * Rendering
      ***************************/
@@ -257,13 +356,13 @@ class Repeater extends Field implements FieldParent {
     /**
      * Renders the repeater table field.
      * 
-     * @param bool $showLabel Whether to show the field's label in the wrapper. Some styles may ignore this and always show the label, or never show the label.
-     * @param bool $showHelp Whether to show the field's help text in the wrapper. Some styles may ignore this and always show the help text, or never show the help text.
+     * @param bool $showLabel Whether to show the field's label in the wrapper. Some wrappers may ignore this and always show the label, or never show the label.
+     * @param bool $showHelp Whether to show the field's help text in the wrapper. Some wrappers may ignore this and always show the help text, or never show the help text.
      *
      * @return void
      */
     public function render(bool $showLabel = true, bool $showHelp = true): void {
-        $wrapper = $this->resolveStyle();
+        $wrapper = $this->resolveFieldWrapper();
 
         echo view($wrapper, [
             'view'      => $this->getFieldComponent(),
@@ -280,7 +379,7 @@ class Repeater extends Field implements FieldParent {
      * @return string
      */
     public function getFieldComponent(): string {
-        return Context::isAdmin() ? 'meros::fields.repeater-admin' : 'meros::fields.repeater';
+        return Context::isAdmin() ? 'meros::forms.fields.repeater-admin' : 'meros::forms.fields.repeater';
     }
 
     /**

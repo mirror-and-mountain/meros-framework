@@ -3,7 +3,7 @@
 namespace MM\Meros\App\Toolbox\Forms\Helpers;
 
 use MM\Meros\App\Toolbox\Forms\Builder;
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Forms\Field;
 
 use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Fields;
@@ -43,14 +43,14 @@ class Hydrator {
 
             if (Utilities::isGroupRow($rowPayload)) {
                 $rowPayloads[$index] = [
-                    '_type' => 'group',
+                    'type' => 'group',
                     'group' => $this->hydrateGroupPayload($rowPayload['group'])
                 ];
                 continue;
             }
 
             $rowPayloads[$index] = [
-                '_type'  => 'fields',
+                'type'   => 'fields',
                 'fields' => $this->hydrateFieldPayloads($rowPayload['fields'] ?? [])
             ];
         }
@@ -136,8 +136,8 @@ class Hydrator {
                 }
             }
 
-            if (method_exists($instance, 'refresh')) {
-                $instance->refresh($hydratedSubFields);
+            if (method_exists($instance, 'refreshFields')) {
+                $instance->refreshFields($hydratedSubFields);
             }
         }
 

@@ -78,6 +78,6 @@ class Radio extends Select {
      * @return string
      */
     public function getFieldComponent(): string {
-        return 'meros::fields.choice';
+        return 'meros::forms.fields.choice';
     }
 }

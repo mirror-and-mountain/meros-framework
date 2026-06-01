@@ -6,9 +6,9 @@ use Closure;
 use Illuminate\Support\Str;
 
 use MM\Meros\Services\Contracts\FeatureDefinition;
-
-use MM\Meros\Facades\Context;
 use MM\Meros\Facades\PostMetaDefinitions as PostMetaFacade;
+
+use MM\Meros\App\Models\Post;
 
 class PostType extends FeatureDefinition {
     /**
@@ -70,6 +70,13 @@ class PostType extends FeatureDefinition {
      * @var string
      */
     protected string $editPostLink = '';
+
+    /**
+     * The model instance associated with a specific post of this post type, if applicable.
+     *
+     * @var Post|null
+     */
+    protected ?Post $model = null;
 
     final public function __construct(
         FeatureProvider $provider,
@@ -857,6 +864,24 @@ class PostType extends FeatureDefinition {
      */
     public function getArgs(): array {
         return $this->args;
+    }
+
+    /**
+     * Retrieves a specific post of this post type by its ID.
+     *
+     * @param int $postId
+     *
+     * @return Post|null
+     */
+    public function get(int $postId): ?Post {
+        if ($this->model) {
+            return $this->model::find($postId);
+        }
+
+        else {
+            $this->model = Post::where('ID', $postId)->where('post_type', $this->handle)->first();
+            return $this->model;
+        }
     }
 
 

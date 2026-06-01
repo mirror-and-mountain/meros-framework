@@ -1,6 +1,8 @@
 <?php 
 
-namespace MM\Meros\Services\Contracts;
+namespace MM\Meros\Services\Contracts\Forms;
+
+use MM\Meros\Services\Contracts\FeatureDefinition;
 
 abstract class FormAction extends FeatureDefinition {
     /**
@@ -74,8 +76,10 @@ abstract class FormAction extends FeatureDefinition {
      * 
      * This should return an HTML string containing the form 
      * fields for configuring the action's settings.
+     * 
+     * @param array $formFields An array of the form's fields, which can be used to populate options in the configuration dialogue if needed.
      *
      * @return string
      */
-    abstract public function renderConfigurationDialog(): string;
+    abstract public function renderConfigurationDialog(array $formFields): string;
 }

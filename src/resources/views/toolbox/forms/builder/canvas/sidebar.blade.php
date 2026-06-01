@@ -123,7 +123,7 @@
                         >
                             @if ($field['icon'] !== '')
                                 <span class="mr-2">
-                                    @include('meros::toolbox.forms.field-icons.' . $field['icon'])
+                                    @include('meros::forms.field-icons.' . $field['icon'])
                                 </span>
                             @endif
                             <div class="flex justify-between items-center w-full">

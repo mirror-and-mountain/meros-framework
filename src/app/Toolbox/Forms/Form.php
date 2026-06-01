@@ -4,7 +4,7 @@ namespace MM\Meros\App\Toolbox\Forms;
 
 use Livewire\Component;
 
-use MM\Meros\App\Models\MerosForm as FormModel;
+use MM\Meros\App\Models\Form as FormModel;
 use MM\Meros\App\Toolbox\Forms\Concerns\ManagesFormSchema;
 
 use MM\Meros\App\Toolbox\Forms\Helpers\Hydrator;
@@ -29,13 +29,12 @@ class Form extends Component {
             $this->form = FormModel::find($formID);
 
             if ($this->form) {
-                $rawSchema = $this->loadFormSchema($this->form->schema());
+                $rawSchema = $this->loadFormSchema($this->form->schema?->meta_value ?? []);
                 $this->schema = [
                     'rows'     => Utilities::normaliseRowPayloads($rawSchema['rows'] ?? []),
                     'settings' => $rawSchema['settings'] ?? [],
                 ];
 
-                $this->settings = $this->schema['settings'] ?? [];
                 $this->rowPayloads = $this->schema['rows'] ?? [];
             }
         }

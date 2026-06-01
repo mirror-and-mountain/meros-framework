@@ -20,16 +20,16 @@ class Utilities {
                 continue;
             }
 
-            if (self::isGroupRow($row, 'type')) {
+            if (self::isGroupRow($row)) {
                 $normalisedRows[] = [
-                    '_type' => 'group',
+                    'type' => 'group',
                     'group' => self::normaliseGroupPayload($row['group'])
                 ];
                 continue;
             }
 
             $normalisedRows[] = [
-                '_type'  => 'fields',
+                'type'  => 'fields',
                 'fields' => self::normaliseFieldPayloads($row['fields'] ?? [])
             ];
         }
@@ -45,8 +45,16 @@ class Utilities {
      *
      * @return boolean
      */
-    public static function isGroupRow(array $rowPayload, string $key = '_type'): bool {
-        return ($rowPayload[$key] ?? null ) === 'group' && is_array($rowPayload['group'] ?? null);
+    public static function isGroupRow(array $rowPayload, ?string $key = null): bool {
+        $rowType = null;
+
+        if ($key !== null) {
+            $rowType = $rowPayload[$key] ?? null;
+        } else {
+            $rowType = $rowPayload['type'] ?? $rowPayload['_type'] ?? null;
+        }
+
+        return $rowType === 'group' && is_array($rowPayload['group'] ?? null);
     }
 
     /**

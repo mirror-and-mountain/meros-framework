@@ -7,7 +7,7 @@ use Illuminate\Support\Str;
 use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\Services\Contracts\FeatureDefinition;
 
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Forms\Field;
 use MM\Meros\Services\Contracts\Interfaces\DataRegistrant;
 use MM\Meros\Services\Contracts\Interfaces\AdminFieldRegistrant;
 
@@ -226,7 +226,7 @@ class Setting extends FeatureDefinition implements DataRegistrant, AdminFieldReg
             args:     $args
         );
 
-        $this->field->attachTo($this->settingsField);
+        $this->field->settingsField($this->settingsField);
     }
 
     /** Walk through all sub-items and apply a callback to their setting fields if they exist.

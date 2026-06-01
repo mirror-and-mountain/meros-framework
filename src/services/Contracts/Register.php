@@ -234,19 +234,27 @@ abstract class Register {
     /**
      * Creates a new feature from a registered class and adds it to the register.
      *
-     * @param string $idOrClass The identifier or fully qualified class name to instantiate.
-     * @param array  $props     Optional arguments for the feature's constructor.
+     * @param string             $idOrClass The identifier or fully qualified class name to instantiate.
+     * @param Closure|array|null $callback  Optional callback to configure the feature.
+     * @param array              $props     Optional arguments for the feature's constructor.
      *
      * @return FeatureDefinition The newly created feature instance.
      * @throws \BadMethodCallException If the register does not support making features from registered classes.
      */
-    public function makeFrom(string $idOrClass, array $props = []): FeatureDefinition {
+    public function makeFrom(string $idOrClass, Closure|array|null $callback = null, array $props = []): FeatureDefinition {
         if (!$this->supports('makeFrom')) {
             throw new \BadMethodCallException("This register (" . static::class . ") does not support making features from registered classes.");
         }
 
         $this->ensureCheckedOut();
         $provider = $this->provider;
+
+        $params = func_num_args();
+
+        if ($params === 2 && is_array($callback)) {
+            $props    = $callback;
+            $callback = null;
+        }
 
         if (isset($this->classes[$idOrClass])) {
             $class = $this->classes[$idOrClass];
@@ -264,10 +272,18 @@ abstract class Register {
 
         $parsedProperties = $this->parseProperties($props);
 
-        return $this->attach(new $class(
+        $item = $this->attach(new $class(
             $this->provider,
             $parsedProperties
         ));
+
+        $this->checkout($provider); // Re-checkout to ensure the provider is set after making the item
+
+        if ($callback && $callback instanceof Closure) {
+            $callback($item);
+        }
+
+        return $item;
     }
 
     /**

@@ -1,5 +1,6 @@
 @php
     $id = $field->getID();
+    $fieldType = $field->getType();
     $value = $field->getValue();
     $rawRepeaterValue = is_array($value) ? $value : [];
     $templateRow = $field->buildTemplateRow();
@@ -11,7 +12,7 @@
     $configurationCallback = $field->getConfigurationCallback();
     $templateFieldIdSuffix = '--template';
 @endphp
-<div id="{{ $id }}" class="{{ $field->classList() }} meros-repeater">
+<div id="{{ $id }}" class="{{ $field->classList() }} meros-repeater" data-field-type="{{ $fieldType }}">
     <div
         class="meros-repeater-scroll"
         x-data="{ isDraggingRow: false, draggingRowIndex: null }"

@@ -1,23 +1,23 @@
 <?php 
 
-namespace MM\Meros\App\Fields\Styles;
+namespace MM\Meros\App\FieldWrappers;
 
-use MM\Meros\Services\Contracts\Elements\FormStyle;
+use MM\Meros\Services\Contracts\Forms\FieldWrapper;
 
-class SiteDefault extends FormStyle {
+class SiteDefault extends FieldWrapper {
     /**
-     * The unique handle for this form style.
+     * The unique handle for this field wrapper.
      *
      * @var string
      */
     public string $handle = 'site_default';
 
     /**
-     * The blade view path for this form style.
+     * The blade view path for this field wrapper.
      *
      * @var string
      */
-    protected string $view = 'meros::form-styles.site-default';
+    protected string $view = 'meros::forms.field-wrappers.site-default';
 
     protected array $styleAttributes = [
         'input-size'                    => '--nf-input-size',

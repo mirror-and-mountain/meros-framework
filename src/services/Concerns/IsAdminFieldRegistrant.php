@@ -4,7 +4,7 @@ namespace MM\Meros\Services\Concerns;
 
 use Illuminate\Support\Str;
 
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Forms\Field;
 use MM\Meros\Services\Contracts\Interfaces\AdminFieldRegistrant;
 
 use MM\Meros\Facades\Fields;

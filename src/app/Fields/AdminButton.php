@@ -2,7 +2,7 @@
 
 namespace MM\Meros\App\Fields;
 
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Forms\Field;
 
 class AdminButton extends Field {
     /**
@@ -73,6 +73,6 @@ class AdminButton extends Field {
      * @return string
      */
     public function getFieldComponent(): string {
-        return 'meros::fields.admin-button';
+        return 'meros::forms.fields.admin-button';
     }
 }

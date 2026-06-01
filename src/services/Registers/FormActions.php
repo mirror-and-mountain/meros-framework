@@ -3,7 +3,7 @@
 namespace MM\Meros\Services\Registers;
 
 use MM\Meros\Services\Contracts\Register;
-use MM\Meros\Services\Contracts\FormAction;
+use MM\Meros\Services\Contracts\Forms\FormAction;
 
 class FormActions extends Register {
     protected string $identifier = 'handle';

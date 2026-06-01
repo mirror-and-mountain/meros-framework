@@ -2,26 +2,26 @@
 @use 'tom-select/dist/css/tom-select.css';
 @use 'repeaters.scss';
 
-.meros-site-form-container {
+.meros-form-container {
 	display: flex;
 	flex-direction: column;
 	gap: 1.5rem;
 }
 
-.meros-site-form-header {
-	.meros-site-form-description {
+.meros-form-header {
+	.meros-form-description {
 		font-size: 1rem;
 		color: #4b5563;
 	}
 }
 
-.meros-site-form {
+.meros-form {
 	display: grid;
 	gap: 1rem;
 	min-width: 0;
 }
 
-.meros-site-form-row {
+.meros-form-row {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.75rem;
@@ -30,26 +30,26 @@
 	min-width: 0;
 }
 
-.meros-site-form-row > * {
+.meros-form-row > * {
 	flex: 1 1 calc((100% - 1.5rem) / 3);
 	width: 100%;
 	min-width: 0;
 }
 
-.meros-site-form-field {
+.meros-form-field {
 	justify-self: stretch;
 	align-self: start;
 	width: 100%;
 	min-width: 0;
 }
 
-.meros-site-form-field > * {
+.meros-form-field > * {
 	display: block;
 	width: 100%;
 	min-width: 0;
 }
 
-.meros-site-form-group {
+.meros-form-group {
 	border: 1px solid #d1d5db;
 	border-radius: 0.5rem;
 	background-color: #f9fafb;
@@ -57,7 +57,7 @@
 	min-width: 0;
 }
 
-.meros-site-form-group-header {
+.meros-form-group-header {
 	margin-bottom: 1.25rem;
 
 	a {
@@ -70,20 +70,20 @@
 	}
 }
 
-.meros-site-form-group-header h3 {
+.meros-form-group-header h3 {
 	margin: 0;
 	font-size: 1rem;
 	line-height: 1.3;
 	color: #1f2937;
 }
 
-.meros-site-form-group-header p {
+.meros-form-group-header p {
 	margin: 0.25rem 0 0;
 	font-size: 0.875rem;
 	color: #4b5563;
 }
 
-.meros-site-form .meros-field .description,
+.meros-form .meros-field .description,
 .meros-admin-field .description,
 .meros-field .field-help-text-top,
 .meros-field .field-help-text-bottom {
@@ -96,33 +96,33 @@
 	hyphens: auto;
 }
 
-.meros-site-form .meros-field .description,
+.meros-form .meros-field .description,
 .meros-admin-field .description {
 	line-height: 1.4;
 }
 
-.meros-site-form-group .meros-site-form-row + .meros-site-form-row {
+.meros-form-group .meros-form-row + .meros-form-row {
 	margin-top: 0.75rem;
 }
 
-.meros-site-form .meros-field input[type="text"],
-.meros-site-form .meros-field input[type="email"],
-.meros-site-form .meros-field input[type="url"],
-.meros-site-form .meros-field input[type="number"],
-.meros-site-form .meros-field input[type="password"],
-.meros-site-form .meros-field input[type="search"],
-.meros-site-form .meros-field input[type="tel"],
-.meros-site-form .meros-field input[type="date"],
-.meros-site-form .meros-field input[type="time"],
-.meros-site-form .meros-field textarea,
-.meros-site-form .meros-field select {
+.meros-form .meros-field input[type="text"],
+.meros-form .meros-field input[type="email"],
+.meros-form .meros-field input[type="url"],
+.meros-form .meros-field input[type="number"],
+.meros-form .meros-field input[type="password"],
+.meros-form .meros-field input[type="search"],
+.meros-form .meros-field input[type="tel"],
+.meros-form .meros-field input[type="date"],
+.meros-form .meros-field input[type="time"],
+.meros-form .meros-field textarea,
+.meros-form .meros-field select {
 	width: 100%;
 	max-width: 100%;
 	box-sizing: border-box;
 }
 
-.meros-site-form .meros-field input[type="checkbox"],
-.meros-site-form .meros-field input[type="radio"] {
+.meros-form .meros-field input[type="checkbox"],
+.meros-form .meros-field input[type="radio"] {
 	width: auto;
 	max-width: none;
 	inline-size: 1rem;
@@ -133,67 +133,67 @@
 }
 
 @media (max-width: 980px) {
-	.meros-site-form-row > * {
+	.meros-form-row > * {
 		flex-basis: calc((100% - 0.75rem) / 2);
 	}
 }
 
 @media (max-width: 640px) {
-	.meros-site-form-container {
+	.meros-form-container {
 		gap: 1rem;
 	}
 
-	.meros-site-form {
+	.meros-form {
 		gap: 0.875rem;
 	}
 
-	.meros-site-form-row {
+	.meros-form-row {
 		gap: 0.625rem;
 		margin-bottom: 1rem;
 	}
 
-	.meros-site-form-row > * {
+	.meros-form-row > * {
 		flex-basis: 100%;
 	}
 
-	.meros-site-form-group {
+	.meros-form-group {
 		padding: 0.75rem;
 	}
 
 	/* Prevent iOS auto-zoom and improve touch targets on mobile inputs. */
-	.meros-site-form .meros-field input[type="text"],
-	.meros-site-form .meros-field input[type="email"],
-	.meros-site-form .meros-field input[type="url"],
-	.meros-site-form .meros-field input[type="number"],
-	.meros-site-form .meros-field input[type="password"],
-	.meros-site-form .meros-field input[type="search"],
-	.meros-site-form .meros-field input[type="tel"],
-	.meros-site-form .meros-field input[type="date"],
-	.meros-site-form .meros-field input[type="time"],
-	.meros-site-form .meros-field textarea,
-	.meros-site-form .meros-field select {
+	.meros-form .meros-field input[type="text"],
+	.meros-form .meros-field input[type="email"],
+	.meros-form .meros-field input[type="url"],
+	.meros-form .meros-field input[type="number"],
+	.meros-form .meros-field input[type="password"],
+	.meros-form .meros-field input[type="search"],
+	.meros-form .meros-field input[type="tel"],
+	.meros-form .meros-field input[type="date"],
+	.meros-form .meros-field input[type="time"],
+	.meros-form .meros-field textarea,
+	.meros-form .meros-field select {
 		font-size: 16px;
 		line-height: 1.35;
 	}
 
-	.meros-site-form .meros-field input[type="text"],
-	.meros-site-form .meros-field input[type="email"],
-	.meros-site-form .meros-field input[type="url"],
-	.meros-site-form .meros-field input[type="number"],
-	.meros-site-form .meros-field input[type="password"],
-	.meros-site-form .meros-field input[type="search"],
-	.meros-site-form .meros-field input[type="tel"],
-	.meros-site-form .meros-field input[type="date"],
-	.meros-site-form .meros-field input[type="time"],
-	.meros-site-form .meros-field select {
+	.meros-form .meros-field input[type="text"],
+	.meros-form .meros-field input[type="email"],
+	.meros-form .meros-field input[type="url"],
+	.meros-form .meros-field input[type="number"],
+	.meros-form .meros-field input[type="password"],
+	.meros-form .meros-field input[type="search"],
+	.meros-form .meros-field input[type="tel"],
+	.meros-form .meros-field input[type="date"],
+	.meros-form .meros-field input[type="time"],
+	.meros-form .meros-field select {
 		min-height: 2.5rem;
 	}
 
-	.meros-site-form .meros-field textarea {
+	.meros-form .meros-field textarea {
 		min-height: 7.5rem;
 	}
 
-	.meros-site-form .meros-field .description,
+	.meros-form .meros-field .description,
 	.meros-admin-field .description,
 	.meros-field .field-help-text-top,
 	.meros-field .field-help-text-bottom {

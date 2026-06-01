@@ -1,17 +1,19 @@
 <?php 
 
-namespace MM\Meros\Services\Contracts\Elements;
+namespace MM\Meros\Services\Contracts\Forms;
 
 use Illuminate\Support\Str;
 
-use MM\Meros\Services\Contracts\FeatureDefinition;
-use MM\Meros\Services\Contracts\Admin\SettingsField;
-use MM\Meros\Services\Contracts\Elements\Interfaces\FieldParent;
-
-use MM\Meros\Facades\FormStyles;
-use MM\Meros\Facades\Context;
-
 use MM\Meros\App\Fields\Repeater;
+
+use MM\Meros\Services\Contracts\FeatureProvider;
+use MM\Meros\Services\Contracts\FeatureDefinition;
+
+use MM\Meros\Services\Contracts\Forms\FormRow;
+use MM\Meros\Services\Contracts\Admin\SettingsField;
+
+use MM\Meros\Facades\FieldWrappers;
+use MM\Meros\Facades\Context;
 
 abstract class Field extends FeatureDefinition {
     /**
@@ -65,11 +67,25 @@ abstract class Field extends FeatureDefinition {
     protected string $rootName = '';
 
     /**
-     * The parent field group or repeater instance if this field is a sub-field.
+     * The form row this field belongs to, if any.
      *
-     * @var FieldParent|null
+     * @var FormRow|null
      */
-    protected ?FieldParent $parent = null;
+    protected ?FormRow $row = null;
+
+    /**
+     * The field's position within its parent row.
+     *
+     * @var integer|null
+     */
+    protected ?int $position = null;
+
+    /**
+     * The repeater instance this field belongs to, if any.
+     *
+     * @var Repeater|null
+     */
+    protected ?Repeater $repeater = null;
 
     /**
      * The SettingsField instance associated with this field, if any.
@@ -150,42 +166,52 @@ abstract class Field extends FeatureDefinition {
     protected bool $disabled = false;
 
     /**
+     * An array of conditions that determine the field's visibility or behavior based on other field values.
+     *
+     * @var array
+     */
+    protected array $conditions = [];
+
+    /**
      * An array of CSS classes to apply to the field's wrapper element.
      *
      * @var array
      */
     protected array $classList = [];
 
-    /**
-     * Whether to force the field to take up the full width of its container, regardless of the width setting.
-     *
-     * @var bool
-     */
-    protected bool $forceFullWidth = false;
+    /***************************
+     * Feature Contract Methods
+     ***************************/
 
-    /**
-     * The field's width option, which can be 'full', 'half', or 'third'
-     * to control its width in a form.
-     *
-     * @var string
-     */
-    protected string $width = 'full';
+    final public function __construct(
+        FeatureProvider $provider,
+        array           $props = []
+    ) {
+        parent::__construct($provider, $props);
+        
+        if (empty($this->id)) {
+            $this->id = 'field_' . Str::substr(Str::uuid(), 0, 8);
+        }
+    }
+    
+    final protected function queue(): void {
+        // Field classes don't use the queue method
+    }
 
+    /***************************
+     * Rendering
+     ***************************/
 
-    // These properties are set to true by default as fields don't use the setReady or load methods.
-    final public bool $ready = true;
-    final public bool $loaded = true;
-
-    /**
-     * Renders the field using its designated FormStyle.
+        /**
+     * Renders the field using its designated FieldWrapper.
      * 
-     * @param bool $showLabel Whether to show the field's label in the wrapper. Some styles may ignore this and always show the label, or never show the label.
-     * @param bool $showHelp Whether to show the field's help text in the wrapper. Some styles may ignore this and always show the help text, or never show the help text.
+     * @param bool $showLabel Whether to show the field's label in the wrapper. Some wrappers may ignore this and always show the label, or never show the label.
+     * @param bool $showHelp Whether to show the field's help text in the wrapper. Some wrappers may ignore this and always show the help text, or never show the help text.
      *
      * @return void
      */
     public function render(bool $showLabel = true, bool $showHelp = true): void {
-        $wrapper = $this->resolveStyle();
+        $wrapper = $this->resolveFieldWrapper();
 
         echo view($wrapper, [
             'view'       => $this->getFieldComponent(),
@@ -198,8 +224,8 @@ abstract class Field extends FeatureDefinition {
     /**
      * Renders the field and returns the HTML as a string.
      *
-     * @param bool $showLabel Whether to show the field's label in the wrapper. Some styles may ignore this and always show the label, or never show the label.
-     * @param bool $showHelp Whether to show the field's help text in the wrapper. Some styles may ignore this and always show the help text, or never show the help text.
+     * @param bool $showLabel Whether to show the field's label in the wrapper. Some wrappers may ignore this and always show the label, or never show the label.
+     * @param bool $showHelp Whether to show the field's help text in the wrapper. Some wrappers may ignore this and always show the help text, or never show the help text.
      *
      * @return string The rendered HTML of the field.
      */
@@ -209,17 +235,69 @@ abstract class Field extends FeatureDefinition {
         return ob_get_clean();
     }
 
-    /***************************
-     * Feature Contract Methods
-     ***************************/
-    
-    final protected function queue(): void {
-        // Field classes don't use the queue method
+    /**
+     * Retrieves the name of the Blade component responsible for rendering this field type.
+     *
+     * @return string
+     */
+    abstract public function getFieldComponent(): string;
+
+    /**
+     * Retrieves the Blade view path for the field's assigned field wrapper.
+     *
+     * @return string
+     */
+    protected function resolveFieldWrapper(): string {
+        $hasSettingsField = 
+            $this->settingsField !== null || 
+            ($this->isSubField() && $this->repeater->settingsField !== null);
+        
+        if ($hasSettingsField) {
+            $wrapperHandle = 'admin_settings';
+        } else {
+            $wrapperHandle = Context::isAdmin() ? 'admin_default' : 'site_default';
+        }
+
+        $wrapper = FieldWrappers::checkout($this->provider)->makeFrom($wrapperHandle);
+
+        if ($wrapperHandle === 'admin_settings') {
+            $this->class('meros-settings-field');
+        }
+
+        return $wrapper->getView();
     }
 
     /***************************
      * Fluent Setters
      ***************************/
+
+    /**
+     * Sets the field's parent form row.
+     *
+     * @param FormRow $row
+     *
+     * @return self
+     */
+    public function row(FormRow $row): self {
+        $this->row = $row;
+        return $this;
+    }
+
+    /**
+     * Sets the field's position within its parent row, for reference.
+     * 
+     * This does not automatically reorder the fields in the row. 
+     * The FormRow is responsible for ordering the fields when rendering.
+     *
+     * @param integer $position
+     *
+     * @return self
+     */
+    public function position(int $position): self {
+        $this->position = $position;
+        return $this;
+    }
+
     /**
      * Sets the field's ID.
      *
@@ -386,27 +464,6 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
-     * Sets the field's width option.
-     *
-     * @param string $width One of 'full', 'half', or 'third'.
-     *
-     * @return self
-     */
-    public function width(string $width): self {
-        // If forceFullWidth is enabled, override any width setting to 'full'
-        if ($this->forceFullWidth) {
-            $this->width = 'full';
-            return $this;
-        }
-
-        if (in_array($width, ['full', 'half', 'third'])) {
-            $this->width = $width;
-        }
-
-        return $this;
-    }
-
-    /**
      * Sets the position of the field's help text.
      *
      * @param string $position Either 'top' or 'bottom'.
@@ -422,33 +479,27 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
-     * Associates the field with a parent, marking it as a sub-field.
+     * Associates the field with a repeater, marking it as a sub-field.
      *
-     * @param FieldParent|null $parent The parent to associate with this field. If null is passed, the parent property will be set to null.
+     * @param Repeater|null $repeater The repeater to associate with this field. If null is passed, the repeater property will be set to null.
      *
      * @return self
      */
-    public function parent(FieldParent|null $parent): self {
-        $this->parent = $parent;
+    public function repeater(Repeater|null $repeater): self {
+        $this->repeater = $repeater;
         return $this;
     }
 
     /**
-     * Attaches the field to a parent field group, repeater or settings field and sets the parent context on the field.
+     * Attaches the field to a parent settings field instance.
      *
-     * @param FieldParent|SettingsField $item The parent or settings field to attach this field to.
+     * @param SettingsField $settingsField
      *
      * @return self
      */
-    public function attachTo(FieldParent|SettingsField $item): self {
-        if ($item instanceof SettingsField) {
-            $this->settingsField = $item;
-            $this->settingsField->attach($this);
-            return $this;
-        }
-
-        $this->parent($item);
-        $item->attach($this);
+    public function settingsField(SettingsField $settingsField): self {
+        $this->settingsField = $settingsField;
+        $this->settingsField->attachField($this);
         return $this;
     }
 
@@ -475,8 +526,8 @@ abstract class Field extends FeatureDefinition {
                 'default'          => $this->default,
                 'required'         => $this->isRequired(),
                 'disabled'         => $this->isDisabled(),
+                'conditions'       => $this->conditions,
                 'component'        => $this->getFieldComponent(),
-                'width'            => $this->width,
                 'compatibleDataTypes' => $this->compatibleDataTypes,
             ]
         ];
@@ -511,21 +562,21 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
-     * Retrieves the parent field group or repeater instance if this field is a sub-field.
-     *
-     * @return FieldParent|null
-     */
-    public function getParent(): ?FieldParent {
-        return $this->parent;
-    }
-
-    /**
      * Returns whether the field is a sub-field of a repeater.
      *
      * @return boolean
      */
     public function isSubField(): bool {
-        return $this->parent !== null && $this->parent instanceof Repeater;
+        return $this->repeater !== null;
+    }
+
+    /**
+     * Returns the field type (handle).
+     *
+     * @return string
+     */
+    public function getType(): string {
+        return $this->handle;
     }
 
     /**
@@ -682,11 +733,12 @@ abstract class Field extends FeatureDefinition {
      */
     public function attributes(array $exclude = []): string {
         $attributes = array_merge([
-            'id'       => $this->getId(),
-            'name'     => $this->getName(!$this->isSubField()),
-            'class'    => $this->classList(),
-            'disabled' => $this->disabled,
-            'required' => $this->required,
+            'id'              => $this->getId(),
+            'name'            => $this->getName(!$this->isSubField()),
+            'class'           => $this->classList(),
+            'disabled'        => $this->disabled,
+            'required'        => $this->required,
+            'data-field-type' => $this->handle
         ], $this->attributes);
 
         $rendered = [];
@@ -715,15 +767,6 @@ abstract class Field extends FeatureDefinition {
         }
 
         return implode(' ', $rendered);
-    }
-
-    /**
-     * Retrieves the field's width option.
-     *  
-     * @return string
-     */
-    public function getWidth(): string {
-        return $this->width;
     }
 
     /**
@@ -771,38 +814,6 @@ abstract class Field extends FeatureDefinition {
     /***************************
      * Helpers
      ***************************/
-
-    /**
-     * Retrieves the name of the Blade component responsible for rendering this field type.
-     *
-     * @return string
-     */
-    abstract public function getFieldComponent(): string;
-
-    /**
-     * Retrieves the Blade view path for the field's assigned form style.
-     *
-     * @return string
-     */
-    protected function resolveStyle(): string {
-        $hasSettingsField = 
-            $this->settingsField !== null || 
-            ($this->isSubField() && $this->parent->settingsField !== null);
-        
-        if ($hasSettingsField) {
-            $styleHandle = 'admin_settings';
-        } else {
-            $styleHandle = Context::isAdmin() ? 'admin_default' : 'site_default';
-        }
-
-        $style = FormStyles::checkout($this->provider)->makeFrom($styleHandle);
-
-        if ($styleHandle === 'admin_settings') {
-            $this->class('meros-settings-field');
-        }
-
-        return $style->getView();
-    }
 
     /**
      * Magic method to handle dynamic method calls for chaining, such as setting the section on the associated SettingsField.

@@ -3,7 +3,7 @@
 namespace MM\Meros\App\Fields;
 
 use Illuminate\Support\Str;
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Forms\Field;
 
 class Select extends Field {
     /**
@@ -264,6 +264,6 @@ class Select extends Field {
      * @return string
      */
     public function getFieldComponent(): string {
-        return 'meros::fields.select';
+        return 'meros::forms.fields.select';
     }
 }

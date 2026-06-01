@@ -3,7 +3,7 @@
 namespace MM\Meros\Services\Registers;
 
 use MM\Meros\Services\Contracts\Register;
-use MM\Meros\Services\Contracts\Elements\Field;
+use MM\Meros\Services\Contracts\Forms\Field;
 
 class Fields extends Register {
     protected string $identifier = 'handle';

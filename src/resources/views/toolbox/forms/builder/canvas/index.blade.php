@@ -26,7 +26,7 @@
 
                     @foreach($canvasRows as $rowIndex => $canvasRow)
                         @php 
-                            $isGroupRow = ($canvasRow['_type'] ?? null) === 'group';
+                            $isGroupRow = ($canvasRow['type'] ?? null) === 'group';
                         @endphp
 
                         @if($isGroupRow)

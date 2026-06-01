@@ -1,22 +1,22 @@
-<div class="meros-site-form-container">
-	<div class="meros-site-form-header">
+<div class="meros-form-container">
+	<div class="meros-form-header">
 		@if($showTitle)
-			<h1 class="meros-site-form-title">{{ $formTitle }}</h1>
+			<h1 class="meros-form-title">{{ $formTitle }}</h1>
 		@endif
 		@if($showDescription && !empty($formDescription))
-			<div class="meros-site-form-description">{!! $formDescription !!}</div>
+			<div class="meros-form-description">{!! $formDescription !!}</div>
 		@endif
 	</div>
-	<form class="meros-site-form">
+	<form class="meros-form">
 		@foreach(($formRows ?? []) as $formRow)
-			@if(($formRow['_type'] ?? null) === 'group')
+			@if(($formRow['type'] ?? null) === 'group')
 				@php
 					$group = $formRow['group'] ?? [];
 				@endphp
 
-				<section class="meros-site-form-group" @if(!empty($group['id'])) id="{{ $group['id'] }}" @endif>
+				<div class="meros-form-group" @if(!empty($group['id'])) id="{{ $group['id'] }}" @endif>
 					@if(!empty($group['title']) || !empty($group['description']))
-						<div class="meros-site-form-group-header">
+						<div class="meros-form-group-header">
 							@if(!empty($group['title']))
 								<h3>{{ $group['title'] }}</h3>
 							@endif
@@ -28,13 +28,13 @@
 					@endif
 
 					@foreach(($group['rows'] ?? []) as $groupRow)
-						<div class="meros-site-form-row">
+						<div class="meros-form-row">
 							@foreach($groupRow['fields'] ?? [] as $fieldItem)
 								@php
 									$field = is_array($fieldItem) ? ($fieldItem['field'] ?? null) : $fieldItem;
 								@endphp
 								@if($field)
-									<div class="meros-site-form-field">
+									<div class="meros-form-field">
 										@if(($field->handle ?? null) === 'repeater')
 											{!! $field->render(true, true) !!}
 										@else
@@ -45,15 +45,16 @@
 							@endforeach
 						</div>
 					@endforeach
-				</section>
+				</div>
+				
 			@else
-				<div class="meros-site-form-row">
+				<div class="meros-form-row">
 					@foreach(($formRow['fields'] ?? []) as $fieldItem)
 						@php
 							$field = is_array($fieldItem) ? ($fieldItem['field'] ?? null) : $fieldItem;
 						@endphp
 						@if($field)
-							<div class="meros-site-form-field">
+							<div class="meros-form-field">
 								@if(($field->handle ?? null) === 'repeater')
 									{!! $field->render(true, true) !!}
 								@else

@@ -3,7 +3,7 @@
 namespace MM\Meros\Services\Registers;
 
 use MM\Meros\Services\Contracts\Register;
-use MM\Meros\Services\Contracts\Elements\Form;
+use MM\Meros\Services\Contracts\Forms\Form;
 
 class Forms extends Register {
     protected string $identifier = 'id';
@@ -18,10 +18,10 @@ class Forms extends Register {
      */
     protected function parseProperties(array $props): array {
         return [
-            'id'          => $props['id'] ?? '',
+            'handle'      => $props['handle'] ?? '',
+            'id'          => $props['id'] ?? 0,
             'title'       => $props['title'] ?? '',
-            'description' => $props['description'] ?? '',
-            'elements'    => $props['elements'] ?? [],
+            'description' => $props['description'] ?? ''
         ];
     }
 }

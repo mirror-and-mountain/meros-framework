@@ -3,6 +3,8 @@
 namespace MM\Meros\App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Post extends Model {
     protected $table      = 'posts';
@@ -21,11 +23,11 @@ class Post extends Model {
         'post_author',
     ];
 
-    public function author() {
+    public function author(): BelongsTo {
         return $this->belongsTo(User::class, 'post_author');
     }
 
-    public function meta() {
+    public function meta(): HasMany {
         return $this->hasMany(PostMeta::class, 'post_id');
     }
 

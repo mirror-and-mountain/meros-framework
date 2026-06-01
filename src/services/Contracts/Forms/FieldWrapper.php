@@ -1,27 +1,27 @@
 <?php 
 
-namespace MM\Meros\Services\Contracts\Elements;
+namespace MM\Meros\Services\Contracts\Forms;
 
 use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\Services\Contracts\FeatureDefinition;
 
-abstract class FormStyle extends FeatureDefinition {
+abstract class FieldWrapper extends FeatureDefinition {
     /**
-     * A unique handle for the form style, used for registration and retrieval.
+     * A unique handle for the field wrapper, used for registration and retrieval.
      *
      * @var string
      */
     public string $handle = '';
 
     /**
-     * A fully-qualified blade view path that defines the template for rendering forms with this style.
+     * A fully-qualified blade view path that defines the template for rendering forms with this field wrapper.
      *
      * @var string
      */
     protected string $view = '';
 
     /**
-     * An array of style attributes that can be applied to forms using this style.
+     * An array of style attributes that can be applied to forms using this field wrapper.
      *
      * @var array
      */
