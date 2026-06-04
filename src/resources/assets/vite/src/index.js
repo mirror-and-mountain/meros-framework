@@ -1,10 +1,13 @@
 import registerFormBuilderStore from '../../forms/alpine/formBuilderStore.js';
+import registerFieldsStore from '../../forms/alpine/formStore.js';
 import registerRepeaterFieldStore from '../../forms/alpine/repeaterFieldStore.js';
 import { initRichTextEditors } from '../../forms/richtext.js';
 import { initTomSelects, initTomSelect } from '../../forms/tom-select/index.js';
 import { updateIgnoredFieldWrapperElements } from '../../forms/utils.js';
 import './style.css';
 
+// Initialise the shared callback store first so other stores can register callbacks into it.
+document.addEventListener('alpine:init', registerFieldsStore);
 // Initialise the alpine formBuilder store
 document.addEventListener('alpine:init', registerFormBuilderStore);
 // Initialise the alpine repeaterField store

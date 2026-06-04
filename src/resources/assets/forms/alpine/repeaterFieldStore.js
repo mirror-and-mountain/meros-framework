@@ -834,6 +834,16 @@ export default function registerRepeaterFieldStore() {
 
             const trimmedName = callbackName.trim();
 
+            const formStore = Alpine.store('formStore');
+
+            if (typeof formStore?.resolveCallback === 'function') {
+                const registeredCallback = formStore.resolveCallback(trimmedName);
+
+                if (typeof registeredCallback === 'function') {
+                    return registeredCallback;
+                }
+            }
+
             if (trimmedName.startsWith('$store.')) {
                 const storePath = trimmedName.replace(/^\$store\./, '');
                 const segments = storePath.split('.').filter(Boolean);

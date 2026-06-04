@@ -1,7 +1,5 @@
 <div class="space-y-4">
-
     {{-- Group Title --}}
-
     <div class="nice-form-group">
         <label for="group-title" class="form-label">Title</label>
         <small class="whitespace-normal">The group's title</small>
@@ -15,7 +13,6 @@
     </div>
 
     {{-- Group Description --}}
-
     <div class="nice-form-group meros-rich-textarea-wrapper" wire:ignore>
         <label id="group-description" class="form-label">Description</label>
         <small class="whitespace-normal">The group's description</small>

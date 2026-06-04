@@ -208,4 +208,15 @@
             @change="updateDependentControls('disabled', $event.target.checked)"
         />
     </div>
+
+    {{-- Conditions Editor Button --}}
+    <div x-show="open" class="nice-form-group">
+        <button
+            type="button"
+            class="cursor-pointer py-2 px-4 bg-gray-200 rounded hover:bg-gray-300 active:bg-gray-400 font-medium text-sm transition-colors"
+            @click="$store.formBuilder.editFieldConditions(activeField.sourceRowIndex, activeField.sourceFieldIndex, activeField.sourceGroupRowIndex, activeField.sourceGroupInnerRowIndex)"
+        >
+            Edit Field Conditions
+        </button>
+    </div>
 </div>

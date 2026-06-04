@@ -15,9 +15,7 @@
     {!! $field->attributes(['name', 'class']) !!}
     data-advanced="{{ $isAdvanced ? 'true' : 'false' }}"
     data-allow-add="{{ $allowsAdd ? 'true' : 'false' }}"
-    @if(!empty($onChange))
-        x-on:change="{{ $onChange }}"
-    @endif
+    x-on:change="$store.formStore.evalFieldConditions($el); @if(!empty($onChange)) merosForms.invokeCallback(@js($onChange), $event) @endif"
 >
     @if(empty($options) && !$isAdvanced)
         <option value="" disabled @selected(true)>No options configured</option>

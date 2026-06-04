@@ -1,8 +1,11 @@
 import Quill from 'quill';
 import registerRepeaterFieldStore from '../../../../forms/alpine/repeaterFieldStore.js';
+import registerFieldsStore from '../../../../forms/alpine/formStore.js';
 import { initTomSelects } from '../../../../forms/tom-select/index.js';
 import './style.scss';
 
+// Initialise the shared callback store first so form fields can invoke registered callbacks.
+document.addEventListener('alpine:init', registerFieldsStore);
 // Initialise the alpine repeaterField store
 document.addEventListener('alpine:init', registerRepeaterFieldStore);
 

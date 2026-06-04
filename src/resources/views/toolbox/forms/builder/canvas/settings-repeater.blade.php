@@ -1,4 +1,4 @@
-<div id="meros-form-builder-repeater-settings-{{ $editingRepeaterID }}" class="flex-1 p-4 overflow-y-auto min-w-0" x-data="{ fieldDragging: false }" wire:key="form-builder-repeater-settings-{{ $editingRepeaterID }}">
+<div id="meros-form-builder-repeater-settings-{{ $editingRepeaterID }}" class="flex-1 h-full p-4 pb-25 overflow-y-auto overscroll-contain min-w-0" x-data="{ fieldDragging: false }" wire:key="form-builder-repeater-settings-{{ $editingRepeaterID }}">
     <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-bold"><a class="underline hover:text-blue-700" title="Back to Canvas" href="#" @click.prevent="$store.formBuilder.activeField = null" wire:click="setEditingRepeaterID(null)">Canvas</a> / Repeater Settings</h2>
         @include('meros::toolbox.forms.builder.canvas.action-button')
@@ -22,7 +22,7 @@
             @else
                 <button 
                     type="button" 
-                    class="cursor-pointer py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 active:bg-blue-800 font-medium text-sm transition-colors"
+                    class="cursor-pointer py-2 px-4 mb-4 bg-blue-600 text-white rounded hover:bg-blue-700 active:bg-blue-800 font-medium text-sm transition-colors"
                     @click="$store.formBuilder.updateRepeaterDefaultValue('{{ $editingRepeaterID }}')"
                 >
                         Save As Default Value

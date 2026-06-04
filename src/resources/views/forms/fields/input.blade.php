@@ -21,7 +21,5 @@
     @if ($value !== null && $value !== '')
         value="{{ $value }}"
     @endif
-    @if ($onChange && $onChange !== '')
-        x-on:change="{{ $onChange }}"
-    @endif
+    x-on:change="$store.formStore.evalFieldConditions($el); @if(!empty($onChange)) merosForms.invokeCallback(@js($onChange), $event) @endif"
 />

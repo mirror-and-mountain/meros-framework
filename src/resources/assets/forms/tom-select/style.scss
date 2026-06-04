@@ -119,3 +119,7 @@
     background: color-mix(in srgb, var(--nf-input-focus-border-color) 10%, white 90%);
     color: var(--nf-input-color);
 }
+
+.nice-form-group .meros-repeater .ts-wrapper .ts-dropdown {
+    position: relative !important;
+}

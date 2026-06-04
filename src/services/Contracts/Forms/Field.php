@@ -760,6 +760,8 @@ abstract class Field extends FeatureDefinition {
     /**
      * Sets a JavaScript callback path to be executed when the field's value changes.
      *
+     * The callback is invoked from the field blade with the native DOM change event.
+     * 
      * @param string $callback
      *
      * @return self
@@ -772,6 +774,11 @@ abstract class Field extends FeatureDefinition {
     /**
      * Normalises and validates JavaScript callback paths used by field interactions.
      * Returns an empty string when a callback path is invalid.
+     *
+     * Field onChange callbacks receive:
+     * - $event: the native change event from the field input/select element.
+     *
+        * @return string
      */
     protected function normaliseCallbackPath(string $callback): string {
         $trimmed = trim($callback);
@@ -780,15 +787,21 @@ abstract class Field extends FeatureDefinition {
             return '';
         }
 
-        $pattern = '/^(?:\$store\.)?[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/';
+        $pattern = '/^(?:(?:\$store|\$wire)\.)?[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/';
 
         if (!preg_match($pattern, $trimmed)) {
             return '';
         }
 
-        $path = str_starts_with($trimmed, '$store.')
-            ? substr($trimmed, strlen('$store.'))
-            : $trimmed;
+        $path = $trimmed;
+
+        if (str_starts_with($trimmed, '$store.')) {
+            $path = substr($trimmed, strlen('$store.'));
+        }
+
+        if (str_starts_with($trimmed, '$wire.')) {
+            $path = substr($trimmed, strlen('$wire.'));
+        }
 
         $segments = array_values(array_filter(explode('.', $path), fn($segment) => $segment !== ''));
         $blockedSegments = ['__proto__', 'prototype', 'constructor'];
@@ -829,7 +842,8 @@ abstract class Field extends FeatureDefinition {
                 'default'          => $this->default,
                 'required'         => $this->isRequired(),
                 'disabled'         => $this->isDisabled(),
-                'conditions'       => $this->conditions,
+                'rules'            => $this->getRules(),
+                'conditions'       => $this->getConditions(),
                 'component'        => $this->getFieldComponent(),
                 'compatibleDataTypes' => $this->compatibleDataTypes,
             ]
@@ -1002,16 +1016,46 @@ abstract class Field extends FeatureDefinition {
      * @return array
      */
     public function getConditions(): array {
-        return $this->conditions;
+        return empty($this->conditions) 
+            ? [
+                'show' => [
+                    'logic' => 'and',
+                    'rules' => [],
+                ],
+                'hide' => [
+                    'logic' => 'and',
+                    'rules' => [],
+                ],
+                'require' => [
+                    'logic' => 'and',
+                    'rules' => [],
+                ],
+                'optional' => [
+                    'logic' => 'and',
+                    'rules' => [],
+                ],
+                'enable' => [
+                    'logic' => 'and',
+                    'rules' => [],
+                ],
+                'disable' => [
+                    'logic' => 'and',
+                    'rules' => [],
+                ],
+            ] 
+            : $this->conditions;
     }
 
     /**
-     * Retrieves the JavaScript expression set to execute when the field's value changes.
+     * Retrieves the JavaScript callback path set to execute when the field's value changes.
+     * The callback is executed with the native DOM change event.
      *
      * @return string
      */
     public function getOnChange(): string {
-        return $this->normaliseCallbackPath($this->onChange);
+        return !empty($this->onChange) 
+            ? $this->normaliseCallbackPath($this->onChange) 
+            : '';
     }
 
     /**

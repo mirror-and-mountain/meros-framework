@@ -49,11 +49,25 @@ class Builder extends Component {
     public ?string $editingRepeaterID = null;
 
     /**
+     * The field currently being edited for conditions (if any).
+     *
+     * @var string|null
+     */
+    public ?string $editingFieldID = null;
+
+    /**
      * The repeater field instance currently being edited (if any).
      *
      * @var Field|null
      */
     private ?Field $editingRepeaterField = null;
+
+    /**
+     * The field instance currently being edited for conditions (if any).
+     *
+     * @var Field|null
+     */
+    private ?Field $editingField = null;
 
     /**
      * A collection of hydrated elements used in the schema.
@@ -111,7 +125,8 @@ class Builder extends Component {
             'formTitle'       => $this->formTitle,
             'formDescription' => $this->formDescription,
             'canvasRows'      => $hydratedRows,
-            'editingRepeater' => $this->editingRepeaterField
+            'editingRepeater' => $this->editingRepeaterField,
+            'editingField'    => $this->editingField,
         ])
             ->layout('meros::toolbox.layout', [
                 'navItems'  => $this->navItems,
@@ -169,6 +184,130 @@ class Builder extends Component {
         $this->rowPayloads    = $updatedSchemaRows;
 
         $this->dispatchSchemaUpdate();
+    }
+
+    /**
+     * Updates the conditions for a specific field in the form schema.
+     *
+     * @param array $conditions
+     *
+     * @return void
+     */
+    public function updateFieldConditions(array $conditions): void {
+
+    }
+
+    /**
+     * Sets the ID of the field currently being edited for conditions.
+     *
+     * @param string|null $fieldID
+     *
+     * @return void
+     */
+    public function setEditingFieldID(string|null $fieldID): void {
+        $this->editingFieldID = $fieldID;
+
+        if ($fieldID === null) {
+            $this->editingField = null;
+        } else {
+            $this->editingField = $this->getEditingField($fieldID);
+        }
+
+        $this->dispatchSchemaUpdate();
+    }
+
+    public function getFieldConditionsRepeaters(array $conditions = []): array {
+        if ($this->editingField === null) {
+            return [];
+        }
+
+        if (empty($conditions)) {
+            $conditions = $this->editingField->getConditions() ?? [];
+        }
+
+        $currentFields = [];
+
+        $this->walkFormFields($this->rowPayloads, function($field) use (&$currentFields) {
+            if (($field['properties']['id'] ?? null) !== null) {
+                $currentFields[] = [
+                    'id'    => $field['properties']['id'],
+                    'label' => $field['properties']['label'] ?? 'Untitled Field',
+                    'type'  => $field['handle'] ?? 'unknown'
+                ];
+            }
+        }, false);
+
+        $currentFields = collect($currentFields)->filter(function ($field) {
+            return $field['id'] !== $this->editingFieldID;
+        })->pluck('label', 'id')->toArray();
+
+        $repeaters = [];
+        foreach ($conditions as $type => $configuration) {
+            $logic = $configuration['logic'] ?? 'and';
+            $rules = $configuration['rules'] ?? [];
+
+            $repeater = Fields::checkout(Framework::get())->makeFrom('repeater', [
+                'id'             => 'field-conditions-' . $type,
+                'name'           => 'field_conditions_' . $type,
+                'allowConfigure' => false,
+                'onAddRow'       => '$store.formBuilder.handleFieldConditionsRepeaterAddRow',
+                'onRemoveRow'    => '$store.formBuilder.syncFieldConditionsRepeaterSelectionState',
+                'onMoveRow'      => '$store.formBuilder.syncFieldConditionsRepeaterSelectionState',
+            ]);
+
+            $repeater->class('meros-field-conditions-repeater');
+
+            $repeater->subField('select')
+                ->name('field_id')
+                ->label('Field Name')
+                ->options(array_merge(['' => 'Select a field'], $currentFields))
+                ->onChange('$store.formBuilder.setFieldConditionsRow');
+
+            $repeater->subField('select')
+                ->name('operator')
+                ->label('Operator')
+                ->options([])
+                ->onChange('$store.formBuilder.setFieldConditionOperatorRow');
+
+            $repeater->subField('text')
+                ->name('value')
+                ->label('Value')
+                ->disabled();
+
+            $repeaters[$type] = $repeater;
+        }
+
+        return $repeaters;
+    }
+
+    /**
+     * Retrieves a field instance currently being edited.
+     *
+     * @param string        $fieldID
+     * @param callable|null $predicate Additional field filter callback.
+     *
+     * @return Field|null
+     */
+    private function getEditingField(string $fieldID, ?callable $predicate = null): ?Field {
+        $match = $this->findFirstFormField($this->rowPayloads, function($field) use ($fieldID, $predicate) {
+            $matchesID = ($field['properties']['id'] ?? null) === $fieldID;
+
+            if (!$matchesID) {
+                return false;
+            }
+
+            if ($predicate !== null) {
+                return $predicate($field) === true;
+            }
+
+            return true;
+        });
+
+        if (!$match) {
+            return null;
+        }
+
+        return Hydrator::make($this->fieldTypes, $this)->hydrateFieldPayload($match['field']);
     }
 
     // =========================================================================
@@ -622,15 +761,9 @@ class Builder extends Component {
      * @return Field|null
      */
     private function getEditingRepeaterField(string $repeaterID): ?Field {
-        $match = $this->findFirstFormField($this->rowPayloads, function($field) use ($repeaterID) {
-            return ($field['handle'] ?? null) === 'repeater'
-                && ($field['properties']['id'] ?? null) === $repeaterID;
+        $repeater = $this->getEditingField($repeaterID, function($field) {
+            return ($field['handle'] ?? null) === 'repeater';
         });
-
-        $repeater = null;
-        if ($match) {
-            $repeater = Hydrator::make($this->fieldTypes, $this)->hydrateFieldPayload($match['field']);
-        }
 
         $this->editingRepeaterField = $repeater;
         return $repeater;

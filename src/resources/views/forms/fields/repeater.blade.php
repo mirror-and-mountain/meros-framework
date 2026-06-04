@@ -19,7 +19,7 @@
     $removeRowText    = $field->getRemoveRowText();
     $configureRowText = $field->getConfigureRowText();
 @endphp
-<div id="{{ $id }}" class="{{ $field->classList() }} meros-repeater" data-field-type="repeater">
+<div id="{{ $id }}" class="{{ $field->classList() }} meros-repeater" data-field-type="repeater" data-repeater-name="{{ str_replace(['-'], '_', $id) }}">
     <div
         class="meros-repeater-scroll"
         x-data="{ isDraggingRow: false, draggingRowIndex: null }"

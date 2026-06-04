@@ -2,6 +2,8 @@
     @include('meros::toolbox.forms.builder.canvas.sidebar')
     @if($editingRepeater !== null)
         @include('meros::toolbox.forms.builder.canvas.settings-repeater')
+    @elseif($editingField !== null)
+        @include('meros::toolbox.forms.builder.canvas.settings-field-conditions')
     @else
         <div id="meros-form-builder-canvas" class="flex-1 h-full p-4 pb-25 overflow-y-auto overscroll-contain min-w-0" wire:key="form-builder-canvas">
             <div class="flex items-center justify-between mb-4">

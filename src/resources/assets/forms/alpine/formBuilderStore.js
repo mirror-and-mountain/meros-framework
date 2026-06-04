@@ -1,4 +1,5 @@
 import { merosHydrateQuillContent } from '../richtext.js';
+import { initTomSelect } from '../tom-select/index.js';
 
 export default function registerFormBuilderStore() {
     const store = {
@@ -19,6 +20,7 @@ export default function registerFormBuilderStore() {
         rowsUpdater: null,
         actionsUpdater: null,
         actionConfigCallback: null,
+        fieldConditionsEditCallback: null,
 
         // Repeater properties
         repeaterEditCallback: null,
@@ -108,6 +110,11 @@ export default function registerFormBuilderStore() {
         // Sets the action configuration callback
         setActionConfigCallback(callback) {
             this.actionConfigCallback = typeof callback === 'function' ? callback : null;
+        },
+
+        // Sets the callback to open the field conditions editor for a specific field
+        setFieldConditionsEditCallback(callback) {
+            this.fieldConditionsEditCallback = typeof callback === 'function' ? callback : null;
         },
 
         // Callbacks for repeater field editing, moving, and adding
@@ -212,6 +219,8 @@ export default function registerFormBuilderStore() {
                     helpText: '',
                     helpTextPosition: 'top',
                     value: '',
+                    rules: [],
+                    conditions: this.getFieldConditionsDefaults(),
                     required: false,
                     disabled: false,
                 },
@@ -243,6 +252,37 @@ export default function registerFormBuilderStore() {
             }
 
             return payload;
+        },
+
+
+        // Gets default structure for field conditions.
+        getFieldConditionsDefaults() {
+            return {
+                show: {
+                    logic: 'and',
+                    rules: [],
+                },
+                hide: {
+                    logic: 'and',
+                    rules: [],
+                },
+                require: {
+                    logic: 'and',
+                    rules: [],
+                },
+                'optional': {
+                    logic: 'and',
+                    rules: [],
+                },
+                'enable': {
+                    logic: 'and',
+                    rules: [],
+                },
+                'disable': {
+                    logic: 'and',
+                    rules: [],
+                }
+            };
         },
 
         isInputField(handle) {
@@ -497,25 +537,24 @@ export default function registerFormBuilderStore() {
             return [];
         },
 
-        // Collects field labels keyed by field id, including nested repeater fields.
-        getFieldLabelsById() {
-            const labelsById = {};
+        // Collects field payloads keyed by field id, including nested repeater fields.
+        getFieldsById() {
+            const fieldsById = {};
 
-            const collectFieldLabels = fields => {
+            const collectFields = fields => {
                 if (!Array.isArray(fields)) {
                     return;
                 }
 
                 fields.forEach(field => {
                     const fieldId = field?.properties?.id;
-                    const fieldLabel = field?.properties?.label;
 
                     if (typeof fieldId === 'string' && fieldId.trim() !== '') {
-                        labelsById[fieldId] = typeof fieldLabel === 'string' ? fieldLabel : '';
+                        fieldsById[fieldId] = field;
                     }
 
                     if (field?.handle === 'repeater') {
-                        collectFieldLabels(this.getRepeaterSubFields(field));
+                        collectFields(this.getRepeaterSubFields(field));
                     }
                 });
             };
@@ -523,17 +562,17 @@ export default function registerFormBuilderStore() {
             (this.rows ?? []).forEach(row => {
                 if (row?.type === 'group') {
                     (row.group?.rows ?? []).forEach(innerRow => {
-                        collectFieldLabels(innerRow?.fields ?? []);
+                        collectFields(innerRow?.fields ?? []);
                     });
                     return;
                 }
 
                 if (row?.type === 'fields') {
-                    collectFieldLabels(row.fields ?? []);
+                    collectFields(row.fields ?? []);
                 }
             });
 
-            return labelsById;
+            return fieldsById;
         },
 
         // Inserts a field as a new top-level row at the specified index.
@@ -1292,7 +1331,7 @@ export default function registerFormBuilderStore() {
             const descriptionEditorEl = document.getElementById('group-description-editor');
 
             if (descriptionEditorEl) {
-                const description = group.description || '';
+                const description = group.description ?? '';
                 merosHydrateQuillContent(descriptionEditorEl, description === '' ? JSON.stringify([{ insert: '\n' }]) : description);
             }
         },
@@ -1327,6 +1366,384 @@ export default function registerFormBuilderStore() {
                 sourceGroupRowIndex,
                 sourceGroupInnerRowIndex,
             };
+        },
+
+        // ======================================
+        // Field Conditions Handlers
+        // ======================================
+
+        editFieldConditions(sourceRowIndex, sourceFieldIndex, sourceGroupRowIndex = null, sourceGroupInnerRowIndex = null) {
+            let field = null;
+
+            if (sourceGroupRowIndex !== null && sourceGroupInnerRowIndex !== null) {
+                field = this.findGroupField(this.rows, sourceGroupRowIndex, sourceGroupInnerRowIndex, sourceFieldIndex);
+            } else {
+                field = this.findTopField(this.rows, sourceRowIndex, sourceFieldIndex);
+            }
+
+            if (!field) {
+                return;
+            }
+
+            this.activeField = {
+                handle: field.handle,
+                ...field.properties,
+                sourceRowIndex,
+                sourceFieldIndex,
+                sourceGroupRowIndex,
+                sourceGroupInnerRowIndex,
+            };
+
+            if (this.fieldConditionsEditCallback) {
+                this.fieldConditionsEditCallback(field.properties.id);
+            }
+        },
+
+        // Handles field selection changes for a condition row and keeps operator/value controls in sync.
+        setFieldConditionsRow({ target }) {
+            const conditionsRepeater = target.closest('.meros-field-conditions-repeater');
+            const rowElement = target.closest('tr.meros-repeater-row');
+            const field = this.getFieldsById()[target.value];
+            const fieldType = field?.handle;
+
+            if (!conditionsRepeater || !rowElement) {
+                return;
+            }
+
+            if (!field || !fieldType) {
+                this.setFieldConditionOperators(null, rowElement);
+                this.setFieldConditionPlaceholderInput(rowElement);
+                this.syncFieldConditionFieldSelectionState(conditionsRepeater);
+                return;
+            }
+
+            const operatorSelector = this.setFieldConditionOperators(fieldType, rowElement);
+
+            if (operatorSelector) {
+                this.setFieldConditionOperatorRow({ target: operatorSelector });
+            } else {
+                this.setFieldConditionPlaceholderInput(rowElement);
+            }
+
+            this.syncFieldConditionFieldSelectionState(conditionsRepeater);
+        },
+
+        // Handles operator selection changes and only enables a value control when needed.
+        setFieldConditionOperatorRow({ target }) {
+            const rowElement = target?.closest?.('tr.meros-repeater-row') ?? null;
+
+            if (!rowElement) {
+                return;
+            }
+
+            const fieldSelector = rowElement.querySelector('td[data-field-name="field_id"] select');
+            const selectedFieldId = String(fieldSelector?.value ?? '').trim();
+            const selectedOperator = String(target?.value ?? '').trim();
+
+            if (selectedFieldId === '' || selectedOperator === '') {
+                this.setFieldConditionPlaceholderInput(rowElement);
+                return;
+            }
+
+            if (this.shouldDisableFieldConditionValueInput(selectedOperator)) {
+                this.setFieldConditionPlaceholderInput(rowElement);
+                return;
+            }
+
+            const field = this.getFieldsById()[selectedFieldId];
+            const fieldType = field?.handle;
+
+            if (!field || !fieldType) {
+                this.setFieldConditionPlaceholderInput(rowElement);
+                return;
+            }
+
+            this.setFieldConditionValueInput(field, fieldType, rowElement);
+        },
+
+        // Re-syncs duplicate-field option disabling after repeater mutations.
+        syncFieldConditionsRepeaterSelectionState(params = {}) {
+            const repeaterId = String(params?.repeaterId ?? '').trim();
+            const triggerElement = params?.triggerElement ?? null;
+
+            const repeaterElement = repeaterId !== ''
+                ? document.getElementById(repeaterId)
+                : triggerElement?.closest?.('.meros-repeater') ?? null;
+
+            if (!repeaterElement) {
+                return;
+            }
+
+            this.syncFieldConditionFieldSelectionState(repeaterElement);
+        },
+
+        // Normalises a newly added condition row to the placeholder operator/value state.
+        handleFieldConditionsRepeaterAddRow(params = {}) {
+            const repeaterId = String(params?.repeaterId ?? '').trim();
+            const triggerElement = params?.triggerElement ?? null;
+            const rowIndex = Number(params?.rowIndex);
+
+            const repeaterElement = repeaterId !== ''
+                ? document.getElementById(repeaterId)
+                : triggerElement?.closest?.('.meros-repeater') ?? null;
+
+            if (!repeaterElement) {
+                return;
+            }
+
+            if (Number.isInteger(rowIndex) && rowIndex >= 0) {
+                const rowElement = repeaterElement.querySelector(`tr.meros-repeater-row[data-repeater-row-index="${rowIndex}"]`);
+
+                if (rowElement) {
+                    this.resetFieldConditionRowInputs(rowElement);
+                }
+            }
+
+            this.syncFieldConditionFieldSelectionState(repeaterElement);
+        },
+
+        // Resets operator and value controls for a condition row to a neutral, disabled state.
+        resetFieldConditionRowInputs(rowElement) {
+            if (!rowElement) {
+                return;
+            }
+
+            this.setFieldConditionOperators(null, rowElement);
+            this.setFieldConditionPlaceholderInput(rowElement);
+        },
+
+        // Renders a single disabled text input in the value cell as a placeholder.
+        setFieldConditionPlaceholderInput(rowElement) {
+            const valueCell = rowElement.querySelector('td[data-field-name="value"]');
+
+            if (!valueCell) {
+                return;
+            }
+
+            const { valueInputName, valueInputWrapper } = this.clearFieldConditionValueInput(valueCell);
+
+            if (!valueInputWrapper) {
+                return;
+            }
+
+            const resetInput = document.createElement('input');
+            resetInput.type = 'text';
+            resetInput.name = valueInputName;
+            resetInput.value = '';
+            resetInput.disabled = true;
+            resetInput.setAttribute('aria-disabled', 'true');
+
+            valueInputWrapper.appendChild(resetInput);
+        },
+
+        // Operators that do not require user-provided values.
+        shouldDisableFieldConditionValueInput(operator) {
+            const normalisedOperator = String(operator ?? '').trim();
+
+            return normalisedOperator === 'is_empty' || normalisedOperator === 'is_not_empty';
+        },
+
+        // Finds the canonical input name so value control swaps preserve payload keys.
+        getFieldConditionValueInputName(valueCell) {
+            const namedControl = valueCell?.querySelector('input[name], select[name], textarea[name]');
+
+            if (namedControl && typeof namedControl.name === 'string' && namedControl.name.trim() !== '') {
+                return namedControl.name;
+            }
+
+            return '';
+        },
+
+        // Destroys any active TomSelect instances before value-cell DOM replacement.
+        destroyFieldConditionTomSelect(valueCell) {
+            if (!valueCell) {
+                return;
+            }
+
+            const advancedSelects = Array.from(valueCell.querySelectorAll('select[data-advanced="true"], select.meros-select-field'));
+
+            advancedSelects.forEach(selectElement => {
+                if (selectElement?.tomselect) {
+                    initTomSelect(selectElement, true);
+                }
+            });
+        },
+
+        // Fully clears value-cell controls and TomSelect artifacts before rebuilding.
+        clearFieldConditionValueInput(valueCell) {
+            const valueInputName = this.getFieldConditionValueInputName(valueCell);
+            const valueInputWrapper = valueCell?.querySelector('.meros-field') ?? valueCell;
+
+            this.destroyFieldConditionTomSelect(valueCell);
+
+            valueInputWrapper?.querySelectorAll?.('.ts-wrapper, .ts-dropdown').forEach(element => {
+                element.remove();
+            });
+
+            valueInputWrapper?.querySelectorAll?.('input, select, textarea').forEach(control => {
+                control.remove();
+            });
+
+            return {
+                valueInputName,
+                valueInputWrapper,
+            };
+        },
+
+        // Rebuilds the operator list for the selected field type and preserves prior valid selection.
+        setFieldConditionOperators(fieldType, rowElement) {
+            const operatorSelector = rowElement.querySelector('td[data-field-name="operator"] select');
+
+            if (!operatorSelector) {
+                return null;
+            }
+
+            const previousOperator = String(operatorSelector.value ?? '').trim();
+
+            const operatorMap = {
+                text: ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+                textarea: ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+                email: ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+                url: ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+                tel: ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+                hidden: ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+                number: ['equals', 'not_equals', 'greater_than', 'less_than', 'greater_than_or_equal_to', 'less_than_or_equal_to', 'is_empty', 'is_not_empty'],
+                range: ['equals', 'not_equals', 'greater_than', 'less_than', 'greater_than_or_equal_to', 'less_than_or_equal_to', 'is_empty', 'is_not_empty'],
+                select: ['equals', 'not_equals'],
+                advanced_select: ['equals', 'not_equals'],
+                radio: ['equals', 'not_equals'],
+                multi_select: ['contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+                checkboxes: ['contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+                date: ['equals', 'not_equals', 'before', 'after', 'on_or_before', 'on_or_after', 'between', 'not_between', 'is_empty', 'is_not_empty'],
+                time: ['equals', 'not_equals', 'before', 'after', 'on_or_before', 'on_or_after', 'between', 'not_between', 'is_empty', 'is_not_empty'],
+                datetime: ['equals', 'not_equals', 'before', 'after', 'on_or_before', 'on_or_after', 'between', 'not_between', 'is_empty', 'is_not_empty'],
+                checkbox: ['is_checked', 'is_unchecked'],
+            };
+
+            const operators = fieldType
+                ? (operatorMap[fieldType] || ['equals', 'not_equals', 'is_empty', 'is_not_empty'])
+                : [];
+
+            // Clear existing options
+            operatorSelector.innerHTML = '';
+
+            const placeholderOption = document.createElement('option');
+            placeholderOption.value = '';
+            placeholderOption.textContent = 'Select operator';
+            operatorSelector.appendChild(placeholderOption);
+
+            // Add new options
+            operators.forEach(operator => {
+                const option = document.createElement('option');
+                option.value = operator;
+                option.textContent = operator.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+                operatorSelector.appendChild(option);
+            });
+
+            if (previousOperator !== '' && operators.includes(previousOperator)) {
+                operatorSelector.value = previousOperator;
+            } else {
+                operatorSelector.value = '';
+            }
+
+            return operatorSelector;
+        },
+
+        // Rebuilds the value control based on selected field type (including TomSelect-backed controls).
+        setFieldConditionValueInput(field, fieldType, rowElement) {
+            const valueCell = rowElement.querySelector('td[data-field-name="value"]');
+
+            if (!valueCell) {
+                return;
+            }
+
+            const { valueInputName, valueInputWrapper } = this.clearFieldConditionValueInput(valueCell);
+
+            if (!valueInputWrapper) {
+                return;
+            }
+
+            // Create a new input based on the field type
+            let newInput;
+            let setTomSelect = false;
+
+            if (['select', 'advanced_select', 'radio'].includes(fieldType)) {
+                newInput = document.createElement('select');
+                newInput.name = valueInputName;
+
+                const options = field?.properties?.options ?? {};
+                Object.entries(options).forEach(([value, label]) => {
+                    const optionEl = document.createElement('option');
+                    optionEl.value = String(value);
+                    optionEl.textContent = typeof label === 'string' ? label : String(label ?? value);
+                    newInput.appendChild(optionEl);
+                });
+            }
+
+            else if (['multi_select', 'checkboxes'].includes(fieldType)) {
+                newInput = document.createElement('select');
+                newInput.name = valueInputName;
+                newInput.multiple = true;
+                newInput.setAttribute('data-advanced', 'true');
+
+                const options = field?.properties?.options ?? {};
+                Object.entries(options).forEach(([value, label]) => {
+                    const optionEl = document.createElement('option');
+                    optionEl.value = String(value);
+                    optionEl.textContent = typeof label === 'string' ? label : String(label ?? value);
+                    newInput.appendChild(optionEl);
+                });
+
+                setTomSelect = true;
+            }
+            
+            else {
+                newInput = document.createElement('input');
+                newInput.type = field.handle;
+                newInput.name = valueInputName;
+            }
+
+            valueInputWrapper.appendChild(newInput);
+
+            if (setTomSelect) {
+                initTomSelect(newInput);
+            }
+        },
+
+        syncFieldConditionFieldSelectionState(conditionsRepeater) {
+            const selectors = Array.from(
+                conditionsRepeater.querySelectorAll('tr.meros-repeater-row td[data-field-name="field_id"] select')
+            );
+
+            if (selectors.length === 0) {
+                return;
+            }
+
+            const selectedCounts = selectors.reduce((counts, select) => {
+                const selectedValue = String(select.value ?? '').trim();
+
+                if (selectedValue !== '') {
+                    counts[selectedValue] = (counts[selectedValue] ?? 0) + 1;
+                }
+
+                return counts;
+            }, {});
+
+            selectors.forEach(select => {
+                const currentValue = String(select.value ?? '').trim();
+
+                Array.from(select.options).forEach(option => {
+                    const optionValue = String(option.value ?? '').trim();
+
+                    if (optionValue === '') {
+                        option.disabled = false;
+                        return;
+                    }
+
+                    const selectedElsewhere = optionValue !== currentValue && (selectedCounts[optionValue] ?? 0) > 0;
+                    option.disabled = selectedElsewhere;
+                });
+            });
         },
 
         // Sets the active field to a nested repeater field.
@@ -1824,4 +2241,18 @@ export default function registerFormBuilderStore() {
     };
 
     Alpine.store('formBuilder', store);
+
+    const formStore = Alpine.store('formStore');
+
+    if (typeof formStore?.registerCallbacks === 'function') {
+        formStore.registerCallbacks({
+            '$store.formBuilder.saveActions': store.saveActions.bind(store),
+            '$store.formBuilder.refreshActionConfigurationDialog': store.refreshActionConfigurationDialog.bind(store),
+            '$store.formBuilder.onActionRowAdded': store.onActionRowAdded.bind(store),
+            '$store.formBuilder.onActionRowRemoved': store.onActionRowRemoved.bind(store),
+            '$store.formBuilder.onActionRowMoved': store.onActionRowMoved.bind(store),
+            '$store.formBuilder.onActionRowConfigure': store.onActionRowConfigure.bind(store),
+            '$store.formBuilder.getActionConfigurationDialog': store.getActionConfigurationDialog.bind(store),
+        });
+    }
 }

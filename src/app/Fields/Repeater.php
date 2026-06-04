@@ -297,6 +297,12 @@ class Repeater extends Field {
 
     /**
      * Sets the name of a js callback function to use for configuring the repeater's row.
+        *
+        * Configure-row callbacks receive a payload array with:
+        * - triggerElement: the clicked configure button
+        * - repeaterId: the repeater DOM id, or null when unavailable
+        * - rowValue: the current row values keyed by field name
+        * - rowIndex: the current row index, or null when unavailable
      *
      * @param string $callback
      *
@@ -309,6 +315,13 @@ class Repeater extends Field {
 
     /**
      * Sets the name of a js callback function to use when a row is added to the repeater.
+        *
+        * Add-row callbacks receive a payload array with:
+        * - triggerElement: the add button that triggered the action
+        * - repeaterId: the repeater DOM id, or null when unavailable
+        * - rowIndex: the index of the newly added row
+        * - rowValue: the new row values keyed by field name
+        * - repeaterValue: the full repeater value snapshot after the add
      *
      * @param string $callback
      *
@@ -321,6 +334,13 @@ class Repeater extends Field {
 
     /**
      * Sets the name of a js callback function to use when a row is removed from the repeater.
+        *
+        * Remove-row callbacks receive a payload array with:
+        * - triggerElement: the remove button that triggered the action
+        * - repeaterId: the repeater DOM id, or null when unavailable
+        * - rowIndex: the index of the removed row
+        * - rowValue: the removed row values keyed by field name
+        * - repeaterValue: the full repeater value snapshot after the removal
      *
      * @param string $callback
      *
@@ -333,6 +353,15 @@ class Repeater extends Field {
 
     /**
      * Sets the name of a js callback function to use when a row is moved in the repeater.
+        *
+        * Move-row callbacks receive a payload array with:
+        * - triggerElement: the dragged row's move handle or repeater root
+        * - repeaterId: the repeater DOM id, or null when unavailable
+        * - rowValue: the moved row values keyed by field name
+        * - sourceIndex: the original row index
+        * - requestedTargetIndex: the target index requested by the drag/drop interaction
+        * - targetIndex: the final row index after normalisation
+        * - repeaterValue: the full repeater value snapshot after the move
      *
      * @param string $callback
      *
@@ -510,7 +539,7 @@ class Repeater extends Field {
      * @return string
      */
     public function getOnConfigureRowCallback(): string {
-        $configuredCallback = $this->normaliseCallbackPath($this->onConfigureRow);
+        $configuredCallback = !empty($this->onConfigureRow) ? $this->normaliseCallbackPath($this->onConfigureRow) : '';
 
         return empty($configuredCallback) && $this->allowsConfigure()
             ? $this->defaultConfigurationCallback
@@ -523,7 +552,7 @@ class Repeater extends Field {
      * @return string
      */
     public function getOnAddRowCallback(): string {
-        return $this->normaliseCallbackPath($this->onAddRow);
+        return !empty($this->onAddRow) ? $this->normaliseCallbackPath($this->onAddRow) : '';
     }
 
     /**
@@ -532,7 +561,7 @@ class Repeater extends Field {
      * @return string
      */
     public function getOnRemoveRowCallback(): string {
-        return $this->normaliseCallbackPath($this->onRemoveRow);
+        return !empty($this->onRemoveRow) ? $this->normaliseCallbackPath($this->onRemoveRow) : '';
     }
 
     /**
@@ -541,7 +570,7 @@ class Repeater extends Field {
      * @return string
      */
     public function getOnMoveRowCallback(): string {
-        return $this->normaliseCallbackPath($this->onMoveRow);
+        return !empty($this->onMoveRow) ? $this->normaliseCallbackPath($this->onMoveRow) : '';
     }
 
     /**

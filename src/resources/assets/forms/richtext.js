@@ -75,6 +75,11 @@ export function merosHydrateQuillContent(container, content = null) {
     }
 
     else {
+        if (typeof content === 'string') {
+            container._quill.root.innerHTML = content;
+            return;
+        }
+        
         container._quill.setContents(JSON.parse(content));
     }
 }
