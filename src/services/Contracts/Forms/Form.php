@@ -93,11 +93,11 @@ class Form extends FeatureDefinition {
     /**
      * Sets the ID of the form.
      *
-     * @param int $id
+     * @param int|string $id
      *
      * @return self
      */
-    public function id(int $id): self {
+    public function id(int|string $id): self {
         $this->id = $id;
         return $this;
     }
@@ -167,11 +167,11 @@ class Form extends FeatureDefinition {
      *
      * @return Collection|array
      */
-    public function getForms(bool $asArray = false): Collection|array {
+    public function getElements(bool $asArray = false): Collection|array {
         $elements = collect();
 
-        $this->walkRows(function(FormRow $row) use ($elements, $asArray) {
-            $elements = $elements->merge($row->getForms($asArray));
+        $this->walkRows(function(FormRow $row) use (&$elements) {
+            $elements = $elements->merge($row->getElements());
         });
 
         return $asArray ? $elements->toArray() : $elements;
@@ -187,8 +187,8 @@ class Form extends FeatureDefinition {
     public function getFields(bool $asArray = false): Collection|array {
         $fields = collect();
 
-        $this->walkRows(function(FormRow $row) use ($fields, $asArray) {
-            $fields = $fields->merge($row->getFields($asArray));
+        $this->walkRows(function(FormRow $row) use (&$fields) {
+            $fields = $fields->merge($row->getFields());
         });
 
         return $asArray ? $fields->toArray() : $fields;

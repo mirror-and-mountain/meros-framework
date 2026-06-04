@@ -13,7 +13,6 @@ use MM\Meros\Services\Contracts\Forms\FormRow;
 use MM\Meros\Services\Contracts\Admin\SettingsField;
 
 use MM\Meros\Facades\FieldWrappers;
-use MM\Meros\Facades\Context;
 
 abstract class Field extends FeatureDefinition {
     /**
@@ -173,17 +172,39 @@ abstract class Field extends FeatureDefinition {
     protected array $conditions = [];
 
     /**
+     * The name of a js callback function to execute when the field's value changes.
+     *
+     * @var string
+     */
+    protected string $onChange = '';
+
+    /**
+     * An array of validation rules to apply to the field's value.
+     *
+     * @var array
+     */
+    protected array $rules = [];
+
+    /**
+     * For concrete field classes that support validation rules,
+     * this array defines the keys that will be accepted via the rule() and rules() methods.
+     *
+     * @var array
+     */
+    protected array $supportedRules = [];
+
+    /**
      * An array of CSS classes to apply to the field's wrapper element.
      *
      * @var array
      */
     protected array $classList = [];
 
-    /***************************
-     * Feature Contract Methods
-     ***************************/
+    // =========================================================================
+    // Contract Methods
+    // =========================================================================
 
-    final public function __construct(
+    public function __construct(
         FeatureProvider $provider,
         array           $props = []
     ) {
@@ -198,9 +219,9 @@ abstract class Field extends FeatureDefinition {
         // Field classes don't use the queue method
     }
 
-    /***************************
-     * Rendering
-     ***************************/
+    // =========================================================================
+    // Rendering
+    // =========================================================================
 
         /**
      * Renders the field using its designated FieldWrapper.
@@ -255,7 +276,8 @@ abstract class Field extends FeatureDefinition {
         if ($hasSettingsField) {
             $wrapperHandle = 'admin_settings';
         } else {
-            $wrapperHandle = Context::isAdmin() ? 'admin_default' : 'site_default';
+            // $wrapperHandle = Context::isAdmin() ? 'admin_default' : 'site_default';
+            $wrapperHandle = 'site_default'; // Sharing in both contexts for now.
         }
 
         $wrapper = FieldWrappers::checkout($this->provider)->makeFrom($wrapperHandle);
@@ -267,36 +289,9 @@ abstract class Field extends FeatureDefinition {
         return $wrapper->getView();
     }
 
-    /***************************
-     * Fluent Setters
-     ***************************/
-
-    /**
-     * Sets the field's parent form row.
-     *
-     * @param FormRow $row
-     *
-     * @return self
-     */
-    public function row(FormRow $row): self {
-        $this->row = $row;
-        return $this;
-    }
-
-    /**
-     * Sets the field's position within its parent row, for reference.
-     * 
-     * This does not automatically reorder the fields in the row. 
-     * The FormRow is responsible for ordering the fields when rendering.
-     *
-     * @param integer $position
-     *
-     * @return self
-     */
-    public function position(int $position): self {
-        $this->position = $position;
-        return $this;
-    }
+    // =========================================================================
+    // Attribute Setters
+    // =========================================================================
 
     /**
      * Sets the field's ID.
@@ -444,6 +439,19 @@ abstract class Field extends FeatureDefinition {
         $this->classList = array_merge($this->classList, $classes);
         return $this;
     }
+
+    /**
+     * Removes one or more CSS classes from the field's class list.
+     *
+     * @param string|array $classes
+     *
+     * @return self
+     */
+    public function removeClass(string|array $classes): self {
+        $classes = is_array($classes) ? $classes : explode(' ', $classes);
+        $this->classList = array_diff($this->classList, $classes);
+        return $this;
+    }
     
     /**
      * Adds an additional HTML attribute to the field's input element.
@@ -478,6 +486,37 @@ abstract class Field extends FeatureDefinition {
         return $this;
     }
 
+    // =========================================================================
+    // Context Setters
+    // =========================================================================
+
+    /**
+     * Sets the field's parent form row.
+     *
+     * @param FormRow $row
+     *
+     * @return self
+     */
+    public function row(FormRow $row): self {
+        $this->row = $row;
+        return $this;
+    }
+
+    /**
+     * Sets the field's position within its parent row, for reference.
+     * 
+     * This does not automatically reorder the fields in the row. 
+     * The FormRow is responsible for ordering the fields when rendering.
+     *
+     * @param integer $position
+     *
+     * @return self
+     */
+    public function position(int $position): self {
+        $this->position = $position;
+        return $this;
+    }
+
     /**
      * Associates the field with a repeater, marking it as a sub-field.
      *
@@ -502,6 +541,270 @@ abstract class Field extends FeatureDefinition {
         $this->settingsField->attachField($this);
         return $this;
     }
+
+    // =========================================================================
+    // Dynamic Setters
+    // =========================================================================
+
+    /**
+     * Defines validation rules for the field's value.
+     *
+     * @param array $rules
+     *
+     * @return self
+     */
+    public function rules(array $rules): self {
+        foreach ($rules as $key => $value) {
+            if (in_array($key, $this->supportedRules)) {
+                $this->rules[$key] = $value;
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Sets a single validation rule for the field.
+     *
+     * @param string $key
+     * @param mixed  $value
+     *
+     * @return self
+     */
+    public function rule(string $key, mixed $value): self {
+        if (in_array($key, $this->supportedRules)) {
+            $this->rules[$key] = $value;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Defines conditions for the field that determine its visibility or behaviour 
+     * based on the values of other fields. 
+     *
+     * @param array $conditions
+     *
+     * @return self
+     */
+    public function conditions(array $conditions): self {
+        $validTypes = [
+            'show',
+            'hide',
+            'require',
+            'optional',
+            'enable',
+            'disable',
+        ];
+
+        $parsedConditions = [];
+
+        foreach($conditions as $type => $config) {
+            if (!in_array($type, $validTypes)) {
+                continue;
+            }
+
+            $logicOperator = in_array($config['logic'] ?? 'and', ['and', 'or']) ? $config['logic'] : 'and';
+            $rules         = $config['rules'] ?? [];
+            $parsedRules   = [];
+
+            foreach($rules as $rule) {
+                if (!is_array($rule)) {
+                    continue;
+                }
+                
+                $field    = $rule['field'] ?? null;
+                $operator = $rule['operator'] ?? null;
+                $value    = $rule['value'] ?? null;
+
+                if ($field === null || $operator === null || $value === null) {
+                    continue;
+                }
+
+                $parsedRules[] = [
+                    'field'    => $field,
+                    'operator' => $operator,
+                    'value'    => $value,
+                ];
+            }
+
+            if (empty($parsedRules)) {
+                continue;
+            }
+
+            $parsedConditions[$type] = [
+                'logic' => $logicOperator,
+                'rules' => $parsedRules,
+            ];
+        }    
+
+        $this->conditions = $parsedConditions;
+
+        return $this;
+    }
+
+    /**
+     * Shorthand method to define a 'show' condition for the field.
+     *
+     * @param array  $rules An array of rules that determine when to show the field.
+     * @param string $logic The logic operator to apply to the rules, either 'and' or 'or'.
+     *
+     * @return self
+     */
+    public function showWhen(array $rules, string $logic = 'and'): self {
+        $logic = in_array($logic, ['and', 'or']) ? $logic : 'and';
+
+        return $this->conditions([
+            'show' => [
+                'logic' => $logic,
+                'rules' => $rules,
+            ]
+        ]);
+    }
+
+    /**
+     * Shorthand method to define a 'hide' condition for the field.
+     *
+     * @param array  $rules An array of rules that determine when to hide the field.
+     * @param string $logic The logic operator to apply to the rules, either 'and' or 'or'.
+     *
+     * @return self
+     */
+    public function hideWhen(array $rules, string $logic = 'and'): self {
+        $logic = in_array($logic, ['and', 'or']) ? $logic : 'and';
+
+        return $this->conditions([
+            'hide' => [
+                'logic' => $logic,
+                'rules' => $rules,
+            ]
+        ]);
+    }
+
+    /**
+     * Shorthand method to define a 'require' condition for the field.
+     *
+     * @param array  $rules An array of rules that determine when to require the field.
+     * @param string $logic The logic operator to apply to the rules, either 'and' or 'or'.
+     *
+     * @return self
+     */
+    public function requireWhen(array $rules, string $logic = 'and'): self {
+        $logic = in_array($logic, ['and', 'or']) ? $logic : 'and';
+
+        return $this->conditions([
+            'require' => [
+                'logic' => $logic,
+                'rules' => $rules,
+            ]
+        ]);
+    }
+
+    /**
+     * Shorthand method to define an 'optional' condition for the field.
+     *
+     * @param array  $rules An array of rules that determine when to make the field optional.
+     * @param string $logic The logic operator to apply to the rules, either 'and' or 'or'.
+     *
+     * @return self
+     */
+    public function optionalWhen(array $rules, string $logic = 'and'): self {
+        $logic = in_array($logic, ['and', 'or']) ? $logic : 'and';
+
+        return $this->conditions([
+            'optional' => [
+                'logic' => $logic,
+                'rules' => $rules,
+            ]
+        ]);
+    }
+
+    /**
+     * Shorthand method to define an 'enable' condition for the field.
+     *
+     * @param array  $rules An array of rules that determine when to enable the field.
+     * @param string $logic The logic operator to apply to the rules, either 'and' or 'or'.
+     *
+     * @return self
+     */
+    public function enableWhen(array $rules, string $logic = 'and'): self {
+        $logic = in_array($logic, ['and', 'or']) ? $logic : 'and';
+
+        return $this->conditions([
+            'enable' => [
+                'logic' => $logic,
+                'rules' => $rules,
+            ]
+        ]);
+    }
+
+    /**
+     * Shorthand method to define a 'disable' condition for the field.
+     *
+     * @param array  $rules An array of rules that determine when to disable the field.
+     * @param string $logic The logic operator to apply to the rules, either 'and' or 'or'.
+     *
+     * @return self
+     */
+    public function disableWhen(array $rules, string $logic = 'and'): self {
+        $logic = in_array($logic, ['and', 'or']) ? $logic : 'and';
+
+        return $this->conditions([
+            'disable' => [
+                'logic' => $logic,
+                'rules' => $rules,
+            ]
+        ]);
+    }
+
+    /**
+     * Sets a JavaScript callback path to be executed when the field's value changes.
+     *
+     * @param string $callback
+     *
+     * @return self
+     */
+    public function onChange(string $callback): self {
+        $this->onChange = $this->normaliseCallbackPath($callback);
+        return $this;
+    }
+
+    /**
+     * Normalises and validates JavaScript callback paths used by field interactions.
+     * Returns an empty string when a callback path is invalid.
+     */
+    protected function normaliseCallbackPath(string $callback): string {
+        $trimmed = trim($callback);
+
+        if ($trimmed === '' || strlen($trimmed) > 200) {
+            return '';
+        }
+
+        $pattern = '/^(?:\$store\.)?[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/';
+
+        if (!preg_match($pattern, $trimmed)) {
+            return '';
+        }
+
+        $path = str_starts_with($trimmed, '$store.')
+            ? substr($trimmed, strlen('$store.'))
+            : $trimmed;
+
+        $segments = array_values(array_filter(explode('.', $path), fn($segment) => $segment !== ''));
+        $blockedSegments = ['__proto__', 'prototype', 'constructor'];
+
+        foreach ($segments as $segment) {
+            if (in_array($segment, $blockedSegments, true)) {
+                return '';
+            }
+        }
+
+        return $trimmed;
+    }
+
+    // =========================================================================
+    // Getters
+    // =========================================================================
 
     /**
      * Converts the field's properties to an array format suitable for JSON serialization
@@ -538,10 +841,6 @@ abstract class Field extends FeatureDefinition {
 
         return $json;
     }
-
-    /***************************
-     * Getters
-     ***************************/
 
     /**
      * Retrieves the field's data type.
@@ -698,6 +997,61 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
+     * Retrieves the field's conditions array.
+     *
+     * @return array
+     */
+    public function getConditions(): array {
+        return $this->conditions;
+    }
+
+    /**
+     * Retrieves the JavaScript expression set to execute when the field's value changes.
+     *
+     * @return string
+     */
+    public function getOnChange(): string {
+        return $this->normaliseCallbackPath($this->onChange);
+    }
+
+    /**
+     * Returns validation rules as an array of HTML attributes that can be applied to the 
+     * field's input element for client-side validation.
+     *
+     * @return array
+     */
+    public function getRuleAttributes(): array {
+        $attributes = [];
+
+        foreach ($this->rules as $key => $value) {
+            if (in_array($key, $this->supportedRules)) {
+                if (in_array($key, ['min', 'max', 'maxlength', 'step'])) {
+                    $attributes[$key] = $value;
+                    continue;
+                }
+
+                if (is_bool($value)) {
+                    $attributes["data-rule-{$key}"] = $value ? 'true' : 'false';
+                    continue;
+                }
+
+                $attributes["data-rule-{$key}"] = $value;
+            }
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * Retrieves the field's validation rules.
+     *
+     * @return array
+     */
+    public function getRules(): array {
+        return $this->rules;
+    }
+
+    /**
      * Checks if the field is marked as required.
      *
      * @return boolean
@@ -737,9 +1091,11 @@ abstract class Field extends FeatureDefinition {
             'name'            => $this->getName(!$this->isSubField()),
             'class'           => $this->classList(),
             'disabled'        => $this->disabled,
+            'aria-disabled'   => $this->disabled ? 'true' : 'false',
             'required'        => $this->required,
+            'aria-required'   => $this->required ? 'true' : 'false',
             'data-field-type' => $this->handle
-        ], $this->attributes);
+        ], $this->attributes, $this->getRuleAttributes());
 
         $rendered = [];
 
@@ -811,9 +1167,9 @@ abstract class Field extends FeatureDefinition {
         return static::$icon;
     }
 
-    /***************************
-     * Helpers
-     ***************************/
+    // =========================================================================
+    // Helpers
+    // =========================================================================
 
     /**
      * Magic method to handle dynamic method calls for chaining, such as setting the section on the associated SettingsField.

@@ -17,6 +17,8 @@ use MM\Meros\Services\Concerns\IsDataRegistrant;
 use MM\Meros\Facades\Context;
 use MM\Meros\Facades\FieldGroups;
 
+use Illuminate\Support\Facades\Log;
+
 class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRegistrant {
 
     /**
@@ -122,7 +124,7 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
      * @return void
      */
     final public function queueFromPostType(PostType $postType): void {
-        if ($this->isRoot()) {
+        if ($this->isRoot() && !$this->queued) {
             $this->postType = $postType->handle;
 
             register_post_meta(
@@ -166,6 +168,8 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
 
                 $this->metaBoxQueued = true;
             }
+
+            $this->queued = true;
         }
     }
 
@@ -225,7 +229,7 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         $existingData = $this->getValue($postId);
 
         // Merge submitted data with existing data, ensuring we only save defined sub-fields
-        foreach ($this->fieldGroup->getFields() as $field) {
+        foreach ($this->fieldGroup->getFields(true) as $field) {
             $subKey = $field->getName(false); // Get the field name without the root path
 
             if (array_key_exists($subKey, $submittedData)) {
@@ -431,5 +435,22 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         else {
             return $this->parent->getFieldGroup();
         }
+    }
+
+    /**
+     * Sets an existing field group to be used for this post meta.
+     *
+     * @param FieldGroup $fieldGroup
+     *
+     * @return self
+     */
+    public function setFieldGroup(FieldGroup $fieldGroup): self {
+        if (!$this->isRoot()) {
+            throw new \LogicException("Cannot set field group on a non-root post meta. Field groups can only be set on root post meta instances.");
+        }
+
+        $this->fieldGroup = $fieldGroup;
+        $this->fieldGroup->parentMeta($this);
+        return $this;
     }
 }

@@ -1,6 +1,6 @@
 <div 
     id="meros-form-builder-sidebar" 
-    class="relative shrink-0 bg-gray-100 p-4 overflow-y-auto border-r border-gray-300"
+    class="relative shrink-0 h-full bg-gray-100 p-4 overflow-x-hidden overflow-y-auto overscroll-contain border-r border-gray-300"
     x-data="{ 
         sidebarWidth: 320,
         isResizing: false,

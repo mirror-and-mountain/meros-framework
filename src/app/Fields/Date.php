@@ -34,6 +34,27 @@ class Date extends Input {
     ];
 
     /**
+     * Rules supported by the field for validation purposes.
+     *
+     * @var array
+     */
+    protected array $supportedRules = [
+        'min',
+        'max',
+        'step'
+    ];
+
+    /**
+     * Supported features for the date field.
+     *
+     * @var array
+     */
+    protected array $supports = [
+        'placeholder',
+        'icon'
+    ];
+
+    /**
      * An array of data types that this field is compatible with.
      *
      * @var array

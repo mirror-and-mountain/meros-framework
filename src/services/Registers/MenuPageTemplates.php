@@ -8,6 +8,7 @@ use MM\Meros\Services\Contracts\Admin\MenuPageTemplate;
 class MenuPageTemplates extends Register {
     protected string $identifier = 'slug';
     protected string $definition = MenuPageTemplate::class;
+    protected array  $rejects    = ['makeFromCallback'];
 
     /**
      * Parses properties for the menu page's constructor.

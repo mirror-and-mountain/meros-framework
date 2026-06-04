@@ -8,10 +8,10 @@ use MM\Meros\Services\Contracts\Forms\Field;
 class Fields extends Register {
     protected string $identifier = 'handle';
     protected string $definition = Field::class;
-    protected array  $rejects    = ['make'];
+    protected array  $rejects    = ['make', 'makeFromCallback'];
 
     /**
-     * Parses properties for the asset's constructor.
+     * Parses properties for the field's constructor.
      *
      * @param array $props
      *

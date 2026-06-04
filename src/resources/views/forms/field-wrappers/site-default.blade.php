@@ -4,8 +4,15 @@
     $hasHelpText      = !empty($helpText);
     $helpTextPosition = $hasHelpText ? $field->getHelpTextPosition() : null;
     $showLabel        = $showLabel;
+    $isRequired       = $field->isRequired();
+    $isDisabled       = $field->isDisabled();
     $isFieldSet       = in_array($field->handle, ['radio', 'checkboxes']);
     $wireIgnore       = (method_exists($field, 'isAdvanced') && $field->isAdvanced()) || $field->handle === 'rich_text' ? 'wire:ignore' : '';
+
+    if ($isRequired && $isDisabled) {
+        $isRequired = false;
+    }
+
 @endphp
 
 <div 
@@ -14,7 +21,20 @@
 >
     @if ($showLabel && $field->handle !== 'repeater')
         @if (!$isFieldSet)
-            <label for="{{ $id }}">{{ $field->getLabel() }}</label>
+            <label 
+                @if($field->handle === 'rich_text')
+                    id="{{ $id }}-label"
+                @else
+                    id="{{ $id }}-label"
+                    for="{{ $id }}"
+                @endif
+                class="form-label"
+            >
+                {{ $field->getLabel() }}
+                @if($isRequired)
+                    <span class="required-indicator">*</span>
+                @endif
+            </label>
         @endif
     @endif
 

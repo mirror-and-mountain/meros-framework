@@ -8,6 +8,7 @@ use MM\Meros\Services\Contracts\Forms\FormAction;
 class FormActions extends Register {
     protected string $identifier = 'handle';
     protected string $definition = FormAction::class;
+    protected array  $rejects    = ['makeFromCallback'];
 
     /**
      * Parses the properties for the form action's constructor.

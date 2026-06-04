@@ -1,7 +1,7 @@
 import registerFormBuilderStore from '../../forms/alpine/formBuilderStore.js';
 import registerRepeaterFieldStore from '../../forms/alpine/repeaterFieldStore.js';
 import { initRichTextEditors } from '../../forms/richtext.js';
-import { initTomSelects } from '../../forms/tom-select/index.js';
+import { initTomSelects, initTomSelect } from '../../forms/tom-select/index.js';
 import { updateIgnoredFieldWrapperElements } from '../../forms/utils.js';
 import './style.css';
 
@@ -20,6 +20,16 @@ window.addEventListener('meros-form-builder-schema-updated', (event) => {
     initTomSelects();
     initRichTextEditors(richTextPayloads);
 });
+
+// Listen for task to remake a specific TomSelect instance if needed
+window.addEventListener('meros-remake-tom-select', (event) => {
+    const { fieldId } = event.detail;
+    const el = document.getElementById(fieldId);
+
+    if (el) {
+        initTomSelect(el, true);
+    }
+})
 
 // Listen for updates to rich text content to reinitialise rich text editors as needed
 window.addEventListener('meros-form-builder-rich-text-updated', (event) => {

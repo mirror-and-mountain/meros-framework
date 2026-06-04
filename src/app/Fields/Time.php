@@ -34,6 +34,16 @@ class Time extends Input {
     ];
 
     /**
+     * Supported features for the time field.
+     *
+     * @var array
+     */
+    protected array $supports = [
+        'placeholder',
+        'icon'
+    ];
+
+    /**
      * An array of data types that this field is compatible with.
      *
      * @var array

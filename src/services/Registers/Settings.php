@@ -8,7 +8,7 @@ use MM\Meros\Services\Contracts\Admin\Setting;
 class Settings extends Register {
     protected string $identifier = 'name';
     protected string $definition = Setting::class;
-    protected array  $rejects    = ['multiple', 'public'];
+    protected array  $rejects    = ['multiple', 'public', 'makeFrom', 'makeFromCallback'];
 
     /**
      * Parses properties for the setting's constructor.

@@ -8,6 +8,7 @@ use MM\Meros\Services\Contracts\Forms\Form;
 class Forms extends Register {
     protected string $identifier = 'id';
     protected string $definition = Form::class;
+    protected array  $rejects    = ['makeFromCallback'];
 
     /**
      * Parses properties for the form's constructor.
@@ -19,7 +20,7 @@ class Forms extends Register {
     protected function parseProperties(array $props): array {
         return [
             'handle'      => $props['handle'] ?? '',
-            'id'          => $props['id'] ?? 0,
+            'id'          => $props['id'] ?? '',
             'title'       => $props['title'] ?? '',
             'description' => $props['description'] ?? ''
         ];

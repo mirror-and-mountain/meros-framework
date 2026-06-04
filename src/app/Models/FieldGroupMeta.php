@@ -13,7 +13,7 @@ class FieldGroupMeta extends PostMeta {
         return parent::newQuery()->where('meta_key', '_meros_field_group_meta');
     }
 
-    public function field_group(): BelongsTo {
+    public function fieldGroup(): BelongsTo {
         return $this->belongsTo(FieldGroup::class, 'post_id');
     }
 }

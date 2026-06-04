@@ -20,6 +20,20 @@ class Input extends Field {
     protected string $placeholder = '';
 
     /**
+     * Whether the field shows an icon (if supported).
+     *
+     * @var bool
+     */
+    protected bool $showsIcon = true;
+
+    /**
+     * The position of the icon in the field, if supported.
+     *
+     * @var string
+     */
+    protected string $iconPosition = '';
+
+    /**
      * Supported attributes for the input field.
      *
      * @var array
@@ -66,6 +80,55 @@ class Input extends Field {
         return $this;
     }
 
+    /**
+     * Configures the field to show an icon in the form builder UI, if supported.
+     *
+     * @param boolean $showIcon
+     * @param string  $position
+     *
+     * @return self
+     */
+    public function showIcon(bool $showIcon = true, string $position = 'left'): self {
+        if (!$this->supports('icon')) {
+            $this->showsIcon = false;
+            return $this;
+        }
+
+        if ($showIcon) {
+            $this->showsIcon = true;
+            $this->iconPosition = in_array($position, ['left', 'right']) ? $position : 'left';
+        } else {
+            $this->showsIcon = false;
+            $this->iconPosition = '';
+        }
+        
+        return $this;
+    }
+
+    /**
+     * Configures the field to hide its icon if supported.
+     *
+     * @return self
+     */
+    public function hideIcon(): self {
+        return $this->showIcon(false);
+    }
+
+    /**
+     * Sets the field's icon position, if supported.
+     *
+     * @param string $position
+     *
+     * @return self
+     */
+    public function iconPosition(string $position): self {
+        if ($this->supports('icon') && in_array($position, ['left', 'right'])) {
+            return $this->showIcon(true, $position);
+        }
+
+        return $this;
+    }
+
     /***************************
      * Rendering
      ***************************/
@@ -91,6 +154,24 @@ class Input extends Field {
     }
 
     /**
+     * Determines if the field is configured to show an icon in the field input.
+     *
+     * @return boolean
+     */
+    public function showsIcon(): bool {
+        return $this->supports('icon') && $this->showsIcon;
+    }
+
+    /**
+     * Gets the position of the icon for the field, if supported and enabled.
+     *
+     * @return string
+     */
+    public function getIconPosition(): string {
+        return empty($this->iconPosition) ? 'left' : $this->iconPosition;
+    }
+
+    /**
      * Converts the field's properties to an array format suitable for JSON serialization
      * 
      * @param boolean $asString Whether to return the JSON as a string or an array.
@@ -102,7 +183,9 @@ class Input extends Field {
         $json = parent::toJson();
         
         if ($this->supports('placeholder')) {
-            $json['properties']['placeholder'] = $this->getPlaceholder();
+            $json['properties']['placeholder']  = $this->getPlaceholder();
+            $json['properties']['showsIcon']    = $this->showsIcon();
+            $json['properties']['iconPosition'] = $this->getIconPosition();
         }
         
         if ($asString) {

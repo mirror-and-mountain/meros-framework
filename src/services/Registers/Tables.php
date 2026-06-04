@@ -13,6 +13,7 @@ use MM\Meros\Services\Registers\Interfaces\Discovery;
 class Tables extends Register implements Discovery {
     protected string $identifier = 'handle';
     protected string $definition = Table::class;
+    protected array  $rejects    = ['makeFromCallback'];
 
     use Concerns\Discovers;
 

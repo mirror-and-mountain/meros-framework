@@ -8,9 +8,11 @@ export default function registerFormBuilderStore() {
         formSlug: '',
         formStatus: '',
         rows: [],
-        actions: [],
-        actionPayloads: [],
+        actions: {},
+        actionPayloads: {},
         richTextPayloads: [],
+        actionConfigContext: null,
+        actionConfigDialog: null,
 
         // Updaters/callbacks
         settingsUpdater: null,
@@ -78,12 +80,9 @@ export default function registerFormBuilderStore() {
 
         // Sets the actions object
         setActions(actions) {
-            this.actions = actions;
-        },
-
-        // Sets the action payloads
-        setActionPayloads(payloads) {
-            this.actionPayloads = payloads;
+            this.actions = (actions && typeof actions === 'object')
+                ? { ...actions }
+                : {};
         },
 
         // Sets the rich text payloads
@@ -201,20 +200,20 @@ export default function registerFormBuilderStore() {
         // Creates a new field payload based on the handle and current item label or field label.
         createFieldPayload(handle) {
             const safeHandle = String(handle ?? '').trim();
-            const label = this.fieldLabel ?? this.itemLabel ?? this.humanizeHandle(safeHandle) ?? 'Field';
+            const label  = this.fieldLabel ?? this.itemLabel ?? this.humanizeHandle(safeHandle) ?? 'Field';
+            const idName = this.makeId();
 
             const payload = {
                 handle: safeHandle,
                 properties: {
-                    id: this.makeId(),
+                    id: idName,
                     label,
-                    name: this.slugify(label) || this.slugify(safeHandle) || this.makeId(),
+                    name: idName,
                     helpText: '',
                     helpTextPosition: 'top',
                     value: '',
                     required: false,
                     disabled: false,
-                    width: 'full',
                 },
             };
 
@@ -233,6 +232,16 @@ export default function registerFormBuilderStore() {
                 payload.properties.placeholder = '';
             }
 
+            // Adjust payload for fields that support TomSelect.
+            if (this.isSelectField(safeHandle)) {
+                if (['advanced_select', 'multi_select'].includes(safeHandle)) {
+                    payload.properties.advanced = true;
+                    payload.properties.allowAdd = false;
+                } else {
+                    payload.properties.advanced = false;
+                }
+            }
+
             return payload;
         },
 
@@ -241,7 +250,11 @@ export default function registerFormBuilderStore() {
         },
 
         isChoiceField(handle) {
-            return ['select', 'radio', 'checkboxes', 'multi_select'].includes(handle);
+            return ['select', 'radio', 'checkboxes', 'multi_select', 'advanced_select'].includes(handle);
+        },
+
+        isSelectField(handle) {
+            return ['select', 'multi_select', 'advanced_select'].includes(handle);
         },
 
         isSingleChoiceField(handle) {
@@ -250,6 +263,21 @@ export default function registerFormBuilderStore() {
 
         isMultipleChoiceField(handle) {
             return ['checkboxes', 'multi_select'].includes(handle);
+        },
+
+        hasTomSelectDefaultValue(handle) {
+            return ['multi_select', 'advanced_select', 'checkboxes'].includes(handle);
+        },
+
+        supportsIcon(handle) {
+            return [
+                'email',
+                'tel',
+                'url',
+                'date',
+                'time',
+                'password'
+            ].includes(handle);
         },
 
         // ======================================
@@ -1459,41 +1487,340 @@ export default function registerFormBuilderStore() {
         // Action Configuration Handlers
         // ======================================
 
-        // Retrieves the configuration dialog content for a given action handle, using the configured callback.
-        async getActionConfigurationDialog(params = null) {
+        // Calls the configured action updater callback with the current actions from the store to persist them outside of the store.
+        saveActions() {
+            const storeRef = Alpine.store('formBuilder');
+
+            if (!storeRef.actionsUpdater) {
+                return;
+            }
+
+            const repeaterStore = Alpine.store('repeaterField');
+            const value = repeaterStore ? repeaterStore.getRepeaterValue('meros-form-actions-repeater') : null;
+
+            if (!Array.isArray(value)) {
+                storeRef.actionsUpdater(storeRef.actions);
+                return;
+            }
+
+            const nextActions = {};
+
+            value.forEach((actionEntry, index) => {
+                const actionType = String(actionEntry?.action_type ?? '').trim();
+                const actionId = String(actionEntry?.action_id ?? '').trim();
+
+                if (actionType === '') {
+                    return;
+                }
+
+                const uniqueHandle = storeRef.getActionUniqueHandle(actionType, actionId, index);
+                const parsedActionId = String(uniqueHandle.split('__').slice(1).join('__') ?? '').trim();
+                const storedActionId = actionId !== '' ? actionId : parsedActionId;
+                const existingConfig = storeRef.actions?.[uniqueHandle]?.config;
+
+                nextActions[uniqueHandle] = {
+                    label: typeof actionEntry?.action_label === 'string' ? actionEntry.action_label : '',
+                    config: (existingConfig && typeof existingConfig === 'object' && !Array.isArray(existingConfig))
+                        ? { ...existingConfig }
+                        : {},
+                    action_id: storedActionId,
+                };
+            });
+
+            storeRef.actions = nextActions;
+            storeRef.actionsUpdater(nextActions);
+        },
+
+        // Builds a stable unique action key from action type + action id.
+        getActionUniqueHandle(actionType, actionId, fallbackIndex = null) {
+            const type = String(actionType ?? '').trim();
+            const id = String(actionId ?? '').trim();
+
+            if (type === '') {
+                return '';
+            }
+
+            if (id !== '') {
+                return `${type}__${id}`;
+            }
+
+            return Number.isInteger(fallbackIndex)
+                ? `${type}__${fallbackIndex}`
+                : type;
+        },
+
+        // Handles action-row additions from repeater callbacks.
+        onActionRowAdded(params = {}) {
+            const repeaterId = typeof params?.repeaterId === 'string' ? params.repeaterId : '';
+            const rowIndex = Number.isInteger(params?.rowIndex) ? params.rowIndex : null;
+            const repeaterStore = Alpine.store('repeaterField');
+
+            if (repeaterId !== '' && rowIndex !== null && typeof repeaterStore?.setCellValue === 'function') {
+                const randomDigits = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');
+                repeaterStore.setCellValue(repeaterId, rowIndex, 'action_id', `action_${randomDigits}`);
+            }
+
+            this.saveActions();
+        },
+
+        // Handles action-row removals from repeater callbacks.
+        onActionRowRemoved(params = {}) {
+            this.saveActions();
+        },
+
+        // Handles action-row reordering from repeater callbacks.
+        onActionRowMoved(params = {}) {
+            this.saveActions();
+        },
+
+        // Handles action-row configure callbacks from repeater rows.
+        async onActionRowConfigure(params = null) {
             if (typeof this.actionConfigCallback !== 'function') {
                 return;
             }
 
+            // Get the action handle
             const resolvedActionHandle = typeof params === 'string'
-                ? params
+                ? String(params).split('__')[0]
                 : params?.rowValue?.action_type;
 
+            // Get the action label
+            const resolvedActionLabel = typeof params === 'string'
+                ? (this.actions?.[params]?.label ?? '')
+                : params?.rowValue?.action_label || '';
+
+            const resolvedActionId = typeof params === 'string'
+                ? String(this.actions?.[params]?.action_id ?? params.split('__').slice(1).join('__') ?? '').trim()
+                : String(params?.rowValue?.action_id ?? '').trim();
+
+            const resolvedRowIndex = Number.isInteger(params?.rowIndex)
+                ? params.rowIndex
+                : null;
+
+            // Bail if we don't have a valid action handle to work with
             if (typeof resolvedActionHandle !== 'string' || resolvedActionHandle.trim() === '') {
                 return;
             }
 
-            const dialogContent = await this.actionConfigCallback(resolvedActionHandle, this.getFieldLabelsById());
+            // Use a stable per-row key so reordering rows doesn't remap configs.
+            const actionHandle = resolvedActionHandle;
+            const uniqueHandle = this.getActionUniqueHandle(actionHandle, resolvedActionId, resolvedRowIndex);
 
+            if (uniqueHandle === '') {
+                return;
+            }
+
+            // Get the current configuration for this action from the store.
+            const actionEntry = (this.actions && typeof this.actions === 'object' && !Array.isArray(this.actions))
+                ? this.actions[uniqueHandle]
+                : null;
+            const currentConfig = (actionEntry && typeof actionEntry === 'object' && !Array.isArray(actionEntry))
+                ? { ...(actionEntry.config ?? {}) }
+                : {};
+
+            // Store the context for this action configuration to be used in future updates to the dialog content.
+            this.actionConfigContext = {
+                actionHandle,
+                uniqueHandle,
+                rowIndex: resolvedRowIndex,
+            };
+
+            // Generate the dialog content by calling the configured callback with the action handle, field labels, and current configuration values for this action instance.
+            const dialogContent = await this.actionConfigCallback(uniqueHandle, this.getFieldLabelsById(), currentConfig);
+
+            // Parse the returned dialog content
             const html = typeof dialogContent === 'string'
                 ? dialogContent
                 : (typeof dialogContent?.html === 'string' ? dialogContent.html : '');
 
+            // Bail if we don't have a valid HTML string to show in the dialog
             if (typeof html !== 'string' || html.trim() === '') {
                 return;
             }
 
+            // Initialise the repeater field for managing form actions
             const repeaterFieldStore = Alpine.store('repeaterField');
 
             if (typeof repeaterFieldStore?.openRepeaterDialogFromHtml !== 'function') {
                 return;
             }
 
-            repeaterFieldStore.openRepeaterDialogFromHtml(html, async ({ dialog, shell, body }) => {
-                console.log('dialog updated!', { dialog, shell, body });
+            // Callback after the dialog is submitted to update the action configuration values in the store and trigger the action updater callback.
+            this.actionConfigDialog = repeaterFieldStore.openRepeaterDialogFromHtml(html, async ({ dialog, shell, body }) => {
+                const nextActions = (this.actions && typeof this.actions === 'object' && !Array.isArray(this.actions))
+                    ? { ...this.actions }
+                    : {};
+
+                nextActions[uniqueHandle] = {
+                    label: resolvedActionLabel,
+                    config: this.getActionConfigurationDialogGroupFieldValues(dialog),
+                    action_id: resolvedActionId,
+                };
+
+                this.actions = nextActions;
+                this.actionsUpdater?.(nextActions);
+
                 return true;
-            });
+            }, 'form-action-configuration-dialog');
+
+            if (this.actionConfigDialog instanceof HTMLDialogElement) {
+                this.actionConfigDialog.addEventListener('close', () => {
+                    this.actionConfigDialog = null;
+                }, { once: true });
+            }
         },
+
+        // Retrieves the configuration dialog content for a given action handle, using the configured callback.
+        async getActionConfigurationDialog(params = null) {
+            return this.onActionRowConfigure(params);
+        },
+
+        // Refreshes the content of the currently open action configuration dialog, if it exists, by re-calling the configuration callback with the current context and updated field values from the dialog.
+        refreshActionConfigurationDialog() {
+            const formBuilderStore = Alpine.store('formBuilder');
+            const storeRef = formBuilderStore && typeof formBuilderStore === 'object'
+                ? formBuilderStore
+                : this;
+
+            if (typeof storeRef?.actionConfigCallback !== 'function') {
+                return;
+            }
+
+            const dialog = storeRef.actionConfigDialog instanceof HTMLDialogElement
+                ? storeRef.actionConfigDialog
+                : document.getElementById('form-action-configuration-dialog');
+            if (!dialog) {
+                return;
+            }
+
+            const context = storeRef.actionConfigContext;
+
+            if (!context?.actionHandle || !context?.uniqueHandle) {
+                return;
+            }
+
+            const body = dialog.querySelector('.meros-repeater-config-dialog__body');
+
+            if (!body) {
+                return;
+            }
+
+            const storedConfig = (storeRef.actions && typeof storeRef.actions === 'object' && !Array.isArray(storeRef.actions))
+                ? { ...(storeRef.actions[context.uniqueHandle]?.config ?? {}) }
+                : {};
+            const dialogConfig = storeRef.getActionConfigurationDialogGroupFieldValues(dialog);
+            const currentConfig = {
+                ...storedConfig,
+                ...dialogConfig,
+            };
+
+            Promise.resolve(storeRef.actionConfigCallback(context.uniqueHandle, storeRef.getFieldLabelsById(), currentConfig))
+                .then(dialogContent => {
+                    const html = typeof dialogContent === 'string'
+                        ? dialogContent
+                        : (typeof dialogContent?.html === 'string' ? dialogContent.html : '');
+
+                    if (typeof html !== 'string' || html.trim() === '') {
+                        return;
+                    }
+
+                    body.innerHTML = html;
+
+                    const firstField = body.querySelector('input, select, textarea, button');
+
+                    if (firstField instanceof HTMLElement) {
+                        firstField.focus();
+                    }
+                })
+                .catch(() => {
+                    // Ignore refresh failures and keep the current dialog content.
+                });
+        },
+
+        // Parses the field values from the action configuration dialog and returns them as an object.
+        getActionConfigurationDialogGroupFieldValues(dialog) {
+            if (!dialog) {
+                return {};
+            }
+
+            const fieldGroup = dialog.querySelector('.meros-form-group');
+            if (!fieldGroup) {
+                return {};
+            }
+
+            const fields = fieldGroup.querySelectorAll('.meros-field');
+            const values = {};
+
+            fields.forEach(field => {
+                if (field.closest('.meros-repeater-field')) {
+                    return;
+                }
+
+                const input = field.querySelector('[data-field-type]');
+                
+                if (!input) {
+                    return;
+                }
+
+                const name = input.classList.contains('meros-repeater-field') 
+                    ? input.getAttribute('id') 
+                    : input.getAttribute('name');
+
+                const fieldType = input.getAttribute('data-field-type');
+                
+                if (!name || !fieldType) {
+                    return;
+                }
+
+                if (this.isInputField(fieldType)) {
+                    values[name] = input.value;
+                }
+
+                if (fieldType === 'radio') {
+                    const checked = field.querySelector('input[type="radio"]:checked');
+                    if (checked) {
+                        values[name] = checked.value;
+                    }
+                }
+
+                if (fieldType === 'checkbox') {
+                    const checked = field.querySelector('input[type="checkbox"]:checked');
+                    if (checked) {
+                        values[name] = checked.value ? true : false;
+                    }
+                }
+
+                if (fieldType === 'checkboxes') {
+                    const checked = field.querySelectorAll('input[type="checkbox"]:checked');
+                    if (checked) {
+                        values[name] = Array.from(checked).map(c => c.value);
+                    }
+                }
+
+                if (fieldType === 'select') {
+                    const select = field.querySelector('select');
+                    if (select) {
+                        const selectedOption = select.options[select.selectedIndex];
+                        if (selectedOption) {
+                            values[name] = selectedOption.value;
+                        }
+                    }
+                }
+
+                if (fieldType === 'multi_select' || fieldType === 'advanced_select') {
+                    const select = field.querySelector('select');
+                    if (select && select.tomselect) {
+                        values[name] = select.tomselect.getValue();
+                    }
+                }
+
+                if (fieldType === 'repeater') {
+                    values[name] = Alpine.store('repeaterField').getRepeaterValue(name);
+                }
+            });
+
+            return values;
+        }
     };
 
     Alpine.store('formBuilder', store);

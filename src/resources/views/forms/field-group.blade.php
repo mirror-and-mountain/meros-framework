@@ -1,19 +1,19 @@
-<div class="meros-form-group" @if(!empty($group['id'])) id="{{ $group['id'] }}" @endif>
-    @if(!empty($group['title']) || !empty($group['description']))
+<div class="{{ $classList }}" id="{{ $groupID }}" data-group-handle="{{ $groupHandle }}">
+    @if(!empty($groupTitle) || !empty($groupDescription))
         <div class="meros-form-group-header">
-            @if(!empty($group['title']))
-                <h3>{{ $group['title'] }}</h3>
+            @if(!empty($groupTitle))
+                <h3>{{ $groupTitle }}</h3>
             @endif
 
-            @if(!empty($group['description']))
-                <p>{!! $this->renderQuillContent($group['description']) !!}</p>
+            @if(!empty($groupDescription))
+                <p>{{ $groupDescription }}</p>
             @endif
         </div>
     @endif
 
-    @foreach(($group['rows'] ?? []) as $groupRow)
+    @foreach(($groupRows) as $groupRow)
         <div class="meros-form-row">
-            @foreach($groupRow['fields'] ?? [] as $groupField)
+            @foreach($groupRow->getFields() ?? [] as $groupField)
                 <div class="meros-form-field">
                     @if(($groupField->handle ?? null) === 'repeater')
                         {!! $groupField->render(true, true) !!}

@@ -1,6 +1,6 @@
 <div 
     id="meros-form-builder-sidebar" 
-    class="relative shrink-0 bg-gray-100 p-4 overflow-y-auto border-r border-gray-300"
+    class="relative shrink-0 h-full bg-gray-100 p-4 pb-25 overflow-x-hidden overflow-y-auto overscroll-contain border-r border-gray-300"
     x-data="{ 
         openCategory: '{{ array_key_first($fieldCategories) }}',
         sidebarWidth: 320,
@@ -42,13 +42,13 @@
 
     @if(!$editingRepeater)
         <div class="mb-6 border-b border-gray-300 pb-4">
-            <h3 class="text-md font-semibold mb-2">Form Groups</h3>
+            <h3 class="text-md font-semibold mb-2">Field Groups</h3>
 
             <div
                 class="mb-2 p-2 bg-white rounded shadow cursor-grab active:cursor-grabbing flex items-center select-none"
                 draggable="true"
                 data-item-kind="group"
-                data-item-handle=""
+                data-item-handle="untitled_section"
                 data-item-label="Untitled Section"
                 @dragstart="$store.formBuilder.startDrag($el.dataset.itemKind, $el.dataset.itemHandle, $el.dataset.itemLabel); $event.dataTransfer.effectAllowed = 'copy'; $event.dataTransfer.setData('text/plain', 'group:blank')"
                 @dragend="$store.formBuilder.endDrag()"
@@ -59,18 +59,18 @@
                 </div>
             </div>
 
-            @foreach ($fieldGroups as $group)
+            @foreach ($fieldGroups as $handle => $label)
                 <div
                     class="mb-2 p-2 bg-white rounded shadow cursor-grab active:cursor-grabbing flex items-center select-none"
                     draggable="true"
                     data-item-kind="group"
-                    data-item-handle="{{ $group['handle'] }}"
-                    data-item-label="{{ $group['label'] }}"
-                    @dragstart="$store.formBuilder.startDrag($el.dataset.itemKind, $el.dataset.itemHandle, $el.dataset.itemLabel); $event.dataTransfer.effectAllowed = 'copy'; $event.dataTransfer.setData('text/plain', 'group:{{ $group['handle'] }}')"
+                    data-item-handle="{{ $handle }}"
+                    data-item-label="{{ $handle }}"
+                    @dragstart="$store.formBuilder.startDrag($el.dataset.itemKind, $el.dataset.itemHandle, $el.dataset.itemLabel); $event.dataTransfer.effectAllowed = 'copy'; $event.dataTransfer.setData('text/plain', 'group:{{ $handle }}')"
                     @dragend="$store.formBuilder.endDrag()"
                 >
                     <div class="flex justify-between items-center w-full">
-                        {{ $group['label'] }}
+                        {{ $label }}
                         <span class="drag-handle">⠿</span>
                     </div>
                 </div>

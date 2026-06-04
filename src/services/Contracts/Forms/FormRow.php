@@ -103,10 +103,6 @@ class FormRow extends FeatureDefinition {
         $field->position($position);
         $field->row($this);
 
-        if ($callback && $callback instanceof Closure) {
-            $callback($field);
-        }
-
         return $field;
     }
 
@@ -186,19 +182,19 @@ class FormRow extends FeatureDefinition {
      * @return Collection|array 
      */
     public function getFields(bool $asArray = false): Collection|array {
-        $fields = $asArray ? $this->fields : collect($this->fields);
+        $fields = collect($this->fields);
 
         if ($this->childGroup !== null) {
-            $childFields = $this->childGroup->getFields($asArray);
+            $childFields = $this->childGroup->getFields();
 
             if ($asArray) {
-                return array_merge($fields, $childFields);
+                return array_merge($fields->toArray(), $childFields->toArray());
             } else {
                 return $fields->merge($childFields);
             }
         }
 
-        return $fields;
+        return $asArray ? $fields->toArray() : $fields;
     }
 
     /**

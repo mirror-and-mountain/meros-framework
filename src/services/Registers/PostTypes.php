@@ -8,7 +8,7 @@ use MM\Meros\Services\Contracts\PostType;
 class PostTypes extends Register {
     protected string $identifier = 'handle';
     protected string $definition = PostType::class;
-    protected array  $rejects    = ['multiple'];
+    protected array  $rejects    = ['multiple', 'makeFrom', 'makeFromCallback'];
 
     /**
      * Parses properties for the post type's constructor.

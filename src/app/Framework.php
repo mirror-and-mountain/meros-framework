@@ -14,15 +14,20 @@ use MM\Meros\App\Fields\Checkbox;
 use MM\Meros\App\Fields\Checkboxes;
 use MM\Meros\App\Fields\Color;
 use MM\Meros\App\Fields\Date;
+use MM\Meros\App\Fields\Email;
+use MM\Meros\App\Fields\Hidden;
 use MM\Meros\App\Fields\MultiSelect;
 use MM\Meros\App\Fields\Number;
 use MM\Meros\App\Fields\Radio;
+use MM\Meros\App\Fields\Range;
 use MM\Meros\App\Fields\Repeater;
 use MM\Meros\App\Fields\RichText;
 use MM\Meros\App\Fields\Password;
+use MM\Meros\App\Fields\AdvancedSelect;
 use MM\Meros\App\Fields\Select;
 use MM\Meros\App\Fields\Text;
 use MM\Meros\App\Fields\Textarea;
+use MM\Meros\App\Fields\Tel;
 use MM\Meros\App\Fields\Time;
 use MM\Meros\App\Fields\Url;
 
@@ -41,12 +46,16 @@ use MM\Meros\App\Admin\Templates\TabbedSettingsPage;
 use MM\Meros\App\Admin\Templates\MerosFeaturesPage;
 
 use MM\Meros\App\Theme;
-use MM\Meros\App\Models\MerosForm;
+use MM\Meros\App\Models\Form;
+use MM\Meros\App\Models\EmailTemplate;
+use MM\Meros\App\Models\EmailTemplateMeta;
 
 use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Packages as PackagesAccessor;
 use MM\Meros\Facades\Blocks as BlocksAccessor;
 use MM\Meros\Facades\AssetGroups as AssetGroupsAccessor;
+
+use Illuminate\Support\Facades\Log;
 
 final class Framework extends FeatureProvider {
     /**
@@ -85,14 +94,19 @@ final class Framework extends FeatureProvider {
         $this->fields()->register('checkboxes', Checkboxes::class);
         $this->fields()->register('color', Color::class);
         $this->fields()->register('date', Date::class);
+        $this->fields()->register('email', Email::class);
+        $this->fields()->register('hidden', Hidden::class);
         $this->fields()->register('multi_select', MultiSelect::class);
         $this->fields()->register('number', Number::class);
         $this->fields()->register('radio', Radio::class);
+        $this->fields()->register('range', Range::class);
         $this->fields()->register('repeater', Repeater::class);
         $this->fields()->register('rich_text', RichText::class);
+        $this->fields()->register('advanced_select', AdvancedSelect::class);
         $this->fields()->register('select', Select::class);
         $this->fields()->register('text', Text::class);
         $this->fields()->register('textarea', Textarea::class);
+        $this->fields()->register('tel', Tel::class);
         $this->fields()->register('time', Time::class);
         $this->fields()->register('url', Url::class);
         $this->fields()->register('password', Password::class);
@@ -286,6 +300,20 @@ final class Framework extends FeatureProvider {
      * @return void
      */
     private function registerPostTypes(): void {
+        // Add wp core post types to the register
+        $this->postTypes()->make(function ($postType) {
+            $postType->name('post');
+            $postType->label('Post');
+            $postType->isCore();
+        }); // The 'post' post type
+
+        $this->postTypes()->make(function ($postType) {
+            $postType->name('page');
+            $postType->label('Page');
+            $postType->isCore();
+        }); // The 'page' post type
+
+        // Register framework post types
         $this->registerFormPostType();
         $this->registerFieldGroupPostType();
         $this->registerEmailTemplatePostType();
@@ -300,7 +328,7 @@ final class Framework extends FeatureProvider {
         // Register the Form post type.
         $this->postTypes()->make(function ($postType) {
             $postType->name('meros-form');
-            $postType->label('Forms');
+            $postType->label('Form');
             $postType->description('A custom post type for managing Forms.');
             $postType->supports(['title']);
             $postType->menuIcon('dashicons-feedback');
@@ -345,15 +373,9 @@ final class Framework extends FeatureProvider {
                     return $content;
                 }
 
-                $form = MerosForm::find($post->ID);
+                $form = Form::find($post->ID);
 
                 if (!$form) {
-                    return $content;
-                }
-
-                $schema = $form->schema(true);
-
-                if (!$schema) {
                     return $content;
                 }
 
@@ -373,7 +395,7 @@ final class Framework extends FeatureProvider {
         // Register the Field Group post type.
         $this->postTypes()->make(function ($postType) {
             $postType->name('meros-field-group');
-            $postType->label('Field Groups');
+            $postType->label('Field Group');
             $postType->description('A custom post type for managing Field Groups.');
             $postType->supports(['title']);
             $postType->menuIcon('dashicons-feedback');
@@ -384,6 +406,13 @@ final class Framework extends FeatureProvider {
                 $meta->string('schema')
                     ->label('Field Group Structure')
                     ->description('The structure of the field group, stored as a JSON string.');
+            });
+
+            $postType->meta()->add(function ($meta) {
+                $meta->string('render_template')
+                    ->label('Render Template')
+                    ->description('The Blade template used to render this field group when included in forms and settings pages.')
+                    ->field();
             });
         });
     }
@@ -475,7 +504,7 @@ final class Framework extends FeatureProvider {
         // Register the email template post type.
         $this->postTypes()->make(function ($postType) {
             $postType->name('meros-email-template');
-            $postType->label('Email Templates');
+            $postType->label('Email Template');
             $postType->description('A custom post type for managing Email Templates.');
             $postType->menuIcon('dashicons-email');
             $postType->public();
@@ -611,35 +640,26 @@ final class Framework extends FeatureProvider {
                 return;
             }
 
-            $post = get_post($postId);
+            $template = EmailTemplate::find($postId);
 
-            if (!$post) {
+            if (!$template) {
                 return;
             }
 
             // Get post content and extract merge tags
-            $content = $post->post_content;
+            $content = $template->post_content;
 
             // Merge tags are in the format {{merge_tag}}.
             preg_match_all('/{{(.*?)}}/', $content, $matches);
 
             $mergeTags = array_values(array_unique($matches[1] ?? []));
 
-            // Save into the post type's meta container
-            $metaKey  = '_meros_email_template_meta';
-            $existing = get_post_meta($postId, $metaKey, true);
-
-            if (is_string($existing) && $existing !== '') {
-                $decoded = json_decode($existing, true);
-                $meta    = is_array($decoded) ? $decoded : [];
-            } else {
-                $meta = is_array($existing) ? $existing : [];
+            if ($mergeTags !== []) {
+                $template->meta()->updateOrCreate(
+                    ['meta_key' => '_meros_email_template_meta'],
+                    ['meta_value' => json_encode(['merge_tags' => $mergeTags])]
+                );
             }
-
-            // merge_tags is registered as a string subfield in the default meta object.
-            $meta['merge_tags'] = json_encode($mergeTags);
-
-            update_post_meta($postId, $metaKey, $meta);
         }, 100);
     }
 

@@ -2,7 +2,10 @@
 
 namespace MM\Meros\App\Models;
 
-class MerosEmailTemplate extends Post {
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
+class EmailTemplate extends Post {
     /**
      * Scope the query to only include posts of the 'meros-email-template' post type.
      *
@@ -12,34 +15,27 @@ class MerosEmailTemplate extends Post {
         return parent::newQuery()->where('post_type', 'meros-email-template');
     }
 
-    /**
-     * Gets the template's merge tags, either as a JSON string or as an associative array.
-     *
-     * @param boolean $asArray
-     *
-     * @return string|array
-     */
-    public function mergeTags(bool $asArray = true): string|array {
-        $meta = null;
-        $tags = null;
+    public function emailTemplateMeta(): HasOne {
+        return $this->hasOne(EmailTemplateMeta::class, 'post_id');
+    }
 
-        try {
-            $meta = $this->meta->where('meta_key', '_meros_email_template_meta')->first();
-        } catch (\Exception $e) {
-            return $asArray ? [] : json_encode([]);
-        }
+    protected function mergeTags(): Attribute {
+        return Attribute::make(
+            get: function (): array {
+                $mergeTags = $this->emailTemplateMeta?->meta_value['merge_tags'] ?? [];
 
-        if ($meta !== null) {
-            $decoded = maybe_unserialize($meta->meta_value);
-            $tags = $decoded['merge_tags'] ?? [];
-            return $asArray ? json_decode($tags, true) : $tags;
-        }
+                if (is_array($mergeTags)) {
+                    return $mergeTags;
+                }
 
-        if ($tags) {
-            return $asArray ?  $tags : json_encode($tags);
-        }
-        
-        return $asArray ? [] : json_encode([]);
+                if (is_string($mergeTags) && $mergeTags !== '') {
+                    $decoded = json_decode($mergeTags, true);
+                    return is_array($decoded) ? $decoded : [];
+                }
+
+                return [];
+            },
+        );
     }
 
     /**
@@ -66,7 +62,7 @@ class MerosEmailTemplate extends Post {
         }
 
         // Get the template content and merge tags
-        $tags = $this->mergeTags();
+        $tags = $this->merge_tags;
         $content = $this->post_content;
 
         // Parse tags

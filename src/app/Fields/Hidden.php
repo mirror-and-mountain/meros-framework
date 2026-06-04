@@ -2,47 +2,38 @@
 
 namespace MM\Meros\App\Fields;
 
-class Password extends Input {
+class Hidden extends Input {
     /**
      * The unique identifier for the field, used for resolution.
      *
      * @var string
      */
-    public string $handle = 'password';
-
-    /**
-     * The category for the field, used for grouping in the UI.
-     *
-     * @var string
-     */
-    public static string $category = 'specialised';
+    public string $handle = 'hidden';
 
     /**
      * The icon for the field, used in the form builder UI.
      *
      * @var string
      */
-    public static string $icon = 'lock';
+    public static string $icon = 'bars';
 
     /**
-     * Default attributes for the password field.
+     * Default attributes for the hidden field.
      *
      * @var array
      */
     protected array $attributes = [
-        'type' => 'password',
+        'type' => 'hidden',
     ];
 
     /**
-     * Supported features for the password field.
+     * Supported attributes for the hidden field.
      *
      * @var array
      */
-    protected array $supports = [
-        'placeholder',
-        'icon'
-    ];
+    protected array $supports = [];
 
+    
     /**
      * An array of data types that this field is compatible with.
      *

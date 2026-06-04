@@ -17,6 +17,9 @@ use MM\Meros\Services\Contracts\Forms\FormRow;
 use MM\Meros\App\Fields\Repeater;
 use MM\Meros\Facades\FormRows as FormRowsRegister;
 
+use MM\Meros\Facades\PostTypes;
+use MM\Meros\Facades\Context;
+
 class FieldGroup extends FeatureDefinition {
     /**
      * A unique handle for the field group, used for identification and referencing.
@@ -97,13 +100,24 @@ class FieldGroup extends FeatureDefinition {
     }
 
     /**
-     * Sets the ID of the field group.
+     * Alias for handle() method to set the handle of the field group.
      *
-     * @param int $id
+     * @param string $name
      *
      * @return self
      */
-    public function id(int $id): self {
+    public function name (string $name): self {
+        return $this->handle($name);
+    }
+
+    /**
+     * Sets the ID of the field group.
+     *
+     * @param int|string $id
+     *
+     * @return self
+     */
+    public function id(int|string $id): self {
         $this->id = $id;
         return $this;
     }
@@ -151,6 +165,20 @@ class FieldGroup extends FeatureDefinition {
         return $this;
     }
 
+    public function attach(string|array $postTypes): self {
+        $postTypes = (array)$postTypes;
+
+        foreach ($postTypes as $postType) {
+            $postTypeInstance = PostTypes::get($postType);
+
+            if ($postTypeInstance) {
+                $postTypeInstance->fields($this);
+            }
+        }
+
+        return $this;
+    }
+
     /**
      * Attaches a field to the field group by creating a new form row for it. 
      * If the field group is associated with a parent meta object, the field 
@@ -162,7 +190,7 @@ class FieldGroup extends FeatureDefinition {
      *
      * @return Field
      */
-    public function field(Field|string $field, Closure|array|null $callback = null, array $props = []): Field {
+    public function field(Field|string $field, Closure|array|null $callback = null, array $props = []): Field {    
         $newRow = null;
         $params = func_num_args();
 
@@ -208,12 +236,13 @@ class FieldGroup extends FeatureDefinition {
      *
      * @return Field
      */
-    protected function addMetaField(Field $field): Field {
+    public function addMetaField(Field $field, bool $addAsNew = true): Field {
         if ($this->parentMetaObject === null) {
              return $field;
         }
 
-        $subItem = collect($this->parentMetaObject->getSubItems())->where('name', $field->getName())->first();
+        $subItem = collect($this->parentMetaObject->getSubItems())
+            ->where('name', $field->getName(false))->first();
             
         if ($subItem === null) {
             $dataType = $field->getDataType();
@@ -247,7 +276,10 @@ class FieldGroup extends FeatureDefinition {
                 }
             }
 
-            $newItem->field($field);
+            if ($addAsNew) {
+                $newItem->field($field);
+            }
+            
             $newItem->label($field->getLabel());
             $newItem->description($field->getHelpText());
 
@@ -315,10 +347,10 @@ class FieldGroup extends FeatureDefinition {
     * @return Collection|array
     */
     public function getFields($asArray = false): Collection|array {
-        $fields = collect();
+        $fields = collect([]);
 
-        $this->walkRows(function(FormRow $row) use ($fields, $asArray) {
-            $fields = $fields->merge($row->getFields($asArray));
+        $this->walkRows(function(FormRow $row) use (&$fields) {
+            $fields = $fields->merge($row->getFields());
         });
 
         return $asArray ? $fields->toArray() : $fields;
@@ -334,6 +366,42 @@ class FieldGroup extends FeatureDefinition {
      */
     public function getRows(bool $asArray = false): Collection|array {
         return $asArray ? $this->rows : collect($this->rows);
+    }
+
+    /**
+     * Retrieves the handle of the field group.
+     *
+     * @return string
+     */
+    public function getHandle(): string {
+        return $this->handle;
+    }
+
+    /**
+     * Retrieves the ID of the field group.
+     *
+     * @return int|string
+     */
+    public function getId(): int|string {
+        return $this->id;
+    }
+
+    /**
+     * Retrieves the title of the field group.
+     *
+     * @return string
+     */
+    public function getTitle(): string {
+        return $this->title;
+    }
+
+    /**
+     * Retrieves the description of the field group.
+     *
+     * @return string
+     */
+    public function getDescription(): string {
+        return $this->description;
     }
 
     /***************************
@@ -356,9 +424,30 @@ class FieldGroup extends FeatureDefinition {
      * @return void
      */
     public function render(): void {
-        echo view('meros::fields.field-group', [
-            'title'       => $this->title,
-            'description' => $this->description,
+        $classList = 'meros-form-group';
+
+        if (Context::isAdmin()) {
+            $classList .= ' meros-form-group--admin';
+        }
+
+        echo view('meros::forms.field-group', [
+            'groupID'          => $this->id,
+            'groupHandle'      => $this->handle,
+            'groupTitle'       => Context::isEditingPost() ? '': $this->title,
+            'groupDescription' => $this->description,
+            'groupRows'        => $this->rows,
+            'classList'        => $classList,
         ]);
+    }
+
+    /**
+     * Renders the field group and its fields, and returns the HTML as a string.
+     *
+     * @return string
+     */
+    public function html(): string {
+        ob_start();
+        $this->render();
+        return ob_get_clean();
     }
 }

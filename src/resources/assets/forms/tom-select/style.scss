@@ -1,1 +1,121 @@
 @use 'tom-select/dist/css/tom-select.css';
+
+.nice-form-group .ts-wrapper {
+    width: 100%;
+}
+
+.nice-form-group .ts-wrapper .ts-control {
+    background: var(--nf-input-background-color) !important;
+    font-size: var(--nf-input-font-size) !important;
+    font-family: var(--nf-input-font-family) !important;
+    box-shadow: none !important;
+    border-radius: var(--nf-input-border-radius) !important;
+    border: var(--nf-input-border-width) var(--nf-input-border-style) var(--nf-input-border-color) !important;
+    border-bottom: var(--nf-input-border-bottom-width) var(--nf-input-border-style) var(--nf-input-border-color) !important;
+    color: var(--nf-input-color) !important;
+    padding: calc(var(--nf-input-size) * 0.5) calc(var(--nf-input-size) * 0.75) !important;
+    min-height: calc(var(--nf-input-size) * 2.75) !important;
+    line-height: 1.35;
+    transition: all 0.15s ease-out !important;
+    gap: calc(var(--nf-input-size) * 0.25);
+}
+
+.nice-form-group .ts-wrapper.focus .ts-control,
+.nice-form-group .ts-wrapper.focus .ts-control:focus-within {
+    border-color: var(--nf-input-focus-border-color) !important;
+    border-bottom-color: var(--nf-input-focus-border-color) !important;
+    box-shadow: 0 0 0 1px var(--nf-input-focus-border-color) !important;
+    outline: none !important;
+}
+
+.nice-form-group .ts-wrapper .ts-control > input {
+    font-size: var(--nf-input-font-size) !important;
+    font-family: var(--nf-input-font-family) !important;
+    color: var(--nf-input-color) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1.35 !important;
+}
+
+.nice-form-group .ts-wrapper .ts-control > input::placeholder {
+    color: var(--nf-input-placeholder-color) !important;
+    opacity: 1;
+}
+
+.nice-form-group .ts-wrapper.single .ts-control > .item {
+    color: var(--nf-input-color);
+    line-height: 1.35;
+    margin: 0;
+    padding: 0;
+}
+
+.nice-form-group .ts-wrapper.single .ts-control {
+    align-items: center;
+}
+
+.nice-form-group .ts-wrapper.multi .ts-control {
+    align-items: center;
+    padding-top: calc(var(--nf-input-size) * 0.5) !important;
+    padding-bottom: calc(var(--nf-input-size) * 0.5) !important;
+}
+
+.nice-form-group .ts-wrapper.multi .ts-control > .item {
+    background: color-mix(in srgb, var(--nf-input-focus-border-color) 10%, white 90%);
+    border: 1px solid color-mix(in srgb, var(--nf-input-focus-border-color) 20%, white 80%);
+    border-radius: calc(var(--nf-input-border-radius) * 0.9);
+    color: var(--nf-input-color);
+    font-size: calc(var(--nf-input-font-size) * 0.95);
+    line-height: 1.2;
+    padding: 0.2rem 0.45rem;
+    margin: 0;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+}
+
+.nice-form-group .ts-wrapper.multi .ts-control > input {
+    align-self: center;
+}
+
+.nice-form-group .ts-wrapper.plugin-remove_button .item .remove {
+    border-left: 1px solid color-mix(in srgb, var(--nf-input-border-color) 65%, white 35%);
+    color: var(--nf-input-color);
+    opacity: 0.8;
+}
+
+.nice-form-group .ts-wrapper.plugin-remove_button .item .remove:hover {
+    background: color-mix(in srgb, var(--nf-input-focus-border-color) 12%, white 88%);
+    color: var(--nf-input-color);
+    opacity: 1;
+}
+
+.nice-form-group .ts-wrapper.disabled .ts-control,
+.nice-form-group .ts-wrapper.disabled .ts-control * {
+    cursor: not-allowed;
+}
+
+.nice-form-group .ts-dropdown {
+    margin-top: calc(var(--nf-input-size) * 0.25);
+    border-radius: var(--nf-input-border-radius);
+    border: var(--nf-input-border-width) var(--nf-input-border-style) var(--nf-input-border-color);
+    background: var(--nf-input-background-color);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+    color: var(--nf-input-color);
+    overflow: hidden;
+}
+
+.nice-form-group .ts-dropdown .option,
+.nice-form-group .ts-dropdown .create {
+    font-size: var(--nf-input-font-size);
+    font-family: var(--nf-input-font-family);
+    color: var(--nf-input-color);
+    padding: calc(var(--nf-input-size) * 0.6) calc(var(--nf-input-size) * 0.75);
+}
+
+.nice-form-group .ts-dropdown .option:hover,
+.nice-form-group .ts-dropdown .option.active,
+.nice-form-group .ts-dropdown .create:hover,
+.nice-form-group .ts-dropdown .active.create {
+    background: color-mix(in srgb, var(--nf-input-focus-border-color) 10%, white 90%);
+    color: var(--nf-input-color);
+}

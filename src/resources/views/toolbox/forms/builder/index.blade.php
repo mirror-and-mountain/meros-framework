@@ -51,7 +51,7 @@
             $store.formBuilder.setSettingsUpdater((key, value) => $wire.updateSettings(key, value));
             $store.formBuilder.setRowsUpdater((rows) => $wire.updateRows(rows));
             $store.formBuilder.setActionsUpdater((actions) => $wire.updateActions(actions));
-            $store.formBuilder.setActionConfigCallback((actionHandle, fields) => $wire.getActionConfigurationDialog(actionHandle, fields));
+            $store.formBuilder.setActionConfigCallback((actionHandle, fields, config) => $wire.getActionConfigurationDialog(actionHandle, fields, config));
 
             getSettings().then(settings => {
                 $store.formBuilder.formTitle = settings.title;
@@ -69,7 +69,7 @@
             });
 
             getActionPayloads().then(payloads => {
-                $store.formBuilder.setActionPayloads(payloads);
+                $store.formBuilder.setActions(payloads);
             });
 
             getRichTextPayloads().then(payloads => {

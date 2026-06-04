@@ -67,12 +67,13 @@
     </div>
 
     {{-- Field Default Value - Rich Text --}}
-    <div class="nice-form-group meros-rich-textarea-wrapper" wire:ignore>
-        <label for="field-default-value-rich-text" class="form-label">Default value</label>
+    <div x-show="open && activeField.handle === 'rich_text'" class="nice-form-group meros-rich-textarea-wrapper" wire:ignore>
+        <label id="field-default-value-rich-text" class="form-label">Default value</label>
         <small class="whitespace-normal">The field's default value</small>
         <div
             id="field-default-value-rich-text"
             class="meros-rich-textarea meros-rich-text-default-value"
+            aria-labelledby="field-default-value-rich-text"
             :data-rt-id="activeField?.id"
         ></div>
     </div>
@@ -81,7 +82,7 @@
 
     <div x-show="open && $store.formBuilder.isSingleChoiceField(activeField.handle)" class="nice-form-group">
         <label for="field-default-value-select" class="form-label">Default value</label>
-        <small class="whitespace-normal">The field's default value (must match one of the option values)</small>
+        <small class="whitespace-normal">The field's default value</small>
         <select
             id="field-default-value-select"
             :value="activeField?.default ?? ''"
@@ -94,16 +95,34 @@
         </select>
     </div>
 
-    {{-- Field Default Value - Multiple Choice --}}
+    {{-- Field Default Value - Multiple Choice  --}}
 
     <div x-show="open && $store.formBuilder.isMultipleChoiceField(activeField.handle)" class="nice-form-group" wire:ignore>
         <label for="field-default-value-multiple" class="form-label">Default value</label>
-        <small class="whitespace-normal">The field's default value (must match one of the option values)</small>
+        <small class="whitespace-normal">The field's default value</small>
         <select
             id="field-default-value-multiple"
             class="meros-select-field meros-multi-select-default-value"
             @change="updateSetting('default', $event.target.value)"
             multiple
+            data-advanced="true"
+            :data-field-id="activeField?.id"
+        >
+            <template x-for="[value, label] in getOptionEntries(activeField?.options)" :key="value">
+                <option :value="value" x-text="label"></option>
+            </template>
+        </select>
+    </div>
+
+    {{-- Field Default Value - Advanced Select  --}}
+
+    <div x-show="open && activeFieldType === 'advanced_select'" class="nice-form-group" wire:ignore>
+        <label for="field-default-value-advanced" class="form-label">Default value</label>
+        <small class="whitespace-normal">The field's default value</small>
+        <select
+            id="field-default-value-advanced"
+            class="meros-select-field meros-advanced-select-default-value"
+            @change="updateSetting('default', $event.target.value)"
             data-advanced="true"
             :data-field-id="activeField?.id"
         >
@@ -127,6 +146,19 @@
         ></textarea>
     </div>
 
+    {{-- Allow add toggle for tomselect fields --}}
+    <div x-show="open && activeField?.advanced" class="nice-form-group">
+        <label for="field-advanced-allow-add" class="form-label">Allow Custom Values</label>
+        <small class="whitespace-normal">Whether to allow users to add custom values to the field</small>
+        <input
+            id="field-advanced-allow-add"
+            class="switch"
+            type="checkbox"
+            :checked="activeField?.allowAdd ?? false"
+            @change="updateSetting('allowAdd', $event.target.checked)"
+        />
+    </div>
+
     {{-- Help Text --}}
 
     <div x-show="open" class="nice-form-group">
@@ -144,10 +176,36 @@
         <small class="whitespace-normal">Whether to show the help text below the field</small>
         <input
             id="field-help-text-position"
+            class="switch"
             type="checkbox"
             :checked="activeField?.helpTextPosition === 'bottom' ?? false"
             @change="updateSetting('helpTextPosition', $event.target.checked ? 'bottom' : 'top')"
         />
     </div>
-    
+
+    {{-- States --}}
+    <div x-show="open" class="nice-form-group">
+        <label for="field-required" class="form-label">Required</label>
+        <small class="whitespace-normal">Whether the field is required by default</small>
+        <input
+            id="field-required"
+            class="switch"
+            type="checkbox"
+            :checked="activeField?.required ?? false"
+            @change="updateDependentControls('required', $event.target.checked)"
+        />
+    </div>
+
+    {{-- States --}}
+    <div x-show="open" class="nice-form-group">
+        <label for="field-disabled" class="form-label">Disabled</label>
+        <small class="whitespace-normal">Whether the field is disabled by default</small>
+        <input
+            id="field-disabled"
+            class="switch"
+            type="checkbox"
+            :checked="activeField?.disabled ?? false"
+            @change="updateDependentControls('disabled', $event.target.checked)"
+        />
+    </div>
 </div>

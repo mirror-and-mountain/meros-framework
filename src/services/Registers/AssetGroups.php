@@ -8,6 +8,7 @@ use MM\Meros\Services\Contracts\AssetGroup;
 class AssetGroups extends Register {
     protected string $identifier = 'name';
     protected string $definition = AssetGroup::class;
+    protected array  $rejects    = ['makeFromCallback'];
 
     /**
      * Parses properties for the asset group's constructor.

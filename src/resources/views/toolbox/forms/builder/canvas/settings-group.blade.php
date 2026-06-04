@@ -17,11 +17,12 @@
     {{-- Group Description --}}
 
     <div class="nice-form-group meros-rich-textarea-wrapper" wire:ignore>
-        <label for="group-description" class="form-label">Description</label>
+        <label id="group-description" class="form-label">Description</label>
         <small class="whitespace-normal">The group's description</small>
         <div
             id="group-description-editor"
             class="meros-rich-textarea meros-form-group-description"
+            aria-labelledby="group-description"
         ></div>
     </div>
 </div>

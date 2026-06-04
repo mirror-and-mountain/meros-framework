@@ -1,18 +1,25 @@
 @php
-    $id = $field->getID();
-    $fieldType = $field->getType();
-    $value = $field->getValue();
-    $rawRepeaterValue = is_array($value) ? $value : [];
-    $templateRow = $field->buildTemplateRow();
-    $showsMoveColumn = $field->allowsReorder();
+    $id                 = $field->getID();
+    $value              = $field->getValue();
+    $rawRepeaterValue   = is_array($value) ? $value : [];
+    $templateRow        = $field->buildTemplateRow();
+    $showsMoveColumn    = $field->allowsReorder();
     $showsActionsColumn = $field->allowsConfigure() || $field->allowsRemove();
     $columnCount = count($field->getFieldNames())
         + ($showsMoveColumn ? 1 : 0)
         + ($showsActionsColumn ? 1 : 0);
-    $configurationCallback = $field->getConfigurationCallback();
-    $templateFieldIdSuffix = '--template';
+
+    $onConfigure              = $field->getOnConfigureRowCallback();
+    $configureRequiredFields  = $field->getConfigureRequiredFields();
+    $onAddCallback    = $field->getOnAddRowCallback();
+    $onRemoveCallback = $field->getOnRemoveRowCallback();
+    $onMoveCallback   = $field->getOnMoveRowCallback();
+
+    $addRowText       = $field->getAddRowText();
+    $removeRowText    = $field->getRemoveRowText();
+    $configureRowText = $field->getConfigureRowText();
 @endphp
-<div id="{{ $id }}" class="{{ $field->classList() }} meros-repeater" data-field-type="{{ $fieldType }}">
+<div id="{{ $id }}" class="{{ $field->classList() }} meros-repeater" data-field-type="repeater">
     <div
         class="meros-repeater-scroll"
         x-data="{ isDraggingRow: false, draggingRowIndex: null }"
@@ -74,6 +81,9 @@
                                     title="Drag to reorder row"
                                     @dragstart="const rowIndex = Number($el.closest('tr')?.dataset.repeaterRowIndex ?? {{ $rowIndex }}); isDraggingRow = true; draggingRowIndex = rowIndex; $store.repeaterField.startRowDrag($event, rowIndex)"
                                     @dragend="isDraggingRow = false; draggingRowIndex = null"
+                                    @if(!empty($onMoveCallback))
+                                        data-move-row-callback="{{ $onMoveCallback }}"
+                                    @endif
                                 >
                                     ☰
                                 </button>
@@ -107,12 +117,15 @@
                                 @if($field->allowsConfigure())
                                     <button
                                         type="button"
-                                        @click.stop="$store.repeaterField.configureRow($el, @js($configurationCallback))"
-                                        data-configure-callback="{{ $configurationCallback }}"
+                                        @click.stop="$store.repeaterField.configureRow($el, @js($onConfigure))"
+                                        data-configure-row-callback="{{ $onConfigure }}"
+                                        @if(!empty($configureRequiredFields))
+                                            data-configure-required-fields="{{ json_encode($configureRequiredFields) }}"
+                                        @endif
                                         class="meros-repeater-button meros-repeater-button--neutral meros-repeater-button--configure"
-                                        title="Configure row"
+                                        title="{{ $configureRowText }}"
                                     >
-                                        Configure
+                                        {{ $configureRowText }}
                                     </button>
                                 @endif
                                 @if($field->allowsRemove())
@@ -120,9 +133,12 @@
                                         type="button"
                                         @click.stop="$store.repeaterField.removeRow($el)"
                                         class="meros-repeater-button meros-repeater-button--danger"
-                                        title="Remove row"
+                                        title="{{ $removeRowText }}"
+                                        @if(!empty($onRemoveCallback))
+                                            data-remove-row-callback="{{ $onRemoveCallback }}"
+                                        @endif
                                     >
-                                        Remove
+                                        {{ $removeRowText }}
                                     </button>
                                 @endif
                             </td>
@@ -163,6 +179,9 @@
                                 draggable="true"
                                 class="meros-repeater-move-button"
                                 title="Drag to reorder row"
+                                @if(!empty($onMoveCallback))
+                                    data-move-row-callback="{{ $onMoveCallback }}"
+                                @endif
                             >
                                 ☰
                             </button>
@@ -187,9 +206,6 @@
                                         $subField->attribute('data-default-value', $default);
                                     }
 
-                                    // Keep template field ids unique in the live DOM.
-                                    $subField->id($subField->getID() . $templateFieldIdSuffix);
-                                    $subField->attribute('disabled', true);
                                 @endphp
                                 {!! $subField->render(false, false) !!}
                             @endif
@@ -200,21 +216,27 @@
                             @if($field->allowsConfigure())
                                 <button
                                     type="button"
-                                    @click.stop="$store.repeaterField.configureRow($el, @js($configurationCallback))"
-                                    data-configure-callback="{{ $configurationCallback }}"
+                                    @click.stop="$store.repeaterField.configureRow($el, @js($onConfigure))"
+                                    data-configure-row-callback="{{ $onConfigure }}"
+                                    @if(!empty($configureRequiredFields))
+                                        data-configure-required-fields="{{ json_encode($configureRequiredFields) }}"
+                                    @endif
                                     class="meros-repeater-button meros-repeater-button--neutral meros-repeater-button--configure"
-                                    title="Configure row"
+                                    title="{{ $configureRowText }}"
                                 >
-                                    Configure
+                                    {{ $configureRowText }}
                                 </button>
                             @endif
                             @if($field->allowsRemove())
                                 <button
                                     type="button"
                                     class="meros-repeater-button meros-repeater-button--danger"
-                                    title="Remove row"
+                                    title="{{ $removeRowText }}"
+                                    @if(!empty($onRemoveCallback))
+                                        data-remove-row-callback="{{ $onRemoveCallback }}"
+                                    @endif
                                 >
-                                    Remove
+                                    {{ $removeRowText }}
                                 </button>
                             @endif
                         </td>
@@ -230,9 +252,12 @@
                 type="button"
                 @click.stop="$store.repeaterField.addRow($el)"
                 class="meros-repeater-button meros-repeater-button--neutral"
-                title="Add new row"
+                title="{{ $addRowText }}"
+                @if(!empty($onAddCallback))
+                    data-add-row-callback="{{ $onAddCallback }}"
+                @endif
             >
-                Add Row
+                {{ $addRowText }}
             </button>
         @endif
     </div>

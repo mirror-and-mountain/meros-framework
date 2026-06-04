@@ -158,14 +158,56 @@ final class Context {
             return false;
         }
 
-        if (!isset($this->params['post'])) {
+        if ($this->adminScreen === 'post-new.php') {
+            return ($this->params['post_type'] ?? '') === $postType;
+        }
+
+        if ($this->adminScreen === 'post.php') {
+            $postId = $this->params['post'] ?? null;
+
+            if (!$postId) {
+                return false;
+            }
+
+            $post = get_post($postId);
+
+            if (!$post) {
+                return false;
+            }
+
+            return $post->post_type === $postType;
+        }
+
+        return false;
+    }
+
+    /**
+     * Returns whether the user is currently editing any post in WP Admin.
+     *
+     * @return bool True if the user is editing a post, false otherwise.
+     */
+    public function isEditingPost(): bool {
+        if (!$this->isAdmin) {
             return false;
         }
 
-        $postId = $this->params['post'];
-        $post = get_post($postId);
+        if ($this->adminScreen === 'post-new.php') {
+            return true;
+        }
 
-        return $post && $post->post_type === $postType;
+        if ($this->adminScreen === 'post.php') {
+            $postId = $this->params['post'] ?? null;
+
+            if (!$postId) {
+                return false;
+            }
+
+            $post = get_post($postId);
+
+            return $post !== null;
+        }
+
+        return false;
     }
 
      /**

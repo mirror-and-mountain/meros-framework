@@ -7,7 +7,6 @@ use MM\Meros\Services\Contracts\Forms\Field;
 
 use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Fields;
-use MM\Meros\Facades\FieldGroups;
 
 class Hydrator {
     /**
@@ -17,11 +16,16 @@ class Hydrator {
      */
     private array $fieldTypes = [];
 
+    /**
+     * The Builder instance used to register hydrated Field instances with.
+     *
+     * @var Builder|null
+     */
     private ?Builder $builder = null;
 
     private function __construct(array $fieldTypes, ?Builder $builder = null) {
-        $this->fieldTypes = $fieldTypes;
-        $this->builder    = $builder;
+        $this->fieldTypes  = $fieldTypes;
+        $this->builder     = $builder;
     }
 
     public static function make(array $fieldTypes, ?Builder $builder = null): self {
@@ -44,7 +48,7 @@ class Hydrator {
             if (Utilities::isGroupRow($rowPayload)) {
                 $rowPayloads[$index] = [
                     'type' => 'group',
-                    'group' => $this->hydrateGroupPayload($rowPayload['group'])
+                    'group' => $this->hydrateGroupPayload($rowPayload['group'] ?? [])
                 ];
                 continue;
             }
@@ -63,9 +67,9 @@ class Hydrator {
      *
      * @param array $groupPayload
      *
-     * @return array
+     * @return array|null
      */
-    private function hydrateGroupPayload(array $groupPayload): array {
+    public function hydrateGroupPayload(array $groupPayload): array|null {
         $groupRows = [];
 
         foreach ($groupPayload['rows'] ?? [] as $index => $groupRow) {
@@ -164,7 +168,7 @@ class Hydrator {
         }
 
         $fieldInstance = Fields::checkout(Framework::get())
-            ->makeFrom($fieldType, $properties);
+            ->makeFrom($handle, $properties);
 
         return $fieldInstance;
     }

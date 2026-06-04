@@ -5,6 +5,7 @@
     $isSubField = $field->isSubField();
     $fieldValue = $field->getValue();
     $layout     = $field->getLayout();
+    $isRequired = $field->isRequired();
     $helpText   = $showHelp ? $field->getHelpText() : '';
     $helpTextPosition = $showHelp ? $field->getHelpTextPosition() : null;
     $fieldSetClass    = $isSubField ? 'nice-form-group !-mt-2.5' : 'nice-form-group';
@@ -12,7 +13,14 @@
 
 <fieldset id="{{ $id }}" class="{{ $fieldSetClass }}" data-field-type="{{ $fieldType }}" x-data="{ layout: '{{ $layout }}' }">
     @if(!$isSubField)
-        <legend>{{ $field->getLabel() }}</legend>
+        <legend 
+            class="form-label"
+        >
+            {{ $field->getLabel() }}
+            @if($isRequired)
+                <span class="required-indicator">*</span>
+            @endif
+        </legend>
     
         @if($showHelp)
             <small class="description">{{ $helpText }}</small>
@@ -32,7 +40,7 @@
             @endphp
             <input 
                 id="{{ $id }}_{{ $value }}" 
-                {!! $field->attributes(['id', 'name', 'data-field-type']) !!} 
+                {!! $field->attributes(['id', 'name', 'data-field-type', 'required', 'aria-required']) !!} 
                 name="{{ $field->getName(!$isSubField) . ($field->allowsMultiple() ? '[]' : '') }}"
                 data-option-value="{{ $value }}"
                 @checked($checked) 

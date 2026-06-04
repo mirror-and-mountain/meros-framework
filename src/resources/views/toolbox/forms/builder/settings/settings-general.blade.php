@@ -1,8 +1,10 @@
 <div 
     x-show="settingsPage === 'general'" 
-    class="flex flex-col gap-4 p-4 overflow-y-auto min-w-0" 
+    class="h-full gap-4 p-4 overflow-y-auto overscroll-contain w-1/3 min-w-0" 
     wire:key="form-builder-settings-general"
 >
+    <h2 class="text-lg font-bold">General Settings</h2>
+    
     {{-- Form Title --}}
     <div class="nice-form-group">
         <label for="form-title">Form Title</label>
@@ -31,11 +33,11 @@
 
     {{-- Form Description --}}
     <div class="nice-form-group meros-rich-textarea-wrapper" wire:ignore>
-        <label for="form-description" class="form-label">Form Description</label>
+        <label id="form-description" class="form-label">Form Description</label>
         <small class="whitespace-normal">The form's description</small>
         <div
-            id="form-description-editor"
             class="meros-rich-textarea meros-form-description"
+            aria-labelledby="form-description"
         ></div>
     </div>
 
@@ -55,5 +57,5 @@
         </select>
     </div>
 
-    @include('meros::toolbox.forms.builder.canvas.header', ['sectionTitle' => '', 'showHeader' => false])
+    @include('meros::toolbox.forms.builder.canvas.action-button', ['reverse' => true])
 </div>

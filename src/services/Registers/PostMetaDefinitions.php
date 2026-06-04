@@ -8,7 +8,7 @@ use MM\Meros\Services\Contracts\PostMeta;
 class PostMetaDefinitions extends Register {
     protected string $identifier = 'name';
     protected string $definition = PostMeta::class;
-    protected array  $rejects    = ['multiple'];
+    protected array  $rejects    = ['multiple', 'makeFrom', 'makeFromCallback'];
 
     /**
      * Parses properties for the post meta's constructor.

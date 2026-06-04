@@ -67,8 +67,10 @@ export function merosHydrateQuillContent(container, content = null) {
 
         const payload = richTextPayloads.find(payload => payload.rt_id  === rtId);
 
-        if (payload && payload.content) {
-            container._quill.setContents(JSON.parse(payload.content));
+        if (payload) {
+            if (payload.content) {
+                container._quill.setContents(JSON.parse(payload.content));
+            }
         }
     }
 
@@ -90,6 +92,7 @@ export function initRichTextEditors(richTextPayloads = []) {
         }
 
         const quill = new Quill(editor, {
+            readOnly: editor.hasAttribute('aria-disabled') || editor.hasAttribute('disabled'),
             theme: 'snow',
             modules: {
                 toolbar: ['bold', 'italic', 'underline', 'link']

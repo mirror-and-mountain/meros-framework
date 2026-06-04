@@ -34,6 +34,16 @@ class Url extends Input {
     ];
 
     /**
+     * Supported features for the URL field.
+     *
+     * @var array
+     */
+    protected array $supports = [
+        'placeholder',
+        'icon'
+    ];
+
+    /**
      * An array of data types that this field is compatible with.
      *
      * @var array

@@ -35,6 +35,21 @@ class Select extends Field {
     protected array $options = [];
 
     /**
+     * Indicates whether to use an advanced UI for the choice field (e.g., tomselect).
+     *
+     * @var bool|null
+     */
+    protected ?bool $advanced = null;
+
+    /**
+     * Indicates whether to allow adding new options in the UI.
+     * Applies to advanced select fields only.
+     *
+     * @var bool|null
+     */
+    protected ?bool $allowAdd = null;
+
+    /**
      * Features supported by the choice-type field.
      * Can be overridden by child classes.
      *
@@ -52,9 +67,7 @@ class Select extends Field {
      * @var array
      */
     protected array $attributes = [
-        'multiple'       => false,
-        'data-advanced'  => 'false',
-        'data-allow-add' => 'false',
+        'multiple' => false,
     ];
 
     /**
@@ -158,7 +171,7 @@ class Select extends Field {
      */
     public function advanced(bool $advanced = true): self {
         if ($this->supports('advanced')) {
-            $this->attribute('data-advanced', $advanced ? 'true' : 'false');
+            $this->advanced = $advanced;
         }
         return $this;
     }
@@ -173,7 +186,7 @@ class Select extends Field {
      */
     public function allowAdd(bool $allowAdd = true): self {
         if ($this->supports('allowAdd')) {
-            $this->attribute('data-allow-add', $allowAdd ? 'true' : 'false');
+            $this->allowAdd = $allowAdd;
         }
         return $this;
     }
@@ -220,7 +233,11 @@ class Select extends Field {
      * @return bool True if adding new options is allowed, false otherwise.
      */
     public function allowsAdd(): bool {
-        return ($this->attributes['data-allow-add'] ?? 'false') === 'true';
+        if ($this->supports('allowAdd') && $this->isAdvanced()) {
+            return $this->allowAdd ?? false;
+        }
+
+        return false;
     }
 
     /**
@@ -229,7 +246,11 @@ class Select extends Field {
      * @return bool True if advanced UI is enabled, false otherwise.
      */
     public function isAdvanced(): bool {
-        return ($this->attributes['data-advanced'] ?? 'false') === 'true';
+        if ($this->supports('advanced')) {
+            return $this->advanced ?? false;
+        }
+
+        return false;
     }
 
     /**
@@ -245,8 +266,8 @@ class Select extends Field {
         
         $json['properties']['options']        = $this->getOptions();
         $json['properties']['allowsMultiple'] = $this->allowsMultiple();
-        $json['properties']['allowsAdd']      = $this->allowsAdd();
-        $json['properties']['advanced']       = ($this->attributes['data-advanced'] ?? 'false') === 'true';
+        $json['properties']['allowAdd']       = $this->allowsAdd();
+        $json['properties']['advanced']       = $this->isAdvanced();
         
         if ($asString) {
             return json_encode($json, ...$flags);

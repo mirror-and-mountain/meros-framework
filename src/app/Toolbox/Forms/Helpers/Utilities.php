@@ -38,6 +38,51 @@ class Utilities {
     }
 
     /**
+     * Normalises action payloads to a handle-keyed map of {label, config, action_id}.
+     *
+     * @param mixed $actions
+     *
+     * @return array
+     */
+    public static function normaliseActionPayloads(mixed $actions): array {
+        if (!is_array($actions)) {
+            return [];
+        }
+
+        $normalised = [];
+
+        foreach ($actions as $handle => $entry) {
+            if (!is_string($handle) || trim($handle) === '') {
+                continue;
+            }
+
+            $entry = is_array($entry) ? $entry : [];
+
+            $actionID = '';
+
+            if (isset($entry['action_id']) && is_string($entry['action_id'])) {
+                $actionID = trim($entry['action_id']);
+            }
+
+            if ($actionID === '' && str_contains($handle, '__')) {
+                $suffix = Str::after($handle, '__');
+
+                if ($suffix !== $handle) {
+                    $actionID = trim($suffix);
+                }
+            }
+
+            $normalised[$handle] = [
+                'label'  => isset($entry['label']) && is_string($entry['label']) ? $entry['label'] : '',
+                'config' => isset($entry['config']) && is_array($entry['config']) ? $entry['config'] : [],
+                'action_id' => $actionID,
+            ];
+        }
+
+        return $normalised;
+    }
+
+    /**
      * Helper to determine if a given row payload is a group row.
      *
      * @param array  $rowPayload

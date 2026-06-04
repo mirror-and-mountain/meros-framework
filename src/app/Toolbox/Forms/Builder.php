@@ -13,6 +13,7 @@ use MM\Meros\Services\Contracts\Forms\FieldGroup;
 use MM\Meros\Services\Contracts\Forms\FormAction;
 
 use MM\Meros\Facades\Fields;
+use MM\Meros\Facades\FieldGroups;
 use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\FormActions;
 
@@ -94,7 +95,7 @@ class Builder extends Component {
 
         $this->schema = [
             'rows'     => Utilities::normaliseRowPayloads($rawSchema['rows'] ?? []),
-            'actions'  => $rawSchema['actions'] ?? []
+            'actions'  => $this->normaliseActionPayloads($rawSchema['actions'] ?? [])
         ];
 
         $this->rowPayloads    = $this->schema['rows'] ?? [];
@@ -146,8 +147,10 @@ class Builder extends Component {
      * @return void
      */
     public function updateActions(array $actions): void {
-        $this->schema['actions'] = $actions;
-        $this->actionPayloads = $actions;
+        $normalisedActions = $this->normaliseActionPayloads($actions);
+
+        $this->schema['actions'] = $normalisedActions;
+        $this->actionPayloads = $normalisedActions;
 
         $this->dispatchSchemaUpdate();
     }
@@ -160,10 +163,90 @@ class Builder extends Component {
      * @return void
      */
     public function updateRows(array $updatedSchemaRows): void {
+        $updatedSchemaRows = $this->normaliseFieldGroupRows($updatedSchemaRows);
+
         $this->schema['rows'] = $updatedSchemaRows;
         $this->rowPayloads    = $updatedSchemaRows;
 
         $this->dispatchSchemaUpdate();
+    }
+
+    // =========================================================================
+    // Group Management Methods
+    // =========================================================================
+
+    /**
+     * Normalises field group rows in the provided schema rows, merging them with registered field group configurations where applicable.
+     *
+     * @param array $rows
+     *
+     * @return array
+     */
+    private function normaliseFieldGroupRows(array $rows): array {
+        $this->walkFormGroups($rows, function($group, $location) use (&$rows) {
+            $handle = $group['handle'] ?? null;
+
+            if ($handle === null) {
+                return;
+            }
+
+            if (in_array($handle, array_keys($this->fieldGroups))) {
+                $normalisedGroup = $this->normaliseFieldGroupInstance($handle);
+                if ($normalisedGroup === null) {
+                    return;
+                }
+
+                $rows[$location['rowIndex']]['group'] = array_merge(
+                    $group,
+                    $normalisedGroup
+                );
+            }
+        });
+
+        return $rows;
+    }
+
+    /**
+     * Instantiates a FieldGroup instance by handle and normalises it for use in the builder.
+     * Used for handling preset field groups available in the builder.
+     *
+     * @param string $handle
+     *
+     * @return array|null
+     */
+    private function normaliseFieldGroupInstance(string $handle): ?array {
+        if (!isset($this->fieldGroups[$handle])) {
+            return null;
+        }
+
+        $instance = FieldGroups::checkout(Framework::get())->get($handle);
+
+        if ($instance === null) {
+            return null;
+        }
+
+        $groupRows       = $instance->getRows();
+        $parsedGroupRows = [];
+
+        foreach ($groupRows as $index => $groupRow) {
+            $parsedGroupRows[$index]['fields'] = $groupRow->getFields(true);
+
+            foreach ($parsedGroupRows[$index]['fields'] as $fieldIndex => $field) {
+                if ($field instanceof Field) {
+                    $parsedGroupRows[$index]['fields'][$fieldIndex] = $field->toJson();
+                }
+            }
+        }
+
+        $id = $instance->getID();
+
+        return [
+            'id'          => empty($id) ? 'field_' . Str::substr(Str::uuid(), 0, 8) : $id,
+            'handle'      => '', // Clear out the handle so we don't renormalise the instance later.
+            'title'       => $instance->getTitle(),
+            'description' => $instance->getDescription(),
+            'rows'        => $parsedGroupRows
+        ];
     }
 
     // =========================================================================
@@ -190,7 +273,7 @@ class Builder extends Component {
      * @return array
      */
     public function getActions(): array {
-        return $this->schema['actions'] ?? [];
+        return $this->normaliseActionPayloads($this->schema['actions'] ?? []);
     }
 
     /**
@@ -199,7 +282,7 @@ class Builder extends Component {
      * @return array
      */
     public function getActionPayloads(): array {
-        return $this->actionPayloads ?? [];
+        return $this->normaliseActionPayloads($this->actionPayloads ?? []);
     }
 
     /**
@@ -236,27 +319,66 @@ class Builder extends Component {
     public function getActionsRepeaterField(): Field {
         $this->initialiseFormActions();
 
+        $existingActions = [];
+
+        foreach ($this->normaliseActionPayloads($this->actionPayloads) as $handle => $_payload) {
+            $actionType = Str::before($handle, '__');
+            $actionId = Str::after($handle, '__');
+
+            if ($actionType === '') {
+                continue;
+            }
+
+            if ($actionId === '' || $actionId === $actionType) {
+                $actionId = 'action_' . Str::substr(Str::uuid(), 0, 8);
+            }
+
+            $existingActions[] = [
+                'action_label' => empty($_payload['label']) ?? '' ? Str::title(Str::replace(['-', '_'], ' ', $actionType)) : $_payload['label'],
+                'action_type'  => $actionType,
+                'action_id'    => $actionId,
+            ];
+        }
+
         $field = Fields::checkout(Framework::get())->makeFrom(
             'repeater', [
                 'id'                    => 'meros-form-actions-repeater',
                 'label'                 => 'Form Actions',
                 'name'                  => 'form_actions',
-                'helpText'              => 'Add actions to be performed when the form is submitted.',
-                'configurationCallback' => '$store.formBuilder.getActionConfigurationDialog'
+                'default'               => $existingActions,
+                'addRowText'            => 'Add Action',
+                'onAddRow'              => '$store.formBuilder.onActionRowAdded',
+                'onRemoveRow'           => '$store.formBuilder.onActionRowRemoved',
+                'onMoveRow'             => '$store.formBuilder.onActionRowMoved',
+                'onConfigureRow'        => '$store.formBuilder.onActionRowConfigure'
             ]
         );
+
+        $field->configureRequiredFields(['action_type']);
 
         $field->subField('select', function($select) {
             $select->label('Action Type');
             $select->name('action_type');
+            $select->onChange('$store.formBuilder.saveActions');
             
             $options = [];
-            foreach($this->actionPayloads as $handle => $payload) {
+
+            foreach($this->availableActions as $handle => $payload) {
                 $options[$handle] = $payload['label'];
             }
 
             $select->options($options);
         });
+
+        $field->subField('text')
+            ->label('Label')
+            ->name('action_label')
+            ->onChange('$store.formBuilder.saveActions');
+
+        $field->subField('text')
+            ->label('Action ID')
+            ->name('action_id')
+            ->disabled();
 
         return $field;
     }
@@ -264,15 +386,17 @@ class Builder extends Component {
     /**
      * Retrieves the configuration dialog for a specific form action type, rendered as an HTML string.
      *
-     * @param string $actionHandle
+     * @param string $uniqueActionHandle
      * @param array  $formFields
      *
      * @return string
      */
-    public function getActionConfigurationDialog(string $actionHandle, array $formFields): string {
+    public function getActionConfigurationDialog(string $uniqueActionHandle, array $formFields = [], array $config = []): string {
         $this->initialiseFormActions();
 
-        if (!in_array($actionHandle, array_keys($this->actionPayloads))) {
+        $actionHandle = Str::before($uniqueActionHandle, '__');
+
+        if (!in_array($actionHandle, array_keys($this->availableActions))) {
             return '';
         }
 
@@ -282,7 +406,29 @@ class Builder extends Component {
             return '';
         }
 
-        return $actionInstance->renderConfigurationDialog($formFields);
+        $config = $config !== []
+            ? $config
+            : ($this->normaliseActionPayloads($this->actionPayloads)[$uniqueActionHandle]['config'] ?? []);
+
+        return $actionInstance->renderConfigurationDialog($formFields, $config);
+
+    }
+
+    /**
+     * Normalises action payloads via Utilities helper.
+     *
+     * @param mixed $actions
+     *
+     * @return array
+     */
+    private function normaliseActionPayloads(mixed $actions): array {
+        $normaliser = [Utilities::class, 'normaliseActionPayloads'];
+
+        if (is_callable($normaliser)) {
+            return call_user_func($normaliser, $actions);
+        }
+
+        return [];
     }
 
     // =========================================================================
@@ -526,73 +672,12 @@ class Builder extends Component {
     // =========================================================================
 
     /**
-     * Retrieves advanced select fields from the form schema's row payloads.
-     *
-     * @param array $rows
+     * Retrieves advanced select payloads from the provided schema rows.
      *
      * @return array
      */
-    private function getAdvancedSelectFields(array $rows): array {
-        $advancedSelects = [];
-
-        $this->walkFormFields($rows, function($field) use (&$advancedSelects) {
-            $advancedSelects = array_merge(
-                $advancedSelects,
-                $this->extractAdvancedSelects([$field])
-            );
-        });
-
-        return $advancedSelects;
-    }
-
-    /**
-     * Extracts advanced select fields from the schema rows.
-     *
-     * @param array $fields
-     *
-     * @return array
-     */
-    private function extractAdvancedSelects(array $fields): array {
-        $advancedSelects = [];
-
-        foreach ($fields as $field) {
-            if (in_array($field['handle'], ['select', 'multi_select']) && 
-                ($field['properties']['advanced'] ?? null) === true) 
-            {
-                $advancedSelects[] = $this->buildAdvancedSelectConfig($field['properties']);
-            } 
-            
-            else if ($field['handle'] === 'repeater') {
-                foreach ($field['fields'] ?? [] as $repeaterField) {
-                    if (in_array($repeaterField['handle'], ['select', 'multi_select']) && 
-                        ($repeaterField['properties']['advanced'] ?? null) === true) 
-                    {
-                        $advancedSelects[] = $this->buildAdvancedSelectConfig($repeaterField['properties']);
-                    }
-                }
-            }
-        }
-
-        return $advancedSelects;
-    }
-
-    /**
-     * Builds an advanced select configuration from field properties.
-     *
-     * @param array $properties
-     *
-     * @return array
-     */
-    private function buildAdvancedSelectConfig(array $properties): array {
-        return [
-            'id'               => $properties['id'],
-            'label'            => $properties['label'] ?? '',
-            'name'             => $properties['name'] ?? '',
-            'helpText'         => $properties['helpText'] ?? '',
-            'helpTextPosition' => $properties['helpTextPosition'] ?? 'top',
-            'required'         => $properties['required'] ?? false,
-            'disabled'         => $properties['disabled'] ?? false
-        ];
+    private function getAdvancedSelectPayloads(): array {
+        return $this->getFieldTypePayloads('advanced_select', $this->rowPayloads);
     }
 
     // =========================================================================
@@ -605,41 +690,92 @@ class Builder extends Component {
      * @return array
      */
     public function getRichTextPayloads(): array {
-        $richTextObjects = [];
+        return $this->getFieldTypePayloads('rich_text', $this->rowPayloads);
+    }
 
-        foreach ($this->rowPayloads as $rowIndex => $row) {
-            if ($row['type'] === 'group') {
-                $group = $row['group'] ?? null;
+    /**
+     * Retrieves payloads for a specific field type from the provided schema rows.
+     *
+     * @param string $fieldType
+     * @param array  $rows
+     *
+     * @return array
+     */
+    private function getFieldTypePayloads(string $fieldType, array $rows): array {
+        $payloads = [];
 
-                if ($group && !empty($group['description'])) {
-                    $richTextObjects[] = [
-                        'rt_id'   => $rowIndex,
+        if ($fieldType === 'rich_text') {
+            $this->walkFormGroups($rows, function($group, $location) use (&$payloads) {
+                if (!empty($group['description'])) {
+                    $payloads[] = [
+                        'rt_id'   => $location['rowIndex'],
                         'content' => $group['description'],
                     ];
                 }
-            }
+            });
         }
 
-        $this->walkFormFields($this->rowPayloads, function($field, $location) use (&$richTextObjects) {
-            if (($field['handle'] ?? '') !== 'rich_text') {
-                return;
+        $this->walkFormFields($rows, function($field, $location) use (&$payloads, $fieldType) {
+            $payload = $this->buildFieldTypePayload($field, $location, $fieldType);
+
+            if ($payload !== null) {
+                $payloads[] = $payload;
             }
+        }, true);
 
-            $properties = $field['properties'] ?? [];
-            $fallbackID = "{$location['rowIndex']}_{$location['fieldIndex']}";
+        return $payloads;
+    }
 
-            $richTextObjects[] = [
+    /**
+     * Builds a payload for a field based on the requested field type.
+     *
+     * @param array  $field
+     * @param array  $location
+     * @param string $fieldType
+     *
+     * @return array|null
+     */
+    private function buildFieldTypePayload(array $field, array $location, string $fieldType): ?array {
+        $properties = $field['properties'] ?? [];
+
+        if (
+            $fieldType === 'advanced_select'
+            && in_array($field['handle'] ?? null, ['advanced_select', 'multi_select'], true)
+            && (($properties['advanced'] ?? false) === true)
+        ) {
+            return [
+                'id'               => $properties['id'] ?? '',
+                'label'            => $properties['label'] ?? '',
+                'name'             => $properties['name'] ?? '',
+                'helpText'         => $properties['helpText'] ?? '',
+                'helpTextPosition' => $properties['helpTextPosition'] ?? 'top',
+                'required'         => $properties['required'] ?? false,
+                'disabled'         => $properties['disabled'] ?? false,
+                'advanced'         => $properties['advanced'] ?? false,
+                'allowAdd'         => $properties['allowAdd'] ?? false,
+                'options'          => $properties['options'] ?? []
+            ];
+        }
+
+        if ($fieldType === 'rich_text' && (($field['handle'] ?? null) === 'rich_text')) {
+            $fallbackID = isset($location['repeaterFieldIndex'])
+                ? "{$location['rowIndex']}_{$location['fieldIndex']}_{$location['repeaterFieldIndex']}"
+                : "{$location['rowIndex']}_{$location['fieldIndex']}";
+
+            return [
                 'id'               => $properties['id'] ?? $fallbackID,
                 'name'             => $properties['name'] ?? '',
                 'label'            => $properties['label'] ?? '',
                 'helpText'         => $properties['helpText'] ?? '',
                 'helpTextPosition' => $properties['helpTextPosition'] ?? '',
+                'required'         => $properties['required'] ?? false,
+                'disabled'         => $properties['disabled'] ?? false,
                 'rt_id'            => $properties['id'] ?? $fallbackID,
                 'content'          => $properties['value'] ?? $properties['default'] ?? '',
             ];
-        });
+        }
 
-        return $richTextObjects;
+        return null;
     }
 
     /**
@@ -704,7 +840,7 @@ class Builder extends Component {
         $serializer = Serializer::make(Hydrator::make($this->fieldTypes, $this));
 
         $serializedSchema = [
-            'actions'  => [],
+            'actions'  => $this->actionPayloads ?? [],
             'rows'     => $serializer->serializeFormSchema($this->rowPayloads ?? [])
         ];
         
@@ -740,8 +876,10 @@ class Builder extends Component {
      * @return void
      */
     private function dispatchSchemaUpdate(): void {
-        $advancedSelectPayloads = $this->getAdvancedSelectFields($this->rowPayloads);
+        $advancedSelectPayloads = $this->getAdvancedSelectPayloads();
         $richTextPayloads = $this->getRichTextPayloads();
+
+        // dd($advancedSelectPayloads, $richTextPayloads, $this->rowPayloads);
 
         $ignoredFields = array_merge(
             $advancedSelectPayloads,
@@ -796,30 +934,76 @@ class Builder extends Component {
      *
      * @return void
      */
-    private function walkFormFields(array $rows, callable $callback): void {
+    private function walkFormFields(array $rows, callable $callback, bool $walkRepeaterFields = false): void {
         foreach ($rows as $rowIndex => $row) {
             if (($row['type'] ?? null) === 'fields') {
                 foreach ($row['fields'] ?? [] as $fieldIndex => $field) {
-                    $callback($field, [
+                    $location = [
                         'rowIndex'      => $rowIndex,
                         'groupRowIndex' => null,
                         'fieldIndex'    => $fieldIndex,
                         'rowType'       => 'fields',
-                    ]);
+                    ];
+
+                    $callback($field, $location);
+
+                    if ($walkRepeaterFields && ($field['handle'] ?? null) === 'repeater') {
+                        foreach ($field['fields'] ?? [] as $repeaterFieldIndex => $repeaterField) {
+                            $callback($repeaterField, [
+                                'rowIndex'           => $location['rowIndex'],
+                                'groupRowIndex'      => $location['groupRowIndex'],
+                                'fieldIndex'         => $location['fieldIndex'],
+                                'rowType'            => $location['rowType'],
+                                'repeaterFieldIndex' => $repeaterFieldIndex,
+                            ]);
+                        }
+                    }
                 }
             }
 
             if (($row['type'] ?? null) === 'group') {
                 foreach ($row['group']['rows'] ?? [] as $groupRowIndex => $groupRow) {
                     foreach ($groupRow['fields'] ?? [] as $fieldIndex => $field) {
-                        $callback($field, [
+                        $location = [
                             'rowIndex'      => $rowIndex,
                             'groupRowIndex' => $groupRowIndex,
                             'fieldIndex'    => $fieldIndex,
                             'rowType'       => 'group',
-                        ]);
+                        ];
+
+                        $callback($field, $location);
+
+                        if ($walkRepeaterFields && ($field['handle'] ?? null) === 'repeater') {
+                            foreach ($field['fields'] ?? [] as $repeaterFieldIndex => $repeaterField) {
+                                $callback($repeaterField, [
+                                    'rowIndex'           => $location['rowIndex'],
+                                    'groupRowIndex'      => $location['groupRowIndex'],
+                                    'fieldIndex'         => $location['fieldIndex'],
+                                    'rowType'            => $location['rowType'],
+                                    'repeaterFieldIndex' => $repeaterFieldIndex,
+                                ]);
+                            }
+                        }
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Walk each group row in the provided rows, including nested group rows.
+     *
+     * @param array    $rows
+     * @param callable $callback Receives ($group, $location)
+     *
+     * @return void
+     */
+    private function walkFormGroups(array $rows, callable $callback): void {
+        foreach ($rows as $rowIndex => $row) {
+            if (($row['type'] ?? null) === 'group') {
+                $callback($row['group'] ?? [], [
+                    'rowIndex' => $rowIndex,
+                ]);
             }
         }
     }

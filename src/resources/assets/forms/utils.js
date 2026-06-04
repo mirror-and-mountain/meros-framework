@@ -8,16 +8,67 @@ export function updateIgnoredFieldWrapperElements(ignoredFields) {
         const wrapper = el.closest('.meros-field.nice-form-group');
         if (!wrapper) return;
 
-        const label = wrapper.querySelector('label');
+        // Update Label
+        const label = wrapper.querySelector('.form-label');
         if (label && field?.label) {
             label.innerText = field.label;
         }
 
+        // Update name attribute
         if (field.name) {
             const name = el.getAttribute('multiple') ? `${field.name}[]` : field.name;
             el.setAttribute('name', name);
         }
 
+        // Update required state
+        if (field.required) {
+            const requiredIndicator = label?.querySelector('.required-indicator') || document.createElement('span');
+            requiredIndicator.classList.add('required-indicator');
+            requiredIndicator.innerText = '*';
+
+            if (!label.querySelector('.required-indicator')) {
+                label.appendChild(requiredIndicator);
+            }
+        } else {
+            const requiredIndicator = label?.querySelector('.required-indicator');
+            if (requiredIndicator) {
+                requiredIndicator.remove();
+            }
+        }
+
+        // Update disabled state
+        if (field.disabled) {
+            el.setAttribute('disabled', 'disabled');
+            el.setAttribute('aria-disabled', 'true');
+
+            if (el.dataset.fieldType === 'rich_text') {
+                const quillContainer = el.querySelector('.ql-editor');
+                if (quillContainer) {
+                    quillContainer.setAttribute('contenteditable', 'false');
+                }
+            }
+
+            if (el.tomselect) {
+                el.tomselect.disable();
+            }
+
+        } else {
+            el.removeAttribute('disabled');
+            el.removeAttribute('aria-disabled');
+
+            if (el.dataset.fieldType === 'rich_text') {
+                const quillContainer = el.querySelector('.ql-editor');
+                if (quillContainer) {
+                    quillContainer.setAttribute('contenteditable', 'true');
+                }
+            }
+
+            if (el.tomselect) {
+                el.tomselect.enable();
+            }
+        }
+
+        // Update help text and position
         if (field.helpText) {
             const helpTextEl = wrapper.querySelector('small');
             const newPosition = field.helpTextPosition || 'top';

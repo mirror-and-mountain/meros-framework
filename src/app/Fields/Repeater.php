@@ -96,13 +96,32 @@ class Repeater extends Field {
     protected ?bool $allowConfigure = null;
 
     /**
-     * The name of a js callback function to use for configuring the repeater's row.
-     * If unset and allowConfigure is true, a default callback will be used that opens a
-     * modal with the row's fields for configuration.
+     * The fields that belong to this repeater.
+     *
+     * @var array<Field>
+     */
+    public array $fields = [];
+
+    /**
+     * The text to show in the button for adding new rows to the repeater.
      *
      * @var string
      */
-    protected string $configurationCallback = '';
+    protected string $addRowText = '';
+
+    /**
+     * The text to show in the button for configuring a row in the repeater.
+     *
+     * @var string
+     */
+    protected string $configureRowText = '';
+
+    /**
+     * The text to show in the button for removing a row from the repeater.
+     *
+     * @var string
+     */
+    protected string $removeRowText = '';
 
     /**
      * Default callback path for row configure actions.
@@ -112,11 +131,43 @@ class Repeater extends Field {
     protected string $defaultConfigurationCallback = '$store.repeaterField.defaultConfigureRowModal';
 
     /**
-     * The fields that belong to this repeater.
+     * The name of a js callback function to use when a row is added to the repeater.
      *
-     * @var array<Field>
+     * @var string
      */
-    public array $fields = [];
+    protected string $onAddRow = '';
+
+    /**
+     * The name of a js callback function to use when a row is removed from the repeater.
+     *
+     * @var string
+     */
+    protected string $onRemoveRow = '';
+
+    /**
+     * The name of a js callback function to use when a row is moved in the repeater.
+     *
+     * @var string
+     */
+    protected string $onMoveRow = '';
+
+    /**
+     * The name of a js callback function to use for configuring the repeater's row.
+     * If unset and allowConfigure is true, a default callback will be used that opens a
+     * modal with the row's fields for configuration.
+     *
+     * @var string
+     */
+    protected string $onConfigureRow = '';
+
+    /**
+     * An optional list of field names that must have a non-empty value before the
+     * configure button is enabled for a row. Only applies when a custom onConfigureRow
+     * callback is set.
+     *
+     * @var array<string>
+     */
+    protected array $configureRequiredFields = [];
 
     /**
      * Converts the field's properties to an array format suitable for JSON serialization
@@ -193,14 +244,102 @@ class Repeater extends Field {
     }
 
     /**
+     * Sets the text to show in the button for adding new rows to the repeater.
+     *
+     * @param string $text
+     *
+     * @return static
+     */
+    public function addRowText(string $text): static {
+        $this->addRowText = $text;
+        return $this;
+    }
+
+    /**
+     * Sets the text to show in the button for configuring a row in the repeater.
+     *
+     * @param string $text
+     *
+     * @return static
+     */
+    public function configureRowText(string $text): static {
+        $this->configureRowText = $text;
+        return $this;
+    }
+
+    /**
+     * Sets the text to show in the button for removing a row from the repeater.
+     *
+     * @param string $text
+     *
+     * @return static
+     */
+    public function removeRowText(string $text): static {
+        $this->removeRowText = $text;
+        return $this;
+    }
+
+    /**
+     * Sets the field names that must have a non-empty value before the configure button
+     * is enabled on a row. Only applied when a custom onConfigureRow callback is set.
+     *
+     * @param array<string> $fieldNames
+     *
+     * @return static
+     */
+    public function configureRequiredFields(array $fieldNames): static {
+        $this->configureRequiredFields = array_values(array_filter(
+            array_map('strval', $fieldNames),
+            fn($name) => trim($name) !== ''
+        ));
+        return $this;
+    }
+
+    /**
      * Sets the name of a js callback function to use for configuring the repeater's row.
      *
      * @param string $callback
      *
      * @return static
      */
-    public function configurationCallback(string $callback): static {
-        $this->configurationCallback = $callback;
+    public function onConfigureRow(string $callback): static {
+        $this->onConfigureRow = $this->normaliseCallbackPath($callback);
+        return $this;
+    }
+
+    /**
+     * Sets the name of a js callback function to use when a row is added to the repeater.
+     *
+     * @param string $callback
+     *
+     * @return static
+     */
+    public function onAddRow(string $callback): static {
+        $this->onAddRow = $this->normaliseCallbackPath($callback);
+        return $this;
+    }
+
+    /**
+     * Sets the name of a js callback function to use when a row is removed from the repeater.
+     *
+     * @param string $callback
+     *
+     * @return static
+     */
+    public function onRemoveRow(string $callback): static {
+        $this->onRemoveRow = $this->normaliseCallbackPath($callback);
+        return $this;
+    }
+
+    /**
+     * Sets the name of a js callback function to use when a row is moved in the repeater.
+     *
+     * @param string $callback
+     *
+     * @return static
+     */
+    public function onMoveRow(string $callback): static {
+        $this->onMoveRow = $this->normaliseCallbackPath($callback);
         return $this;
     }
 
@@ -265,6 +404,30 @@ class Repeater extends Field {
         $this->fields = $fields;
     }
 
+    /**
+     * Removes a field from the repeater's fields array.
+     *
+     * @param Field $field The field instance to remove.
+     *
+     * @return self
+     */
+    public function removeField(Field $field): self {
+        $this->fields = array_filter($this->fields, fn($f) => $f !== $field);
+        return $this;
+    }
+
+    /**
+     * Removes a field from the repeater's fields array.
+     * Alias for removeField() method.
+     *
+     * @param Field $field The field instance to remove.
+     *
+     * @return self
+     */
+    public function detach(Field $field): self {
+        return $this->removeField($field);
+    }
+
     /********************
      * Getters
      ********************/
@@ -306,14 +469,79 @@ class Repeater extends Field {
     }
 
     /**
+     * Gets the text to show in the button for adding new rows to the repeater.
+     *
+     * @return string
+     */
+    public function getAddRowText(): string {
+        return empty($this->addRowText) ? 'Add Row' : $this->addRowText;
+    }
+
+    /**
+     * Gets the text to show in the button for configuring a row in the repeater.
+     *
+     * @return string
+     */
+    public function getConfigureRowText(): string {
+        return empty($this->configureRowText) ? 'Configure' : $this->configureRowText;
+    }
+
+    /**
+     * Gets the text to show in the button for removing a row from the repeater.
+     *
+     * @return string
+     */
+    public function getRemoveRowText(): string {
+        return empty($this->removeRowText) ? 'Remove' : $this->removeRowText;
+    }
+
+    /**
+     * Gets the field names required to be non-empty before configure is enabled.
+     *
+     * @return array<string>
+     */
+    public function getConfigureRequiredFields(): array {
+        return $this->configureRequiredFields;
+    }
+
+    /**
      * Gets the name of the js callback function used for configuring the repeater's row.
      *
      * @return string
      */
-    public function getConfigurationCallback(): string {
-        return empty($this->configurationCallback) && $this->allowsConfigure()
+    public function getOnConfigureRowCallback(): string {
+        $configuredCallback = $this->normaliseCallbackPath($this->onConfigureRow);
+
+        return empty($configuredCallback) && $this->allowsConfigure()
             ? $this->defaultConfigurationCallback
-            : $this->configurationCallback;
+            : $configuredCallback;
+    }
+
+    /**
+     * Gets the name of the js callback function used when a row is added to the repeater.
+     *
+     * @return string
+     */
+    public function getOnAddRowCallback(): string {
+        return $this->normaliseCallbackPath($this->onAddRow);
+    }
+
+    /**
+     * Gets the name of the js callback function used when a row is removed from the repeater.
+     *
+     * @return string
+     */
+    public function getOnRemoveRowCallback(): string {
+        return $this->normaliseCallbackPath($this->onRemoveRow);
+    }
+
+    /**
+     * Gets the name of the js callback function used when a row is moved in the repeater.
+     *
+     * @return string
+     */
+    public function getOnMoveRowCallback(): string {
+        return $this->normaliseCallbackPath($this->onMoveRow);
     }
 
     /**
@@ -398,28 +626,7 @@ class Repeater extends Field {
         foreach ($items as $index => $rowData) {
             $rowData = is_array($rowData) ? $rowData : [];
             $rowToken = $this->resolveRowToken($rowData, $index);
-            $row = [];
-
-            foreach ($this->fields as $field) {
-                $fieldInstance = clone $field;
-                
-                // Store the original field name before generating the indexed name
-                $baseFieldName = $fieldInstance->getName();
-
-                $fieldInstance->attribute('data-row-index', $rowToken);
-                $fieldInstance->attribute('data-base-field-name', $baseFieldName);
-
-                $fieldInstance->id($this->generateSubFieldId($fieldInstance, $rowToken));
-                $fieldInstance->name($this->generateSubFieldName($fieldInstance, $rowToken));
-                
-                // Look up value using the base field name, not the generated indexed name
-                $fieldInstance->value($rowData[$baseFieldName] ?? null);
-
-                // Key the row by base field name so repeater view can access with getFieldNames()
-                $row[$baseFieldName] = $fieldInstance;
-            }
-
-            $rows[] = $row;
+            $rows[] = $this->buildRowFields($rowData, $rowToken);
         }
 
         return $rows;
@@ -431,28 +638,15 @@ class Repeater extends Field {
      * @return array
      */
     public function buildTemplateRow(): array {
-        $rows = [];
         $rowToken = $this->resolveRowToken([], 0);
 
-        foreach ($this->fields as $field) {
-            $fieldInstance = clone $field;
-            $baseFieldName = $fieldInstance->getName();
-
-            $fieldInstance->attribute('data-row-index', $rowToken);
-            $fieldInstance->attribute('data-base-field-name', $baseFieldName);
-
-            $fieldInstance->id($this->generateSubFieldId($fieldInstance, $rowToken));
-            $fieldInstance->name($this->generateSubFieldName($fieldInstance, $rowToken));
-
-            $rows[$baseFieldName] = $fieldInstance;
-        }
-
-        return $rows;
+        return $this->buildRowFields([], $rowToken, true);
     }
 
     /********************
      * Helpers
      ********************/
+
     /**
      * Generates a unique name for a sub-field based on the repeater's root name, the repeater's name, the row index, and the sub-field's name.
      *
@@ -488,6 +682,49 @@ class Repeater extends Field {
         }
 
         return "{$this->rootName}_{$this->id}_{$idToken}_{$fieldId}";
+    }
+
+    /**
+     * Builds a row of cloned repeater sub-fields with resolved ids, names, and row metadata.
+     *
+     * @param array  $rowData Row values keyed by base field name.
+     * @param string $rowToken Stable row token.
+     * @param bool   $isTemplate Whether the row is the hidden template row.
+     *
+     * @return array
+     */
+    protected function buildRowFields(array $rowData, string $rowToken, bool $isTemplate = false): array {
+        $row = [];
+
+        foreach ($this->fields as $field) {
+            $fieldInstance = clone $field;
+
+            // Store the original field name before generating the indexed name.
+            $baseFieldName = $fieldInstance->getName();
+            $fieldId = $this->generateSubFieldId($fieldInstance, $rowToken);
+
+            if ($isTemplate) {
+                $fieldId .= '-template';
+            }
+
+            $fieldInstance->attribute('data-row-index', $rowToken);
+            $fieldInstance->attribute('data-base-field-name', $baseFieldName);
+            $fieldInstance->attribute('data-repeater-preserve-disabled', $field->isDisabled() ? 'true' : 'false');
+            $fieldInstance->id($fieldId);
+            $fieldInstance->name($this->generateSubFieldName($fieldInstance, $rowToken));
+
+            if ($isTemplate) {
+                $fieldInstance->attribute('disabled', true);
+            } else {
+                // Look up value using the base field name, not the generated indexed name.
+                $fieldInstance->value($rowData[$baseFieldName] ?? null);
+            }
+
+            // Key the row by base field name so repeater view can access with getFieldNames().
+            $row[$baseFieldName] = $fieldInstance;
+        }
+
+        return $row;
     }
 
     /**

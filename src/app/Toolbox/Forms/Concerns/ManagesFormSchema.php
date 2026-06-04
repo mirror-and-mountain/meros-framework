@@ -54,6 +54,13 @@ trait ManagesFormSchema {
     public string $formStatus = '';
 
     /**
+     * The available form actions that can be added to the form.
+     *
+     * @var array
+     */
+    public array $availableActions = [];
+
+    /**
      * The form actions associated with the current form.
      *
      * @var array
@@ -125,12 +132,8 @@ trait ManagesFormSchema {
      * @return void
      */
     private function initialiseFieldGroups(): void {
-        foreach (FieldGroups::getRegistered() as $handle => $fieldGroup) {
-            $this->fieldGroups[ $handle ] = [
-                'handle' => $handle,
-                'class'  => $fieldGroup,
-                'label'  => Str::title(Str::replace(['-', '_'], ' ', $handle))
-            ];
+        foreach (FieldGroups::getRegistered() as $handle => $_) {
+            $this->fieldGroups[ $handle ] = Str::title(Str::replace(['-', '_'], ' ', $handle));
         }
     }
 
@@ -141,7 +144,7 @@ trait ManagesFormSchema {
      */
     private function initialiseFormActions(): void {
         foreach (FormActions::getRegistered() as $handle => $action) {
-            $this->actionPayloads[ $handle ] = [
+            $this->availableActions[ $handle ] = [
                 'handle' => $handle,
                 'class'  => $action,
                 'label'  => Str::title(Str::replace(['-', '_'], ' ', $handle)),

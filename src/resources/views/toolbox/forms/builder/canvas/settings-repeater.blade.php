@@ -1,7 +1,8 @@
 <div id="meros-form-builder-repeater-settings-{{ $editingRepeaterID }}" class="flex-1 p-4 overflow-y-auto min-w-0" x-data="{ fieldDragging: false }" wire:key="form-builder-repeater-settings-{{ $editingRepeaterID }}">
-    @include('meros::toolbox.forms.builder.canvas.header', [
-        'sectionTitle' => '<a class="underline hover:text-blue-700" title="Back to Canvas" href="#" @click.prevent="$store.formBuilder.activeField = null" wire:click="setEditingRepeaterID(null)">Canvas</a> / Repeater Settings'
-    ])
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold"><a class="underline hover:text-blue-700" title="Back to Canvas" href="#" @click.prevent="$store.formBuilder.activeField = null" wire:click="setEditingRepeaterID(null)">Canvas</a> / Repeater Settings</h2>
+        @include('meros::toolbox.forms.builder.canvas.action-button')
+    </div>
     <div class="space-y-4">
         {!! $editingRepeater->render(false, false) !!}
         <div>

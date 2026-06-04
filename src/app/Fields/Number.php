@@ -27,6 +27,17 @@ class Number extends Input {
     ];
 
     /**
+     * Rules supported by the field for validation purposes.
+     *
+     * @var array
+     */
+    protected array $supportedRules = [
+        'min',
+        'max',
+        'step'
+    ];
+
+    /**
      * An array of data types that this field is compatible with.
      *
      * @var array

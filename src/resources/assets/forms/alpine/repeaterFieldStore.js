@@ -45,12 +45,29 @@ export default function registerRepeaterFieldStore() {
             const hasRows = rowElements.length > 0;
             const hasFields = templateRow?.querySelector('.meros-repeater-data-cell') !== null;
 
-            if (!hasFields || !hasRows) {
+            if (!hasRows) {
+                return [];
+            }
+
+            if (!hasFields) {
                 alert('Cannot get repeater value: No field cells found in the repeater template row.');
                 return false;
             }
 
             return rowElements.map(rowElement => {
+                return this.buildRepeaterRowValue(rowElement);
+            });
+        },
+
+        // Returns repeater rows without alerts, intended for internal callback payloads.
+        getRepeaterValueSnapshot(anchorOrRepeaterId) {
+            const repeaterRoot = this.resolveRepeater(anchorOrRepeaterId);
+
+            if (!repeaterRoot) {
+                return [];
+            }
+
+            return this.getRowElements(repeaterRoot).map(rowElement => {
                 return this.buildRepeaterRowValue(rowElement);
             });
         },
@@ -84,6 +101,96 @@ export default function registerRepeaterFieldStore() {
             const fieldCellElement = rowElement?.querySelectorAll('td[data-field-name]')?.[safeCellIndex] ?? null;
 
             return this.getFieldCellValue(fieldCellElement);
+        },
+
+        // ======================================
+        // Repeater Value Setting Helpers
+        // ======================================
+
+        // Updates a single repeater cell by field name.
+        setCellValue(repeaterID, rowIndex, fieldName, value) {
+            const repeaterRoot = this.resolveRepeater(repeaterID);
+            const safeRowIndex = this.parseIndex(rowIndex);
+
+            if (!repeaterRoot || safeRowIndex === null || safeRowIndex < 0 || typeof fieldName !== 'string' || fieldName.trim() === '') {
+                return false;
+            }
+
+            const rowElement = this.getRowElements(repeaterRoot)[safeRowIndex] ?? null;
+
+            if (!rowElement) {
+                return false;
+            }
+
+            const trimmedFieldName = fieldName.trim();
+            let fieldCellElement = null;
+
+            if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+                fieldCellElement = rowElement.querySelector(`td[data-field-name="${CSS.escape(trimmedFieldName)}"]`);
+            }
+
+            if (!fieldCellElement) {
+                fieldCellElement = Array.from(rowElement.querySelectorAll('td[data-field-name]')).find(cellElement => {
+                    return cellElement.getAttribute('data-field-name') === trimmedFieldName;
+                }) ?? null;
+            }
+
+            if (!this.setFieldCellValue(fieldCellElement, value)) {
+                return false;
+            }
+
+            this.syncConfigureButtonState(repeaterRoot);
+            return true;
+        },
+
+        // Updates an entire repeater row. Accepts either an array (cell order) or an object keyed by field name.
+        setRowValue(repeaterID, rowIndex, value) {
+            const repeaterRoot = this.resolveRepeater(repeaterID);
+            const safeRowIndex = this.parseIndex(rowIndex);
+
+            if (!repeaterRoot || safeRowIndex === null || safeRowIndex < 0) {
+                return false;
+            }
+
+            const rowElement = this.getRowElements(repeaterRoot)[safeRowIndex] ?? null;
+
+            if (!rowElement) {
+                return false;
+            }
+
+            const fieldCellElements = Array.from(rowElement.querySelectorAll('td[data-field-name]'));
+
+            if (fieldCellElements.length === 0) {
+                return false;
+            }
+
+            let updatedCount = 0;
+
+            if (Array.isArray(value)) {
+                fieldCellElements.forEach((fieldCellElement, index) => {
+                    if (index in value && this.setFieldCellValue(fieldCellElement, value[index])) {
+                        updatedCount += 1;
+                    }
+                });
+            } else if (value && typeof value === 'object') {
+                fieldCellElements.forEach(fieldCellElement => {
+                    const fieldName = fieldCellElement.getAttribute('data-field-name');
+
+                    if (!fieldName || !Object.prototype.hasOwnProperty.call(value, fieldName)) {
+                        return;
+                    }
+
+                    if (this.setFieldCellValue(fieldCellElement, value[fieldName])) {
+                        updatedCount += 1;
+                    }
+                });
+            } else {
+                return false;
+            }
+
+            this.syncConfigureButtonState(repeaterRoot);
+
+            return updatedCount > 0;
         },
 
         // Internal utilities for repeater getter APIs.
@@ -239,6 +346,150 @@ export default function registerRepeaterFieldStore() {
             return controls[0]?.value ?? null;
         },
 
+        // Dispatches input/change events so external listeners react to programmatic updates.
+        dispatchControlValueEvents(control) {
+            if (!(control instanceof HTMLElement)) {
+                return;
+            }
+
+            control.dispatchEvent(new Event('input', { bubbles: true }));
+            control.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+
+        // Sets a repeater field cell's value while accounting for input type differences.
+        setFieldCellValue(fieldCellElement, nextValue) {
+            if (!fieldCellElement) {
+                return false;
+            }
+
+            const advancedSelect = fieldCellElement.querySelector('select.meros-select-field[data-advanced="true"]');
+
+            if (advancedSelect) {
+                const values = Array.isArray(nextValue)
+                    ? nextValue.map(value => String(value))
+                    : (nextValue === null || nextValue === undefined || nextValue === '' ? [] : [String(nextValue)]);
+
+                if (advancedSelect?.tomselect) {
+                    if (advancedSelect.multiple) {
+                        advancedSelect.tomselect.setValue(values, true);
+                    } else if (values.length === 0) {
+                        advancedSelect.tomselect.clear(true);
+                    } else {
+                        advancedSelect.tomselect.setValue(values[0], true);
+                    }
+
+                    this.dispatchControlValueEvents(advancedSelect);
+                    return true;
+                }
+
+                Array.from(advancedSelect.options).forEach(option => {
+                    option.selected = values.includes(option.value);
+                });
+
+                if (!advancedSelect.multiple) {
+                    advancedSelect.value = values[0] ?? '';
+                }
+
+                this.dispatchControlValueEvents(advancedSelect);
+                return true;
+            }
+
+            const controls = Array.from(fieldCellElement.querySelectorAll('input, select, textarea')).filter(control => {
+                return !control.closest('.meros-select-field__placeholder') && control.type !== 'hidden';
+            });
+
+            if (controls.length === 0) {
+                return false;
+            }
+
+            const radioControls = controls.filter(control => control.type === 'radio');
+
+            if (radioControls.length > 0) {
+                const expectedValue = nextValue === null || nextValue === undefined ? null : String(nextValue);
+
+                radioControls.forEach(control => {
+                    control.checked = expectedValue !== null && control.value === expectedValue;
+                    this.dispatchControlValueEvents(control);
+                });
+
+                return true;
+            }
+
+            const checkboxControls = controls.filter(control => control.type === 'checkbox');
+
+            if (checkboxControls.length > 0) {
+                const resolveCheckboxValue = checkboxControl => {
+                    return checkboxControl.getAttribute('data-option-value') ?? checkboxControl.value;
+                };
+
+                const isCheckboxGroupField = checkboxControls.some(control => {
+                    const controlName = control.getAttribute('name') ?? '';
+                    return controlName.endsWith('[]');
+                });
+
+                if (isCheckboxGroupField || checkboxControls.length > 1) {
+                    const values = Array.isArray(nextValue)
+                        ? nextValue.map(value => String(value))
+                        : (nextValue === null || nextValue === undefined || nextValue === '' ? [] : [String(nextValue)]);
+
+                    checkboxControls.forEach(control => {
+                        control.checked = values.includes(String(resolveCheckboxValue(control)));
+                        this.dispatchControlValueEvents(control);
+                    });
+
+                    return true;
+                }
+
+                const checkboxControl = checkboxControls[0];
+
+                if (typeof nextValue === 'boolean') {
+                    checkboxControl.checked = nextValue;
+                } else if (Array.isArray(nextValue)) {
+                    checkboxControl.checked = nextValue.map(value => String(value)).includes(String(resolveCheckboxValue(checkboxControl)));
+                } else if (nextValue === null || nextValue === undefined || nextValue === '') {
+                    checkboxControl.checked = false;
+                } else {
+                    const normalisedValue = String(nextValue).toLowerCase();
+
+                    if (['1', 'true', 'on', 'yes'].includes(normalisedValue)) {
+                        checkboxControl.checked = true;
+                    } else if (['0', 'false', 'off', 'no'].includes(normalisedValue)) {
+                        checkboxControl.checked = false;
+                    } else {
+                        checkboxControl.checked = String(resolveCheckboxValue(checkboxControl)) === String(nextValue);
+                    }
+                }
+
+                this.dispatchControlValueEvents(checkboxControl);
+                return true;
+            }
+
+            const selectControl = controls.find(control => control.tagName === 'SELECT');
+
+            if (selectControl) {
+                if (selectControl.multiple) {
+                    const values = Array.isArray(nextValue)
+                        ? nextValue.map(value => String(value))
+                        : (nextValue === null || nextValue === undefined || nextValue === '' ? [] : [String(nextValue)]);
+
+                    Array.from(selectControl.options).forEach(option => {
+                        option.selected = values.includes(option.value);
+                    });
+                } else {
+                    selectControl.value = nextValue === null || nextValue === undefined ? '' : String(nextValue);
+                }
+
+                this.dispatchControlValueEvents(selectControl);
+                return true;
+            }
+
+            const control = controls[0];
+            control.value = nextValue === null || nextValue === undefined ? '' : String(nextValue);
+            this.dispatchControlValueEvents(control);
+
+            return true;
+        },
+
         // ======================================
         // Repeater Configure Modal Helpers
         // ======================================
@@ -310,9 +561,13 @@ export default function registerRepeaterFieldStore() {
         },
 
         // Builds a reusable repeater modal shell.
-        buildRepeaterDialogFromHtml(bodyHtml = '', onUpdate = null) {
+        buildRepeaterDialogFromHtml(bodyHtml = '', onUpdate = null, id = null) {
             const dialogElement = document.createElement('dialog');
             dialogElement.className = 'meros-repeater-config-dialog';
+
+            if (id) {
+                dialogElement.id = id;
+            }
 
             const shellElement = document.createElement('div');
             shellElement.className = 'meros-repeater-config-dialog__shell';
@@ -391,14 +646,14 @@ export default function registerRepeaterFieldStore() {
         },
 
         // Opens a generic repeater modal from raw HTML and handles cleanup.
-        openRepeaterDialogFromHtml(shellHtml = '', onUpdate = null) {
+        openRepeaterDialogFromHtml(shellHtml = '', onUpdate = null, id = null) {
             const existingDialog = document.querySelector('dialog.meros-repeater-config-dialog[open]');
 
             if (existingDialog instanceof HTMLDialogElement) {
                 existingDialog.close();
             }
 
-            const { dialog, body } = this.buildRepeaterDialogFromHtml(shellHtml, onUpdate);
+            const { dialog, body } = this.buildRepeaterDialogFromHtml(shellHtml, onUpdate, id);
             const unlockPageScroll = this.lockRepeaterModalPageScroll();
 
             const cleanup = () => {
@@ -540,12 +795,40 @@ export default function registerRepeaterFieldStore() {
         },
 
         // ======================================
-        // Repeater Configure Callback Helpers
+        // Repeater Callback Helpers
         // ======================================
 
+        // Validates callback path format and blocks unsafe property traversal segments.
+        isSafeRepeaterCallbackPath(callbackName) {
+            if (typeof callbackName !== 'string') {
+                return false;
+            }
+
+            const trimmedName = callbackName.trim();
+
+            if (trimmedName === '' || trimmedName.length > 200) {
+                return false;
+            }
+
+            const callbackPathPattern = /^(?:\$store\.)?[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/;
+
+            if (!callbackPathPattern.test(trimmedName)) {
+                return false;
+            }
+
+            const pathWithoutStorePrefix = trimmedName.startsWith('$store.')
+                ? trimmedName.replace(/^\$store\./, '')
+                : trimmedName;
+
+            const blockedSegments = ['__proto__', 'prototype', 'constructor'];
+            const segments = pathWithoutStorePrefix.split('.').filter(Boolean);
+
+            return !segments.some(segment => blockedSegments.includes(segment));
+        },
+
         // Resolve a configured callback name to an executable function.
-        resolveConfigureCallback(callbackName) {
-            if (typeof callbackName !== 'string' || callbackName.trim() === '') {
+        resolveRepeaterCallback(callbackName) {
+            if (!this.isSafeRepeaterCallbackPath(callbackName)) {
                 return null;
             }
 
@@ -591,19 +874,66 @@ export default function registerRepeaterFieldStore() {
             return typeof value === 'function' ? value.bind(owner) : null;
         },
 
+        // Backward-compatible alias used by existing configure callback flows.
+        resolveConfigureCallback(callbackName) {
+            return this.resolveRepeaterCallback(callbackName);
+        },
+
+        // Resolves and executes a repeater callback if one is configured.
+        invokeRepeaterCallback(callbackName, params = {}) {
+            const callback = this.resolveRepeaterCallback(callbackName);
+
+            if (typeof callback !== 'function') {
+                return false;
+            }
+
+            callback(params);
+            return true;
+        },
+
+        // Reads a callback name from a trigger element and falls back to the repeater root.
+        getRepeaterCallbackName(anchorElement, attributeName) {
+            if (typeof attributeName !== 'string' || attributeName.trim() === '') {
+                return '';
+            }
+
+            const fromAnchor = anchorElement?.getAttribute?.(attributeName) ?? '';
+
+            if (typeof fromAnchor === 'string' && fromAnchor.trim() !== '') {
+                return fromAnchor.trim();
+            }
+
+            const repeaterRoot = this.getRepeaterRoot(anchorElement);
+            const fromRoot = repeaterRoot?.querySelector?.(`[${attributeName}]`)?.getAttribute?.(attributeName) ?? '';
+
+            return typeof fromRoot === 'string' ? fromRoot.trim() : '';
+        },
+
         // Invoke a repeater row configure callback with row payload context.
         configureRow(anchorElement, callbackName) {
             if (this.shouldDisableConfigureButton(anchorElement)) {
                 return;
             }
 
+            const repeaterRoot = this.getRepeaterRoot(anchorElement);
+            const repeaterId = repeaterRoot?.id ?? null;
+
+            const configuredCallbackName = typeof callbackName === 'string' && callbackName.trim() !== ''
+                ? callbackName.trim()
+                : this.getRepeaterCallbackName(anchorElement, 'data-configure-row-callback');
+
+            const rowElement = anchorElement?.closest?.('tr.meros-repeater-row') ?? null;
+            const rowIndex = this.parseIndex(rowElement?.dataset?.repeaterRowIndex);
+
             const params = {
                 triggerElement: anchorElement,
+                repeaterId,
                 rowValue: this.getRepeaterRowValue(anchorElement),
+                rowIndex
             };
 
             const fallbackCallback = this.defaultConfigureRowModal.bind(this);
-            const callback = this.resolveConfigureCallback(callbackName);
+            const callback = this.resolveRepeaterCallback(configuredCallbackName);
 
             if (typeof callback !== 'function') {
                 fallbackCallback(params);
@@ -634,7 +964,7 @@ export default function registerRepeaterFieldStore() {
             return false;
         },
 
-        // Configure is disabled when a row has exactly one data cell and that cell has no value.
+        // Configure is disabled based on required-field constraints or the single-column fallback.
         shouldDisableConfigureButton(anchorElement) {
             const rowElement = anchorElement?.closest?.('tr.meros-repeater-row') ?? null;
 
@@ -642,15 +972,39 @@ export default function registerRepeaterFieldStore() {
                 return false;
             }
 
+            // If the button carries a list of required field names, check each one.
+            const configureButton = anchorElement?.classList?.contains('meros-repeater-button--configure')
+                ? anchorElement
+                : anchorElement?.closest?.('.meros-repeater-button--configure')
+                    ?? rowElement.querySelector('.meros-repeater-button--configure');
+
+            const requiredFieldsAttr = configureButton?.getAttribute?.('data-configure-required-fields') ?? '';
+
+            if (requiredFieldsAttr.trim() !== '') {
+                let requiredFields = [];
+
+                try {
+                    requiredFields = JSON.parse(requiredFieldsAttr);
+                } catch (_) {
+                    requiredFields = [];
+                }
+
+                if (Array.isArray(requiredFields) && requiredFields.length > 0) {
+                    return requiredFields.some(fieldName => {
+                        const cell = rowElement.querySelector(`td[data-field-name="${CSS.escape(fieldName)}"]`);
+                        return this.isEmptyConfigureValue(this.getFieldCellValue(cell));
+                    });
+                }
+            }
+
+            // Fallback: disable when there is exactly one data cell and it has no value.
             const dataCells = Array.from(rowElement.querySelectorAll('td[data-field-name]'));
 
             if (dataCells.length !== 1) {
                 return false;
             }
 
-            const rowValue = this.getFieldCellValue(dataCells[0]);
-
-            return this.isEmptyConfigureValue(rowValue);
+            return this.isEmptyConfigureValue(this.getFieldCellValue(dataCells[0]));
         },
 
         // Refreshes configure button disabled state for all rows in a repeater.
@@ -1138,23 +1492,23 @@ export default function registerRepeaterFieldStore() {
             });
         },
 
-        // Removes template-only id/for suffixes before a clone becomes a real row.
+        // Removes template-only id/reference suffixes before a clone becomes a real row.
         stripTemplateFieldIdSuffix(rowElement) {
             if (!rowElement) {
                 return;
             }
 
-            const templateIdSuffix = '--template';
+            const idReferenceAttributes = ['id', 'for', 'aria-labelledby', 'aria-describedby', 'data-rt-id'];
 
-            rowElement.querySelectorAll('[id], [for]').forEach(node => {
-                ['id', 'for'].forEach(attribute => {
+            rowElement.querySelectorAll('[id], [for], [aria-labelledby], [aria-describedby], [data-rt-id]').forEach(node => {
+                idReferenceAttributes.forEach(attribute => {
                     const value = node.getAttribute(attribute);
 
-                    if (!value || !value.endsWith(templateIdSuffix)) {
+                    if (!value || !value.includes('-template')) {
                         return;
                     }
 
-                    node.setAttribute(attribute, value.slice(0, -templateIdSuffix.length));
+                    node.setAttribute(attribute, value.replaceAll('-template', ''));
                 });
             });
         },
@@ -1289,7 +1643,16 @@ export default function registerRepeaterFieldStore() {
             this.stripTemplateFieldIdSuffix(clonedRow);
 
             clonedRow.querySelectorAll('input, select, textarea, button').forEach(control => {
+                const shouldPreserveDisabled = control.getAttribute('data-repeater-preserve-disabled') === 'true';
+
+                if (shouldPreserveDisabled) {
+                    control.setAttribute('disabled', 'disabled');
+                    control.setAttribute('aria-disabled', 'true');
+                    return;
+                }
+
                 control.removeAttribute('disabled');
+                control.removeAttribute('aria-disabled');
             });
 
             this.applyRowDefaultValues(rowElement, clonedRow);
@@ -1386,6 +1749,9 @@ export default function registerRepeaterFieldStore() {
 
         // Adds a new row to the repeater field
         addRow(anchorElement) {
+            const repeaterRoot = this.getRepeaterRoot(anchorElement);
+            const repeaterId = repeaterRoot?.id ?? null;
+            const callbackName = this.getRepeaterCallbackName(anchorElement, 'data-add-row-callback');
             const rowElements = this.getRowElements(anchorElement);
             const templateRow = this.getTemplateRowElement(anchorElement);
 
@@ -1414,6 +1780,13 @@ export default function registerRepeaterFieldStore() {
                 }
 
                 this.rebuildRepeaterBody(anchorElement, [firstRow]);
+                this.invokeRepeaterCallback(callbackName, {
+                    triggerElement: anchorElement,
+                    repeaterId,
+                    rowIndex: 0,
+                    rowValue: this.getRepeaterRowValue(repeaterRoot, 0),
+                    repeaterValue: this.getRepeaterValueSnapshot(repeaterRoot),
+                });
                 return;
             }
 
@@ -1427,20 +1800,26 @@ export default function registerRepeaterFieldStore() {
 
             rowElements.push(insertedRow);
             this.rebuildRepeaterBody(anchorElement, rowElements);
+            const nextRowIndex = rowElements.length - 1;
+
+            this.invokeRepeaterCallback(callbackName, {
+                triggerElement: anchorElement,
+                repeaterId,
+                rowIndex: nextRowIndex,
+                rowValue: this.getRepeaterRowValue(repeaterRoot, nextRowIndex),
+                repeaterValue: this.getRepeaterValueSnapshot(repeaterRoot),
+            });
         },
 
         // Removes a row from the repeater field based on the provided index
         removeRow(anchorElement) {
+            const repeaterRoot = this.getRepeaterRoot(anchorElement);
+            const repeaterId = repeaterRoot?.id ?? null;
             const rowElement = anchorElement?.closest?.('tr.meros-repeater-row') ?? null;
             const rowElements = this.getRowElements(anchorElement);
+            const callbackName = this.getRepeaterCallbackName(anchorElement, 'data-remove-row-callback');
 
             if (!rowElement) {
-                return;
-            }
-
-            if (rowElements.length <= 1) {
-                this.pendingTomSelectValuesByElement = null;
-                this.rebuildRepeaterBody(anchorElement, []);
                 return;
             }
 
@@ -1451,11 +1830,33 @@ export default function registerRepeaterFieldStore() {
                 return;
             }
 
+            const removedRowValue = this.buildRepeaterRowValue(rowElement);
+
+            if (rowElements.length <= 1) {
+                this.pendingTomSelectValuesByElement = null;
+                this.rebuildRepeaterBody(anchorElement, []);
+                this.invokeRepeaterCallback(callbackName, {
+                    triggerElement: anchorElement,
+                    repeaterId,
+                    rowIndex,
+                    rowValue: removedRowValue,
+                    repeaterValue: this.getRepeaterValueSnapshot(repeaterRoot),
+                });
+                return;
+            }
+
             rowElements.splice(rowIndex, 1);
 
             // Preserve current values for remaining rows only.
             this.pendingTomSelectValuesByElement = this.captureTomSelectValuesByElement(rowElements);
             this.rebuildRepeaterBody(anchorElement, rowElements);
+            this.invokeRepeaterCallback(callbackName, {
+                triggerElement: anchorElement,
+                repeaterId,
+                rowIndex,
+                rowValue: removedRowValue,
+                repeaterValue: this.getRepeaterValueSnapshot(repeaterRoot),
+            });
         },
 
         // Handles the drag over event on a row gap, showing the visual indicator
@@ -1480,6 +1881,7 @@ export default function registerRepeaterFieldStore() {
         // Moves a row within the repeater field from the source index to the target index
         moveRow(anchorElement, sourceIndex = null, targetIndex = null) {
             const repeaterRoot = this.getRepeaterRoot(anchorElement);
+            const repeaterId = repeaterRoot?.id ?? null;
             const rowElements = this.getRowElements(anchorElement);
             const safeSourceIndex = this.parseIndex(sourceIndex);
             const safeTargetIndex = this.parseIndex(targetIndex);
@@ -1491,6 +1893,12 @@ export default function registerRepeaterFieldStore() {
             if (safeSourceIndex < 0 || safeSourceIndex >= rowElements.length) {
                 return;
             }
+
+            const callbackName = this.getRepeaterCallbackName(
+                rowElements[safeSourceIndex]?.querySelector('.meros-repeater-move-button') ?? repeaterRoot,
+                'data-move-row-callback'
+            );
+            const movedRowValue = this.buildRepeaterRowValue(rowElements[safeSourceIndex]);
 
             const [movingRow] = rowElements.splice(safeSourceIndex, 1);
 
@@ -1510,6 +1918,15 @@ export default function registerRepeaterFieldStore() {
             // Preserve advanced-select values for reorder only.
             this.pendingTomSelectValuesByElement = this.captureTomSelectValuesByElement(rowElements);
             this.rebuildRepeaterBody(anchorElement, rowElements);
+            this.invokeRepeaterCallback(callbackName, {
+                triggerElement: anchorElement,
+                repeaterId,
+                rowValue: movedRowValue,
+                sourceIndex: safeSourceIndex,
+                requestedTargetIndex: safeTargetIndex,
+                targetIndex: insertAt,
+                repeaterValue: this.getRepeaterValueSnapshot(repeaterRoot),
+            });
         },
     };
 

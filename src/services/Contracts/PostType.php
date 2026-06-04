@@ -6,7 +6,10 @@ use Closure;
 use Illuminate\Support\Str;
 
 use MM\Meros\Services\Contracts\FeatureDefinition;
+use MM\Meros\Services\Contracts\Forms\FieldGroup;
+
 use MM\Meros\Facades\PostMetaDefinitions as PostMetaFacade;
+use MM\Meros\Facades\FieldGroups;
 
 use MM\Meros\App\Models\Post;
 
@@ -31,6 +34,13 @@ class PostType extends FeatureDefinition {
      * @var string
      */
     protected string $pluralLabel = '';
+
+    /**
+     * Indicates whether the post type is a WP 'core' post type.
+     *
+     * @var boolean
+     */
+    protected bool $isCore = false;
 
     /**
      * Arguments to be passed to the register_post_type function when registering this post type.
@@ -108,7 +118,9 @@ class PostType extends FeatureDefinition {
 
         if (!$this->queued) {
             add_action('init', function () {
-                register_post_type($this->handle, $this->args);
+                if ($this->isCore === false) {
+                    register_post_type($this->handle, $this->args);
+                }
 
                 if (!empty($this->metaContainers)) {
                     foreach($this->metaContainers as $container) {
@@ -117,11 +129,13 @@ class PostType extends FeatureDefinition {
                 }
             });
 
-            add_action('admin_init', function() {
-                add_filter('manage_' . $this->handle . '_posts_columns', function() {
-                    return $this->columns;
+            if ($this->isCore === false) {
+                add_action('admin_init', function() {
+                    add_filter('manage_' . $this->handle . '_posts_columns', function() {
+                        return $this->columns;
+                    });
                 });
-            });
+            }
 
             add_action('save_post_' . $this->handle, function($postId) {
                 if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
@@ -166,6 +180,21 @@ class PostType extends FeatureDefinition {
      */
     public function name(string $handle): self {
         return $this->handle($handle);
+    }
+
+    /**
+     * Marks the post type as a WP 'core' post type, which prevents it from being registered 
+     * through the register_post_type function and allows it to be used for extending existing 
+     * core post types like 'post' and 'page'.
+     *
+     * @param boolean $isCore
+     *
+     * @return self
+     */
+    public function isCore(bool $isCore = true): self {
+        $this->isCore = $isCore;
+
+        return $this;
     }
 
     /**
@@ -233,6 +262,28 @@ class PostType extends FeatureDefinition {
 
             return $this->editPostLink;
         }, 10, 2);
+
+        return $this;
+    }
+
+    public function fields(FieldGroup|string $fieldGroup): self {
+        if (is_string($fieldGroup)) {
+            $fieldGroup = FieldGroups::checkout($this->provider)
+                ->get($fieldGroup);
+        }
+
+        if (!$fieldGroup instanceof FieldGroup) {
+            return $this;
+        }
+
+        $handle        = $fieldGroup->getHandle();
+        $attachedGroup = $this->metaContainer($handle)
+            ->setFieldGroup($fieldGroup)
+            ->getFieldGroup();
+
+        foreach($attachedGroup->getFields() as $field) {
+            $attachedGroup->addMetaField($field, false);
+        }
 
         return $this;
     }

@@ -34,9 +34,7 @@ class MultiSelect extends Select {
      * @var array
      */
     protected array $attributes = [
-        'multiple'       => true,
-        'data-advanced'  => 'true',
-        'data-allow-add' => 'true',
+        'multiple' => true,
     ];
 
     /**
@@ -52,5 +50,15 @@ class MultiSelect extends Select {
         }
 
         return $value;
+    }
+
+    /**
+     * Determines if this multi-select field should use an advanced UI (e.g., tomselect).
+     * Always set to true for multi-select fields.
+     *
+     * @return boolean
+     */
+    public function isAdvanced(): bool {
+        return true;
     }
 }

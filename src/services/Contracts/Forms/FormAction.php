@@ -26,6 +26,26 @@ abstract class FormAction extends FeatureDefinition {
      */
     public string $description;
 
+    /**
+     * An associative array of configuration options for the form action.
+     *
+     * @var array
+     */
+    protected array $config = [];
+
+    /**
+     * Sets the configuration options for the form action.
+     *
+     * @param array $config
+     *
+     * @return static
+     */
+    public function config(array $config): static {
+        $this->config = $config;
+        return $this;
+    }
+
+
     /***************************
      * Contract methods
      ***************************/
@@ -65,6 +85,15 @@ abstract class FormAction extends FeatureDefinition {
         return $this->description;
     }
 
+    /**
+     * Retrieves the current configuration array for this form action.
+     *
+     * @return array
+     */
+    public function getConfig(): array {
+        return $this->config;
+    }
+
     /***************************
      * Abstract methods
      ***************************/
@@ -77,9 +106,10 @@ abstract class FormAction extends FeatureDefinition {
      * This should return an HTML string containing the form 
      * fields for configuring the action's settings.
      * 
-     * @param array $formFields An array of the form's fields, which can be used to populate options in the configuration dialogue if needed.
+     * @param array $formFields    An array of the form's fields, which can be used to populate options in the configuration dialogue if needed.
+     * @param array $currentConfig The current configuration for the form action, which can be used to prepopulate the configuration dialogue with existing values.
      *
      * @return string
      */
-    abstract public function renderConfigurationDialog(array $formFields): string;
+    abstract public function renderConfigurationDialog(array $formFields, array $currentConfig): string;
 }

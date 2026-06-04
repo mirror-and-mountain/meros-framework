@@ -1,12 +1,14 @@
 import TomSelect from 'tom-select';
 import './style.scss';
 
-function initTomSelect(el) {
+export function initTomSelect(el, destroy = false) {
     const multiple = el.hasAttribute('multiple');
     const allowAdd = el.hasAttribute('data-allow-add') && el.getAttribute('data-allow-add') === 'true';
 
-    if (el.tomselect) {
+    if (el.tomselect && !destroy) {
         return;
+    } else if (el.tomselect && destroy) {
+        el.tomselect.destroy();
     }
 
     const make = (select, multiple, allowAdd) => {

@@ -5,12 +5,19 @@
     $options    = $field->getOptions();
     $classList  = trim('meros-select-field ' . $field->classList());
     $isAdvanced = $field->isAdvanced();
+    $allowsAdd  = $field->allowsAdd();
+    $onChange   = $field->getOnChange();
 @endphp
 
 <select
     name="{{ $field->allowsMultiple() ? $name . '[]' : $name }}"
     class="{{ $classList }}"
     {!! $field->attributes(['name', 'class']) !!}
+    data-advanced="{{ $isAdvanced ? 'true' : 'false' }}"
+    data-allow-add="{{ $allowsAdd ? 'true' : 'false' }}"
+    @if(!empty($onChange))
+        x-on:change="{{ $onChange }}"
+    @endif
 >
     @if(empty($options) && !$isAdvanced)
         <option value="" disabled @selected(true)>No options configured</option>

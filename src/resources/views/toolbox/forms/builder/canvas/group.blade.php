@@ -5,7 +5,7 @@
         @dragstart="$store.formBuilder.endDrag(); $event.dataTransfer.effectAllowed = 'move'; $event.dataTransfer.setData('application/x-meros-group-row', '{{ $groupRowIndex }}')"
         @dragend="$store.formBuilder.endDrag()"
     >
-        <div class="meros-site-form-group-header">
+        <div class="meros-form-group-header">
             <h3 class="font-semibold text-gray-800">⠿ {{ $groupPayload['title'] }}</h3>
             @if(!empty($groupPayload['description']))
                 <p>{!! $this->renderQuillContent($groupPayload['description']) !!}</p>

@@ -3,9 +3,9 @@
 namespace MM\Meros\App\FormActions;
 
 use MM\Meros\Services\Contracts\Forms\FormAction;
-use MM\Meros\App\Models\MerosEmailTemplate as EmailTemplate;
+use MM\Meros\App\Models\EmailTemplate;
 
-use MM\Meros\Facades\Fields;
+use MM\Meros\Facades\FieldGroups;
 use MM\Meros\Facades\Framework;
 
 final class SendEmailWithTemplate extends FormAction {
@@ -44,21 +44,6 @@ final class SendEmailWithTemplate extends FormAction {
      */
     protected ?EmailTemplate $template = null;
 
-    /**
-     * An associative array of configuration options for sending the email, which may include:
-     * - 'to' (string): The recipient email address(es), which can be a single email as a string or an array of emails for multiple recipients.
-     * - 'subject' (string): The subject of the email.
-     * - 'from' (string): The sender's email address.
-     * - 'cc' (array): An array of email addresses to send a carbon copy (CC) to.
-     * - 'bcc' (array): An array of email addresses to send a blind carbon copy (BCC) to.
-     * - 'replyTo' (string): The email address to use for the Reply-To header.
-     * - 'attachments' (array): An array of file paths to attach to the email.
-     * - 'tagMap' (array): An associative array mapping merge tag names to their replacement values, which will be used to replace any merge tags found in the template content before sending the email.
-     *
-     * @var array
-     */
-    protected array $config = [];
-
     /***************************
      * Public Chainable methods
      ***************************/
@@ -79,18 +64,6 @@ final class SendEmailWithTemplate extends FormAction {
             throw new \InvalidArgumentException("Email template with ID '{$templateId}' not found.");
         }
 
-        return $this;
-    }
-
-    /**
-     * Sets the configuration options for sending the email.
-     *
-     * @param array $config
-     *
-     * @return static
-     */
-    public function config(array $config): static {
-        $this->config = $config;
         return $this;
     }
 
@@ -233,15 +206,6 @@ final class SendEmailWithTemplate extends FormAction {
     }
 
     /**
-     * Retrieves the current configuration array for this form action.
-     *
-     * @return array
-     */
-    public function getConfig(): array {
-        return $this->config;
-    }
-
-    /**
      * Renders the configuration dialogue for the form action, 
      * which will be displayed in the admin interface when 
      * configuring the form action for a form. 
@@ -249,38 +213,86 @@ final class SendEmailWithTemplate extends FormAction {
      * This should return an HTML string containing the form 
      * fields for configuring the action's settings.
      * 
-     * @param array $formFields An array of the form's fields, which can be used to populate options in the configuration dialogue if needed.
+     * @param array $formFields    An array of the form's fields, which can be used to populate options in the configuration dialogue if needed.
+     * @param array $currentConfig The current configuration for the form action, which can be used to prepopulate the configuration dialogue with existing values.
      *
      * @return string
      */
-    public function renderConfigurationDialog(array $formFields): string {
-        $html = '';
+    public function renderConfigurationDialog(array $formFields, array $currentConfig): string {
+        $html      = '';
+        $template  = '';
+        $mergeTags = [];
+        $tagMap    = [];
 
         $templateOptions = EmailTemplate::all()
             ->where('post_status', 'publish')
-            ->pluck('post_title', 'ID')
+            ->pluck('post_title', 'post_name')
             ->toArray();
 
-        $templateField = Fields::checkout(Framework::get())->makeFrom('select', [
-            'id'      => 'meros-email-template',
-            'label'   => 'Email Template',
-            'options' => $templateOptions,
-        ]);
+        if ($currentConfig !== []) {
+            $template = $currentConfig['action-send-email-template-config-template'] ?? null;
 
-        $html .= $templateField->html();
+            if ($template) {
+                $templateModel = EmailTemplate::where('post_name', $template)->first();
 
-        $tagsRepeaterField = Fields::checkout(Framework::get())->makeFrom('repeater', [
-            'id'    => 'meros-email-template-tag-map',
-            'label' => 'Merge Tags',
-        ]);
+                if ($templateModel) {
+                    $mergeTags = $templateModel->merge_tags ?? [];
+                }
+            }
 
-        $tagsRepeaterField->subField('select', function ($select) use ($formFields) {
-            $select->label('Form Field');
-            $select->options($formFields);
+            $tagMap = $currentConfig['action-send-email-template-config-tagmap'] ?? [];
+
+            if (collect($tagMap)->pluck('tag_name')->toArray() !== $mergeTags) {
+                $tagMap = [];
+            }
+
+            if ($tagMap === [] && $mergeTags !== []) {
+                foreach ($mergeTags as $tag) {
+                    $tagMap[] = [
+                        'field_name' => '',
+                        'tag_name' => $tag,
+                    ];
+                }
+            }
+        }
+
+        $fieldGroup = FieldGroups::checkout(Framework::get())->make(function ($fieldGroup) use($templateOptions, $template, $mergeTags, $formFields, $tagMap) {
+            $fieldGroup->id('action-send-email-template-config');
+            $fieldGroup->title('Email Configuration');
+
+            $fieldGroup->field('select')->id('action-send-email-template-config-template')
+                ->label('Select Template')
+                ->options(array_merge(['' => 'Select a template...'], $templateOptions))
+                ->default($template !== '' ? $template : '')
+                ->onChange('$store.formBuilder.refreshActionConfigurationDialog');
+
+            if ($template !== '') {
+                $fieldGroup->field('repeater', function ($repeater) use ($mergeTags, $formFields, $tagMap) {
+                    $repeater->id('action-send-email-template-config-tagmap');
+                    $repeater->name('tag_map');
+                    $repeater->allowConfigure(false);
+                    $repeater->allowAdd(false);
+                    $repeater->allowRemove(false);
+                    $repeater->allowReorder(false);
+
+                    $repeater->field('select')
+                        ->id('action-send-email-template-config-field-name')
+                        ->name('field_name')
+                        ->label('Field Name')
+                        ->options(array_merge(['' => ''], $formFields));
+
+                    $repeater->field('select')
+                        ->id('action-send-email-template-config-tag-name')
+                        ->name('tag_name')
+                        ->label('Tag Name')
+                        ->options(array_merge(['' => ''], $mergeTags));
+
+                    $repeater->default($tagMap);
+                });
+            }
         });
 
-        $html .= $tagsRepeaterField->html();
-
+        $html = $fieldGroup->html();
         return $html;
     }
 }

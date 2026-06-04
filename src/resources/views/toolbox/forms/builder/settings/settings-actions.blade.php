@@ -1,3 +1,16 @@
-<div x-show="settingsPage === 'actions'"  wire:ignore>
-    {!! $this->getActionsRepeaterField()->render() !!}
+<div 
+    x-show="settingsPage === 'actions'" 
+    class="h-full gap-4 p-4 overflow-y-auto overscroll-contain min-w-0 w-3/4" 
+    wire:key="form-builder-settings-actions"
+>
+    <h2 class="text-lg font-bold">Actions</h2>
+
+    <div class="mb-4" wire:ignore>
+        <p class="mb-2 text-sm text-gray-600">Configure the actions that should be taken when the form is submitted.</p>
+        {!! $this->getActionsRepeaterField()->render() !!}
+    </div>
+
+    @include('meros::toolbox.forms.builder.canvas.action-button', [
+        'reverse' => true,
+    ])
 </div>

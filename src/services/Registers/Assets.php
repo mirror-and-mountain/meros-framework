@@ -14,7 +14,7 @@ use MM\Meros\Facades\AssetGroups;
 class Assets extends Register implements Discovery {
     protected string $identifier = 'handle';
     protected string $definition = Asset::class;
-    protected array  $rejects    = ['public'];
+    protected array  $rejects    = ['public', 'makeFromCallback'];
 
     use Concerns\Discovers;
 

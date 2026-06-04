@@ -15,25 +15,25 @@ class Form extends Post {
         return parent::newQuery()->where('post_type', 'meros-form');
     }
 
-    public function form_meta(): HasOne {
+    public function formMeta(): HasOne {
         return $this->hasOne(FormMeta::class, 'post_id');
     }
 
     public function schema(): Attribute {
         return Attribute::make(
-            get: fn () => $this->form_meta?->meta_value['schema'] ?? [],
+            get: fn () => $this->formMeta?->meta_value['schema'] ?? [],
         );
     }
 
     protected function rows(): Attribute {
         return Attribute::make(
-            get: fn (): array => $this->form_meta?->meta_value['schema']['rows'] ?? [],
+            get: fn (): array => $this->formMeta?->meta_value['schema']['rows'] ?? [],
         );
     }
 
     protected function actions(): Attribute {
         return Attribute::make(
-            get: fn (): array => $this->form_meta?->meta_value['schema']['actions'] ?? [],
+            get: fn (): array => $this->formMeta?->meta_value['schema']['actions'] ?? [],
         );
     }
 }

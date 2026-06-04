@@ -8,7 +8,7 @@ use MM\Meros\Services\Contracts\Forms\FieldWrapper;
 class FieldWrappers extends Register {
     protected string $identifier = 'handle';
     protected string $definition = FieldWrapper::class;
-    protected array  $rejects = ['make'];
+    protected array  $rejects    = ['make', 'makeFromCallback'];
 
     /**
      * Parses properties for the field wrapper's constructor.

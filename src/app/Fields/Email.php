@@ -2,39 +2,32 @@
 
 namespace MM\Meros\App\Fields;
 
-class Password extends Input {
+class Email extends Input {
     /**
      * The unique identifier for the field, used for resolution.
      *
      * @var string
      */
-    public string $handle = 'password';
-
-    /**
-     * The category for the field, used for grouping in the UI.
-     *
-     * @var string
-     */
-    public static string $category = 'specialised';
+    public string $handle = 'email';
 
     /**
      * The icon for the field, used in the form builder UI.
      *
      * @var string
      */
-    public static string $icon = 'lock';
+    public static string $icon = 'email';
 
     /**
-     * Default attributes for the password field.
+     * Default attributes for the email field.
      *
      * @var array
      */
     protected array $attributes = [
-        'type' => 'password',
+        'type' => 'email',
     ];
 
     /**
-     * Supported features for the password field.
+     * Supported features for the email field.
      *
      * @var array
      */

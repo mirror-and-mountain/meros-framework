@@ -7,6 +7,8 @@
         resizeStartWidth: 384,
         activeField: null,
         activeFieldType: null,
+        requiredControl: null,
+        disabledControl: null,
 
         {{-- Initialise the settings panel --}}
         initialise(activeField) {
@@ -15,13 +17,17 @@
                 this.activeField = $store.formBuilder.activeField;
                 this.activeFieldType = activeField?.handle ?? null;
 
-                if ($store.formBuilder.isMultipleChoiceField(activeField.handle)) {
-                    this.initMultiSelect();
+
+                if ($store.formBuilder.hasTomSelectDefaultValue(activeField.handle)) {
+                    this.initTomSelectDefaultValueControl();
                 }
 
                 if (activeField?.handle === 'rich_text') {
                     this.hydrateQuillContent();
                 }
+
+                this.requiredControl = document.getElementById('field-required');
+                this.disabledControl = document.getElementById('field-disabled');
             }
 
             else if (!activeField) {
@@ -30,15 +36,28 @@
             }
         },
 
-        {{-- Initialise the multi-select field if selected --}}
-        initMultiSelect() {
+        {{-- Initialise the TomSelect default value control if selected --}}
+        initTomSelectDefaultValueControl() {
             this.$nextTick(() => {
                 const options = { ...this.activeField.options };
-                const defaultValue = Array.isArray(this.activeField.default)
-                ? [...this.activeField.default]
-                : (this.activeField.default ? [this.activeField.default] : []);
+                
+                const isMultipleChoice = $store.formBuilder.isMultipleChoiceField(this.activeFieldType);
 
-                const defaultValueSelect = document.querySelector('.meros-multi-select-default-value');
+                let defaultValue = this.activeField.default;
+
+                if (isMultipleChoice) {
+                    defaultValue = Array.isArray(defaultValue) ? defaultValue : (defaultValue ? [defaultValue] : []);
+                } else {
+                    defaultValue = defaultValue ? defaultValue : '';
+                }
+
+                let defaultValueSelect;
+
+                if (isMultipleChoice) {
+                    defaultValueSelect = document.querySelector('.meros-multi-select-default-value');
+                } else {
+                    defaultValueSelect = document.querySelector('.meros-advanced-select-default-value');
+                }
                 
                 if (defaultValueSelect?.tomselect) {
                     defaultValueSelect.tomselect.clear(true);
@@ -51,6 +70,25 @@
                     defaultValueSelect.tomselect.setValue(defaultValue);
                 }
             });
+        },
+
+        {{-- Update the required and disabled controls --}}
+        updateDependentControls(control, value) {
+            if (control === 'required' && this.requiredControl) {
+                if (this.disabledControl?.checked) {
+                    this.disabledControl.checked = false;
+                    this.updateSetting('disabled', false);
+                }
+                this.updateSetting('required', value);
+            }
+
+            if (control === 'disabled' && this.disabledControl) {
+                if (this.requiredControl?.checked) {
+                    this.requiredControl.checked = false;
+                    this.updateSetting('required', false);
+                }
+                this.updateSetting('disabled', value);
+            }
         },
 
         {{-- Update a setting for the active field --}}
@@ -66,6 +104,7 @@
 
                 if (setting === 'default') {
                     value = this.getDefaultSelectValueControl()?.tomselect.getValue() ?? value;
+                    
                     if (this.activeField?.advanced) {
                         this.updateSelectDefaultValue(value);
                     }
@@ -81,6 +120,21 @@
                             value = [selectedValues];
                         }
                     }
+                }
+            }
+
+            if (this.activeField?.advanced && setting === 'allowAdd') {
+                value = Boolean(value);
+                const fieldEl = document.getElementById(this.activeField.id);
+
+                if (fieldEl) {
+                    fieldEl.dataset.allowAdd = value ? 'true' : 'false';
+
+                    window.dispatchEvent(new CustomEvent('meros-remake-tom-select', {
+                        detail: {
+                            fieldId: this.activeField.id,
+                        }
+                    }));
                 }
             }
 
@@ -139,7 +193,11 @@
 
         {{-- Get the default select value control --}}
         getDefaultSelectValueControl() {
-            return document.querySelector('.meros-multi-select-default-value');
+            const isMultipleChoice = $store.formBuilder.isMultipleChoiceField(this.activeFieldType);
+
+            return isMultipleChoice 
+                ? document.querySelector('.meros-multi-select-default-value') 
+                : document.querySelector('.meros-advanced-select-default-value');
         },
 
         {{-- Get the option entries for a field --}}
@@ -250,7 +308,7 @@
     aria-label="Field settings panel"
     aria-description="Panel for editing the settings of the selected field"
     aria-expanded="open"
-    class="relative shrink-0 border-l border-gray-300 bg-white p-4 overflow-y-auto overflow-x-hidden"
+    class="relative shrink-0 h-full border-l border-gray-300 bg-white p-4 pb-25 overflow-x-hidden overflow-y-auto overscroll-contain"
     :style="`width: ${panelWidth}px`"
 >
     <div
