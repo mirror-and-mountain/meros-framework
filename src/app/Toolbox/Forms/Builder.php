@@ -10,7 +10,6 @@ use Illuminate\Support\Collection;
 
 use MM\Meros\Services\Contracts\Forms\Field;
 use MM\Meros\Services\Contracts\Forms\FieldGroup;
-use MM\Meros\Services\Contracts\Forms\FormAction;
 
 use MM\Meros\Facades\Fields;
 use MM\Meros\Facades\FieldGroups;
@@ -683,6 +682,8 @@ class Builder extends Component {
      */
     public function getActionConfigurationDialog(string $uniqueActionHandle, array $formFields = [], array $config = []): string {
         $this->initialiseFormActions();
+
+        //// Here. We'll get form fields in the same way do as in conditions rather than receiving from the front end.
 
         $actionHandle = Str::before($uniqueActionHandle, '__');
 

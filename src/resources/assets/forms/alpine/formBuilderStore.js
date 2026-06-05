@@ -1302,18 +1302,107 @@ export default function registerFormBuilderStore() {
                 return;
             }
 
-            const field = this.findTopField(this.rows, sourceRowIndex, sourceFieldIndex);
-            
-            if (field && this.activeField?.id === field.properties.id) {
+            const field = (sourceGroupRowIndex !== null && sourceGroupInnerRowIndex !== null)
+                ? this.findGroupField(this.rows, sourceGroupRowIndex, sourceGroupInnerRowIndex, sourceFieldIndex)
+                : this.findTopField(this.rows, sourceRowIndex, sourceFieldIndex);
+
+            const removedFieldId = String(field?.properties?.id ?? '').trim();
+            const closeEditingPanel = removedFieldId !== '' && this.activeField?.id === removedFieldId;
+
+            if (closeEditingPanel) {
                 this.activeField = null;
             }
 
             this.commitRows(rows => {
+                let extracted = null;
+
                 if (sourceGroupRowIndex !== null && sourceGroupInnerRowIndex !== null) {
-                    this.extractGroupField(rows, sourceGroupRowIndex, sourceGroupInnerRowIndex, sourceFieldIndex);
+                    extracted = this.extractGroupField(rows, sourceGroupRowIndex, sourceGroupInnerRowIndex, sourceFieldIndex);
                 } else {
-                    this.extractTopField(rows, sourceRowIndex, sourceFieldIndex);
+                    extracted = this.extractTopField(rows, sourceRowIndex, sourceFieldIndex);
                 }
+
+                const extractedFieldId = String(extracted?.field?.properties?.id ?? removedFieldId).trim();
+
+                if (extractedFieldId !== '') {
+                    this.purgeFieldConditionRulesByFieldId(rows, extractedFieldId);
+                }
+            }, closeEditingPanel);
+        },
+
+        // Removes any field-condition rules that reference a removed field id.
+        purgeFieldConditionRulesByFieldId(rows, removedFieldId) {
+            const targetFieldId = String(removedFieldId ?? '').trim();
+
+            if (targetFieldId === '') {
+                return;
+            }
+
+            const purgeFieldList = fields => {
+                if (!Array.isArray(fields)) {
+                    return;
+                }
+
+                fields.forEach(field => {
+                    if (!field || typeof field !== 'object') {
+                        return;
+                    }
+
+                    this.purgeFieldConditionsForSingleField(field, targetFieldId);
+
+                    if (field.handle === 'repeater') {
+                        purgeFieldList(this.getRepeaterSubFields(field));
+                    }
+                });
+            };
+
+            (rows ?? []).forEach(row => {
+                if (row?.type === 'group') {
+                    (row.group?.rows ?? []).forEach(innerRow => {
+                        purgeFieldList(innerRow?.fields ?? []);
+                    });
+                    return;
+                }
+
+                if (row?.type === 'fields') {
+                    purgeFieldList(row.fields ?? []);
+                }
+            });
+        },
+
+        // Purges matching rules from all condition types on a single field.
+        purgeFieldConditionsForSingleField(field, removedFieldId) {
+            if (!field || typeof field !== 'object') {
+                return;
+            }
+
+            if (!field.properties || typeof field.properties !== 'object') {
+                return;
+            }
+
+            const conditions = field.properties.conditions;
+
+            if (!conditions || typeof conditions !== 'object') {
+                return;
+            }
+
+            Object.keys(conditions).forEach(conditionType => {
+                const conditionConfig = conditions[conditionType];
+
+                if (!conditionConfig || typeof conditionConfig !== 'object') {
+                    return;
+                }
+
+                if (!Array.isArray(conditionConfig.rules)) {
+                    conditionConfig.rules = [];
+                    return;
+                }
+
+                conditionConfig.rules = conditionConfig.rules.filter(rule => {
+                    const ruleFieldId = String(rule?.field_id ?? '').trim();
+
+                    return ruleFieldId === '' || ruleFieldId !== removedFieldId;
+                });
             });
         },
 
@@ -2206,7 +2295,7 @@ export default function registerFormBuilderStore() {
             
             else {
                 newInput = document.createElement('input');
-                newInput.type = field.handle;
+                newInput.type = field.handle === 'range' ? 'number' : field.handle
                 newInput.name = valueInputName;
             }
 
