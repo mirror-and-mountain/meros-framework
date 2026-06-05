@@ -177,24 +177,28 @@ class Builder extends Component {
      *
      * @return void
      */
-    public function updateRows(array $updatedSchemaRows): void {
+    public function updateRows(array $updatedSchemaRows, bool $closeEditingPanel = false): void {
         $updatedSchemaRows = $this->normaliseFieldGroupRows($updatedSchemaRows);
 
         $this->schema['rows'] = $updatedSchemaRows;
         $this->rowPayloads    = $updatedSchemaRows;
 
+        if ($this->editingFieldID !== null && !$closeEditingPanel) {
+            $this->editingField = $this->getEditingField($this->editingFieldID);
+        }
+
+        else if ($this->editingRepeaterID !== null && !$closeEditingPanel) {
+            $this->editingRepeaterField = $this->getEditingRepeaterField($this->editingRepeaterID);
+        }
+
+        else if ($closeEditingPanel) {
+            $this->editingFieldID = null;
+            $this->editingField = null;
+            $this->editingRepeaterID = null;
+            $this->editingRepeaterField = null;
+        }
+
         $this->dispatchSchemaUpdate();
-    }
-
-    /**
-     * Updates the conditions for a specific field in the form schema.
-     *
-     * @param array $conditions
-     *
-     * @return void
-     */
-    public function updateFieldConditions(array $conditions): void {
-
     }
 
     /**
@@ -216,15 +220,21 @@ class Builder extends Component {
         $this->dispatchSchemaUpdate();
     }
 
-    public function getFieldConditionsRepeaters(array $conditions = []): array {
+    // =========================================================================
+    // Conditions Management Methods
+    // =========================================================================
+
+    /**
+     * Builds and returns repeater field instances for managing the conditions of the field currently being edited.
+     *
+     * @return array
+     */
+    public function getFieldConditionsRepeaters(): array {
         if ($this->editingField === null) {
             return [];
         }
 
-        if (empty($conditions)) {
-            $conditions = $this->editingField->getConditions() ?? [];
-        }
-
+        $conditions = $this->editingField->getConditions() ?? [];
         $currentFields = [];
 
         $this->walkFormFields($this->rowPayloads, function($field) use (&$currentFields) {
@@ -239,12 +249,16 @@ class Builder extends Component {
 
         $currentFields = collect($currentFields)->filter(function ($field) {
             return $field['id'] !== $this->editingFieldID;
-        })->pluck('label', 'id')->toArray();
+        })->values();
+
+        $currentFieldLabels = $currentFields->pluck('label', 'id')->toArray();
+        $currentFieldHandlesById = $currentFields->pluck('type', 'id')->toArray();
 
         $repeaters = [];
         foreach ($conditions as $type => $configuration) {
-            $logic = $configuration['logic'] ?? 'and';
             $rules = $configuration['rules'] ?? [];
+            $operatorOptions = $this->getFieldConditionOperatorOptionsForRules($rules, $currentFieldHandlesById);
+            $rulesForRepeaterDefault = $this->normaliseFieldConditionRulesForRepeaterDefault($rules);
 
             $repeater = Fields::checkout(Framework::get())->makeFrom('repeater', [
                 'id'             => 'field-conditions-' . $type,
@@ -253,6 +267,8 @@ class Builder extends Component {
                 'onAddRow'       => '$store.formBuilder.handleFieldConditionsRepeaterAddRow',
                 'onRemoveRow'    => '$store.formBuilder.syncFieldConditionsRepeaterSelectionState',
                 'onMoveRow'      => '$store.formBuilder.syncFieldConditionsRepeaterSelectionState',
+                'addRowText'     => 'Add Condition',
+                'placeholder'    => 'No conditions added yet.'
             ]);
 
             $repeater->class('meros-field-conditions-repeater');
@@ -260,13 +276,13 @@ class Builder extends Component {
             $repeater->subField('select')
                 ->name('field_id')
                 ->label('Field Name')
-                ->options(array_merge(['' => 'Select a field'], $currentFields))
+                ->options(array_merge(['' => 'Select a field'], $currentFieldLabels))
                 ->onChange('$store.formBuilder.setFieldConditionsRow');
 
             $repeater->subField('select')
                 ->name('operator')
                 ->label('Operator')
-                ->options([])
+                ->options($operatorOptions)
                 ->onChange('$store.formBuilder.setFieldConditionOperatorRow');
 
             $repeater->subField('text')
@@ -274,10 +290,145 @@ class Builder extends Component {
                 ->label('Value')
                 ->disabled();
 
+            $repeater->default($rulesForRepeaterDefault);
+
             $repeaters[$type] = $repeater;
         }
 
         return $repeaters;
+    }
+
+    /**
+     * Normalises condition rules so repeater default hydration remains safe for text fallback fields.
+     *
+     * @param array $rules
+     *
+     * @return array
+     */
+    private function normaliseFieldConditionRulesForRepeaterDefault(array $rules): array {
+        return array_map(function($rule) {
+            if (!is_array($rule)) {
+                return $rule;
+            }
+
+            if (!array_key_exists('value', $rule)) {
+                return $rule;
+            }
+
+            $value = $rule['value'];
+
+            if (is_array($value) || is_object($value)) {
+                $rule['value'] = json_encode($value);
+            }
+
+            return $rule;
+        }, $rules);
+    }
+
+    /**
+     * Builds field-condition operator options for a ruleset by resolving each rule's field handle.
+     *
+     * @param array $rules
+     * @param array $fieldHandlesById
+     *
+     * @return array
+     */
+    private function getFieldConditionOperatorOptionsForRules(array $rules, array $fieldHandlesById): array {
+        if (empty($rules)) {
+            return [];
+        }
+
+        $allowedOperators = [];
+
+        foreach ($rules as $rule) {
+            if (!is_array($rule)) {
+                continue;
+            }
+
+            $fieldId = (string) ($rule['field_id'] ?? '');
+            $fieldType = $fieldHandlesById[$fieldId] ?? null;
+
+            foreach ($this->getFieldConditionOperatorsForFieldType($fieldType) as $operator) {
+                if (!in_array($operator, $allowedOperators, true)) {
+                    $allowedOperators[] = $operator;
+                }
+            }
+
+            $savedOperator = (string) ($rule['operator'] ?? '');
+
+            if ($savedOperator !== '' && !in_array($savedOperator, $allowedOperators, true)) {
+                $allowedOperators[] = $savedOperator;
+            }
+        }
+
+        if (empty($allowedOperators)) {
+            return [];
+        }
+
+        $options = ['' => 'Select operator'];
+
+        foreach ($allowedOperators as $operator) {
+            $options[$operator] = $this->formatFieldConditionOperatorLabel($operator);
+        }
+
+        return $options;
+    }
+
+    /**
+     * Returns available field-condition operators for a field type.
+     * Mirrors the operator map in formBuilderStore.
+     *
+     * @param string|null $fieldType
+     *
+     * @return array
+     */
+    private function getFieldConditionOperatorsForFieldType(?string $fieldType): array {
+        $operatorMap = $this->getFieldConditionOperatorMap();
+
+        if ($fieldType === null || $fieldType === '') {
+            return [];
+        }
+
+        return $operatorMap[$fieldType] ?? ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
+    }
+
+    /**
+     * Returns the canonical field-condition operator map.
+     *
+     * @return array
+     */
+    public function getFieldConditionOperatorMap(): array {
+        return [
+            'text'            => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+            'textarea'        => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+            'rich_text'       => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+            'email'           => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+            'url'             => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+            'tel'             => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+            'hidden'          => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+            'number'          => ['equals', 'not_equals', 'greater_than', 'less_than', 'greater_than_or_equal_to', 'less_than_or_equal_to', 'is_empty', 'is_not_empty'],
+            'range'           => ['equals', 'not_equals', 'greater_than', 'less_than', 'greater_than_or_equal_to', 'less_than_or_equal_to', 'is_empty', 'is_not_empty'],
+            'select'          => ['equals', 'not_equals'],
+            'advanced_select' => ['equals', 'not_equals'],
+            'radio'           => ['equals', 'not_equals'],
+            'multi_select'    => ['contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+            'checkboxes'      => ['contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
+            'date'            => ['equals', 'not_equals', 'before', 'after', 'on_or_before', 'on_or_after', 'is_empty', 'is_not_empty'],
+            'time'            => ['equals', 'not_equals', 'before', 'after', 'on_or_before', 'on_or_after', 'is_empty', 'is_not_empty'],
+            'checkbox'        => ['is_checked', 'is_unchecked'],
+            'repeater'        => ['is_empty', 'is_not_empty']
+        ];
+    }
+
+    /**
+     * Formats an operator key for select-option labels.
+     *
+     * @param string $operator
+     *
+     * @return string
+     */
+    private function formatFieldConditionOperatorLabel(string $operator): string {
+        return Str::title(str_replace('_', ' ', $operator));
     }
 
     /**
@@ -753,6 +904,12 @@ class Builder extends Component {
         $this->saveRepeater($repeater);
     }
 
+    public function closeEditingRepeater(): void {
+        $this->editingRepeaterID = null;
+        $this->editingRepeaterField = null;
+        $this->dispatchSchemaUpdate();
+    }
+
     /**
      * Retrieves the repeater field instance currently being edited.
      *
@@ -990,10 +1147,6 @@ class Builder extends Component {
                 'schema'  => $serializedSchema
             ])]
         );
-
-        if ($this->editingRepeaterID) {
-            $this->setEditingRepeaterID($this->editingRepeaterID);
-        }
 
         $this->dispatchSchemaUpdate();
         session()->flash('updateStatus', 'Form successfully saved!');

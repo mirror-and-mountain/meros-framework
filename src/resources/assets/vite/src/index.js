@@ -19,9 +19,11 @@ document.addEventListener('livewire:initialized', initTomSelects);
 window.addEventListener('meros-form-builder-schema-updated', (event) => {
     const { ignoredFields, richTextPayloads } = event.detail;
 
-    updateIgnoredFieldWrapperElements(ignoredFields);
-    initTomSelects();
-    initRichTextEditors(richTextPayloads);
+    setTimeout(() => {
+        updateIgnoredFieldWrapperElements(ignoredFields);
+        initTomSelects();
+        initRichTextEditors(richTextPayloads);
+    }, 500); // Allow for wire:transition to complete.
 });
 
 // Listen for task to remake a specific TomSelect instance if needed

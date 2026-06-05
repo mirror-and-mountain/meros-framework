@@ -55,6 +55,30 @@
                 >
                     @include('meros::toolbox.svgs.settings')
                 </button>
+                @if($groupField->getType() === 'repeater')
+                    <button
+                        type="button"
+                        class="shrink-0 text-gray-300 hover:text-blue-500 transition-colors text-lg leading-none cursor-pointer"
+                        title="Edit repeater fields"
+                        aria-label="Edit repeater fields"
+                        aria-description="Opens the repeater field editor for this repeater field"
+                        @click.stop="$store.formBuilder.openRepeaterFieldSettings(null, {{ $groupFieldIndex }}, {{ $groupRowIndex }}, {{ $groupRowInnerIndex }})"
+                        @mousedown.stop
+                    >
+                        @include('meros::toolbox.svgs.wrench')
+                    </button>
+                @endif
+                <button
+                    type="button"
+                    class="shrink-0 text-gray-300 hover:text-blue-500 transition-colors text-xl leading-none cursor-pointer"
+                    title="Field conditions"
+                    aria-label="Field conditions"
+                    aria-description="Opens the field conditions panel for this field"
+                    @click.stop="$store.formBuilder.editFieldConditions(null, {{ $groupFieldIndex}}, {{ $groupRowIndex }}, {{ $groupRowInnerIndex }})"
+                    @mousedown.stop
+                >
+                    @include('meros::toolbox.svgs.conditions-eye')
+                </button>
                 <button
                     type="button"
                     class="shrink-0 text-gray-300 hover:text-red-500 transition-colors text-lg leading-none cursor-pointer"
@@ -63,7 +87,9 @@
                     aria-description="Removes this field from the form"
                     @click.stop="$store.formBuilder.removeField(null, {{ $groupFieldIndex }}, {{ $groupRowIndex }}, {{ $groupRowInnerIndex }})"
                     @mousedown.stop
-                >&times;</button>
+                >
+                    @include('meros::toolbox.svgs.remove')
+                </button>
             </div>
         </div>
         {!! $groupField->render() !!}
@@ -121,23 +147,48 @@
                         type="button"
                         class="shrink-0 text-gray-300 hover:text-blue-500 transition-colors text-xl leading-none cursor-pointer"
                         title="Field settings"
+                        aria-label="Field settings"
+                        aria-description="Opens the settings panel for this field"
+                        aria-controls="field-settings-panel"
                         @click.stop="$store.formBuilder.editField({{ $fieldRowIndex }}, {{ $fieldIndex }})"
                         @mousedown.stop
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6 cursor-pointer">
-                            <path fill-rule="evenodd" d="M11.828 2.25c-.916 0-1.699.663-1.85 1.567l-.091.549a.798.798 0 0 1-.517.608 7.45 7.45 0 0 0-.478.198.798.798 0 0 1-.796-.064l-.453-.324a1.875 1.875 0 0 0-2.416.2l-.243.243a1.875 1.875 0 0 0-.2 2.416l.324.453a.798.798 0 0 1 .064.796 7.448 7.448 0 0 0-.198.478.798.798 0 0 1-.608.517l-.55.092a1.875 1.875 0 0 0-1.566 1.849v.344c0 .916.663 1.699 1.567 1.85l.549.091c.281.047.508.25.608.517.06.162.127.321.198.478a.798.798 0 0 1-.064.796l-.324.453a1.875 1.875 0 0 0 .2 2.416l.243.243c.648.648 1.67.733 2.416.2l.453-.324a.798.798 0 0 1 .796-.064c.157.071.316.137.478.198.267.1.47.327.517.608l.092.55c.15.903.932 1.566 1.849 1.566h.344c.916 0 1.699-.663 1.85-1.567l.091-.549a.798.798 0 0 1 .517-.608 7.52 7.52 0 0 0 .478-.198.798.798 0 0 1 .796.064l.453.324a1.875 1.875 0 0 0 2.416-.2l.243-.243c.648-.648.733-1.67.2-2.416l-.324-.453a.798.798 0 0 1-.064-.796c.071-.157.137-.316.198-.478.1-.267.327-.47.608-.517l.55-.091a1.875 1.875 0 0 0 1.566-1.85v-.344c0-.916-.663-1.699-1.567-1.85l-.549-.091a.798.798 0 0 1-.608-.517 7.507 7.507 0 0 0-.198-.478.798.798 0 0 1 .064-.796l.324-.453a1.875 1.875 0 0 0-.2-2.416l-.243-.243a1.875 1.875 0 0 0-2.416-.2l-.453.324a.798.798 0 0 1-.796.064 7.462 7.462 0 0 0-.478-.198.798.798 0 0 1-.517-.608l-.091-.55a1.875 1.875 0 0 0-1.85-1.566h-.344ZM12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" clip-rule="evenodd" />
-                        </svg>
+                        @include('meros::toolbox.svgs.settings')
+                    </button>
+                    @if($field->getType() === 'repeater')
+                        <button
+                            type="button"
+                            class="shrink-0 text-gray-300 hover:text-blue-500 transition-colors text-xl leading-none cursor-pointer"
+                            title="Edit repeater fields"
+                            aria-label="Edit repeater fields"
+                            aria-description="Opens the repeater field editor for this repeater field"
+                            @click.stop="$store.formBuilder.openRepeaterFieldSettings({{ $fieldRowIndex }}, {{ $fieldIndex }})"
+                            @mousedown.stop
+                        >
+                            @include('meros::toolbox.svgs.wrench')
+                        </button>
+                    @endif
+                    <button
+                        type="button"
+                        class="shrink-0 text-gray-300 hover:text-blue-500 transition-colors text-xl leading-none cursor-pointer"
+                        title="Field conditions"
+                        aria-label="Field conditions"
+                        aria-description="Opens the field conditions panel for this field"
+                        @click.stop="$store.formBuilder.editFieldConditions({{ $fieldRowIndex }}, {{ $fieldIndex }})"
+                        @mousedown.stop
+                    >
+                        @include('meros::toolbox.svgs.conditions-eye')
                     </button>
                     <button
                         type="button"
-                        class="shrink-0 text-gray-300 hover:text-red-500 transition-colors text-xl leading-none"
+                        class="shrink-0 text-gray-300 hover:text-red-500 transition-colors text-xl leading-none cursor-pointer"
                         title="Remove field"
+                        aria-label="Remove field"
+                        aria-description="Removes this field from the form"
                         @click.stop="$store.formBuilder.removeField({{ $fieldRowIndex }}, {{ $fieldIndex }})"
                         @mousedown.stop
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6 cursor-pointer">
-                            <path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-                        </svg>
+                        @include('meros::toolbox.svgs.remove')
                     </button>
                 </div>
             </div>

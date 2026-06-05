@@ -19,7 +19,7 @@
     class="meros-field nice-form-group" {{ $showLabel === false ? 'style=margin-top:0;' : '' }}
     {{ $wireIgnore }}
 >
-    @if ($showLabel && $field->handle !== 'repeater')
+    @if ($showLabel)
         @if (!$isFieldSet)
             <label 
                 @if($field->handle === 'rich_text')

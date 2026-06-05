@@ -41,6 +41,13 @@ class Repeater extends Field {
     protected string $rootName = '';
 
     /**
+     * The placeholder text to show in the repeater when there are no rows.
+     *
+     * @var string
+     */
+    protected string $placeholder = '';
+
+    /**
      * Default class list for repeaters.
      *
      * @var array
@@ -194,6 +201,18 @@ class Repeater extends Field {
     /********************
      * Fluent Setters
      ********************/
+
+    /**
+     * Sets the placeholder text to show in the repeater when there are no rows.
+     *
+     * @param string $text
+     *
+     * @return static
+     */
+    public function placeholder(string $text): static {
+        $this->placeholder = $text;
+        return $this;
+    }
 
     /**
      * Sets whether to allow adding new rows in the repeater.
@@ -460,6 +479,15 @@ class Repeater extends Field {
     /********************
      * Getters
      ********************/
+
+    /**
+     * Gets the placeholder text to show in the repeater when there are no rows.
+     *
+     * @return string
+     */
+    public function getPlaceholder(): string {
+        return empty($this->placeholder) ? 'No items added yet.' : $this->placeholder;
+    }
 
     /**
      * Gets whether the repeater allows adding new rows.

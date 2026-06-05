@@ -49,10 +49,11 @@
 
             // Set up the form builder store
             $store.formBuilder.setSettingsUpdater((key, value) => $wire.updateSettings(key, value));
-            $store.formBuilder.setRowsUpdater((rows) => $wire.updateRows(rows));
+            $store.formBuilder.setRowsUpdater((rows, closeEditingPanel) => $wire.updateRows(rows, closeEditingPanel));
             $store.formBuilder.setFieldConditionsEditCallback((fieldId) => $wire.setEditingFieldID(fieldId));
             $store.formBuilder.setActionsUpdater((actions) => $wire.updateActions(actions));
             $store.formBuilder.setActionConfigCallback((actionHandle, fields, config) => $wire.getActionConfigurationDialog(actionHandle, fields, config));
+            $store.formBuilder.setFieldConditionOperatorMap(@js($this->getFieldConditionOperatorMap()));
 
             getSettings().then(settings => {
                 $store.formBuilder.formTitle = settings.title;

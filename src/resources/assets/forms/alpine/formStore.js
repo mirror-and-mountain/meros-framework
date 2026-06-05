@@ -2,7 +2,81 @@
 
 export default function registerFormStore() {
     const store = {
+        forms: {},
+        repeaterStore: null,
         fieldCallbacks: {},
+
+        init() {
+            this.repeaterStore = Alpine.store('repeaterField');
+        },
+
+        // ======================================
+        // Helpers
+        // ======================================
+        getField(fieldId, property = null, formId = null) {
+            const field = document.getElementById(fieldId);
+
+            if (!field) {
+                return null;
+            }
+
+            if (property === null) {
+                return field;
+            }
+
+            if (property === 'value') {
+                return this.getFieldValue(field);
+            }
+        },
+
+        getFieldValue(fieldOrFieldId, formId = null) {
+            const field = typeof fieldOrFieldId === 'string' 
+                ? document.getElementById(fieldOrFieldId) 
+                : fieldOrFieldId;
+
+            if (!field) {
+                return null;
+            }
+
+            const fieldId = field.id;
+
+            if (field.tagName === 'INPUT' || 
+                field.tagName === 'SELECT' || 
+                field.tagName === 'TEXTAREA'
+            ) {
+                return field.tomselect ? field.tomselect.getValue() : field.value;
+            }
+
+            if (field.tagName === 'INPUT' && field.type === 'checkbox') {
+                return field.checked ? true : false;
+            }
+
+            if (field.tagName === 'FIELDSET') {
+                if (field.getAttribute('data-field-type') === 'checkboxes') {
+                    const checkboxes = field.querySelectorAll('input[type="checkbox"]');
+                    return Array.from(checkboxes).filter(checkbox => checkbox.checked).map(checkbox => {
+                        return checkbox.getAttribute('data-option-value') || checkbox.value;
+                    });
+                }
+
+                if (field.getAttribute('data-field-type') === 'radio') {
+                    const radio = field.querySelector('input[type="radio"]:checked');
+                    return radio ? radio.getAttribute('data-option-value') || radio.value : null;
+                }
+            }
+
+            if (field.classList.contains('meros-rich-textarea')) {
+                return field.__quill ? field.__quill.root.innerHTML : null;
+            }
+
+            if (field.classList.contains('meros-repeater-field')) {
+                if (!this.repeaterStore) {
+                    this.repeaterStore = Alpine.store('repeaterField');
+                }
+
+                return this.repeaterStore ? this.repeaterStore.getRepeaterValue(fieldId) : null;
+            }
+        },
 
         // ======================================
         // Field conditions handlers
@@ -221,6 +295,7 @@ export default function registerFormStore() {
     // Alpine store registration and public API exposure
     // ======================================================
     Alpine.store('formStore', store);
+    Alpine.store('formStore').init();
 
     if (typeof window !== 'undefined') {
         // Public callback registry API.
@@ -228,7 +303,9 @@ export default function registerFormStore() {
         // - field onChange: (event)
         // - repeater configure: (params)
         // - repeater add/remove/move: (params)
-        const helper = {
+        const helpers = {
+            getField: (fieldId, property = null, formId = null) => Alpine.store('formStore')?.getField(fieldId, property, formId) ?? null,
+            getFieldValue: (fieldOrFieldId, formId = null) => Alpine.store('formStore')?.getFieldValue(fieldOrFieldId, formId) ?? null,
             registerCallback: (callbackName, callback) => Alpine.store('formStore')?.registerCallback(callbackName, callback) ?? '',
             registerCallbacks: callbacks => Alpine.store('formStore')?.registerCallbacks(callbacks) ?? [],
             resolveCallback: callbackName => Alpine.store('formStore')?.resolveCallback(callbackName) ?? null,
@@ -237,7 +314,7 @@ export default function registerFormStore() {
             clearCallbacks: () => Alpine.store('formStore')?.clearCallbacks(),
         };
 
-        window.merosForms = helper;
-        window.dispatchEvent(new CustomEvent('meros::forms-ready'));
+        window.mforms = helpers;
+        window.dispatchEvent(new CustomEvent('meros:forms-ready'));
     }
 }

@@ -24,7 +24,7 @@
             type="button" 
             @click.prevent="{{ $action ?? '$wire.saveForm()' }}" 
         >
-            Save Form
+            {{ $buttonText ?? 'Save Form' }}
         </button>
     </div>
     @if($reverse ?? false)

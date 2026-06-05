@@ -21,6 +21,7 @@ export default function registerFormBuilderStore() {
         actionsUpdater: null,
         actionConfigCallback: null,
         fieldConditionsEditCallback: null,
+        fieldConditionOperatorMap: {},
 
         // Repeater properties
         repeaterEditCallback: null,
@@ -117,6 +118,13 @@ export default function registerFormBuilderStore() {
             this.fieldConditionsEditCallback = typeof callback === 'function' ? callback : null;
         },
 
+        // Sets the canonical operator map for field-condition operator options.
+        setFieldConditionOperatorMap(map) {
+            this.fieldConditionOperatorMap = (map && typeof map === 'object' && !Array.isArray(map))
+                ? { ...map }
+                : {};
+        },
+
         // Callbacks for repeater field editing, moving, and adding
         setRepeaterEditCallback(callback) {
             this.repeaterEditCallback = typeof callback === 'function' ? callback : null;
@@ -164,13 +172,13 @@ export default function registerFormBuilderStore() {
         },
 
         // Commits mutated rows to Livewire and the store.
-        commitRows(mutator) {
+        commitRows(mutator, closeEditingPanel = false) {
             const nextRows = this.cloneRows();
             mutator(nextRows);
             this.setRows(nextRows);
 
             if (this.rowsUpdater) {
-                this.rowsUpdater(nextRows);
+                this.rowsUpdater(nextRows, closeEditingPanel);
             }
         },
 
@@ -1321,6 +1329,10 @@ export default function registerFormBuilderStore() {
                 return;
             }
 
+            // Clear any stale repeater-inner-field context
+            this.repeaterID = null;
+            this.repeaterFieldID = null;
+
             this.activeField = {
                 handle: 'group',
                 title: group.title,
@@ -1350,13 +1362,9 @@ export default function registerFormBuilderStore() {
                 return;
             }
 
-            if (field.handle === 'repeater') {
-                if (this.repeaterEditCallback) {
-                    this.activeField = null;
-                    this.repeaterEditCallback(field.properties.id);
-                }
-                return;
-            }
+            // Clear any stale repeater-inner-field context
+            this.repeaterID = null;
+            this.repeaterFieldID = null;
 
             this.activeField = {
                 handle: field.handle,
@@ -1368,11 +1376,8 @@ export default function registerFormBuilderStore() {
             };
         },
 
-        // ======================================
-        // Field Conditions Handlers
-        // ======================================
-
-        editFieldConditions(sourceRowIndex, sourceFieldIndex, sourceGroupRowIndex = null, sourceGroupInnerRowIndex = null) {
+        // Opens the repeater field settings panel for managing nested repeater fields and row default values.
+        openRepeaterFieldSettings(sourceRowIndex, sourceFieldIndex, sourceGroupRowIndex = null, sourceGroupInnerRowIndex = null) {
             let field = null;
 
             if (sourceGroupRowIndex !== null && sourceGroupInnerRowIndex !== null) {
@@ -1381,369 +1386,14 @@ export default function registerFormBuilderStore() {
                 field = this.findTopField(this.rows, sourceRowIndex, sourceFieldIndex);
             }
 
-            if (!field) {
+            if (!field || field.handle !== 'repeater') {
                 return;
             }
 
-            this.activeField = {
-                handle: field.handle,
-                ...field.properties,
-                sourceRowIndex,
-                sourceFieldIndex,
-                sourceGroupRowIndex,
-                sourceGroupInnerRowIndex,
-            };
-
-            if (this.fieldConditionsEditCallback) {
-                this.fieldConditionsEditCallback(field.properties.id);
+            if (this.repeaterEditCallback) {
+                this.activeField = null;
+                this.repeaterEditCallback(field.properties.id);
             }
-        },
-
-        // Handles field selection changes for a condition row and keeps operator/value controls in sync.
-        setFieldConditionsRow({ target }) {
-            const conditionsRepeater = target.closest('.meros-field-conditions-repeater');
-            const rowElement = target.closest('tr.meros-repeater-row');
-            const field = this.getFieldsById()[target.value];
-            const fieldType = field?.handle;
-
-            if (!conditionsRepeater || !rowElement) {
-                return;
-            }
-
-            if (!field || !fieldType) {
-                this.setFieldConditionOperators(null, rowElement);
-                this.setFieldConditionPlaceholderInput(rowElement);
-                this.syncFieldConditionFieldSelectionState(conditionsRepeater);
-                return;
-            }
-
-            const operatorSelector = this.setFieldConditionOperators(fieldType, rowElement);
-
-            if (operatorSelector) {
-                this.setFieldConditionOperatorRow({ target: operatorSelector });
-            } else {
-                this.setFieldConditionPlaceholderInput(rowElement);
-            }
-
-            this.syncFieldConditionFieldSelectionState(conditionsRepeater);
-        },
-
-        // Handles operator selection changes and only enables a value control when needed.
-        setFieldConditionOperatorRow({ target }) {
-            const rowElement = target?.closest?.('tr.meros-repeater-row') ?? null;
-
-            if (!rowElement) {
-                return;
-            }
-
-            const fieldSelector = rowElement.querySelector('td[data-field-name="field_id"] select');
-            const selectedFieldId = String(fieldSelector?.value ?? '').trim();
-            const selectedOperator = String(target?.value ?? '').trim();
-
-            if (selectedFieldId === '' || selectedOperator === '') {
-                this.setFieldConditionPlaceholderInput(rowElement);
-                return;
-            }
-
-            if (this.shouldDisableFieldConditionValueInput(selectedOperator)) {
-                this.setFieldConditionPlaceholderInput(rowElement);
-                return;
-            }
-
-            const field = this.getFieldsById()[selectedFieldId];
-            const fieldType = field?.handle;
-
-            if (!field || !fieldType) {
-                this.setFieldConditionPlaceholderInput(rowElement);
-                return;
-            }
-
-            this.setFieldConditionValueInput(field, fieldType, rowElement);
-        },
-
-        // Re-syncs duplicate-field option disabling after repeater mutations.
-        syncFieldConditionsRepeaterSelectionState(params = {}) {
-            const repeaterId = String(params?.repeaterId ?? '').trim();
-            const triggerElement = params?.triggerElement ?? null;
-
-            const repeaterElement = repeaterId !== ''
-                ? document.getElementById(repeaterId)
-                : triggerElement?.closest?.('.meros-repeater') ?? null;
-
-            if (!repeaterElement) {
-                return;
-            }
-
-            this.syncFieldConditionFieldSelectionState(repeaterElement);
-        },
-
-        // Normalises a newly added condition row to the placeholder operator/value state.
-        handleFieldConditionsRepeaterAddRow(params = {}) {
-            const repeaterId = String(params?.repeaterId ?? '').trim();
-            const triggerElement = params?.triggerElement ?? null;
-            const rowIndex = Number(params?.rowIndex);
-
-            const repeaterElement = repeaterId !== ''
-                ? document.getElementById(repeaterId)
-                : triggerElement?.closest?.('.meros-repeater') ?? null;
-
-            if (!repeaterElement) {
-                return;
-            }
-
-            if (Number.isInteger(rowIndex) && rowIndex >= 0) {
-                const rowElement = repeaterElement.querySelector(`tr.meros-repeater-row[data-repeater-row-index="${rowIndex}"]`);
-
-                if (rowElement) {
-                    this.resetFieldConditionRowInputs(rowElement);
-                }
-            }
-
-            this.syncFieldConditionFieldSelectionState(repeaterElement);
-        },
-
-        // Resets operator and value controls for a condition row to a neutral, disabled state.
-        resetFieldConditionRowInputs(rowElement) {
-            if (!rowElement) {
-                return;
-            }
-
-            this.setFieldConditionOperators(null, rowElement);
-            this.setFieldConditionPlaceholderInput(rowElement);
-        },
-
-        // Renders a single disabled text input in the value cell as a placeholder.
-        setFieldConditionPlaceholderInput(rowElement) {
-            const valueCell = rowElement.querySelector('td[data-field-name="value"]');
-
-            if (!valueCell) {
-                return;
-            }
-
-            const { valueInputName, valueInputWrapper } = this.clearFieldConditionValueInput(valueCell);
-
-            if (!valueInputWrapper) {
-                return;
-            }
-
-            const resetInput = document.createElement('input');
-            resetInput.type = 'text';
-            resetInput.name = valueInputName;
-            resetInput.value = '';
-            resetInput.disabled = true;
-            resetInput.setAttribute('aria-disabled', 'true');
-
-            valueInputWrapper.appendChild(resetInput);
-        },
-
-        // Operators that do not require user-provided values.
-        shouldDisableFieldConditionValueInput(operator) {
-            const normalisedOperator = String(operator ?? '').trim();
-
-            return normalisedOperator === 'is_empty' || normalisedOperator === 'is_not_empty';
-        },
-
-        // Finds the canonical input name so value control swaps preserve payload keys.
-        getFieldConditionValueInputName(valueCell) {
-            const namedControl = valueCell?.querySelector('input[name], select[name], textarea[name]');
-
-            if (namedControl && typeof namedControl.name === 'string' && namedControl.name.trim() !== '') {
-                return namedControl.name;
-            }
-
-            return '';
-        },
-
-        // Destroys any active TomSelect instances before value-cell DOM replacement.
-        destroyFieldConditionTomSelect(valueCell) {
-            if (!valueCell) {
-                return;
-            }
-
-            const advancedSelects = Array.from(valueCell.querySelectorAll('select[data-advanced="true"], select.meros-select-field'));
-
-            advancedSelects.forEach(selectElement => {
-                if (selectElement?.tomselect) {
-                    initTomSelect(selectElement, true);
-                }
-            });
-        },
-
-        // Fully clears value-cell controls and TomSelect artifacts before rebuilding.
-        clearFieldConditionValueInput(valueCell) {
-            const valueInputName = this.getFieldConditionValueInputName(valueCell);
-            const valueInputWrapper = valueCell?.querySelector('.meros-field') ?? valueCell;
-
-            this.destroyFieldConditionTomSelect(valueCell);
-
-            valueInputWrapper?.querySelectorAll?.('.ts-wrapper, .ts-dropdown').forEach(element => {
-                element.remove();
-            });
-
-            valueInputWrapper?.querySelectorAll?.('input, select, textarea').forEach(control => {
-                control.remove();
-            });
-
-            return {
-                valueInputName,
-                valueInputWrapper,
-            };
-        },
-
-        // Rebuilds the operator list for the selected field type and preserves prior valid selection.
-        setFieldConditionOperators(fieldType, rowElement) {
-            const operatorSelector = rowElement.querySelector('td[data-field-name="operator"] select');
-
-            if (!operatorSelector) {
-                return null;
-            }
-
-            const previousOperator = String(operatorSelector.value ?? '').trim();
-
-            const operatorMap = {
-                text: ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-                textarea: ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-                email: ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-                url: ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-                tel: ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-                hidden: ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-                number: ['equals', 'not_equals', 'greater_than', 'less_than', 'greater_than_or_equal_to', 'less_than_or_equal_to', 'is_empty', 'is_not_empty'],
-                range: ['equals', 'not_equals', 'greater_than', 'less_than', 'greater_than_or_equal_to', 'less_than_or_equal_to', 'is_empty', 'is_not_empty'],
-                select: ['equals', 'not_equals'],
-                advanced_select: ['equals', 'not_equals'],
-                radio: ['equals', 'not_equals'],
-                multi_select: ['contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-                checkboxes: ['contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-                date: ['equals', 'not_equals', 'before', 'after', 'on_or_before', 'on_or_after', 'between', 'not_between', 'is_empty', 'is_not_empty'],
-                time: ['equals', 'not_equals', 'before', 'after', 'on_or_before', 'on_or_after', 'between', 'not_between', 'is_empty', 'is_not_empty'],
-                datetime: ['equals', 'not_equals', 'before', 'after', 'on_or_before', 'on_or_after', 'between', 'not_between', 'is_empty', 'is_not_empty'],
-                checkbox: ['is_checked', 'is_unchecked'],
-            };
-
-            const operators = fieldType
-                ? (operatorMap[fieldType] || ['equals', 'not_equals', 'is_empty', 'is_not_empty'])
-                : [];
-
-            // Clear existing options
-            operatorSelector.innerHTML = '';
-
-            const placeholderOption = document.createElement('option');
-            placeholderOption.value = '';
-            placeholderOption.textContent = 'Select operator';
-            operatorSelector.appendChild(placeholderOption);
-
-            // Add new options
-            operators.forEach(operator => {
-                const option = document.createElement('option');
-                option.value = operator;
-                option.textContent = operator.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
-                operatorSelector.appendChild(option);
-            });
-
-            if (previousOperator !== '' && operators.includes(previousOperator)) {
-                operatorSelector.value = previousOperator;
-            } else {
-                operatorSelector.value = '';
-            }
-
-            return operatorSelector;
-        },
-
-        // Rebuilds the value control based on selected field type (including TomSelect-backed controls).
-        setFieldConditionValueInput(field, fieldType, rowElement) {
-            const valueCell = rowElement.querySelector('td[data-field-name="value"]');
-
-            if (!valueCell) {
-                return;
-            }
-
-            const { valueInputName, valueInputWrapper } = this.clearFieldConditionValueInput(valueCell);
-
-            if (!valueInputWrapper) {
-                return;
-            }
-
-            // Create a new input based on the field type
-            let newInput;
-            let setTomSelect = false;
-
-            if (['select', 'advanced_select', 'radio'].includes(fieldType)) {
-                newInput = document.createElement('select');
-                newInput.name = valueInputName;
-
-                const options = field?.properties?.options ?? {};
-                Object.entries(options).forEach(([value, label]) => {
-                    const optionEl = document.createElement('option');
-                    optionEl.value = String(value);
-                    optionEl.textContent = typeof label === 'string' ? label : String(label ?? value);
-                    newInput.appendChild(optionEl);
-                });
-            }
-
-            else if (['multi_select', 'checkboxes'].includes(fieldType)) {
-                newInput = document.createElement('select');
-                newInput.name = valueInputName;
-                newInput.multiple = true;
-                newInput.setAttribute('data-advanced', 'true');
-
-                const options = field?.properties?.options ?? {};
-                Object.entries(options).forEach(([value, label]) => {
-                    const optionEl = document.createElement('option');
-                    optionEl.value = String(value);
-                    optionEl.textContent = typeof label === 'string' ? label : String(label ?? value);
-                    newInput.appendChild(optionEl);
-                });
-
-                setTomSelect = true;
-            }
-            
-            else {
-                newInput = document.createElement('input');
-                newInput.type = field.handle;
-                newInput.name = valueInputName;
-            }
-
-            valueInputWrapper.appendChild(newInput);
-
-            if (setTomSelect) {
-                initTomSelect(newInput);
-            }
-        },
-
-        syncFieldConditionFieldSelectionState(conditionsRepeater) {
-            const selectors = Array.from(
-                conditionsRepeater.querySelectorAll('tr.meros-repeater-row td[data-field-name="field_id"] select')
-            );
-
-            if (selectors.length === 0) {
-                return;
-            }
-
-            const selectedCounts = selectors.reduce((counts, select) => {
-                const selectedValue = String(select.value ?? '').trim();
-
-                if (selectedValue !== '') {
-                    counts[selectedValue] = (counts[selectedValue] ?? 0) + 1;
-                }
-
-                return counts;
-            }, {});
-
-            selectors.forEach(select => {
-                const currentValue = String(select.value ?? '').trim();
-
-                Array.from(select.options).forEach(option => {
-                    const optionValue = String(option.value ?? '').trim();
-
-                    if (optionValue === '') {
-                        option.disabled = false;
-                        return;
-                    }
-
-                    const selectedElsewhere = optionValue !== currentValue && (selectedCounts[optionValue] ?? 0) > 0;
-                    option.disabled = selectedElsewhere;
-                });
-            });
         },
 
         // Sets the active field to a nested repeater field.
@@ -1898,6 +1548,1113 @@ export default function registerFormBuilderStore() {
                     ? [...nextValue]
                     : (nextValue && typeof nextValue === 'object' ? { ...nextValue } : nextValue);
             });
+        },
+
+        // ======================================
+        // Field Conditions Handlers
+        // ======================================
+
+        saveFieldConditions() {
+            if (!this.activeField) {
+                return;
+            }
+
+            this.clearFieldConditionsValidationErrors();
+
+            const conditionsRepeaters = document.querySelectorAll('.meros-field-conditions-repeater');
+            const fieldConditions = {};
+
+            conditionsRepeaters.forEach(repeater => {
+                const conditionType = repeater.id.replace('field-conditions-', '');
+                const logicSelector = document.getElementById(`field-conditions-${conditionType}-logic`);
+                const logic = logicSelector ? logicSelector.value : 'and';
+                const rulesValue = mforms.getFieldValue(repeater);
+                const rules = Array.isArray(rulesValue) ? rulesValue : [];
+
+                fieldConditions[conditionType] = {
+                    logic,
+                    rules,
+                };
+            });
+
+            const nextConditions = {
+                ...this.getFieldConditionsDefaults(),
+                ...this.activeField.conditions,
+                ...fieldConditions,
+            };
+            const validationResult = this.validateFieldConditions(nextConditions);
+
+            if (!validationResult.valid) {
+                this.renderFieldConditionsValidationErrors(validationResult.conflicts);
+                return;
+            }
+
+            this.activeField = {
+                ...this.activeField,
+                conditions: nextConditions,
+            };
+
+            const {
+                sourceRowIndex,
+                sourceFieldIndex,
+                sourceGroupRowIndex,
+                sourceGroupInnerRowIndex,
+            } = this.activeField;
+
+            this.commitRows(rows => {
+                if (sourceGroupRowIndex !== null && sourceGroupInnerRowIndex !== null) {
+                    const field = this.findGroupField(rows, sourceGroupRowIndex, sourceGroupInnerRowIndex, sourceFieldIndex);
+
+                    if (field) {
+                        field.properties.conditions = nextConditions;
+                    }
+                } else {
+                    const field = this.findTopField(rows, sourceRowIndex, sourceFieldIndex);
+
+                    if (field) {
+                        field.properties.conditions = nextConditions;
+                    }
+                }
+            }, true);
+        },
+
+        // Set the currently editing field to a field, opening the field condition setting panel for that field (or group)
+        editFieldConditions(sourceRowIndex, sourceFieldIndex, sourceGroupRowIndex = null, sourceGroupInnerRowIndex = null) {
+            let field = null;
+
+            if (sourceGroupRowIndex !== null && sourceGroupInnerRowIndex !== null) {
+                field = this.findGroupField(this.rows, sourceGroupRowIndex, sourceGroupInnerRowIndex, sourceFieldIndex);
+            } else {
+                field = this.findTopField(this.rows, sourceRowIndex, sourceFieldIndex);
+            }
+
+            if (!field) {
+                return;
+            }
+
+            this.activeField = {
+                handle: field.handle,
+                ...field.properties,
+                sourceRowIndex,
+                sourceFieldIndex,
+                sourceGroupRowIndex,
+                sourceGroupInnerRowIndex,
+            };
+
+            if (this.fieldConditionsEditCallback) {
+                this.fieldConditionsEditCallback(field.properties.id);
+            }
+
+            this.hydratePersistedFieldConditionRows();
+        },
+
+        // Replays row setup for persisted field conditions after the Livewire panel re-renders.
+        hydratePersistedFieldConditionRows(maxAttempts = 20) {
+            const attemptsLimit = Number.isInteger(maxAttempts) && maxAttempts > 0
+                ? maxAttempts
+                : 20;
+
+            let attempt = 0;
+
+            const hydrate = () => {
+                const repeaters = Array.from(document.querySelectorAll('.meros-field-conditions-repeater'));
+
+                if (repeaters.length === 0) {
+                    attempt += 1;
+
+                    if (attempt < attemptsLimit) {
+                        window.setTimeout(hydrate, 75);
+                    }
+
+                    return;
+                }
+
+                repeaters.forEach(repeaterElement => {
+                    this.hydrateFieldConditionLogicSelector(repeaterElement);
+
+                    const persistedRules = this.getPersistedFieldConditionRules(repeaterElement);
+                    const fieldSelectors = Array.from(
+                        repeaterElement.querySelectorAll('tr.meros-repeater-row td[data-field-name="field_id"] select')
+                    );
+
+                    fieldSelectors.forEach((selector, rowIndex) => {
+                        const rowElement = selector.closest('tr.meros-repeater-row');
+                        const persistedRule = persistedRules[rowIndex] ?? null;
+
+                        if (!rowElement) {
+                            return;
+                        }
+
+                        const operatorSelector = rowElement.querySelector('td[data-field-name="operator"] select');
+
+                        if (persistedRule && typeof persistedRule === 'object') {
+                            const persistedFieldId = String(persistedRule.field_id ?? '').trim();
+                            const persistedOperator = String(persistedRule.operator ?? '').trim();
+
+                            if (persistedFieldId !== '') {
+                                selector.value = persistedFieldId;
+                            }
+
+                            if (operatorSelector && persistedOperator !== '') {
+                                operatorSelector.value = persistedOperator;
+                            }
+                        }
+
+                        this.setFieldConditionsRow({ target: selector });
+
+                        this.setFieldConditionRowValueFromPersistedRule(rowElement, persistedRule?.value);
+                    });
+
+                    this.syncFieldConditionFieldSelectionState(repeaterElement, {
+                        resetDuplicateOperators: false,
+                    });
+                });
+            };
+
+            window.setTimeout(hydrate, 0);
+        },
+
+        // Retrieves persisted rules for a field-condition repeater from the active field payload.
+        getPersistedFieldConditionRules(repeaterElement) {
+            if (!repeaterElement || !this.activeField || typeof this.activeField !== 'object') {
+                return [];
+            }
+
+            const repeaterId = String(repeaterElement.id ?? '').trim();
+
+            if (repeaterId === '' || !repeaterId.startsWith('field-conditions-')) {
+                return [];
+            }
+
+            const conditionType = repeaterId.replace('field-conditions-', '');
+            const conditions = this.activeField.conditions;
+
+            if (!conditions || typeof conditions !== 'object') {
+                return [];
+            }
+
+            const rules = conditions?.[conditionType]?.rules;
+
+            return Array.isArray(rules) ? rules : [];
+        },
+
+        // Restores persisted logic state and binds a one-time change listener per logic selector.
+        hydrateFieldConditionLogicSelector(repeaterElement) {
+            if (!repeaterElement) {
+                return;
+            }
+
+            const conditionType = this.getFieldConditionTypeFromRepeater(repeaterElement);
+
+            if (conditionType === '') {
+                return;
+            }
+
+            const logicSelector = document.getElementById(`field-conditions-${conditionType}-logic`);
+
+            if (!(logicSelector instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            const persistedLogic = String(this.activeField?.conditions?.[conditionType]?.logic ?? '').trim().toLowerCase();
+
+            if (persistedLogic === 'and' || persistedLogic === 'or') {
+                logicSelector.value = persistedLogic;
+            }
+
+            this.bindFieldConditionLogicSelector(logicSelector);
+
+            const currentLogic = this.getFieldConditionRepeaterLogicValue(repeaterElement);
+            repeaterElement.dataset.fieldConditionLogicState = currentLogic;
+        },
+
+        // Ensures logic-selector event listeners are attached once per rendered control.
+        bindFieldConditionLogicSelector(logicSelector) {
+            if (!(logicSelector instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            if (logicSelector.dataset.fieldConditionLogicBound === '1') {
+                return;
+            }
+
+            logicSelector.addEventListener('change', event => {
+                this.handleFieldConditionLogicSelectionChange(event);
+            });
+
+            logicSelector.dataset.fieldConditionLogicBound = '1';
+        },
+
+        // Recomputes operator availability when a repeater logic mode changes.
+        handleFieldConditionLogicSelectionChange(event) {
+            const logicSelector = event?.target;
+
+            if (!(logicSelector instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            const repeaterElement = this.getFieldConditionRepeaterFromLogicSelector(logicSelector);
+
+            if (!repeaterElement) {
+                return;
+            }
+
+            const previousLogic = String(repeaterElement.dataset.fieldConditionLogicState ?? '').trim().toLowerCase();
+            const currentLogic = this.getFieldConditionRepeaterLogicValue(repeaterElement);
+            const resetDuplicateOperators = previousLogic === 'or' && currentLogic === 'and';
+
+            this.syncFieldConditionFieldSelectionState(repeaterElement, {
+                resetDuplicateOperators,
+            });
+
+            repeaterElement.dataset.fieldConditionLogicState = currentLogic;
+        },
+
+        // Derives the condition type key from a conditions repeater id.
+        getFieldConditionTypeFromRepeater(repeaterElement) {
+            const repeaterId = String(repeaterElement?.id ?? '').trim();
+
+            if (repeaterId === '' || !repeaterId.startsWith('field-conditions-')) {
+                return '';
+            }
+
+            return repeaterId.replace('field-conditions-', '');
+        },
+
+        // Resolves the sibling repeater element associated with a logic selector.
+        getFieldConditionRepeaterFromLogicSelector(logicSelector) {
+            const logicId = String(logicSelector?.id ?? '').trim();
+
+            if (logicId === '' || !logicId.startsWith('field-conditions-') || !logicId.endsWith('-logic')) {
+                return null;
+            }
+
+            const conditionType = logicId.replace('field-conditions-', '').replace(/-logic$/, '');
+
+            return document.getElementById(`field-conditions-${conditionType}`);
+        },
+
+        // Returns the current logic mode for a repeater, normalized to and/or.
+        getFieldConditionRepeaterLogicValue(repeaterElement) {
+            const conditionType = this.getFieldConditionTypeFromRepeater(repeaterElement);
+
+            if (conditionType === '') {
+                return 'and';
+            }
+
+            const logicSelector = document.getElementById(`field-conditions-${conditionType}-logic`);
+            const logicValue = String(logicSelector?.value ?? 'and').trim().toLowerCase();
+
+            return logicValue === 'or' ? 'or' : 'and';
+        },
+
+        // Applies a persisted rule value to the currently rendered row value control.
+        setFieldConditionRowValueFromPersistedRule(rowElement, persistedValue) {
+            if (!rowElement) {
+                return;
+            }
+
+            const valueControl = rowElement.querySelector('td[data-field-name="value"] input, td[data-field-name="value"] select, td[data-field-name="value"] textarea');
+
+            if (!valueControl || valueControl.disabled) {
+                return;
+            }
+
+            if (valueControl.tagName === 'SELECT' && valueControl.multiple) {
+                let values = [];
+
+                if (Array.isArray(persistedValue)) {
+                    values = persistedValue.map(value => String(value));
+                } else if (typeof persistedValue === 'string' && persistedValue.trim() !== '') {
+                    try {
+                        const parsed = JSON.parse(persistedValue);
+                        values = Array.isArray(parsed) ? parsed.map(value => String(value)) : [String(persistedValue)];
+                    } catch (error) {
+                        values = [String(persistedValue)];
+                    }
+                }
+
+                Array.from(valueControl.options).forEach(option => {
+                    option.selected = values.includes(String(option.value));
+                });
+
+                if (valueControl.tomselect) {
+                    valueControl.tomselect.setValue(values, true);
+                }
+
+                return;
+            }
+
+            if (valueControl.tagName === 'SELECT') {
+                const value = Array.isArray(persistedValue)
+                    ? String(persistedValue[0] ?? '')
+                    : String(persistedValue ?? '');
+
+                valueControl.value = value;
+
+                if (valueControl.tomselect) {
+                    valueControl.tomselect.setValue(value, true);
+                }
+
+                return;
+            }
+
+            const scalarValue = (Array.isArray(persistedValue) || (persistedValue && typeof persistedValue === 'object'))
+                ? JSON.stringify(persistedValue)
+                : String(persistedValue ?? '');
+
+            valueControl.value = scalarValue;
+        },
+
+        // Handles field selection changes for a condition row and keeps operator/value controls in sync.
+        setFieldConditionsRow({ target }) {
+            const conditionsRepeater = target.closest('.meros-field-conditions-repeater');
+            const rowElement = target.closest('tr.meros-repeater-row');
+            const field = this.getFieldsById()[target.value];
+            const fieldType = field?.handle;
+
+            if (!conditionsRepeater || !rowElement) {
+                return;
+            }
+
+            if (!field || !fieldType) {
+                this.setFieldConditionOperators(null, rowElement);
+                this.setFieldConditionPlaceholderInput(rowElement);
+                this.syncFieldConditionFieldSelectionState(conditionsRepeater, {
+                    resetDuplicateOperators: false,
+                });
+                return;
+            }
+
+            const operatorSelector = this.setFieldConditionOperators(fieldType, rowElement);
+
+            if (operatorSelector) {
+                this.setFieldConditionOperatorRow({ target: operatorSelector });
+            } else {
+                this.setFieldConditionPlaceholderInput(rowElement);
+            }
+
+            this.syncFieldConditionFieldSelectionState(conditionsRepeater, {
+                resetDuplicateOperators: false,
+            });
+        },
+
+        // Handles operator selection changes and only enables a value control when needed.
+        setFieldConditionOperatorRow({ target }) {
+            const rowElement = target?.closest?.('tr.meros-repeater-row') ?? null;
+
+            if (!rowElement) {
+                return;
+            }
+
+            const fieldSelector = rowElement.querySelector('td[data-field-name="field_id"] select');
+            const selectedFieldId = String(fieldSelector?.value ?? '').trim();
+            const selectedOperator = String(target?.value ?? '').trim();
+
+            if (selectedFieldId === '' || selectedOperator === '') {
+                this.setFieldConditionPlaceholderInput(rowElement);
+                return;
+            }
+
+            if (this.shouldDisableFieldConditionValueInput(selectedOperator)) {
+                this.setFieldConditionPlaceholderInput(rowElement);
+                return;
+            }
+
+            const field = this.getFieldsById()[selectedFieldId];
+            const fieldType = field?.handle;
+
+            if (!field || !fieldType) {
+                this.setFieldConditionPlaceholderInput(rowElement);
+                return;
+            }
+
+            this.setFieldConditionValueInput(field, fieldType, rowElement);
+
+            const conditionsRepeater = rowElement.closest('.meros-field-conditions-repeater');
+
+            if (conditionsRepeater) {
+                this.syncFieldConditionFieldSelectionState(conditionsRepeater, {
+                    resetDuplicateOperators: false,
+                });
+            }
+        },
+
+        // Re-syncs field-condition selection state after repeater mutations.
+        syncFieldConditionsRepeaterSelectionState(params = {}) {
+            const repeaterId = String(params?.repeaterId ?? '').trim();
+            const triggerElement = params?.triggerElement ?? null;
+
+            const repeaterElement = repeaterId !== ''
+                ? document.getElementById(repeaterId)
+                : triggerElement?.closest?.('.meros-repeater') ?? null;
+
+            if (!repeaterElement) {
+                return;
+            }
+
+            this.syncFieldConditionFieldSelectionState(repeaterElement, {
+                resetDuplicateOperators: false,
+            });
+        },
+
+        // Normalises a newly added condition row to the placeholder operator/value state.
+        handleFieldConditionsRepeaterAddRow(params = {}) {
+            const repeaterId = String(params?.repeaterId ?? '').trim();
+            const triggerElement = params?.triggerElement ?? null;
+            const rowIndex = Number(params?.rowIndex);
+
+            const repeaterElement = repeaterId !== ''
+                ? document.getElementById(repeaterId)
+                : triggerElement?.closest?.('.meros-repeater') ?? null;
+
+            if (!repeaterElement) {
+                return;
+            }
+
+            if (Number.isInteger(rowIndex) && rowIndex >= 0) {
+                const rowElement = repeaterElement.querySelector(`tr.meros-repeater-row[data-repeater-row-index="${rowIndex}"]`);
+
+                if (rowElement) {
+                    this.resetFieldConditionRowInputs(rowElement);
+                }
+            }
+
+            this.syncFieldConditionFieldSelectionState(repeaterElement, {
+                resetDuplicateOperators: false,
+            });
+        },
+
+        // Resets operator and value controls for a condition row to a neutral, disabled state.
+        resetFieldConditionRowInputs(rowElement) {
+            if (!rowElement) {
+                return;
+            }
+
+            this.setFieldConditionOperators(null, rowElement);
+            this.setFieldConditionPlaceholderInput(rowElement);
+        },
+
+        // Renders a single disabled text input in the value cell as a placeholder.
+        setFieldConditionPlaceholderInput(rowElement) {
+            const valueCell = rowElement.querySelector('td[data-field-name="value"]');
+
+            if (!valueCell) {
+                return;
+            }
+
+            const { valueInputName, valueInputWrapper } = this.clearFieldConditionValueInput(valueCell);
+
+            if (!valueInputWrapper) {
+                return;
+            }
+
+            const resetInput = document.createElement('input');
+            resetInput.type = 'text';
+            resetInput.name = valueInputName;
+            resetInput.value = '';
+            resetInput.disabled = true;
+            resetInput.setAttribute('aria-disabled', 'true');
+
+            valueInputWrapper.appendChild(resetInput);
+        },
+
+        // Operators that do not require user-provided values.
+        shouldDisableFieldConditionValueInput(operator) {
+            const normalisedOperator = String(operator ?? '').trim();
+
+            return normalisedOperator === 'is_empty' || normalisedOperator === 'is_not_empty';
+        },
+
+        // Finds the canonical input name so value control swaps preserve payload keys.
+        getFieldConditionValueInputName(valueCell) {
+            const namedControl = valueCell?.querySelector('input[name], select[name], textarea[name]');
+
+            if (namedControl && typeof namedControl.name === 'string' && namedControl.name.trim() !== '') {
+                return namedControl.name;
+            }
+
+            return '';
+        },
+
+        // Destroys any active TomSelect instances before value-cell DOM replacement.
+        destroyFieldConditionTomSelect(valueCell) {
+            if (!valueCell) {
+                return;
+            }
+
+            const advancedSelects = Array.from(valueCell.querySelectorAll('select[data-advanced="true"], select.meros-select-field'));
+
+            advancedSelects.forEach(selectElement => {
+                if (selectElement?.tomselect) {
+                    initTomSelect(selectElement, true);
+                }
+            });
+        },
+
+        // Fully clears value-cell controls and TomSelect artifacts before rebuilding.
+        clearFieldConditionValueInput(valueCell) {
+            const valueInputName = this.getFieldConditionValueInputName(valueCell);
+            const valueInputWrapper = valueCell?.querySelector('.meros-field') ?? valueCell;
+
+            this.destroyFieldConditionTomSelect(valueCell);
+
+            valueInputWrapper?.querySelectorAll?.('.ts-wrapper, .ts-dropdown').forEach(element => {
+                element.remove();
+            });
+
+            valueInputWrapper?.querySelectorAll?.('input, select, textarea').forEach(control => {
+                control.remove();
+            });
+
+            return {
+                valueInputName,
+                valueInputWrapper,
+            };
+        },
+
+        // Rebuilds the operator list for the selected field type and preserves prior valid selection.
+        setFieldConditionOperators(fieldType, rowElement) {
+            const operatorSelector = rowElement.querySelector('td[data-field-name="operator"] select');
+
+            if (!operatorSelector) {
+                return null;
+            }
+
+            const previousOperator = String(operatorSelector.value ?? '').trim();
+
+            const operatorMap = (this.fieldConditionOperatorMap && typeof this.fieldConditionOperatorMap === 'object')
+                ? this.fieldConditionOperatorMap
+                : {};
+
+            const operators = fieldType
+                ? (operatorMap[fieldType] || ['equals', 'not_equals', 'is_empty', 'is_not_empty'])
+                : [];
+
+            // Clear existing options
+            operatorSelector.innerHTML = '';
+
+            const placeholderOption = document.createElement('option');
+            placeholderOption.value = '';
+            placeholderOption.textContent = 'Select operator';
+            operatorSelector.appendChild(placeholderOption);
+
+            // Add new options
+            operators.forEach(operator => {
+                const option = document.createElement('option');
+                option.value = operator;
+                option.textContent = operator.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+                operatorSelector.appendChild(option);
+            });
+
+            if (previousOperator !== '' && operators.includes(previousOperator)) {
+                operatorSelector.value = previousOperator;
+            } else {
+                operatorSelector.value = '';
+            }
+
+            return operatorSelector;
+        },
+
+        // Rebuilds the value control based on selected field type (including TomSelect-backed controls).
+        setFieldConditionValueInput(field, fieldType, rowElement) {
+            const valueCell = rowElement.querySelector('td[data-field-name="value"]');
+
+            if (!valueCell) {
+                return;
+            }
+
+            const { valueInputName, valueInputWrapper } = this.clearFieldConditionValueInput(valueCell);
+
+            if (!valueInputWrapper) {
+                return;
+            }
+
+            // Create a new input based on the field type
+            let newInput;
+            let setTomSelect = false;
+
+            if (['select', 'advanced_select', 'radio'].includes(fieldType)) {
+                newInput = document.createElement('select');
+                newInput.name = valueInputName;
+
+                const options = field?.properties?.options ?? {};
+                Object.entries(options).forEach(([value, label]) => {
+                    const optionEl = document.createElement('option');
+                    optionEl.value = String(value);
+                    optionEl.textContent = typeof label === 'string' ? label : String(label ?? value);
+                    newInput.appendChild(optionEl);
+                });
+            }
+
+            else if (['multi_select', 'checkboxes'].includes(fieldType)) {
+                newInput = document.createElement('select');
+                newInput.name = valueInputName;
+                newInput.multiple = true;
+                newInput.setAttribute('data-advanced', 'true');
+
+                const options = field?.properties?.options ?? {};
+                Object.entries(options).forEach(([value, label]) => {
+                    const optionEl = document.createElement('option');
+                    optionEl.value = String(value);
+                    optionEl.textContent = typeof label === 'string' ? label : String(label ?? value);
+                    newInput.appendChild(optionEl);
+                });
+
+                setTomSelect = true;
+            }
+            
+            else {
+                newInput = document.createElement('input');
+                newInput.type = field.handle;
+                newInput.name = valueInputName;
+            }
+
+            valueInputWrapper.appendChild(newInput);
+
+            if (setTomSelect) {
+                initTomSelect(newInput);
+            }
+        },
+
+        // Synchronises field selection state across rows in a repeater and applies operator uniqueness rules when needed.
+        syncFieldConditionFieldSelectionState(conditionsRepeater, options = {}) {
+            if (!conditionsRepeater) {
+                return;
+            }
+
+            const selectors = Array.from(
+                conditionsRepeater.querySelectorAll('tr.meros-repeater-row td[data-field-name="field_id"] select')
+            );
+
+            selectors.forEach(select => {
+                Array.from(select.options).forEach(option => {
+                    option.disabled = false;
+                });
+            });
+
+            this.syncFieldConditionOperatorSelectionState(conditionsRepeater, options);
+        },
+
+        // Applies operator uniqueness rules when logic is and, including optional duplicate resets.
+        syncFieldConditionOperatorSelectionState(conditionsRepeater, options = {}) {
+            if (!conditionsRepeater) {
+                return;
+            }
+
+            const resetDuplicateOperators = options?.resetDuplicateOperators === true;
+            const operatorSelectors = Array.from(
+                conditionsRepeater.querySelectorAll('tr.meros-repeater-row td[data-field-name="operator"] select')
+            );
+
+            if (operatorSelectors.length === 0) {
+                return;
+            }
+
+            const logic = this.getFieldConditionRepeaterLogicValue(conditionsRepeater);
+
+            if (logic !== 'and') {
+                operatorSelectors.forEach(select => {
+                    Array.from(select.options).forEach(option => {
+                        option.disabled = false;
+                    });
+                });
+
+                conditionsRepeater.dataset.fieldConditionLogicState = logic;
+                return;
+            }
+
+            if (resetDuplicateOperators) {
+                const seenOperators = new Set();
+
+                operatorSelectors.forEach(select => {
+                    const selectedOperator = String(select.value ?? '').trim();
+
+                    if (selectedOperator === '') {
+                        return;
+                    }
+
+                    const rowElement = select.closest('tr.meros-repeater-row');
+
+                    if (seenOperators.has(selectedOperator)) {
+                        select.value = '';
+
+                        if (rowElement) {
+                            this.setFieldConditionPlaceholderInput(rowElement);
+                        }
+
+                        return;
+                    }
+
+                    seenOperators.add(selectedOperator);
+                });
+            }
+
+            const selectedCounts = operatorSelectors.reduce((counts, select) => {
+                const selectedOperator = String(select.value ?? '').trim();
+
+                if (selectedOperator !== '') {
+                    counts[selectedOperator] = (counts[selectedOperator] ?? 0) + 1;
+                }
+
+                return counts;
+            }, {});
+
+            operatorSelectors.forEach(select => {
+                const currentValue = String(select.value ?? '').trim();
+
+                Array.from(select.options).forEach(option => {
+                    const optionValue = String(option.value ?? '').trim();
+
+                    if (optionValue === '') {
+                        option.disabled = false;
+                        return;
+                    }
+
+                    const selectedElsewhere = optionValue !== currentValue && (selectedCounts[optionValue] ?? 0) > 0;
+                    option.disabled = selectedElsewhere;
+                });
+            });
+
+            conditionsRepeater.dataset.fieldConditionLogicState = logic;
+        },
+
+        // Runs all field-condition validation passes and returns a combined result payload.
+        validateFieldConditions(nextConditions) {
+            const conflicts = [];
+
+            this.collectIncompleteConditionRowConflicts(nextConditions, conflicts);
+            this.collectOpposingConditionTypeConflicts(nextConditions, conflicts);
+            this.collectInvalidConditionTypeCombinationConflicts(nextConditions, conflicts);
+
+            return {
+                valid: conflicts.length === 0,
+                conflicts,
+            };
+        },
+
+        // Locates the field-conditions validation container rendered in the canvas settings panel.
+        getFieldConditionsErrorsContainer() {
+            const container = document.getElementById('field-conditions-errors');
+
+            return container instanceof HTMLElement ? container : null;
+        },
+
+        // Clears any previously rendered field-conditions validation messages.
+        clearFieldConditionsValidationErrors() {
+            const container = this.getFieldConditionsErrorsContainer();
+
+            if (!container) {
+                return;
+            }
+
+            container.innerHTML = '';
+        },
+
+        // Renders deduplicated validation messages into the field-conditions error container.
+        renderFieldConditionsValidationErrors(conflicts = []) {
+            const container = this.getFieldConditionsErrorsContainer();
+
+            if (!container) {
+                return;
+            }
+
+            if (!Array.isArray(conflicts) || conflicts.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            const messageList = conflicts.map(conflict => {
+                const reason = String(conflict?.reason ?? 'Validation conflict detected.');
+                const pair = Array.isArray(conflict?.pair) ? conflict.pair : [];
+                const leftType = String(pair[0] ?? conflict?.left?.conditionType ?? '').trim();
+                const rightType = String(pair[1] ?? conflict?.right?.conditionType ?? '').trim();
+                const leftRowNumber = Number(conflict?.left?.rowNumber);
+                const rightRowNumber = Number(conflict?.right?.rowNumber);
+
+                const leftTypeLabel = leftType !== '' ? leftType.replace(/_/g, ' ') : 'left condition';
+                const rightTypeLabel = rightType !== '' ? rightType.replace(/_/g, ' ') : '';
+
+                const leftDetails = Number.isInteger(leftRowNumber) && leftRowNumber > 0
+                    ? `${leftTypeLabel} row ${leftRowNumber}`
+                    : leftTypeLabel;
+
+                const hasRightSide = rightTypeLabel !== ''
+                    || (Number.isInteger(rightRowNumber) && rightRowNumber > 0);
+
+                const rightDetails = hasRightSide
+                    ? (Number.isInteger(rightRowNumber) && rightRowNumber > 0
+                        ? `${rightTypeLabel !== '' ? rightTypeLabel : 'right condition'} row ${rightRowNumber}`
+                        : (rightTypeLabel !== '' ? rightTypeLabel : 'right condition'))
+                    : '';
+
+                const rowDetails = hasRightSide
+                    ? `${leftDetails} vs ${rightDetails}`
+                    : leftDetails;
+
+                return `${reason} (${rowDetails}).`;
+            });
+
+            const uniqueMessages = Array.from(new Set(messageList));
+            const itemsHtml = uniqueMessages
+                .map(message => `<li>${this.escapeFieldConditionsErrorHtml(message)}</li>`)
+                .join('');
+
+            container.innerHTML = `
+                <div class="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800" role="alert" aria-live="polite">
+                    <p class="font-semibold">Field conditions could not be saved:</p>
+                    <ul class="mt-2 list-disc space-y-1 pl-5">
+                        ${itemsHtml}
+                    </ul>
+                </div>
+            `;
+        },
+
+        // Escapes dynamic validation strings before interpolating into error HTML.
+        escapeFieldConditionsErrorHtml(value) {
+            const text = String(value ?? '');
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+            };
+
+            return text.replace(/[&<>"']/g, match => map[match] ?? match);
+        },
+
+        // Detects rule-level conflicts between opposing condition-type pairs.
+        collectOpposingConditionTypeConflicts(nextConditions, conflicts) {
+            const pairings = [
+                ['show', 'hide'],
+                ['require', 'optional'],
+                ['enable', 'disable'],
+            ];
+
+            pairings.forEach(([leftType, rightType]) => {
+                const leftRules = this.getValidatedFieldConditionRules(nextConditions, leftType);
+                const rightRules = this.getValidatedFieldConditionRules(nextConditions, rightType);
+
+                if (leftRules.length === 0 || rightRules.length === 0) {
+                    return;
+                }
+
+                const rightRulesBySignature = rightRules.reduce((rulesBySignature, rowData) => {
+                    const signature = this.makeFieldConditionRuleSignature(rowData.rule);
+
+                    if (signature === '') {
+                        return rulesBySignature;
+                    }
+
+                    if (!Array.isArray(rulesBySignature[signature])) {
+                        rulesBySignature[signature] = [];
+                    }
+
+                    rulesBySignature[signature].push(rowData);
+                    return rulesBySignature;
+                }, {});
+
+                const rightRulesByFieldId = rightRules.reduce((rulesByFieldId, rowData) => {
+                    const fieldId = this.getFieldConditionRuleFieldId(rowData.rule);
+
+                    if (fieldId === '') {
+                        return rulesByFieldId;
+                    }
+
+                    if (!Array.isArray(rulesByFieldId[fieldId])) {
+                        rulesByFieldId[fieldId] = [];
+                    }
+
+                    rulesByFieldId[fieldId].push(rowData);
+                    return rulesByFieldId;
+                }, {});
+
+                leftRules.forEach(leftRowData => {
+                    const leftSignature = this.makeFieldConditionRuleSignature(leftRowData.rule);
+
+                    if (leftSignature !== '') {
+                        const matchingRightRows = rightRulesBySignature[leftSignature] ?? [];
+
+                        matchingRightRows.forEach(rightRowData => {
+                            conflicts.push({
+                                reason: 'Opposing condition types contain identical rule definitions.',
+                                pair: [leftType, rightType],
+                                left: leftRowData,
+                                right: rightRowData,
+                            });
+                        });
+                    }
+
+                    const leftFieldId = this.getFieldConditionRuleFieldId(leftRowData.rule);
+
+                    if (leftFieldId === '') {
+                        return;
+                    }
+
+                    const matchingFieldRows = rightRulesByFieldId[leftFieldId] ?? [];
+
+                    matchingFieldRows.forEach(rightRowData => {
+                        conflicts.push({
+                            reason: 'Opposing condition types target the same field.',
+                            pair: [leftType, rightType],
+                            left: leftRowData,
+                            right: rightRowData,
+                        });
+                    });
+                });
+            });
+        },
+
+        // Validates each condition row has required operator/value inputs based on operator semantics.
+        collectIncompleteConditionRowConflicts(nextConditions, conflicts) {
+            const conditionTypes = Object.keys(nextConditions ?? {});
+
+            conditionTypes.forEach(conditionType => {
+                const rows = this.getValidatedFieldConditionRules(nextConditions, conditionType);
+
+                rows.forEach(rowData => {
+                    const operator = String(rowData?.rule?.operator ?? '').trim();
+
+                    if (operator === '') {
+                        conflicts.push({
+                            reason: 'Each condition row must have an operator selected.',
+                            pair: [conditionType],
+                            left: rowData,
+                            mode: 'incomplete_condition_row',
+                        });
+                        return;
+                    }
+
+                    if (this.shouldDisableFieldConditionValueInput(operator)) {
+                        return;
+                    }
+
+                    if (!this.isFieldConditionRuleValueProvided(rowData.rule?.value)) {
+                        conflicts.push({
+                            reason: 'Each condition row must include a value for the selected operator.',
+                            pair: [conditionType],
+                            left: rowData,
+                            mode: 'incomplete_condition_row',
+                        });
+                    }
+                });
+            });
+        },
+
+        // Enforces higher-level invalid condition-type combinations (for example hidden + required).
+        collectInvalidConditionTypeCombinationConflicts(nextConditions, conflicts) {
+            const invalidPairs = [
+                {
+                    leftType: 'hide',
+                    rightType: 'require',
+                    reason: 'A field cannot be required while hidden.',
+                },
+                {
+                    leftType: 'disable',
+                    rightType: 'require',
+                    reason: 'A field cannot be required while disabled.',
+                },
+            ];
+
+            invalidPairs.forEach(({ leftType, rightType, reason }) => {
+                const leftRules = this.getValidatedFieldConditionRules(nextConditions, leftType);
+                const rightRules = this.getValidatedFieldConditionRules(nextConditions, rightType);
+
+                if (leftRules.length === 0 || rightRules.length === 0) {
+                    return;
+                }
+
+                conflicts.push({
+                    reason,
+                    pair: [leftType, rightType],
+                    left: leftRules[0],
+                    right: rightRules[0],
+                    mode: 'invalid_condition_type_combination',
+                });
+            });
+        },
+
+        // Normalizes condition rules into row metadata used by validator passes.
+        getValidatedFieldConditionRules(nextConditions, conditionType) {
+            const rules = nextConditions?.[conditionType]?.rules;
+
+            if (!Array.isArray(rules) || rules.length === 0) {
+                return [];
+            }
+
+            return rules
+                .map((rule, index) => ({
+                    conditionType,
+                    rowIndex: index,
+                    rowNumber: index + 1,
+                    rule,
+                }))
+                .filter(rowData => rowData.rule && typeof rowData.rule === 'object');
+        },
+
+            // Builds a stable, comparable signature for rule conflict matching.
+        makeFieldConditionRuleSignature(rule) {
+            if (!rule || typeof rule !== 'object') {
+                return '';
+            }
+
+            const fieldId = this.getFieldConditionRuleFieldId(rule);
+            const operator = String(rule.operator ?? '').trim();
+
+            if (fieldId === '' || operator === '') {
+                return '';
+            }
+
+            if (this.shouldDisableFieldConditionValueInput(operator)) {
+                return `${fieldId}::${operator}::`;
+            }
+
+            const value = this.normaliseFieldConditionRuleValue(rule.value);
+
+            return `${fieldId}::${operator}::${value}`;
+        },
+
+        // Extracts and normalizes the rule field_id used for cross-type comparisons.
+        getFieldConditionRuleFieldId(rule) {
+            if (!rule || typeof rule !== 'object') {
+                return '';
+            }
+
+            return String(rule.field_id ?? '').trim();
+        },
+
+        // Canonicalizes rule values so semantically equal values compare consistently.
+        normaliseFieldConditionRuleValue(value) {
+            if (Array.isArray(value)) {
+                return value.map(item => String(item)).sort().join('|');
+            }
+
+            if (value && typeof value === 'object') {
+                const orderedObject = Object.keys(value)
+                    .sort()
+                    .reduce((result, key) => {
+                        result[key] = value[key];
+                        return result;
+                    }, {});
+
+                return JSON.stringify(orderedObject);
+            }
+
+            return String(value ?? '').trim();
+        },
+
+        // Determines whether a rule value should be treated as present for validation.
+        isFieldConditionRuleValueProvided(value) {
+            if (Array.isArray(value)) {
+                return value.length > 0;
+            }
+
+            if (value && typeof value === 'object') {
+                return Object.keys(value).length > 0;
+            }
+
+            return String(value ?? '').trim() !== '';
         },
 
         // ======================================

@@ -160,7 +160,7 @@
                 @if($field->allowsAdd())
                     <tr>
                         <td colspan="{{ $columnCount }}" class="meros-repeater-empty-state">
-                            No rows yet. Use "Add Row" to create repeater data.
+                            {{ $field->getPlaceholder() }}
                         </td>
                     </tr>
                 @else
