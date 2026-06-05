@@ -18,7 +18,13 @@
                             for="field-conditions-{{ $type }}-logic" 
                             class="block mb-1 text-sm font-medium text-gray-700"
                         >
-                            {{ ucfirst(str_replace('_', ' ', $type)) }} this field when:
+                            @if($type === 'optional')
+                                Make this field optional when:
+                            @elseif($type === 'require')
+                                Make this field required when:
+                            @else
+                                {{ ucfirst(str_replace('_', ' ', $type)) }} this field when:
+                            @endif
                         </label>
                         <select
                             id="field-conditions-{{ $type }}-logic"

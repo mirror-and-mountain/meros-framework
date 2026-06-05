@@ -89,26 +89,34 @@ final class Framework extends FeatureProvider {
         $this->registerRestRoutes();
 
         // Register framework fields
+
+        // Basic Fields
         $this->fields()->register('admin_button', AdminButton::class);
-        $this->fields()->register('checkbox', Checkbox::class);
-        $this->fields()->register('checkboxes', Checkboxes::class);
-        $this->fields()->register('color', Color::class);
-        $this->fields()->register('date', Date::class);
-        $this->fields()->register('email', Email::class);
-        $this->fields()->register('hidden', Hidden::class);
-        $this->fields()->register('multi_select', MultiSelect::class);
-        $this->fields()->register('number', Number::class);
-        $this->fields()->register('radio', Radio::class);
-        $this->fields()->register('range', Range::class);
-        $this->fields()->register('repeater', Repeater::class);
-        $this->fields()->register('rich_text', RichText::class);
-        $this->fields()->register('advanced_select', AdvancedSelect::class);
-        $this->fields()->register('select', Select::class);
         $this->fields()->register('text', Text::class);
         $this->fields()->register('textarea', Textarea::class);
+        $this->fields()->register('email', Email::class);
         $this->fields()->register('tel', Tel::class);
-        $this->fields()->register('time', Time::class);
         $this->fields()->register('url', Url::class);
+        $this->fields()->register('number', Number::class);
+        $this->fields()->register('range', Range::class);
+        $this->fields()->register('checkbox', Checkbox::class);
+        $this->fields()->register('color', Color::class);
+
+        // Choice Fields
+        $this->fields()->register('select', Select::class);
+        $this->fields()->register('multi_select', MultiSelect::class);
+        $this->fields()->register('advanced_select', AdvancedSelect::class);
+        $this->fields()->register('radio', Radio::class);
+        $this->fields()->register('checkboxes', Checkboxes::class);
+
+        // Date Time Fields
+        $this->fields()->register('date', Date::class);
+        $this->fields()->register('time', Time::class);
+
+        // Special Fields
+        $this->fields()->register('hidden', Hidden::class);
+        $this->fields()->register('repeater', Repeater::class);
+        $this->fields()->register('rich_text', RichText::class);
         $this->fields()->register('password', Password::class);
 
         // Register framework field wrappers

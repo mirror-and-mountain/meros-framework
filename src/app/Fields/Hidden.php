@@ -15,7 +15,14 @@ class Hidden extends Input {
      *
      * @var string
      */
-    public static string $icon = 'bars';
+    public static string $icon = 'eye-slash';
+
+    /**
+     * The category for the field, used for grouping in the UI.
+     *
+     * @var string
+     */
+    public static string $category = 'specialised';
 
     /**
      * Default attributes for the hidden field.

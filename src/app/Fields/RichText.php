@@ -17,7 +17,14 @@ class RichText extends Field {
      *
      * @var string
      */
-    public static string $icon = 'bars';
+    public static string $icon = 'paint-brush';
+
+    /**
+     * The category for the field, used for grouping in the UI.
+     *
+     * @var string
+     */
+    public static string $category = 'specialised';
 
     /**
      * An array of data types that this field is compatible with.

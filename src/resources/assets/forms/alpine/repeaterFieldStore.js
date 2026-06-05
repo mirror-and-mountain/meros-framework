@@ -1604,7 +1604,7 @@ export default function registerRepeaterFieldStore() {
 
                 emptyStateCell.className = 'meros-repeater-empty-state';
                 emptyStateCell.setAttribute('colspan', String(templateRow?.children?.length ?? 1));
-                emptyStateCell.textContent = 'No rows yet. Use "Add Row" to create repeater data.';
+                emptyStateCell.textContent = 'Nothing here yet...';
                 emptyStateRow.appendChild(emptyStateCell);
                 fragment.appendChild(emptyStateRow);
             } else {

@@ -11,6 +11,13 @@ class Range extends Number {
     public string $handle = 'range';
 
     /**
+     * The icon for the field, used in the form builder UI.
+     *
+     * @var string
+     */
+    public static string $icon = 'adjustments';
+
+    /**
      * Default attributes for the range field.
      *
      * @var array

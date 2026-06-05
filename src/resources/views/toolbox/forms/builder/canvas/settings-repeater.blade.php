@@ -99,7 +99,7 @@
                                     type="button"
                                     class="shrink-0 text-gray-300 hover:text-red-500 transition-colors text-xl leading-none"
                                     title="Remove field"
-                                    wire:click="removeRepeaterField('{{ $editingRepeaterID }}', '{{ $id }}')"
+                                    x-on:click="confirm('Are you sure want to remove this field? This action cannot be undone') ? $wire.removeRepeaterField('{{ $editingRepeaterID }}', '{{ $id }}') : null"
                                 >
                                     @include('meros::toolbox.svgs.remove')
                                 </button>
