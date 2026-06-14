@@ -4,28 +4,36 @@ namespace MM\Meros\App\Fields;
 
 class AdvancedSelect extends Select {
     /**
-     * The unique identifier for the field, used for resolution.
+     * Sets up the field's handle, supported features, etc.
      *
-     * @var string
+     * @return void
      */
-    public string $handle = 'advanced_select';
+    protected function initialise(): void {
+        $this->handle = 'advanced_select';
+        $this->compatibleDataTypes = ['string'];
+
+        $this->attribute('data-allow-add', 'false');
+        $this->attribute('data-advanced', 'true');
+    }
 
     /**
-     * Choice features supported by the advanced select field.
+     * Sets whether the field allows adding new options on the fly.
      *
-     * @var array
+     * @param boolean $allow
+     *
+     * @return self
      */
-    protected array $supports = [
-        'allowAdd'
-    ];
+    public function allowAdd(bool $allow = true): self {
+        $this->attributes['data-allow-add'] = $allow ? 'true' : 'false';
+        return $this;
+    }
 
     /**
-     * Determines if this advanced select field should use an advanced UI (e.g., tomselect).
-     * Always set to true for advanced select fields.
+     * Retrieves the blade component to use in the render() method.
      *
-     * @return boolean
+     * @return string
      */
-    public function isAdvanced(): bool {
-        return true;
+    public function getFieldComponent(): string {
+        return 'meros::forms.fields.select-advanced';
     }
 }

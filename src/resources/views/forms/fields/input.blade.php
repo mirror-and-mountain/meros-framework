@@ -1,25 +1,9 @@
-@php 
-    $placeholder = $field->getPlaceholder();
-    $showsIcon   = $field->showsIcon();
-    $classList   = $field->classList();
-    $value       = $field->getValue();
-    $onChange    = $field->getOnChange();
-
-    if ($showsIcon) {
-        $classList .= ' icon-' . $field->getIconPosition();
-    }
-@endphp
-
-<input 
-    {!! $field->attributes(['class']) !!}
-    @if (!empty($classList))
-        class="{{ ltrim($classList) }}"
-    @endif
-    @if ($placeholder && $placeholder !== '')
-        placeholder="{{ $placeholder }}"
-    @endif
-    @if ($value !== null && $value !== '')
-        value="{{ $value }}"
-    @endif
-    x-on:change="$store.formStore.evalFieldConditions($el); @if(!empty($onChange)) mforms.invokeCallback(@js($onChange), $event) @endif"
+<input
+    x-data="merosInputField('{{ $id }}', '{{ $serialisedRules }}')"
+    id="{{ $id }}"
+    name="{{ $name }}"
+    {!! $attributes !!}
+    value="{{ $field->getValue()}}"
+    @change="onChange()"
+    @input="onInput()"
 />

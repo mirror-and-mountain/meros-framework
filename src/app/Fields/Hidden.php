@@ -3,51 +3,20 @@
 namespace MM\Meros\App\Fields;
 
 class Hidden extends Input {
-    /**
-     * The unique identifier for the field, used for resolution.
-     *
-     * @var string
-     */
-    public string $handle = 'hidden';
-
-    /**
-     * The icon for the field, used in the form builder UI.
-     *
-     * @var string
-     */
     public static string $icon = 'eye-slash';
-
-    /**
-     * The category for the field, used for grouping in the UI.
-     *
-     * @var string
-     */
     public static string $category = 'specialised';
 
     /**
-     * Default attributes for the hidden field.
+     * Sets up the field's handle, supported features, etc.
      *
-     * @var array
+     * @return void
      */
-    protected array $attributes = [
-        'type' => 'hidden',
-    ];
+    protected function initialise(): void {
+        parent::initialise();
+        $this->handle = 'hidden';
+        $this->compatibleDataTypes = ['string'];
 
-    /**
-     * Supported attributes for the hidden field.
-     *
-     * @var array
-     */
-    protected array $supports = [];
-
-    
-    /**
-     * An array of data types that this field is compatible with.
-     *
-     * @var array
-     */
-    protected array $compatibleDataTypes = [
-        'string'
-    ];
+        $this->inputType('hidden');
+    }
 
 }

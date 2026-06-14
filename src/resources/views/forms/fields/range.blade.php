@@ -3,7 +3,7 @@
         <div class="nice-form-group" style="flex: 75%;">
             <input
                 type="range"
-                {!! $field->attributes() !!}
+                {!! $attributes !!}
                 @if ($field->getValue() !== null && $field->getValue() !== '')
                     value="{{ $field->getValue() }}"
                 @endif
@@ -14,13 +14,10 @@
         <div class="nice-form-group" style="flex: 25%;">
             <input
                 type="number"
-                {!! $field->attributes(['id', 'name']) !!}
+                {!! $field->filterAttributes($attributes, ['id', 'name']) !!}
                 name="{{ $field->getName() }}_number"
                 id="{{ $id }}-number"
                 aria-labelledby="{{ $id }}-label"
-                @if ($field->getPlaceholder() && $field->getPlaceholder() !== '')
-                    placeholder="{{ $field->getPlaceholder() }}"
-                @endif
                 @if ($field->getValue() !== null && $field->getValue() !== '')
                     value="{{ $field->getValue() }}"
                 @endif
@@ -33,7 +30,7 @@
     <input
         type="range"
         id="{{ $id }}"
-        {!! $field->attributes() !!}
+        {!! $attributes !!}
         @if ($field->getValue() !== null && $field->getValue() !== '')
             value="{{ $field->getValue() }}"
         @endif

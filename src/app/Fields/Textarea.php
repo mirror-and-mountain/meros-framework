@@ -5,60 +5,27 @@ namespace MM\Meros\App\Fields;
 use MM\Meros\Services\Contracts\Forms\Field;
 
 class Textarea extends Field {
-    /**
-     * The unique identifier for the field, used for resolution.
-     *
-     * @var string
-     */
-    public string $handle = 'textarea';
-
-    /**
-     * The icon for the field, used in the form builder UI.
-     *
-     * @var string
-     */
     public static string $icon = 'bars-long';
 
     /**
-     * Default attributes for the textarea field.
+     * Sets up the field's handle, supported features, etc.
      *
-     * @var array
+     * @return void
      */
-    protected array $attributes = [
-        'rows' => 3,
-    ];
+    protected function initialise(): void {
+        $this->handle = 'textarea';
+        $this->compatibleDataTypes = ['string'];
 
-    /**
-     * Rules supported by the field for validation purposes.
-     *
-     * @var array
-     */
-    protected array $supportedRules = [
-        'maxlength',
-        'maxwords',
-        'minwords'
-    ];
+        $this->attribute('rows', 3);
 
-    /**
-     * An array of data types that this field is compatible with.
-     *
-     * @var array
-     */
-    protected array $compatibleDataTypes = [
-        'string'
-    ];
+        $this->addSupports([
+            'required',
+            'disabled',
+            'helpText',
+            'placeholder',
+        ]);
+    }
 
-    /**
-     * Whether to force the field to take up the full width of its container, regardless of the width setting.
-     *
-     * @var bool
-     */
-    protected bool $forceFullWidth = true;
-
-
-    /***************************
-     * Fluent Setters
-     ***************************/
     /**
      * Sets the number of rows for the textarea input.
      *
@@ -71,10 +38,6 @@ class Textarea extends Field {
         return $this;
     }
     
-
-    /***************************
-     * Rendering
-     ***************************/
     /**
      * Retrieves the blade component to use in the render() method.
      *

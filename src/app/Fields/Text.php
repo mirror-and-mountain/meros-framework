@@ -3,47 +3,19 @@
 namespace MM\Meros\App\Fields;
 
 class Text extends Input {
-    /**
-     * The unique identifier for the field, used for resolution.
-     *
-     * @var string
-     */
-    public string $handle = 'text';
-
-    /**
-     * The icon for the field, used in the form builder UI.
-     *
-     * @var string
-     */
     public static string $icon = 'bars';
 
     /**
-     * Default attributes for the text field.
+     * Sets up the field's handle, supported features, etc.
      *
-     * @var array
+     * @return void
      */
-    protected array $attributes = [
-        'type' => 'text',
-    ];
+    protected function initialise(): void {
+        parent::initialise();
+        $this->handle = 'text';
+        $this->compatibleDataTypes = ['string'];
 
-    /**
-     * Rules supported by the field for validation purposes.
-     *
-     * @var array
-     */
-    protected array $supportedRules = [
-        'maxlength',
-        'maxwords',
-        'minwords'
-    ];
-    
-    /**
-     * An array of data types that this field is compatible with.
-     *
-     * @var array
-     */
-    protected array $compatibleDataTypes = [
-        'string'
-    ];
-
+        $this->inputType('text');
+        $this->addSupport('icon');
+    }
 }

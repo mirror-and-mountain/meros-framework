@@ -2,40 +2,19 @@
 
 namespace MM\Meros\App\Fields;
 
-class MultiSelect extends Select {
+class MultiSelect extends AdvancedSelect {
     /**
-     * The unique identifier for the field, used for resolution.
+     * Sets up the field's handle, supported features, etc.
      *
-     * @var string
+     * @return void
      */
-    public string $handle = 'multi_select';
+    protected function initialise(): void {
+        parent::initialise();
+        $this->handle = 'multi_select';
+        $this->compatibleDataTypes = ['array.scalar'];
 
-    /**
-     * Choice features supported by the multi-select field.
-     *
-     * @var array
-     */
-    protected array $supports = [
-        'allowAdd'
-    ];
-
-    /**
-     * An array of data types that this field is compatible with.
-     *
-     * @var array
-     */
-    protected array $compatibleDataTypes = [
-        'array.scalar'
-    ];
-
-    /**
-     * Default attributes for the multi-select field.
-     *
-     * @var array
-     */
-    protected array $attributes = [
-        'multiple' => true,
-    ];
+        $this->attribute('multiple', true);
+    }
 
     /**
      * Retrieves the field's value, ensuring it's returned as an array.
@@ -53,12 +32,11 @@ class MultiSelect extends Select {
     }
 
     /**
-     * Determines if this multi-select field should use an advanced UI (e.g., tomselect).
-     * Always set to true for multi-select fields.
+     * Retrieves the blade component to use in the render() method.
      *
-     * @return boolean
+     * @return string
      */
-    public function isAdvanced(): bool {
-        return true;
+    public function getFieldComponent(): string {
+        return 'meros::forms.fields.select-multi';
     }
 }

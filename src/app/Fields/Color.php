@@ -3,35 +3,18 @@
 namespace MM\Meros\App\Fields;
 
 class Color extends Input {
-    /**
-     * The unique identifier for the field, used for resolution.
-     *
-     * @var string
-     */
-    public string $handle = 'color';
-
-    /**
-     * The icon for the field, used in the form builder UI.
-     *
-     * @var string
-     */
     public static string $icon = 'swatch';
 
     /**
-     * Default attributes for the color field.
+     * Sets up the field's handle, supported features, etc.
      *
-     * @var array
+     * @return void
      */
-    protected array $attributes = [
-        'type' => 'color',
-    ];
+    protected function initialise(): void {
+        parent::initialise();
+        $this->handle = 'color';
+        $this->compatibleDataTypes = ['string'];
 
-    /**
-     * An array of data types that this field is compatible with.
-     *
-     * @var array
-     */
-    protected array $compatibleDataTypes = [
-        'string'
-    ];
+        $this->inputType('color');
+    }
 }

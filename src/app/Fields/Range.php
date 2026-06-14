@@ -3,35 +3,26 @@
 namespace MM\Meros\App\Fields;
 
 class Range extends Number {
-    /**
-     * The unique identifier for the field, used for resolution.
-     *
-     * @var string
-     */
-    public string $handle = 'range';
-
-    /**
-     * The icon for the field, used in the form builder UI.
-     *
-     * @var string
-     */
     public static string $icon = 'adjustments';
-
-    /**
-     * Default attributes for the range field.
-     *
-     * @var array
-     */
-    protected array $attributes = [
-        'type' => 'range',
-    ];
     
     /**
-     * Whether the field shows a number input alongside the range slider.
+     * Whether the range field should show a number input alongside the range slider.
      *
      * @var boolean
      */
-    public bool $showsNumberInput = true;
+    protected bool $showsNumberInput = true;
+
+    /**
+     * Sets up the field's handle, supported features, etc.
+     *
+     * @return void
+     */
+    protected function initialise(): void {
+        $this->handle = 'range';
+        $this->compatibleDataTypes = ['integer', 'float', 'decimal'];
+
+        $this->inputType('range');
+    }
 
     /**
      * Sets the range field to show a number input alongside the range slider.

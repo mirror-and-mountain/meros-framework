@@ -3,88 +3,57 @@
 namespace MM\Meros\App\Fields;
 
 class Number extends Input {
-    /**
-     * The unique identifier for the field, used for resolution.
-     *
-     * @var string
-     */
-    public string $handle = 'number';
-
-    /**
-     * The icon for the field, used in the form builder UI.
-     *
-     * @var string
-     */
     public static string $icon = 'calculator';
 
     /**
-     * Default attributes for the number field.
+     * Sets up the field's handle, supported features, etc.
      *
-     * @var array
+     * @return void
      */
-    protected array $attributes = [
-        'type' => 'number',
-    ];
+    protected function initialise(): void {
+        parent::initialise();
+        $this->handle = 'number';
+        $this->compatibleDataTypes = ['integer', 'float', 'decimal'];
+
+        $this->inputType('number');
+    }
 
     /**
-     * Rules supported by the field for validation purposes.
+     * Sets the minimum value for the number input field, if supported.
      *
-     * @var array
-     */
-    protected array $supportedRules = [
-        'min',
-        'max',
-        'step'
-    ];
-
-    /**
-     * An array of data types that this field is compatible with.
-     *
-     * @var array
-     */
-    protected array $compatibleDataTypes = [
-        'integer',
-        'float',
-        'decimal',
-    ];
-
-
-    /***************************
-     * Fluent Setters
-     ***************************/
-    /**
-     * Sets the minimum attribute for number inputs.
-     *
-     * @param float $min The minimum value allowed for the input.
+     * @param float $min
      *
      * @return self
      */
     public function min(float $min): self {
         $this->attribute('min', $min);
+
         return $this;
     }
-    
+
     /**
-     * Sets the maximum attribute for number inputs.
+     * Sets the maximum value for the number input field, if supported.
      *
-     * @param float $max The maximum value allowed for the input.
+     * @param float $max
      *
      * @return self
      */
     public function max(float $max): self {
         $this->attribute('max', $max);
+
         return $this;
     }
 
     /**
-     * Sets the step attribute for number inputs.
+     * Sets the step value for the number input field, if supported.
      *
-     * @param float $step The step value for the input.
+     * @param float $step
      *
      * @return self
      */
     public function step(float $step): self {
         $this->attribute('step', $step);
+
         return $this;
     }
 }

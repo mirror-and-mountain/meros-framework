@@ -6,31 +6,17 @@ use Closure;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
+use MM\Meros\Services\Contracts\FeatureProvider;
+
 use MM\Meros\Services\Contracts\Forms\Field;
+
 use MM\Meros\Facades\Fields as FieldsRegister;
+use MM\Meros\Facades\FieldGroups as FieldGroupsRegister;
 
 use MM\Meros\Facades\Context;
 
 class Repeater extends Field {
-    /**
-     * The unique identifier for the field, used for resolution.
-     *
-     * @var string
-     */
-    public string $handle = 'repeater';
-
-    /**
-     * The category for the field, used for grouping in the UI.
-     *
-     * @var string
-     */
     public static string $category = 'specialised';
-
-    /**
-     * The icon for the field, used in the form builder UI.
-     *
-     * @var string
-     */
     public static string $icon = 'table';
     
     /**
@@ -46,29 +32,6 @@ class Repeater extends Field {
      * @var string
      */
     protected string $placeholder = '';
-
-    /**
-     * Default class list for repeaters.
-     *
-     * @var array
-     */
-    protected array $classList = ['meros-repeater-field'];
-
-    /**
-     * An array of data types that this field is compatible with.
-     *
-     * @var array
-     */
-    protected array $compatibleDataTypes = [
-        'array.object'
-    ];
-
-    /**
-     * Whether to force the field to take up the full width of its container, regardless of the width setting.
-     *
-     * @var bool
-     */
-    protected bool $forceFullWidth = true;
 
     /**
      * Whether to allow adding/removing/reordering rows in the repeater. 
@@ -105,9 +68,23 @@ class Repeater extends Field {
     /**
      * The fields that belong to this repeater.
      *
-     * @var array<Field>
+     * @var array<Field|array>
      */
     public array $fields = [];
+
+    /**
+     * Custom configuration dialogs for repeater rows, each with an optional rule for when to show the dialog.
+     *
+     * @var array
+     */
+    protected array $customConfigurationDialogs = [];
+
+    /**
+     * A hidden field used to store the configuration for a repeater row when using a custom configuration dialog.
+     *
+     * @var Field|null
+     */
+    protected ?Field $hiddenConfigurationField = null;
 
     /**
      * The text to show in the button for adding new rows to the repeater.
@@ -131,43 +108,6 @@ class Repeater extends Field {
     protected string $removeRowText = '';
 
     /**
-     * Default callback path for row configure actions.
-     *
-     * @var string
-     */
-    protected string $defaultConfigurationCallback = '$store.repeaterField.defaultConfigureRowModal';
-
-    /**
-     * The name of a js callback function to use when a row is added to the repeater.
-     *
-     * @var string
-     */
-    protected string $onAddRow = '';
-
-    /**
-     * The name of a js callback function to use when a row is removed from the repeater.
-     *
-     * @var string
-     */
-    protected string $onRemoveRow = '';
-
-    /**
-     * The name of a js callback function to use when a row is moved in the repeater.
-     *
-     * @var string
-     */
-    protected string $onMoveRow = '';
-
-    /**
-     * The name of a js callback function to use for configuring the repeater's row.
-     * If unset and allowConfigure is true, a default callback will be used that opens a
-     * modal with the row's fields for configuration.
-     *
-     * @var string
-     */
-    protected string $onConfigureRow = '';
-
-    /**
      * An optional list of field names that must have a non-empty value before the
      * configure button is enabled for a row. Only applies when a custom onConfigureRow
      * callback is set.
@@ -176,31 +116,286 @@ class Repeater extends Field {
      */
     protected array $configureRequiredFields = [];
 
-    /**
-     * Converts the field's properties to an array format suitable for JSON serialization
-     * 
-     * @param boolean $asString Whether to return the JSON as a string or an array.
-     * @param string  ...$flags Optional flags to pass to json_encode if $asString is true.
-     *
-     * @return array|string
-     */
-    public function toJson(bool $asString = false, string ...$flags): array|string {
-        $json = parent::toJson();
+    // =========================================================================
+    // Initialisation
+    // =========================================================================
 
-        $json['fields'] = array_map(function($field) {
-            return $field->toJson();
-        }, $this->fields);
-        
-        if ($asString) {
-            return json_encode($json, ...$flags);
-        }
+    public function __construct(
+        FeatureProvider $provider,
+        array           $props = []
+    ) {
+        parent::__construct($provider, $props);
 
-        return $json;
+        $this->instantiateFields();
     }
 
-    /********************
-     * Fluent Setters
-     ********************/
+    /**
+     * Sets up the field's handle, supported features, etc.
+     *
+     * @return void
+     */
+    protected function initialise(): void {
+        $this->handle = 'repeater';
+        $this->compatibleDataTypes = ['array.object'];
+
+        $this->addSupports([
+            'required',
+            'placeholder',
+            'helpText'
+        ]);
+
+        $this->class('meros-repeater-field');
+
+    }
+
+    // =========================================================================
+    // Rendering
+    // =========================================================================
+
+    /**
+     * Renders the field using its designated FieldWrapper.
+     * 
+     * @param bool  $wrapped Whether to render the field within its wrapper. If false, only the field's input component will be rendered without any wrapper or additional elements.
+     * @param array $props   An optional array of properties for rendering the field. This can include 'id', 'label', 'helpText', 'excludeAttributes', and 'component'.
+     *
+     * @return void
+     */
+    public function render(bool $wrapped = true, array $props = []): void {
+        $props = $this->getRenderProps($props);
+
+        $allowsActions = $props['allowsConfigure'] || $props['allowsRemove'];
+        $props['columnCount']   = count($this->fields) + ($props['allowsReorder'] ? 1 : 0) + ($allowsActions ? 1 : 0);
+
+        if ($wrapped) {
+            $wrapper = $this->resolveFieldWrapper();
+
+            echo view($wrapper, $props);
+        }
+
+        else {
+            echo view($parsedConfig['component'] ?? $this->getFieldComponent(), $props);
+        }
+    }
+
+    /**
+     * Retrieves the rendering properties for the field, applying defaults where necessary.
+     *
+     * @param array $props An array of properties that may include 'id', 'label', 'helpText', 'excludeAttributes', and 'component'.
+     *
+     * @return array An array containing the parsed properties with defaults applied.
+     */
+    protected function getRenderProps(array $props = []): array {
+        $parsedProps = $this->parseRenderProps($props);
+
+        return [
+            'view'                       => $parsedProps['component'] ?? $this->getFieldComponent(),
+            'field'                      => $this,
+            'id'                         => $parsedProps['id'],
+            'name'                       => $parsedProps['name'],
+            'label'                      => $parsedProps['label'] ?? $this->getLabel(),
+            'helpText'                   => $parsedProps['helpText'] ?? $this->getHelpText(),
+            'value'                      => $this->getValue(),
+            'rows'                       => $this->buildRows(),
+            'templateRow'                => $this->buildTemplateRow(),
+            'fieldNames'                 => $this->getFieldNames(),
+            'fieldLabels'                => $this->getFieldLabels(),
+            'attributes'                 => $this->attributes($parsedProps['attributes'] ?? [], $parsedProps['excludeAttributes'] ?? []),
+            'placeholder'                => $parsedProps['placeholder'],
+            'allowsAdd'                  => $parsedProps['allowsAdd'],
+            'allowsRemove'               => $parsedProps['allowsRemove'],
+            'allowsConfigure'            => $parsedProps['allowsConfigure'],
+            'showsActionsColumn'         => $parsedProps['allowsConfigure'] || $parsedProps['allowsRemove'],
+            'allowsReorder'              => $parsedProps['allowsReorder'],
+            'addRowText'                 => $parsedProps['addRowText'],
+            'configureRowText'           => $parsedProps['configureRowText'],
+            'removeRowText'              => $parsedProps['removeRowText'],
+            'hasRules'                   => $this->hasRules(),
+            'rules'                      => $parsedProps['rules'],
+            'maxRows'                    => $this->getRuleValue('maxitems'),
+            'minRows'                    => $this->getRuleValue('minitems'),
+            'configureRequiredFields'    => $parsedProps['configureRequiredFields'],
+            'customConfigurationDialogs' => $parsedProps['customConfigurationDialogs']
+        ];
+    }
+
+    /**
+     * Parses the rendering properties for the field, applying defaults where necessary.
+     *
+     * @param array $props An array of properties that may include 'id', 'label', 'helpText', 'excludeAttributes', and 'component'.
+     *
+     * @return array An array containing the parsed properties with defaults applied.
+     */
+    protected function parseRenderProps(array $props): array {
+        $parsedProps = parent::parseRenderProps($props);
+
+        $parsedProps['placeholder'] = is_string($props['placeholder'] ?? null)
+            ? $props['placeholder']
+            : $this->placeholder;
+
+        $parsedProps['allowsAdd'] = is_bool($props['allowsAdd'] ?? null)
+            ? $props['allowsAdd']
+            : ($this->allowAdd ?? true);
+
+        $parsedProps['allowsRemove'] = is_bool($props['allowsRemove'] ?? null)
+            ? $props['allowsRemove']
+            : ($this->allowRemove ?? true);
+
+        $parsedProps['allowsReorder'] = is_bool($props['allowsReorder'] ?? null)
+            ? $props['allowsReorder']
+            : ($this->allowReorder ?? true);
+
+        $parsedProps['allowsConfigure'] = is_bool($props['allowsConfigure'] ?? null)
+            ? $props['allowsConfigure']
+            : ($this->allowConfigure ?? true);
+
+        $parsedProps['addRowText'] = is_string($props['addRowText'] ?? null)
+            ? $props['addRowText']
+            : ($this->addRowText ?: 'Add Row');
+
+        $parsedProps['configureRowText'] = is_string($props['configureRowText'] ?? null)
+            ? $props['configureRowText']
+            : ($this->configureRowText ?: 'Configure');
+
+        $parsedProps['removeRowText'] = is_string($props['removeRowText'] ?? null)
+            ? $props['removeRowText']
+            : ($this->removeRowText ?: 'Remove');
+
+        $parsedProps['configureRequiredFields'] = is_array($props['configureRequiredFields'] ?? null)
+            ? $props['configureRequiredFields']
+            : $this->configureRequiredFields;
+
+        $parsedProps['customConfigurationDialogs'] = is_array($props['customConfigurationDialogs'] ?? null)
+            ? $props['customConfigurationDialogs']
+            : $this->customConfigurationDialogs;
+
+        return $parsedProps;
+    }
+
+    /**
+     * Renders the default value control for the repeater field in the field settings panel.
+     * Repeaters do not have a default value control, so this method is intentionally left blank.
+     *
+     * @return void
+     */
+    public function renderDefaultValueControl(): void {
+        return; // Repeaters don't have a default value control in the field settings panel
+    }
+
+    /**
+     * Returns the name of the Blade component used to render the repeater field.
+     *
+     * @return string
+     */
+    public function getFieldComponent(): string {
+        return 'meros::forms.fields.repeater';
+    }
+
+    /**
+     * Builds row arrays of cloned sub-fields for each repeater item.
+     *
+     * @return array
+     */
+    public function buildRows(): array {
+        $value = $this->getValue();
+        $items = is_array($value) && !empty($value)
+            ? $value
+            : [];
+
+        $rows = [];
+
+        foreach ($items as $index => $rowData) {
+            $rowData  = is_array($rowData) ? $rowData : [];
+            $rowToken = $this->resolveRowToken($rowData, $index);
+            $rows[]   = $this->buildRowFields($rowData, $rowToken);
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Builds a hidden template row for the empty-state repeater UI.
+     *
+     * @return array
+     */
+    public function buildTemplateRow(): array {
+        $rowToken = $this->resolveRowToken([], 0);
+
+        return $this->buildRowFields([], $rowToken, true);
+    }
+
+    // =========================================================================
+    // Configuration Dialogs
+    // =========================================================================
+
+    /**
+     * Defines a custom configuration dialog for repeater rows with an optional rule for when to show the dialog. 
+     * The callback receives a FieldGroup instance to which fields can be added for the dialog. 
+     * 
+     * The rule is an array in the format [fieldName, operator, value] that determines when to 
+     * show the dialog based on the values of the row's fields.
+     *
+     * @param Closure $callback
+     * @param array   $rule
+     *
+     * @return self
+     */
+    public function customConfigurationDialog(Closure $callback, array $rule = [], array $default = []): self {
+        $dialog = FieldGroupsRegister::checkout($this->provider)->make();
+
+        $callback($dialog);
+
+        $this->customConfigurationDialogs[] = [
+            'rule'  => $rule,
+            'html'  => $dialog->html(['class' => 'meros-form-group--no-style']),
+        ];
+
+        if ($this->hiddenConfigurationField === null) {
+            $this->hiddenConfigurationField = FieldsRegister::checkout($this->provider)
+                ->makeFrom('hidden', function (Field $field) use ($default) {
+                $field->name('__configuration')
+                    ->hideInRepeaterTable()
+                    ->attribute('data-repeater-configuration-field', true)
+                    ->attribute('value-as-json', 'true')
+                    ->default(json_encode($default));
+            });
+
+            $this->field($this->hiddenConfigurationField);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Gets the custom configuration dialogs for repeater rows, including their rules and rendered HTML.
+     *
+     * @return array
+     */
+    private function getCustomConfigurationDialogs(): array {
+        return collect($this->customConfigurationDialogs)
+            ->map(fn($dialog) => $dialog ?? [])
+            ->toArray();
+    }
+
+    // =========================================================================
+    // Attribute Setters
+    // =========================================================================
+
+    /**
+     * Sets whether the repeater field is required.
+     *
+     * @param boolean $required
+     *
+     * @return static
+     */
+    public function required(bool $required = true): static {
+        if ($required) {
+            $this->attribute('data-required', 'true');
+        } else {
+            $this->removeAttribute('data-required');
+        }
+
+        return $this;
+    }
 
     /**
      * Sets the placeholder text to show in the repeater when there are no rows.
@@ -298,6 +493,10 @@ class Repeater extends Field {
         return $this;
     }
 
+    // =========================================================================
+    // Field Setters
+    // =========================================================================
+
     /**
      * Sets the field names that must have a non-empty value before the configure button
      * is enabled on a row. Only applied when a custom onConfigureRow callback is set.
@@ -311,83 +510,6 @@ class Repeater extends Field {
             array_map('strval', $fieldNames),
             fn($name) => trim($name) !== ''
         ));
-        return $this;
-    }
-
-    /**
-     * Sets the name of a js callback function to use for configuring the repeater's row.
-        *
-        * Configure-row callbacks receive a payload array with:
-        * - triggerElement: the clicked configure button
-        * - repeaterId: the repeater DOM id, or null when unavailable
-        * - rowValue: the current row values keyed by field name
-        * - rowIndex: the current row index, or null when unavailable
-     *
-     * @param string $callback
-     *
-     * @return static
-     */
-    public function onConfigureRow(string $callback): static {
-        $this->onConfigureRow = $this->normaliseCallbackPath($callback);
-        return $this;
-    }
-
-    /**
-     * Sets the name of a js callback function to use when a row is added to the repeater.
-        *
-        * Add-row callbacks receive a payload array with:
-        * - triggerElement: the add button that triggered the action
-        * - repeaterId: the repeater DOM id, or null when unavailable
-        * - rowIndex: the index of the newly added row
-        * - rowValue: the new row values keyed by field name
-        * - repeaterValue: the full repeater value snapshot after the add
-     *
-     * @param string $callback
-     *
-     * @return static
-     */
-    public function onAddRow(string $callback): static {
-        $this->onAddRow = $this->normaliseCallbackPath($callback);
-        return $this;
-    }
-
-    /**
-     * Sets the name of a js callback function to use when a row is removed from the repeater.
-        *
-        * Remove-row callbacks receive a payload array with:
-        * - triggerElement: the remove button that triggered the action
-        * - repeaterId: the repeater DOM id, or null when unavailable
-        * - rowIndex: the index of the removed row
-        * - rowValue: the removed row values keyed by field name
-        * - repeaterValue: the full repeater value snapshot after the removal
-     *
-     * @param string $callback
-     *
-     * @return static
-     */
-    public function onRemoveRow(string $callback): static {
-        $this->onRemoveRow = $this->normaliseCallbackPath($callback);
-        return $this;
-    }
-
-    /**
-     * Sets the name of a js callback function to use when a row is moved in the repeater.
-        *
-        * Move-row callbacks receive a payload array with:
-        * - triggerElement: the dragged row's move handle or repeater root
-        * - repeaterId: the repeater DOM id, or null when unavailable
-        * - rowValue: the moved row values keyed by field name
-        * - sourceIndex: the original row index
-        * - requestedTargetIndex: the target index requested by the drag/drop interaction
-        * - targetIndex: the final row index after normalisation
-        * - repeaterValue: the full repeater value snapshot after the move
-     *
-     * @param string $callback
-     *
-     * @return static
-     */
-    public function onMoveRow(string $callback): static {
-        $this->onMoveRow = $this->normaliseCallbackPath($callback);
         return $this;
     }
 
@@ -453,6 +575,38 @@ class Repeater extends Field {
     }
 
     /**
+     * Moves a field to a new position within the repeater's fields array.
+     *
+     * @param string  $fieldId
+     * @param integer $newPosition
+     *
+     * @return void
+     */
+    public function moveField(string $fieldId, int $newPosition): void {
+        $field = collect($this->fields)->firstWhere('id', $fieldId);
+
+        if ($field === null) {
+            return; // Field not found in the repeater
+        }
+
+        $currentIndex = array_search($field, $this->fields, true);
+
+        if ($currentIndex === false) {
+            return; // Field not found in the repeater
+        }
+
+        array_splice($this->fields, $currentIndex, 1); // Remove the field from its current position
+
+        if ($newPosition >= count($this->fields)) {
+            $this->fields[] = $field; // Add to the end if new position is out of bounds
+        } else {
+            array_splice($this->fields, $newPosition, 0, [$field]); // Insert at the new position
+        }
+
+        $this->fields = array_values($this->fields); // Reindex the array
+    }
+
+    /**
      * Removes a field from the repeater's fields array.
      *
      * @param Field $field The field instance to remove.
@@ -461,6 +615,7 @@ class Repeater extends Field {
      */
     public function removeField(Field $field): self {
         $this->fields = array_filter($this->fields, fn($f) => $f !== $field);
+        $this->fields = array_values($this->fields); // Reindex the array
         return $this;
     }
 
@@ -476,130 +631,9 @@ class Repeater extends Field {
         return $this->removeField($field);
     }
 
-    /********************
-     * Getters
-     ********************/
-
-    /**
-     * Gets the placeholder text to show in the repeater when there are no rows.
-     *
-     * @return string
-     */
-    public function getPlaceholder(): string {
-        return empty($this->placeholder) ? 'No items added yet.' : $this->placeholder;
-    }
-
-    /**
-     * Gets whether the repeater allows adding new rows.
-     *
-     * @return boolean
-     */
-    public function allowsAdd(): bool {
-        return $this->allowAdd ?? true;
-    }
-
-    /**
-     * Gets whether the repeater allows removing rows.
-     *
-     * @return boolean
-     */
-    public function allowsRemove(): bool {
-        return $this->allowRemove ?? true;
-    }
-
-    /**
-     * Gets whether the repeater allows reordering rows.
-     *
-     * @return boolean
-     */
-    public function allowsReorder(): bool {
-        return $this->allowReorder ?? true;
-    }
-
-    /**
-     * Gets whether the repeater allows configuring rows.
-     * 
-     * @return boolean
-     */
-    public function allowsConfigure(): bool {
-        return $this->allowConfigure ?? true;
-    }
-
-    /**
-     * Gets the text to show in the button for adding new rows to the repeater.
-     *
-     * @return string
-     */
-    public function getAddRowText(): string {
-        return empty($this->addRowText) ? 'Add Row' : $this->addRowText;
-    }
-
-    /**
-     * Gets the text to show in the button for configuring a row in the repeater.
-     *
-     * @return string
-     */
-    public function getConfigureRowText(): string {
-        return empty($this->configureRowText) ? 'Configure' : $this->configureRowText;
-    }
-
-    /**
-     * Gets the text to show in the button for removing a row from the repeater.
-     *
-     * @return string
-     */
-    public function getRemoveRowText(): string {
-        return empty($this->removeRowText) ? 'Remove' : $this->removeRowText;
-    }
-
-    /**
-     * Gets the field names required to be non-empty before configure is enabled.
-     *
-     * @return array<string>
-     */
-    public function getConfigureRequiredFields(): array {
-        return $this->configureRequiredFields;
-    }
-
-    /**
-     * Gets the name of the js callback function used for configuring the repeater's row.
-     *
-     * @return string
-     */
-    public function getOnConfigureRowCallback(): string {
-        $configuredCallback = !empty($this->onConfigureRow) ? $this->normaliseCallbackPath($this->onConfigureRow) : '';
-
-        return empty($configuredCallback) && $this->allowsConfigure()
-            ? $this->defaultConfigurationCallback
-            : $configuredCallback;
-    }
-
-    /**
-     * Gets the name of the js callback function used when a row is added to the repeater.
-     *
-     * @return string
-     */
-    public function getOnAddRowCallback(): string {
-        return !empty($this->onAddRow) ? $this->normaliseCallbackPath($this->onAddRow) : '';
-    }
-
-    /**
-     * Gets the name of the js callback function used when a row is removed from the repeater.
-     *
-     * @return string
-     */
-    public function getOnRemoveRowCallback(): string {
-        return !empty($this->onRemoveRow) ? $this->normaliseCallbackPath($this->onRemoveRow) : '';
-    }
-
-    /**
-     * Gets the name of the js callback function used when a row is moved in the repeater.
-     *
-     * @return string
-     */
-    public function getOnMoveRowCallback(): string {
-        return !empty($this->onMoveRow) ? $this->normaliseCallbackPath($this->onMoveRow) : '';
-    }
+    // =========================================================================
+    // Getters
+    // =========================================================================
 
     /**
      * Returns the fields that belong to this repeater as a collection.
@@ -617,7 +651,7 @@ class Repeater extends Field {
      *
      * @return array
      */
-    public function getFieldNames(): array {
+    protected function getFieldNames(): array {
         return collect($this->fields)
             ->map(fn($field) => $field->getName())
             ->toArray();
@@ -628,81 +662,68 @@ class Repeater extends Field {
      *
      * @return array
      */
-    public function getFieldLabels(): array {
+    protected function getFieldLabels(): array {
         return collect($this->fields)
             ->map(fn($field) => $field->getLabel())
             ->toArray();
     }
 
-    /***************************
-     * Rendering
-     ***************************/
+    // =========================================================================
+    // Serialisation
+    // =========================================================================
 
     /**
-     * Renders the repeater table field.
+     * Converts the field's properties to an array format suitable for JSON serialization
      * 
-     * @param bool $showLabel Whether to show the field's label in the wrapper. Some wrappers may ignore this and always show the label, or never show the label.
-     * @param bool $showHelp Whether to show the field's help text in the wrapper. Some wrappers may ignore this and always show the help text, or never show the help text.
+     * @param boolean $asString Whether to return the JSON as a string or an array.
+     * @param string  ...$flags Optional flags to pass to json_encode if $asString is true.
+     *
+     * @return array|string
+     */
+    public function toJson(bool $asString = false, string ...$flags): array|string {
+        $json = parent::toJson();
+
+        $json['fields'] = array_map(function($field) {
+            return $field->toJson();
+        }, $this->fields);
+        
+        if ($asString) {
+            return json_encode($json, ...$flags);
+        }
+
+        return $json;
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    /**
+     * Instantiates any sub fields that are provided as an array.
      *
      * @return void
      */
-    public function render(bool $showLabel = true, bool $showHelp = true): void {
-        $wrapper = $this->resolveFieldWrapper();
-
-        echo view($wrapper, [
-            'view'      => $this->getFieldComponent(),
-            'field'     => $this,
-            'rows'      => $this->buildRows(),
-            'showLabel' => $showLabel,
-            'showHelp'  => $showHelp
-        ]);
-    }
-
-    /**
-     * Returns the name of the Blade component used to render the repeater field.
-     *
-     * @return string
-     */
-    public function getFieldComponent(): string {
-        return Context::isAdmin() ? 'meros::forms.fields.repeater-admin' : 'meros::forms.fields.repeater';
-    }
-
-    /**
-     * Builds row arrays of cloned sub-fields for each repeater item.
-     *
-     * @return array
-     */
-    public function buildRows(): array {
-        $value = $this->getValue();
-        $items = is_array($value) && !empty($value)
-            ? $value
-            : [];
-
-        $rows = [];
-
-        foreach ($items as $index => $rowData) {
-            $rowData = is_array($rowData) ? $rowData : [];
-            $rowToken = $this->resolveRowToken($rowData, $index);
-            $rows[] = $this->buildRowFields($rowData, $rowToken);
+    protected function instantiateFields(): void {
+        if (empty($this->fields)) {
+            return;
         }
 
-        return $rows;
+        foreach ($this->fields as $index => $fieldData) {
+            if ($fieldData instanceof Field) {
+                continue;
+            }
+
+            if (!is_array($fieldData) || !isset($fieldData['type'])) {
+                continue; // Skip invalid field data
+            }
+
+            $field = $fieldData['type']::initFromData($fieldData);
+
+            $field->repeater($this);
+
+            $this->fields[$index] = $field;
+        }
     }
-
-    /**
-     * Builds a hidden template row for the empty-state repeater UI.
-     *
-     * @return array
-     */
-    public function buildTemplateRow(): array {
-        $rowToken = $this->resolveRowToken([], 0);
-
-        return $this->buildRowFields([], $rowToken, true);
-    }
-
-    /********************
-     * Helpers
-     ********************/
 
     /**
      * Generates a unique name for a sub-field based on the repeater's root name, the repeater's name, the row index, and the sub-field's name.
@@ -772,6 +793,7 @@ class Repeater extends Field {
 
             if ($isTemplate) {
                 $fieldInstance->attribute('disabled', true);
+                $fieldInstance->attribute('data-disabled-for-template-only', $fieldInstance->isDisabled() ? 'true' : 'false');
             } else {
                 // Look up value using the base field name, not the generated indexed name.
                 $fieldInstance->value($rowData[$baseFieldName] ?? null);

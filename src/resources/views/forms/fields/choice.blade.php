@@ -1,55 +1,39 @@
 @php 
-    $id         = $field->getId();
-    $fieldType  = $field->getType();
-    $classList  = $field->classList();
-    $isSubField = $field->isSubField();
-    $fieldValue = $field->getValue();
-    $layout     = $field->getLayout();
-    $isRequired = $field->isRequired();
-    $helpText   = $showHelp ? $field->getHelpText() : '';
-    $helpTextPosition = $showHelp ? $field->getHelpTextPosition() : null;
-    $fieldSetClass    = $isSubField ? 'nice-form-group !-mt-2.5' : 'nice-form-group';
+    $allowsMultiple = $type === 'checkboxes';
+    $fieldSetClass  = $isSubField ? 'nice-form-group !-mt-2.5' : 'nice-form-group';
 @endphp
 
-<fieldset id="{{ $id }}" class="{{ $fieldSetClass }}" data-field-type="{{ $fieldType }}" x-data="{ layout: '{{ $layout }}' }">
-    @if(!$isSubField)
+<fieldset id="{{ $id }}" class="{{ $fieldSetClass }}" data-field-type="{{ $fieldType }}">
+    @if(!$isSubField && $label !== false)
         <legend 
             class="form-label"
         >
-            {{ $field->getLabel() }}
+            {{ $label }}
             @if($isRequired)
                 <span class="required-indicator">*</span>
             @endif
         </legend>
     
-        @if($showHelp)
+        @if($helpText !== false && !empty($helpText))
             <small class="description">{{ $helpText }}</small>
         @endif
     @endif
 
-    @if($layout === 'horizontal')
-        <div class="flex gap-3 items-start -mt-6">
-    @endif
-
-    @foreach($field->getOptions() as $value => $label)
+    @foreach($options as $optValue => $label)
         <div class="nice-form-group">
             @php
-                $checked = $field->allowsMultiple()
-                    ? (is_array($fieldValue) && in_array($value, $fieldValue, true))
-                    : ($fieldValue !== null && (string) $fieldValue === (string) $value);
+                $checked = $allowsMultiple
+                    ? (is_array($value) && in_array($optValue, $value, true))
+                    : ($value !== null && (string) $value === (string) $optValue);
             @endphp
             <input 
-                id="{{ $id }}_{{ $value }}" 
-                {!! $field->attributes(['id', 'name', 'data-field-type', 'required', 'aria-required']) !!} 
-                name="{{ $field->getName(!$isSubField) . ($field->allowsMultiple() ? '[]' : '') }}"
-                data-option-value="{{ $value }}"
+                id="{{ $id }}_{{ $optValue }}" 
+                {!! $field->filterAttributes($attributes, ['data-field-type', 'required', 'aria-required', 'multiple']) !!} 
+                name="{{ $field->getName(!$isSubField) . ($allowsMultiple ? '[]' : '') }}"
+                data-option-value="{{ $optValue }}"
                 @checked($checked) 
             />
-            <label for="{{ $id }}_{{ $value }}" :class="layout === 'horizontal' ? '!whitespace-pre' : ''">{{ $label }}</label>
+            <label for="{{ $id }}_{{ $optValue }}">{{ $label }}</label>
         </div>
     @endforeach
-
-    @if($layout === 'horizontal')
-        </div>
-    @endif
 </fieldset>

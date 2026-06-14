@@ -5,34 +5,19 @@ namespace MM\Meros\App\Fields;
 use MM\Meros\Services\Contracts\Forms\Field;
 
 class Checkbox extends Field {
-    /**
-     * The unique identifier for the field, used for resolution.
-     *
-     * @var string
-     */
     public string $handle = 'checkbox';
-
-    /**
-     * The category for the field, used for grouping in the UI.
-     *
-     * @var string
-     */
     public static string $icon = 'tick';
 
-    /**
-     * Default attributes for the number field.
-     *
-     * @var array
-     */
     protected array $attributes = [
         'type' => 'checkbox',
     ];
 
-    /**
-     * An array of data types that this field is compatible with.
-     *
-     * @var array
-     */
+    protected array $supports = [
+        'required',
+        'disabled',
+        'helpText'
+    ];
+
     protected array $compatibleDataTypes = [
         'boolean'
     ];
@@ -50,9 +35,6 @@ class Checkbox extends Field {
         return $this->value;
     }
 
-    /***************************
-     * Rendering
-     ***************************/
     /**
      * Retrieves the blade component to use in the render() method.
      *

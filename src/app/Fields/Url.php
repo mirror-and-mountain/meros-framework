@@ -3,46 +3,19 @@
 namespace MM\Meros\App\Fields;
 
 class Url extends Input {
-    /**
-     * The unique identifier for the field, used for resolution.
-     *
-     * @var string
-     */
-    public string $handle = 'url';
-
-    /**
-     * The icon for the field, used in the form builder UI.
-     *
-     * @var string
-     */
     public static string $icon = 'link';
 
     /**
-     * Default attributes for the URL field.
+     * Sets up the field's handle, supported features, etc.
      *
-     * @var array
+     * @return void
      */
-    protected array $attributes = [
-        'type' => 'url',
-    ];
+    protected function initialise(): void {
+        parent::initialise();
+        $this->handle = 'url';
+        $this->compatibleDataTypes = ['string'];
 
-    /**
-     * Supported features for the URL field.
-     *
-     * @var array
-     */
-    protected array $supports = [
-        'placeholder',
-        'icon'
-    ];
-
-    /**
-     * An array of data types that this field is compatible with.
-     *
-     * @var array
-     */
-    protected array $compatibleDataTypes = [
-        'string'
-    ];
-
+        $this->inputType('url');
+        $this->addSupport('icon');
+    }
 }

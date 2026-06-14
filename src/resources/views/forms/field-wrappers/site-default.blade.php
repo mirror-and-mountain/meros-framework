@@ -1,28 +1,22 @@
 @php
-    $id               = $field->getId();
-    $helpText         = $showHelp ? $field->getHelpText() : '';
-    $hasHelpText      = !empty($helpText);
-    $helpTextPosition = $hasHelpText ? $field->getHelpTextPosition() : null;
-    $showLabel        = $showLabel;
-    $isRequired       = $field->isRequired();
-    $isDisabled       = $field->isDisabled();
-    $isFieldSet       = in_array($field->handle, ['radio', 'checkboxes']);
-    $wireIgnore       = (method_exists($field, 'isAdvanced') && $field->isAdvanced()) || $field->handle === 'rich_text' ? 'wire:ignore' : '';
+    $attributesString = trim((string) $attributes);
+    $isRequired = (bool) preg_match('/(?:^|\s)required(?:\s|=|$)/', $attributesString);
+    $isDisabled = (bool) preg_match('/(?:^|\s)disabled(?:\s|=|$)/', $attributesString);
+    $isFieldSet = in_array($field->handle, ['radio', 'checkboxes']);
 
     if ($isRequired && $isDisabled) {
         $isRequired = false;
     }
-
 @endphp
 
-<div 
-    class="meros-field nice-form-group" {{ $showLabel === false ? 'style=margin-top:0;' : '' }}
-    {{ $wireIgnore }}
+<div
+    x-data="merosFieldWrapper"
+    class="meros-field nice-form-group" {{ $label === false ? 'style=margin-top:0;' : '' }}
 >
-    @if ($showLabel)
+    @if ($label !== false)
         @if (!$isFieldSet)
             <label 
-                @if($field->handle === 'rich_text')
+                @if(in_array($field->handle, ['rich_text', 'repeater']))
                     id="{{ $id }}-label"
                 @else
                     id="{{ $id }}-label"
@@ -30,7 +24,7 @@
                 @endif
                 class="form-label"
             >
-                {{ $field->getLabel() }}
+                {{ $label }}
                 @if($isRequired)
                     <span class="required-indicator">*</span>
                 @endif
@@ -38,13 +32,50 @@
         @endif
     @endif
 
-    @if(!$isFieldSet && $showHelp && ($helpTextPosition === 'top' || $field->handle === 'checkbox'))
-        <small class="description field-help-text-top">{{ $helpText }}</small>
+    @if(!$isFieldSet && $helpText !== false && !empty($helpText))
+        <small class="description">{{ $helpText }}</small>
     @endif
 
     @include($view)
 
-    @if(!$isFieldSet && $showHelp && ($helpTextPosition === 'bottom' && $field->handle !== 'checkbox'))
-        <small class="description field-help-text-bottom">{{ $helpText }}</small>
+    @if($hasRules)
+        @if($field->hasRule('min-chars') || $field->hasRule('max-chars'))
+            <div class="meros-field-hints">
+                @if($field->hasRule('min-chars') && isset($rules['min-chars']))
+                    <small class="meros-field-hint">
+                        Minimum characters: {{ $rules['min-chars']['value'] }}
+                    </small>
+                @endif
+
+                @if($field->hasRule('max-chars') && isset($rules['max-chars']))
+                    <small class="meros-field-hint char-count-hint">
+                        <span x-text="getControlCharCount()"></span>/{{ $rules['max-chars']['value'] }}
+                    </small>
+                @endif
+            </div>
+
+        @elseif($field->hasRule('min-words') || $field->hasRule('max-words'))
+            <div class="meros-field-hints">
+                @if($field->hasRule('min-words') && isset($rules['min-words']))
+                    <small class="meros-field-hint">
+                        Minimum words: {{ $rules['min-words']['value'] }}
+                    </small>
+                @endif
+
+                @if($field->hasRule('max-words') && isset($rules['max-words']))
+                    <small class="meros-field-hint word-count-hint">
+                        <span x-text="getControlWordCount()"></span>/{{ $rules['max-words']['value'] }}
+                    </small>
+                @endif
+            </div>
+        @endif
+
+        <small 
+            id="{{ $id }}-validation-messages" 
+            class="meros-field-validation-messages" 
+            @if(!$field->hasRule('min-chars') && !$field->hasRule('min-words')) style="margin-top: 0.5rem;" @endif
+        >
+            {{-- Validation messages will be dynamically inserted here --}}
+        </small>
     @endif
 </div>

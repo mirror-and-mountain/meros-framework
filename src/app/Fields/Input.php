@@ -4,134 +4,22 @@ namespace MM\Meros\App\Fields;
 
 use MM\Meros\Services\Contracts\Forms\Field;
 
-class Input extends Field {
+abstract class Input extends Field {
     /**
-     * The unique identifier for the field, used for resolution.
+     * Sets up the field's handle, supported features, etc.
      *
-     * @var string
+     * @return void
      */
-    public string $handle = 'input';
-
-    /**
-     * The placeholder text for the input field.
-     *
-     * @var string
-     */
-    protected string $placeholder = '';
-
-    /**
-     * Whether the field shows an icon (if supported).
-     *
-     * @var bool
-     */
-    protected bool $showsIcon = true;
-
-    /**
-     * The position of the icon in the field, if supported.
-     *
-     * @var string
-     */
-    protected string $iconPosition = '';
-
-    /**
-     * Supported attributes for the input field.
-     *
-     * @var array
-     */
-    protected array $supports = [
-        'placeholder'
-    ];
-
-    /**
-     * Default attributes for the input field.
-     *
-     * @var array
-     */
-    protected array $attributes = [
-        'type' => 'text',
-    ];
-
-    /**
-     * Checks if the field supports a given feature.
-     *
-     * @param string $feature The feature to check (e.g., 'multiple', 'advanced').
-     *
-     * @return bool True if the feature is supported, false otherwise.
-     */
-    protected function supports(string $feature): bool {
-        return in_array($feature, $this->supports);
+    protected function initialise(): void {
+        $this->handle = 'input';
+        $this->addSupports([
+            'required',
+            'disabled',
+            'placeholder',
+            'helpText'
+        ]);
     }
 
-    /***************************
-     * Fluent Setters
-     ***************************/
-
-    /**
-     * Sets the placeholder text for the input field.
-     *
-     * @param string $placeholder
-     *
-     * @return self
-     */
-    public function placeholder(string $placeholder): self {
-        if ($this->supports('placeholder')) {
-            $this->placeholder = $placeholder;
-        }
-        return $this;
-    }
-
-    /**
-     * Configures the field to show an icon in the form builder UI, if supported.
-     *
-     * @param boolean $showIcon
-     * @param string  $position
-     *
-     * @return self
-     */
-    public function showIcon(bool $showIcon = true, string $position = 'left'): self {
-        if (!$this->supports('icon')) {
-            $this->showsIcon = false;
-            return $this;
-        }
-
-        if ($showIcon) {
-            $this->showsIcon = true;
-            $this->iconPosition = in_array($position, ['left', 'right']) ? $position : 'left';
-        } else {
-            $this->showsIcon = false;
-            $this->iconPosition = '';
-        }
-        
-        return $this;
-    }
-
-    /**
-     * Configures the field to hide its icon if supported.
-     *
-     * @return self
-     */
-    public function hideIcon(): self {
-        return $this->showIcon(false);
-    }
-
-    /**
-     * Sets the field's icon position, if supported.
-     *
-     * @param string $position
-     *
-     * @return self
-     */
-    public function iconPosition(string $position): self {
-        if ($this->supports('icon') && in_array($position, ['left', 'right'])) {
-            return $this->showIcon(true, $position);
-        }
-
-        return $this;
-    }
-
-    /***************************
-     * Rendering
-     ***************************/
     /**
      * Retrieves the blade component to use in the render() method.
      *
@@ -141,57 +29,32 @@ class Input extends Field {
         return 'meros::forms.fields.input';
     }
 
-    /***************************
-     * Getters
-     ***************************/
     /**
-     * Gets the placeholder text for the input field, if set.
+     * Sets the type of input field to use (text, email, password, etc.).
      *
-     * @return string
+     * @param string $type
+     *
+     * @return void
      */
-    public function getPlaceholder(): string {
-        return $this->placeholder;
+    protected function inputType(string $type): void {
+        $this->attribute('type', $type);
     }
 
     /**
-     * Determines if the field is configured to show an icon in the field input.
+     * Sets the field to show an icon in the field input, if supported.
      *
-     * @return boolean
-     */
-    public function showsIcon(): bool {
-        return $this->supports('icon') && $this->showsIcon;
-    }
-
-    /**
-     * Gets the position of the icon for the field, if supported and enabled.
+     * @param boolean $show
+     * @param string  $position
      *
-     * @return string
+     * @return self
      */
-    public function getIconPosition(): string {
-        return empty($this->iconPosition) ? 'left' : $this->iconPosition;
-    }
-
-    /**
-     * Converts the field's properties to an array format suitable for JSON serialization
-     * 
-     * @param boolean $asString Whether to return the JSON as a string or an array.
-     * @param string  ...$flags Optional flags to pass to json_encode if $asString is true.
-     *
-     * @return array|string
-     */
-    public function toJson(bool $asString = false, string ...$flags): array|string {
-        $json = parent::toJson();
-        
-        if ($this->supports('placeholder')) {
-            $json['properties']['placeholder']  = $this->getPlaceholder();
-            $json['properties']['showsIcon']    = $this->showsIcon();
-            $json['properties']['iconPosition'] = $this->getIconPosition();
-        }
-        
-        if ($asString) {
-            return json_encode($json, ...$flags);
+    public function showIcon(bool $show = true, string $position = 'left'): self {
+        if ($this->supports('icon') && $show) {
+            $this->class("icon-{$position}");
+        } else {
+            $this->removeClass(['icon-left', 'icon-right']);
         }
 
-        return $json;
+        return $this;
     }
 }

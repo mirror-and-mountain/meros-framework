@@ -3,92 +3,20 @@
 namespace MM\Meros\App\Fields;
 
 class Time extends Input {
-    /**
-     * The unique identifier for the field, used for resolution.
-     *
-     * @var string
-     */
-    public string $handle = 'time';
-
-    /**
-     * The category for the field, used for grouping in the UI.
-     *
-     * @var string
-     */
     public static string $category = 'dates';
-
-    /**
-     * The icon for the field, used in the form builder UI.
-     *
-     * @var string
-     */
     public static string $icon = 'clock';
 
     /**
-     * Default attributes for the time field.
+     * Sets up the field's handle, supported features, etc.
      *
-     * @var array
+     * @return void
      */
-    protected array $attributes = [
-        'type' => 'time',
-    ];
+    protected function initialise(): void {
+        parent::initialise();
+        $this->handle = 'time';
+        $this->compatibleDataTypes = ['string'];
 
-    /**
-     * Supported features for the time field.
-     *
-     * @var array
-     */
-    protected array $supports = [
-        'placeholder',
-        'icon'
-    ];
-
-    /**
-     * An array of data types that this field is compatible with.
-     *
-     * @var array
-     */
-    protected array $compatibleDataTypes = [
-        'string'
-    ];
-
-
-    /***************************
-     * Fluent Setters
-     ***************************/
-    /**
-     * Sets the minimum attribute for time inputs.
-     *
-     * @param string $min The minimum time allowed for the input.
-     *
-     * @return self
-     */
-    public function min(string $min): self {
-        $this->attribute('min', $min);
-        return $this;
-    }
-    
-    /**
-     * Sets the maximum attribute for time inputs.
-     *
-     * @param string $max The maximum time allowed for the input.
-     *
-     * @return self
-     */
-    public function max(string $max): self {
-        $this->attribute('max', $max);
-        return $this;
-    }
-
-    /**
-     * Sets the step attribute for time inputs.
-     *
-     * @param string $step The step value for the input.
-     *
-     * @return self
-     */
-    public function step(string $step): self {
-        $this->attribute('step', $step);
-        return $this;
+        $this->inputType('time');
+        $this->addSupport('icon');
     }
 }

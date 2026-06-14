@@ -1,5 +1,3 @@
-@use 'tom-select/dist/css/tom-select.css';
-
 .nice-form-group .ts-wrapper {
     width: 100%;
 }
@@ -120,6 +118,7 @@
     color: var(--nf-input-color);
 }
 
-.nice-form-group .meros-repeater .ts-wrapper .ts-dropdown {
+.nice-form-group .meros-repeater .ts-wrapper .ts-dropdown,
+.meros-repeater-config-dialog .ts-wrapper .ts-dropdown {
     position: relative !important;
 }

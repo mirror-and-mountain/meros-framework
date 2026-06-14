@@ -5,6 +5,7 @@ namespace MM\Meros\Services\Contracts\Forms;
 use Closure;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use Livewire\Wireable;
 
 use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\Services\Contracts\FeatureDefinition;
@@ -19,8 +20,9 @@ use MM\Meros\Facades\FormRows as FormRowsRegister;
 
 use MM\Meros\Facades\PostTypes;
 use MM\Meros\Facades\Context;
+use MM\Meros\Facades\Framework;
 
-class FieldGroup extends FeatureDefinition {
+class FieldGroup extends FeatureDefinition implements Wireable {
     /**
      * A unique handle for the field group, used for identification and referencing.
      *
@@ -40,21 +42,35 @@ class FieldGroup extends FeatureDefinition {
      *
      * @var string
      */
-    protected string $title = '';
+    public string $title = '';
 
     /**
      * A description providing additional context about the field group, its purpose, or usage instructions.
      *
      * @var string
      */
-    protected string $description = '';
+    public string $description = '';
+
+    /**
+     * The parent form row this field group belongs to, if any.
+     *
+     * @var FormRow|null
+     */
+    public ?FormRow $parentRow = null;
+
+    /**
+     * The index of the parent row this field group belongs to, if any.
+     *
+     * @var int|null
+     */
+    public ?int $parentRowIndex = null;
 
     /**
      * The rows that belong to this field group.
      *
-     * @var array<FormRow>
+     * @var array<FormRow|array>
      */
-    protected array $rows = [];
+    public array $rows = [];
 
     /**
      * The parent meta object this field group belongs to, if any.
@@ -62,11 +78,12 @@ class FieldGroup extends FeatureDefinition {
      * @var PostMeta|null
      */
     protected ?PostMeta $parentMetaObject = null;
-    
 
-    /***************************
-     * Feature Contract Methods
-     ***************************/
+    use Concerns\SanitizesHtml;
+    
+    // =========================================================================
+    // Contract Methods
+    // =========================================================================
 
     final public function __construct(
         FeatureProvider $provider,
@@ -77,15 +94,100 @@ class FieldGroup extends FeatureDefinition {
         if (empty($this->handle)) {
             $this->handle = Str::snake($this->title);
         }
+
+        if (empty($this->id)) {
+            $this->id = 'field-group-' . Str::substr(Str::uuid(), 0, 8);
+        }
+
+        $this->instantiateRows();
     }
 
     protected function queue(): void {
         // Field groups don't use the queue method.
     }
 
-    /***************************
-     * Public Chainable methods
-     ***************************/
+    /**
+     * Converts the field group instance into a format suitable for Livewire rendering.
+     *
+     * @return array
+     */
+    public function toLivewire(): array {
+        return $this->toJson();
+    }
+
+    /**
+     * Reconstructs a field group instance from Livewire data.
+     *
+     * @param array $data
+     *
+     * @return self
+     */
+    public static function fromLivewire($data): self {
+        return new static(
+            Framework::get(),
+            $data
+        );
+    }
+
+    /**
+     * Alias for fromLivewire() to initialize a field group instance from an array of data.
+     *
+     * @param array $data
+     *
+     * @return self
+     */
+    public static function initFromData(array $data): self {
+        return self::fromLivewire($data);
+    }
+
+    // =========================================================================
+    // Rendering
+    // =========================================================================
+
+    /**
+     * Renders the field group and its fields using a Blade view.
+     *
+     * @return void
+     */
+    public function render(array $config = []): void {
+        $classList = 'meros-form-group';
+
+        $showTitle       = (bool) ($config['showTitle'] ?? true);
+        $showDescription = (bool) ($config['showDescription'] ?? true);
+        $classList       = (string) ($config['class'] ?? '') . ' ' . $classList;
+
+        if (Context::isAdmin()) {
+            $classList .= ' meros-form-group--admin';
+            $showTitle = false;
+        }
+
+        echo view('meros::forms.field-group', [
+            'groupID'          => $this->id,
+            'groupHandle'      => $this->handle,
+            'groupTitle'       => $showTitle ? $this->title : '',
+            'groupDescription' => $showDescription ? $this->description : '',
+            'groupRows'        => $this->rows,
+            'classList'        => $classList,
+        ]);
+    }
+
+    /**
+     * Renders the field group and its fields, and returns the HTML as a string.
+     *
+     * @return string
+     */
+    public function html(array $config = []): string {
+        ob_start();
+        $this->render($config);
+
+        $html = ob_get_clean();
+        return $this->sanitizeHtml(is_string($html) ? $html : '');
+    }
+
+    // =========================================================================
+    // Attribute Setters
+    // =========================================================================
+
     /**
      * Sets the handle of the field group.
      *
@@ -106,7 +208,7 @@ class FieldGroup extends FeatureDefinition {
      *
      * @return self
      */
-    public function name (string $name): self {
+    public function name(string $name): self {
         return $this->handle($name);
     }
 
@@ -149,22 +251,48 @@ class FieldGroup extends FeatureDefinition {
     /**
      * Attaches a form row to the field group.
      *
-     * @param Closure|null $callback Optional. A callback that receives the form row instance for configuration.
+     * @param Closure|FormRow|null $rowOrCallback A callback that receives the form row instance for configuration, or a FormRow instance to attach directly.
+     * @param int|null             $rowIndex       Optional index to insert the row at. If not provided, the row will be appended to the end of the rows array.
      *
      * @return self
      */
-    public function row(?Closure $callback = null): self {
-        $row = FormRowsRegister::checkout($this->provider)
-            ->make();
+    public function row(FormRow|Closure|null $rowOrCallback = null, ?int $rowIndex = null): self {
+        $index    = $rowIndex ?? count($this->rows);
+        $row      = null;
+        $callback = null;
 
-        if ($callback) {
-            $callback($row);
+        if ($rowOrCallback instanceof FormRow) {
+            $row = $rowOrCallback;
+        } 
+        
+        else {
+            $row = FormRowsRegister::checkout($this->provider)
+                ->make(['index' => $index]);
+
+             $callback = $rowOrCallback;
+
+             if ($callback && $callback instanceof Closure) {
+                $callback($row);
+             }
+        }
+        
+        array_splice($this->rows, $index, 0, [$row]);
+
+        foreach ($this->rows as $idx => $existingRow) {
+            $existingRow->parentGroup($this, (string) $this->id);
+            $existingRow->updateIndex($idx);
         }
 
-        $this->rows[] = $row;
         return $this;
     }
 
+    /**
+     * Attaches the field group to one or more post types, making it available for use within those post types' edit screens.
+     *
+     * @param string|array $postTypes A single post type or an array of post types to attach the field group to.
+     *
+     * @return self
+     */
     public function attach(string|array $postTypes): self {
         $postTypes = (array)$postTypes;
 
@@ -191,7 +319,6 @@ class FieldGroup extends FeatureDefinition {
      * @return Field
      */
     public function field(Field|string $field, Closure|array|null $callback = null, array $props = []): Field {    
-        $newRow = null;
         $params = func_num_args();
 
         if ($params === 2 && is_array($callback)) {
@@ -205,24 +332,38 @@ class FieldGroup extends FeatureDefinition {
         unset($props['row']); // Remove 'row' from props to avoid confusion
 
         if ($rowIndex !== null && array_key_exists($rowIndex, $this->rows)) {
-            $row   = $this->rows[$rowIndex];
+            $row = $this->rows[$rowIndex];
             $field = $row->field($field, $callback, $props);
-        } 
-        
-        else {
+        } else {
             $newRow = FormRowsRegister::checkout($this->provider)->make();
-            $field  = $newRow->field($field, $callback, $props);
-        }
+            $this->row($newRow);
 
-        if ($newRow !== null) {
-            $this->rows[] = $newRow;
+            $targetIndex = count($this->rows) - 1;
+            $field = $this->rows[$targetIndex]->field($field, $callback, array_merge($props, [
+                'rowIndex' => $targetIndex,
+            ]));
         }
 
         if ($this->parentMetaObject !== null) {
             $field = $this->addMetaField($field);
         }
 
+        $field->group($this, $this->id);
         return $field;
+    }
+
+    /**
+     * Associates the field group with a parent form row, or disassociates it if null is passed. 
+     *
+     * @param FormRow|null $row
+     * @param integer|null $rowIndex
+     *
+     * @return self
+     */
+    public function parentRow(?FormRow $row, ?int $rowIndex = null): self {
+        $this->parentRow = $row;
+        $this->parentRowIndex = $rowIndex;
+        return $this;
     }
 
     /**
@@ -321,9 +462,8 @@ class FieldGroup extends FeatureDefinition {
             'id'          => $this->id,
             'title'       => $this->title,
             'description' => $this->description,
-            'schema'      => [
-                'rows' => array_map(fn($row) => $row->toJson(), $this->rows)
-            ]
+            'rowIndex'    => $this->parentRowIndex,
+            'rows'        => array_map(fn($row) => $row->toJson(), $this->rows)
         ];
 
         if ($asString) {
@@ -334,9 +474,18 @@ class FieldGroup extends FeatureDefinition {
     }
 
 
-    /***************************
-     * Getters
-     ***************************/
+    // =========================================================================
+    // Getters
+    // =========================================================================
+
+    /**
+     * Checks if the field group contains any form rows.
+     *
+     * @return bool
+     */
+    public function hasContent(): bool {
+        return count($this->rows) > 0;
+    }
 
     /**
     * Retrieves the fields contained within the field group as a collection or array.
@@ -404,50 +553,44 @@ class FieldGroup extends FeatureDefinition {
         return $this->description;
     }
 
-    /***************************
-     * Helpers
-     ***************************/
+    // =========================================================================
+    // Helpers
+    // =========================================================================
 
+    /**
+     * Walks through each form row in the field group and applies the given callback function to it.
+     *
+     * @param Closure $callback
+     *
+     * @return void
+     */
     protected function walkRows(Closure $callback): void {
         foreach ($this->rows as $row) {
             $callback($row);
         }
     }
 
-    /***************************
-     * Rendering
-     ***************************/
-
     /**
-     * Renders the field group and its fields using a Blade view.
+     * Instantiates any form rows in the field group that are provided in array format.
      *
      * @return void
      */
-    public function render(): void {
-        $classList = 'meros-form-group';
-
-        if (Context::isAdmin()) {
-            $classList .= ' meros-form-group--admin';
+    protected function instantiateRows(): void {
+        if (empty($this->rows)) {
+            return;
         }
 
-        echo view('meros::forms.field-group', [
-            'groupID'          => $this->id,
-            'groupHandle'      => $this->handle,
-            'groupTitle'       => Context::isEditingPost() ? '': $this->title,
-            'groupDescription' => $this->description,
-            'groupRows'        => $this->rows,
-            'classList'        => $classList,
-        ]);
-    }
+        foreach ($this->rows as $index => $rowData) {
+            $row = $rowData;
 
-    /**
-     * Renders the field group and its fields, and returns the HTML as a string.
-     *
-     * @return string
-     */
-    public function html(): string {
-        ob_start();
-        $this->render();
-        return ob_get_clean();
+            if (!$rowData instanceof FormRow) {
+                $row = FormRow::initFromData($rowData);
+            }
+
+            $row->parentGroup($this, (string) $this->id);
+            $row->updateIndex($index);
+
+            $this->rows[$index] = $row;
+        }
     }
 }

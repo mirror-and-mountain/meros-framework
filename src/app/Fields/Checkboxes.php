@@ -3,54 +3,21 @@
 namespace MM\Meros\App\Fields;
 
 class Checkboxes extends Select {
-    /**
-     * The unique identifier for the field, used for resolution.
-     *
-     * @var string
-     */
-    public string $handle = 'checkboxes';
-
-    /**
-     * Whether to show the choices horizontally or vertically in the UI.
-     *
-     * @var string
-     */
-    protected string $layout = '';
-
-    /**
-     * The icon for the field, used in the form builder UI.
-     *
-     * @var string
-     */
     public static string $icon = 'tick';
 
     /**
-     * Choice features supported by the checkboxes field.
+     * Sets up the field's handle, supported features, etc.
      *
-     * @var array
+     * @return void
      */
-    protected array $supports = [];
+    protected function initialise(): void {
+        parent::initialise();
+        $this->handle = 'checkboxes';
+        $this->compatibleDataTypes = ['array.scalar'];
 
-    /**
-     * Default attributes for the checkboxes field.
-     *
-     * @var array
-     */
-    protected array $attributes = [
-        'multiple'       => true,
-        'data-advanced'  => 'false',
-        'data-allow-add' => 'false',
-        'type'           => 'checkbox',
-    ];
-
-    /**
-     * An array of data types that this field is compatible with.
-     *
-     * @var array
-     */
-    protected array $compatibleDataTypes = [
-        'array.scalar'
-    ];
+        $this->attribute('type', 'checkbox');
+        $this->attribute('multiple', true);
+    }
 
     /**
      * Retrieves the field's value, ensuring it's returned as an array.
@@ -68,24 +35,20 @@ class Checkboxes extends Select {
     }
 
     /**
-     * Retrieves the layout for the field, defaulting to 'vertical' if not set.
-     *
-     * @return string
-     */
-    public function getLayout(): string {
-        return empty($this->layout) ? 'vertical' : $this->layout;
-    }
-
-
-    /***************************
-     * Rendering
-     ***************************/
-    /**
      * Retrieves the blade component to use in the render() method.
      *
      * @return string
      */
     public function getFieldComponent(): string {
         return 'meros::forms.fields.choice';
+    }
+
+    /**
+     * Retrieves the default value control for the field.
+     *
+     * @return string
+     */
+    public function getDefaultValueControl(): string {
+        return 'meros::forms.fields.select-multi';
     }
 }

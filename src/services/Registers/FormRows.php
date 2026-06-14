@@ -18,8 +18,6 @@ class FormRows extends Register {
      * @return array
      */
     protected function parseProperties(array $props): array {
-        return [
-            'handle'      => $props['handle'] ?? '',
-        ];
+        return $props; // No special parsing needed for form rows at this time.
     }
 }

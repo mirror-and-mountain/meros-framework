@@ -1,6 +1,8 @@
 @use 'nice-forms.css/dist/nice-forms.css';
 @use 'tom-select/dist/css/tom-select.css';
 @use 'repeaters.scss';
+@use 'tomselect.scss';
+
 
 .meros-form-container {
 	display: flex;
@@ -49,7 +51,7 @@
 	min-width: 0;
 }
 
-.meros-form-group:not(.meros-form-group--admin) {
+.meros-form-group:not(.meros-form-group--admin):not(.meros-form-group--no-style) {
 	border: 1px solid #d1d5db;
 	border-radius: 0.5rem;
 	background-color: #f9fafb;
@@ -83,10 +85,9 @@
 	color: #4b5563;
 }
 
-.meros-form-field .meros-field .description,
+.meros-field .description,
 .meros-admin-field .description,
-.meros-field .field-help-text-top,
-.meros-field .field-help-text-bottom {
+.meros-field .field-help-text-top {
 	display: block;
 	min-width: 0;
 	max-width: 100%;
@@ -96,7 +97,7 @@
 	hyphens: auto;
 }
 
-.meros-form-field .meros-field .description,
+.meros-field .description,
 .meros-admin-field .description {
 	line-height: 1.4;
 }
@@ -105,20 +106,36 @@
 	margin-top: 0.75rem;
 }
 
-.meros-field input[type="text"],
-.meros-field input[type="email"],
-.meros-field input[type="url"],
-.meros-field input[type="number"],
-.meros-field input[type="password"],
-.meros-field input[type="search"],
-.meros-field input[type="tel"],
-.meros-field input[type="date"],
-.meros-field input[type="time"],
-.meros-field textarea,
-.meros-field select {
-	width: 100% !important;
-	max-width: 100%;
-	box-sizing: border-box;
+.meros-field {
+	input[type="text"],
+	input[type="email"],
+	input[type="url"],
+	input[type="number"],
+	input[type="password"],
+	input[type="search"],
+	input[type="tel"],
+	input[type="date"],
+	input[type="time"],
+	textarea,
+	select {
+		width: 100% !important;
+		max-width: 100%;
+		box-sizing: border-box;
+	}
+
+	&.invalid {
+		input,
+		textarea,
+		select {
+			border-bottom-color: var(--nf-invalid-input-border-bottom-color, red) !important;
+		}
+	}
+
+	.meros-field-hints {
+		display: flex;
+		justify-content: space-between;
+		margin-top: 0.5rem;
+	}
 }
 
 .meros-field input[type="checkbox"],

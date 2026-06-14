@@ -1,41 +1,99 @@
-@php
-    $id                 = $field->getID();
-    $value              = $field->getValue();
-    $rawRepeaterValue   = is_array($value) ? $value : [];
-    $templateRow        = $field->buildTemplateRow();
-    $showsMoveColumn    = $field->allowsReorder();
-    $showsActionsColumn = $field->allowsConfigure() || $field->allowsRemove();
-    $columnCount = count($field->getFieldNames())
-        + ($showsMoveColumn ? 1 : 0)
-        + ($showsActionsColumn ? 1 : 0);
+<div 
+    x-data="merosRepeaterField('{{ $id }}')"
+    id="{{ $id }}" 
+    class="{{ $classList }} meros-repeater" 
+    data-field-type="repeater" 
+    data-repeater-name="{{ str_replace(['-'], '_', $id) }}"
+    aria-labelledby="{{ $id }}-label"
+    data-rule-maxitems="{{ $maxRows ?? '-1' }}"
+    data-rule-minitems="{{ $minRows ?? '-1' }}"
+>
+    {{-- Repeater row configuration dialog --}}
+    <template x-teleport="body">
+        <dialog
+            class="meros-repeater-config-dialog"
+            x-ref="rowConfigDialog"
+            x-cloak
+            x-effect="if (rowDialogOpen && activeDialogRowIndex !== null) { if (!$el.open) $el.showModal(); } else if ($el.open) { $el.close(); }"
+            @close="if (rowDialogOpen) updateRowDialog()"
+            @click.self="updateRowDialog()"
+            @keydown.escape.window="updateRowDialog()"
+        >
+            <div
+                class="meros-repeater-config-dialog__shell transition duration-200 ease-out"
+                :class="isUpdatingRowDialog ? 'opacity-95 scale-[0.995]' : 'opacity-100 scale-100'"
+                @click.stop
+            >
+                <header class="meros-repeater-config-dialog__header">
+                    <h2 class="meros-repeater-config-dialog__title">{{ $configureRowText }}</h2>
+                </header>
 
-    $onConfigure              = $field->getOnConfigureRowCallback();
-    $configureRequiredFields  = $field->getConfigureRequiredFields();
-    $onAddCallback    = $field->getOnAddRowCallback();
-    $onRemoveCallback = $field->getOnRemoveRowCallback();
-    $onMoveCallback   = $field->getOnMoveRowCallback();
+                <template x-if="!isUsingCustomConfigurationDialog">
+                    <div class="meros-repeater-config-dialog__body" x-ref="rowConfigDialogBody">
+                        @foreach($fieldNames as $fieldIndex => $fieldName)
+                            @php
+                                $templateSubField = $templateRow[$fieldName] ?? null;
+                                $isHiddenInTable = $templateSubField && $templateSubField->isHiddenInRepeaterTable();
+                            @endphp
 
-    $addRowText       = $field->getAddRowText();
-    $removeRowText    = $field->getRemoveRowText();
-    $configureRowText = $field->getConfigureRowText();
-@endphp
-<div id="{{ $id }}" class="{{ $field->classList() }} meros-repeater" data-field-type="repeater" data-repeater-name="{{ str_replace(['-'], '_', $id) }}">
-    <div
-        class="meros-repeater-scroll"
-        x-data="{ isDraggingRow: false, draggingRowIndex: null }"
-    >
+                            <section class="meros-repeater-config-dialog__field" data-field-name="{{ $fieldName }}">
+                                <h3 class="meros-repeater-config-dialog__field-label">
+                                    {{ $fieldLabels[$fieldIndex] ?? $fieldName }}@if($isHiddenInTable) (This field is hidden in the table)@endif
+                                </h3>
+                                <div class="meros-repeater-config-dialog__field-input" data-field-name="{{ $fieldName }}"></div>
+                            </section>
+                        @endforeach
+                    </div>
+                </template>
+
+                <template x-if="isUsingCustomConfigurationDialog && customConfigurationDialogHtml !== '' && customConfigurationDialogHtml !== null">
+                    <div
+                        x-data
+                        id="meros-repeater-config-dialog-custom-body"
+                        class="meros-repeater-config-dialog__body" 
+                        x-ref="customRowConfigDialogBody"
+                        x-html="customConfigurationDialogHtml"
+                    >
+                    </div>
+                </template>
+
+                <footer class="meros-repeater-config-dialog__footer">
+                    <button
+                        type="button"
+                        class="meros-repeater-button meros-repeater-button--neutral"
+                        :disabled="isUpdatingRowDialog"
+                        @click="updateRowDialog()"
+                    >
+                        <span x-show="isUpdatingRowDialog" x-cloak>
+                            @include('meros::toolbox.svgs.spinner')
+                        </span>
+                        <span>Update</span>
+                    </button>
+                </footer>
+            </div>
+        </dialog>
+    </template>
+
+    {{-- Repeater table --}}
+    <div class="meros-repeater-scroll">
         <table class="meros-repeater-table meros-repeater-table--interactive">
+            {{-- Repeater header --}}
             <thead class="meros-repeater-head">
                 <tr>
-                    @if($showsMoveColumn)
+                    @if($allowsReorder)
                         <th class="meros-repeater-head-cell meros-repeater-head-cell--move">Move</th>
                     @endif
-                    @foreach($field->getFieldNames() as $fieldIndex => $fieldName)
+                    @foreach($fieldNames as $fieldIndex => $fieldName)
+                        @php
+                            $templateSubField = $templateRow[$fieldName] ?? null;
+                            $isHiddenInTable = $templateSubField && $templateSubField->isHiddenInRepeaterTable();
+                        @endphp
+
                         <th
-                            class="meros-repeater-data-header meros-repeater-head-cell"
-                            wire:key="repeater-head-{{ $field->getID() }}-{{ $fieldName }}"
+                            class="meros-repeater-data-header meros-repeater-head-cell {{ $isHiddenInTable ? 'meros-repeater-data-header--hidden' : '' }}"
+                            @if($isHiddenInTable) aria-hidden="true" @endif
                         >
-                            {{ $field->getFieldLabels()[$fieldIndex] ?? $fieldName }}
+                            {{ $fieldLabels[$fieldIndex] ?? $fieldName }}
                         </th>
                     @endforeach
                     @if($showsActionsColumn)
@@ -43,44 +101,23 @@
                     @endif
                 </tr>
             </thead>
-            <tbody class="meros-repeater-body">
-                <tr class="meros-repeater-gap-row">
-                    <td colspan="{{ $columnCount }}" class="meros-repeater-gap-cell">
-                        <div
-                            class="meros-repeater-row-gap"
-                            :class="isDraggingRow ? 'is-active' : ''"
-                            @dragover.prevent="$store.repeaterField.handleRowGapDragOver($el)"
-                            @dragleave="$store.repeaterField.hideRowGap($el)"
-                            @drop.prevent="$store.repeaterField.handleRowGapDrop($event, $el)"
-                        ></div>
-                    </td>
-                </tr>
-
-                @forelse($rows as $rowIndex => $row)
-                    @php
-                        $rowKey = $rawRepeaterValue[$rowIndex]['__rowKey'] ?? null;
-                        $fallbackRowKey = is_array($rawRepeaterValue[$rowIndex] ?? null)
-                            ? ('hash-' . md5(json_encode($rawRepeaterValue[$rowIndex])))
-                            : ('idx-' . $rowIndex);
-                        $renderRowKey = is_string($rowKey) && $rowKey !== '' ? $rowKey : $fallbackRowKey;
-                    @endphp
+            {{-- Repeater body --}}
+            <tbody class="meros-repeater-body" x-sort="handleReorder">
+                {{-- Repeater rows --}}
+                @foreach($rows as $rowIndex => $row)
                     <tr
+                        x-sort:item="{{ $rowIndex }}"
                         class="meros-repeater-row"
                         data-repeater-row-index="{{ $rowIndex }}"
-                        data-repeater-row-key="{{ $renderRowKey }}"
-                        wire:key="repeater-row-{{ $renderRowKey }}"
-                        :class="draggingRowIndex === {{ $rowIndex }} ? 'is-dragging' : ''"
-                        @dragover.prevent
                     >
-                        @if($field->allowsReorder())
-                            <td class="meros-repeater-move-cell">
+                        @if($allowsReorder)
+                            <td class="meros-repeater-move-cell" x-sort:handle>
                                 <button
                                     type="button"
                                     draggable="true"
                                     class="meros-repeater-move-button"
                                     title="Drag to reorder row"
-                                    @dragstart="const rowIndex = Number($el.closest('tr')?.dataset.repeaterRowIndex ?? {{ $rowIndex }}); isDraggingRow = true; draggingRowIndex = rowIndex; $store.repeaterField.startRowDrag($event, rowIndex)"
-                                    @dragend="isDraggingRow = false; draggingRowIndex = null"
+    
                                     @if(!empty($onMoveCallback))
                                         data-move-row-callback="{{ $onMoveCallback }}"
                                     @endif
@@ -89,11 +126,17 @@
                                 </button>
                             </td>
                         @endif
-                        @foreach($field->getFieldNames() as $fieldName)
+                        {{-- Row cells --}}
+                        @foreach($fieldNames as $fieldName)
+                            @php
+                                $templateSubField = $templateRow[$fieldName] ?? null;
+                                $isHiddenInTable = $templateSubField && $templateSubField->isHiddenInRepeaterTable();
+                            @endphp
+
                             <td
-                                class="meros-repeater-data-cell"
+                                class="meros-repeater-data-cell {{ $isHiddenInTable ? 'meros-repeater-data-cell--hidden' : '' }}"
                                 data-field-name="{{ $fieldName }}"
-                                wire:key="repeater-cell-{{ $renderRowKey }}-{{ $fieldName }}"
+                                @if($isHiddenInTable) aria-hidden="true" @endif
                             >
                                 @php
                                     $subField = $row[$fieldName] ?? null;
@@ -108,35 +151,35 @@
                                             $subField->attribute('data-default-value', $default);
                                         }
                                     @endphp
-                                    {!! $subField->render(false, false) !!}
+                                    {!! $subField->render(true, ['label' => false, 'helpText' => false]) !!}
                                 @endif
                             </td>
                         @endforeach
+                        {{-- Row actions --}}
                         @if($showsActionsColumn)
+                            {{-- Row configure button --}}
                             <td class="meros-repeater-actions-cell">
-                                @if($field->allowsConfigure())
+                                @if($allowsConfigure)
                                     <button
                                         type="button"
-                                        @click.stop="$store.repeaterField.configureRow($el, @js($onConfigure))"
-                                        data-configure-row-callback="{{ $onConfigure }}"
                                         @if(!empty($configureRequiredFields))
                                             data-configure-required-fields="{{ json_encode($configureRequiredFields) }}"
                                         @endif
-                                        class="meros-repeater-button meros-repeater-button--neutral meros-repeater-button--configure"
+                                        class="meros-repeater-button meros-repeater-button--configure meros-repeater-button--neutral"
                                         title="{{ $configureRowText }}"
+                                        :disabled="isOpeningRowDialog || isUpdatingRowDialog"
+                                        @click.stop="openRowDialog($event, @js($customConfigurationDialogs))"
                                     >
-                                        {{ $configureRowText }}
+                                        <span class="configure-row-text" x-text="'{{ $configureRowText }}'"></span>
                                     </button>
                                 @endif
-                                @if($field->allowsRemove())
+                                {{-- Row remove button --}}
+                                @if($allowsRemove)
                                     <button
                                         type="button"
-                                        @click.stop="$store.repeaterField.removeRow($el)"
-                                        class="meros-repeater-button meros-repeater-button--danger"
+                                        @click.stop="removeRow($event)"
+                                        class="meros-repeater-button meros-repeater-button--remove meros-repeater-button--danger"
                                         title="{{ $removeRowText }}"
-                                        @if(!empty($onRemoveCallback))
-                                            data-remove-row-callback="{{ $onRemoveCallback }}"
-                                        @endif
                                     >
                                         {{ $removeRowText }}
                                     </button>
@@ -144,35 +187,26 @@
                             </td>
                         @endif
                     </tr>
+                @endforeach
 
-                    <tr class="meros-repeater-gap-row">
-                        <td colspan="{{ $columnCount }}" class="meros-repeater-gap-cell">
-                            <div
-                                class="meros-repeater-row-gap"
-                                :class="isDraggingRow ? 'is-active' : ''"
-                                @dragover.prevent="$store.repeaterField.handleRowGapDragOver($el)"
-                                @dragleave="$store.repeaterField.hideRowGap($el)"
-                                @drop.prevent="$store.repeaterField.handleRowGapDrop($event, $el)"
-                            ></div>
-                        </td>
-                    </tr>
-                @empty
-                @if($field->allowsAdd())
+                {{-- Placeholder row when there are no entries --}}
+                @if($allowsAdd)
                     <tr>
-                        <td colspan="{{ $columnCount }}" class="meros-repeater-empty-state">
-                            {{ $field->getPlaceholder() }}
+                        <td x-show="showPlaceholder" colspan="{{ $columnCount }}" class="meros-repeater-empty-state">
+                            {{ $placeholder }}
                         </td>
                     </tr>
                 @else
                     <tr>
-                        <td colspan="{{ $columnCount }}" class="meros-repeater-empty-state">
-                            No data.
+                        <td x-show="showPlaceholder" colspan="{{ $columnCount }}" class="meros-repeater-empty-state">
+                            Nothing to display.
                         </td>
                     </tr>
                 @endif
-                @endforelse
-                <tr id="meros-repeater-template-row-{{ $field->getID() }}" class="meros-repeater-row meros-repeater-template-row" style="display: none;">
-                    @if($field->allowsReorder())
+
+                {{-- Template row for new entries --}}
+                <tr id="meros-repeater-template-row-{{ $id }}" class="meros-repeater-row meros-repeater-template-row" style="display: none;">
+                    @if($allowsReorder)
                         <td class="meros-repeater-move-cell">
                             <button
                                 type="button"
@@ -187,14 +221,15 @@
                             </button>
                         </td>
                     @endif
-                    @foreach($field->getFieldNames() as $fieldName)
+                    @foreach($fieldNames as $fieldName)
                         @php
                             $subField = $templateRow[$fieldName] ?? null;
+                            $isHiddenInTable = $subField && $subField->isHiddenInRepeaterTable();
                         @endphp
                         <td
-                            class="meros-repeater-data-cell"
+                            class="meros-repeater-data-cell {{ $isHiddenInTable ? 'meros-repeater-data-cell--hidden' : '' }}"
                             data-field-name="{{ $fieldName }}"
-                            wire:key="repeater-template-cell-{{ $field->getID() }}-{{ $fieldName }}"
+                            @if($isHiddenInTable) aria-hidden="true" @endif
                         >
                             @if($subField)
                                 @php
@@ -207,34 +242,31 @@
                                     }
 
                                 @endphp
-                                {!! $subField->render(false, false) !!}
+                                {!! $subField->render(true, ['label' => false, 'helpText' => false]) !!}
                             @endif
                         </td>
                     @endforeach
                     @if($showsActionsColumn)
                         <td class="meros-repeater-actions-cell">
-                            @if($field->allowsConfigure())
+                            @if($allowsConfigure)
                                 <button
                                     type="button"
-                                    @click.stop="$store.repeaterField.configureRow($el, @js($onConfigure))"
-                                    data-configure-row-callback="{{ $onConfigure }}"
                                     @if(!empty($configureRequiredFields))
                                         data-configure-required-fields="{{ json_encode($configureRequiredFields) }}"
                                     @endif
-                                    class="meros-repeater-button meros-repeater-button--neutral meros-repeater-button--configure"
+                                    class="meros-repeater-button meros-repeater-button--configure meros-repeater-button--neutral"
                                     title="{{ $configureRowText }}"
+                                    :disabled="isOpeningRowDialog || isUpdatingRowDialog"
+                                    @click.stop="openRowDialog($event, @js($customConfigurationDialogs))"
                                 >
-                                    {{ $configureRowText }}
+                                    <span class="configure-row-text" x-text="'{{ $configureRowText }}'"></span>
                                 </button>
                             @endif
-                            @if($field->allowsRemove())
+                            @if($allowsRemove)
                                 <button
                                     type="button"
-                                    class="meros-repeater-button meros-repeater-button--danger"
+                                    class="meros-repeater-button meros-repeater-button--remove meros-repeater-button--danger"
                                     title="{{ $removeRowText }}"
-                                    @if(!empty($onRemoveCallback))
-                                        data-remove-row-callback="{{ $onRemoveCallback }}"
-                                    @endif
                                 >
                                     {{ $removeRowText }}
                                 </button>
@@ -246,16 +278,15 @@
         </table>
     </div>
 
+    {{-- Repeater footer --}}
     <div class="meros-repeater-footer">
-        @if($field->allowsAdd())
+        {{-- Add row button --}}
+        @if($allowsAdd)
             <button
                 type="button"
-                @click.stop="$store.repeaterField.addRow($el)"
+                @click.stop="addRow"
                 class="meros-repeater-button meros-repeater-button--neutral"
                 title="{{ $addRowText }}"
-                @if(!empty($onAddCallback))
-                    data-add-row-callback="{{ $onAddCallback }}"
-                @endif
             >
                 {{ $addRowText }}
             </button>

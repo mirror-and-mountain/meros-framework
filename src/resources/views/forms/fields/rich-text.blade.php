@@ -1,9 +1,13 @@
+@php
+    $id = $field->getId();
+@endphp
 <div
+    x-data="quill"
     class="meros-rich-textarea"
-    id="{{ $field->getId() }}"
+    id="{{ $id }}"
     name="{{ $field->getName() }}"
-    aria-labelledby="{{ $field->getId() . '_label' }}"
-    data-rt-id="{{ $field->getId() }}"
+    aria-labelledby="{{ $id . '-label' }}"
+    data-rt-id="{{ $id }}"
     data-field-type="{{ $field->getType() }}"
     @if($field->isDisabled()) disabled aria-disabled="true" @endif
     @if($field->isRequired()) data-required="true" aria-required="true" @endif

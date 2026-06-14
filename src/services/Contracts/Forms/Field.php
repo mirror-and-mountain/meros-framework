@@ -3,7 +3,10 @@
 namespace MM\Meros\Services\Contracts\Forms;
 
 use Illuminate\Support\Str;
+use Livewire\Wireable;
 
+use MM\Meros\App\Fields\Input;
+use MM\Meros\App\Fields\Choice;
 use MM\Meros\App\Fields\Repeater;
 
 use MM\Meros\Services\Contracts\FeatureProvider;
@@ -13,8 +16,10 @@ use MM\Meros\Services\Contracts\Forms\FormRow;
 use MM\Meros\Services\Contracts\Admin\SettingsField;
 
 use MM\Meros\Facades\FieldWrappers;
+use MM\Meros\Facades\Fields;
+use MM\Meros\Facades\Framework;
 
-abstract class Field extends FeatureDefinition {
+abstract class Field extends FeatureDefinition implements Wireable {
     /**
      * The field's unique slug, should be implemented by concrete field classes 
      * to provide a unique identifier for the field type.
@@ -45,6 +50,91 @@ abstract class Field extends FeatureDefinition {
     public static bool $showInFormBuilder = true;
 
     /**
+     * The field's name, which can be used for form submission and as a fallback for generating the label.
+     *
+     * @var string
+     */
+    protected string $name = '';
+
+    /**
+     * The field's unique ID, which can be used for HTML attributes and as a fallback for generating the name.
+     *
+     * @var string
+     */
+    public string $id = '';
+
+    /**
+     * The field's label, displayed to users and used 
+     * as a fallback for generating the name.
+     *
+     * @var string
+     */
+    protected string $label = '';
+
+    /**
+     * The field's help text, providing additional guidance to users.
+     *
+     * @var string|null
+     */
+    protected ?string $helpText = null;
+
+    /**
+     * The field's default value, used when no explicit value is set.
+     *
+     * @var mixed
+     */
+    protected mixed $default = null;
+
+    /**
+     * The field's current value, which may be set explicitly or fall back to the default.
+     *
+     * @var mixed
+     */
+    protected mixed $value = null;
+
+    /**
+     * An array of CSS classes to apply to the field's wrapper element.
+     *
+     * @var array
+     */
+    protected array $classList = [];
+
+    /**
+     * An array of features supported by the field.
+     *
+     * @var array
+     */
+    protected array $supports = [];
+
+    /**
+     * An associative array of additional HTML attributes to apply to the field's input element.
+     *
+     * @var array
+     */
+    protected array $attributes = [];
+
+    /**
+     * An array of conditions that determine the field's visibility or behavior based on other field values.
+     *
+     * @var array
+     */
+    protected array $conditions = [];
+
+    /**
+     * An array of validation rules to apply to the field's value.
+     *
+     * @var array
+     */
+    protected array $rules = [];
+
+    /**
+     * Whether the field has been automatically set as required due to an enforcing rule.
+     *
+     * @var boolean
+     */
+    protected bool $mustBeRequired = false;
+
+    /**
      * An array of data types that this field is compatible with.
      *
      * @var array
@@ -66,6 +156,13 @@ abstract class Field extends FeatureDefinition {
     protected string $rootName = '';
 
     /**
+     * The ID of the form this field belongs to, if any.
+     *
+     * @var string|int|null
+     */
+    protected string|int|null $formId = null;
+
+    /**
      * The form row this field belongs to, if any.
      *
      * @var FormRow|null
@@ -73,11 +170,32 @@ abstract class Field extends FeatureDefinition {
     protected ?FormRow $row = null;
 
     /**
+     * The index of the field's parent row within the field's current form or group.
+     *
+     * @var integer|null
+     */
+    protected ?int $rowIndex = null;
+
+    /**
      * The field's position within its parent row.
      *
      * @var integer|null
      */
-    protected ?int $position = null;
+    protected ?int $rowPosition = null;
+
+    /**
+     * The field group this field belongs to, if any.
+     *
+     * @var FieldGroup|null
+     */
+    protected ?FieldGroup $group = null;
+
+    /**
+     * The ID of the field's parent group.
+     *
+     * @var string|null
+     */
+    protected ?string $groupId = null;
 
     /**
      * The repeater instance this field belongs to, if any.
@@ -87,121 +205,23 @@ abstract class Field extends FeatureDefinition {
     protected ?Repeater $repeater = null;
 
     /**
+     * The ID of the field's parent repeater, if any.
+     *
+     * @var string|null
+     */
+    protected ?string $repeaterId = null;
+
+    /**
      * The SettingsField instance associated with this field, if any.
      *
      * @var SettingsField|null
      */
     public ?SettingsField $settingsField = null;
 
-    /**
-     * The field's name, which can be used for form submission and as a fallback for generating the label.
-     *
-     * @var string
-     */
-    public string $name = '';
-
-    /**
-     * The field's unique ID, which can be used for HTML attributes and as a fallback for generating the name.
-     *
-     * @var string
-     */
-    protected string $id = '';
-
-    /**
-     * An associative array of additional HTML attributes to apply to the field's input element.
-     *
-     * @var array
-     */
-    protected array $attributes = [];
-
-    /**
-     * The field's label, displayed to users and used 
-     * as a fallback for generating the name.
-     *
-     * @var string
-     */
-    protected string $label = '';
-
-    /**
-     * The field's help text, providing additional guidance to users.
-     *
-     * @var string
-     */
-    protected string $helpText = '';
-
-    /**
-     * The position of the field's help text, which can be 'top' or 'bottom'.
-     *
-     * @var string
-     */
-    protected string $helpTextPosition = '';
-
-    /**
-     * The field's default value, used when no explicit value is set.
-     *
-     * @var mixed
-     */
-    protected mixed $default = null;
-
-    /**
-     * The field's current value, which may be set explicitly or fall back to the default.
-     *
-     * @var mixed
-     */
-    protected mixed $value = null;
-
-    /**
-     * Whether the field is required for form submission.
-     *
-     * @var boolean
-     */
-    protected bool $required = false;
-
-    /**
-     * Whether the field is disabled and not interactive.
-     *
-     * @var boolean
-     */
-    protected bool $disabled = false;
-
-    /**
-     * An array of conditions that determine the field's visibility or behavior based on other field values.
-     *
-     * @var array
-     */
-    protected array $conditions = [];
-
-    /**
-     * The name of a js callback function to execute when the field's value changes.
-     *
-     * @var string
-     */
-    protected string $onChange = '';
-
-    /**
-     * An array of validation rules to apply to the field's value.
-     *
-     * @var array
-     */
-    protected array $rules = [];
-
-    /**
-     * For concrete field classes that support validation rules,
-     * this array defines the keys that will be accepted via the rule() and rules() methods.
-     *
-     * @var array
-     */
-    protected array $supportedRules = [];
-
-    /**
-     * An array of CSS classes to apply to the field's wrapper element.
-     *
-     * @var array
-     */
-    protected array $classList = [];
+    use Concerns\SanitizesHtml;
 
     // =========================================================================
-    // Contract Methods
+    // Initialisation
     // =========================================================================
 
     public function __construct(
@@ -209,9 +229,45 @@ abstract class Field extends FeatureDefinition {
         array           $props = []
     ) {
         parent::__construct($provider, $props);
+
+        $this->initialise();
+        $this->initialiseRules();
+        $this->initialiseAttributes();
+
+        if (array_key_exists('attributes', $props) && is_array($props['attributes'])) {
+            $this->attributes = array_merge($this->attributes ?? [], $props['attributes']);
+        }
         
         if (empty($this->id)) {
-            $this->id = 'field_' . Str::substr(Str::uuid(), 0, 8);
+            $this->id = 'field-' . Str::substr(Str::uuid(), 0, 8);
+
+            if (empty($this->name)) {
+                $this->name = Str::replace('-', '_', $this->id);
+            }
+        }
+
+        if (empty($this->name)) {
+            $this->name = 'field_' . Str::substr(Str::uuid(), 0, 8);
+
+            if (empty($this->id)) {
+                $this->id = Str::slug($this->name);
+            }
+        }
+
+        if ($this->supports('required') && isset($props['required'])) {
+            $this->attribute('required', $props['required']);
+        }
+
+        if ($this->supports('disabled') && isset($props['disabled'])) {
+            $this->attribute('disabled', $props['disabled']);
+        }
+
+        if ($this->supports('helpText') && isset($props['helpText'])) {
+            $this->helpText = $props['helpText'];
+        }
+
+        if ($this->supports('helpText') && $this->helpText === null) {
+            $this->helpText = '';
         }
     }
     
@@ -219,49 +275,244 @@ abstract class Field extends FeatureDefinition {
         // Field classes don't use the queue method
     }
 
+    /**
+     * Can be used to set required properties, such as the field's handle and compatible data types.
+     *
+     * @return void
+     */
+    protected function initialise(): void {
+        // For concrete field classes to implement if needed
+    }
+
+    /**
+     * Initialises available rules for field types based on the field's compatible data types.
+     *
+     * @return void
+     */
+    protected function initialiseRules(): void {
+        $dataTypes = $this->compatibleDataTypes;
+
+        if (in_array('string', $dataTypes) && !is_subclass_of($this, Choice::class)) {
+            $this->rules['max-chars'] = [
+                'value'       => isset($this->rules['max-chars']['value']) ? $this->rules['max-chars']['value'] : null,
+                'label'       => 'Maximum Characters',
+                'description' => 'The maximum number of characters allowed for this field.',
+                'message'     => 'The value must not exceed :max-chars characters.'
+            ];
+            $this->rules['min-chars'] = [
+                'value'       => isset($this->rules['min-chars']['value']) ? $this->rules['min-chars']['value'] : null,
+                'label'       => 'Minimum Characters',
+                'description' => 'The minimum number of characters allowed for this field.',
+                'message'     => 'The value must be at least :min-chars characters.'
+            ];
+            $this->rules['max-words'] = [
+                'value'       => isset($this->rules['max-words']['value']) ? $this->rules['max-words']['value'] : null,
+                'label'       => 'Maximum Words',
+                'description' => 'The maximum number of words allowed for this field.',
+                'message'     => 'The value must not exceed :max-words words.'
+            ];
+            $this->rules['min-words'] = [
+                'value'       => isset($this->rules['min-words']['value']) ? $this->rules['min-words']['value'] : null,
+                'label'       => 'Minimum Words',
+                'description' => 'The minimum number of words allowed for this field.',
+                'message'     => 'The value must be at least :min-words words.'
+            ];
+        }
+
+        if (in_array('integer', $dataTypes) || 
+            in_array('float', $dataTypes) || 
+            in_array('decimal', $dataTypes)
+        ) {
+            $this->rules['max'] = [
+                'value'       => isset($this->rules['max']['value']) ? $this->rules['max']['value'] : null,
+                'label'       => 'Maximum Value',
+                'description' => 'The maximum value allowed for this field.',
+                'message'     => 'The value must not exceed :max.'
+            ];
+            $this->rules['min'] = [
+                'value'       => isset($this->rules['min']['value']) ? $this->rules['min']['value'] : null,
+                'label'       => 'Minimum Value',
+                'description' => 'The minimum value allowed for this field.',
+                'message'     => 'The value must be at least :min.'
+            ];
+        }
+
+        if (in_array('array.scalar', $dataTypes) || in_array('array.object', $dataTypes)) {
+            $this->rules['max-items'] = [
+                'value'       => isset($this->rules['max-items']['value']) ? $this->rules['max-items']['value'] : null,
+                'label'       => 'Maximum Number of Items',
+                'description' => 'The maximum number of items allowed for this field.',
+                'message'     => 'The value must not exceed :max-items items.'
+            ];
+            $this->rules['min-items'] = [
+                'value'       => isset($this->rules['min-items']['value']) ? $this->rules['min-items']['value'] : null,
+                'label'       => 'Minimum Number of Items',
+                'description' => 'The minimum number of items allowed for this field.',
+                'message'     => 'The value must be at least :min-items items.'
+            ];
+        }
+    }
+
+    /**
+     * Initialises available attributes for field types based on the field's 
+     * compatible data types and supported features.
+     *
+     * @return void
+     */
+    protected function initialiseAttributes(): void {
+        if ($this->supports('placeholder') && !isset($this->attributes['placeholder'])) {
+            $this->attribute('placeholder', '');
+        }
+
+        if ($this->supports('required') && !isset($this->attributes['required'])) {
+            $this->attribute('required', false);
+        }
+
+        if ($this->supports('disabled') && !isset($this->attributes['disabled'])) {
+            $this->attribute('disabled', false);
+        }
+
+        $dataTypes = $this->compatibleDataTypes;
+
+        if (!isset($this->attributes['step']) && (
+            in_array('integer', $dataTypes) || 
+            in_array('float', $dataTypes) || 
+            in_array('decimal', $dataTypes)
+        )) {
+            $this->attribute('step', 'any');
+        }
+    }
+
+    /**
+     * Adds a support to the field's list of supports.
+     *
+     * @param string $feature
+     *
+     * @return void
+     */
+    protected function addSupport(string $feature): void {
+        if (!in_array($feature, $this->supports)) {
+            $this->supports[] = $feature;
+        }
+    }
+
+    /**
+     * Adds multiple supports to the field's list of supports.
+     *
+     * @param array $features
+     *
+     * @return void
+     */
+    protected function addSupports(array $features): void {
+        foreach ($features as $feature) {
+            $this->addSupport($feature);
+        }
+    }
+
+    /**
+     * Removes a support from the field's list of supports.
+     *
+     * @param string $feature
+     *
+     * @return void
+     */
+    protected function removeSupport(string $feature): void {
+        if (in_array($feature, $this->supports)) {
+            $this->supports = array_diff($this->supports, [$feature]);
+        }
+    }
+
+    /**
+     * Removes multiple supports from the field's list of supports.
+     *
+     * @param array $features
+     *
+     * @return void
+     */
+    protected function removeSupports(array $features): void {
+        foreach ($features as $feature) {
+            $this->removeSupport($feature);
+        }
+    }
+
+    /**
+     * Converts the field instance into a format suitable for Livewire rendering.
+     *
+     * @return array
+     */
+    public function toLivewire(): array {
+        return $this->toJson();
+    }
+
+    /**
+     * Reconstructs a field instance from Livewire data.
+     *
+     * @param array $data
+     *
+     * @return self
+     */
+    public static function fromLivewire($data): self {
+        $props = $data['properties'] ?? [];
+
+        return new static(
+            Framework::get(),
+            $props
+        );
+    }
+
+    /**
+     * Alias for fromLivewire() to initialize a field instance from an array of data.
+     *
+     * @param array $data
+     *
+     * @return self
+     */
+    public static function initFromData(array $data): self {
+        return self::fromLivewire($data);
+    }
+
+
     // =========================================================================
     // Rendering
     // =========================================================================
 
-        /**
+    /**
      * Renders the field using its designated FieldWrapper.
      * 
-     * @param bool $showLabel Whether to show the field's label in the wrapper. Some wrappers may ignore this and always show the label, or never show the label.
-     * @param bool $showHelp Whether to show the field's help text in the wrapper. Some wrappers may ignore this and always show the help text, or never show the help text.
+     * @param bool  $wrapped Whether to render the field within its wrapper. If false, only the field's input component will be rendered without any wrapper or additional elements.
+     * @param array $props   An optional array of properties for rendering the field. This can include 'id', 'label', 'helpText', 'excludeAttributes', and 'component'.
      *
      * @return void
      */
-    public function render(bool $showLabel = true, bool $showHelp = true): void {
-        $wrapper = $this->resolveFieldWrapper();
+    public function render(bool $wrapped = true, array $props = []): void {
+        $props = $this->getRenderProps($props);
 
-        echo view($wrapper, [
-            'view'       => $this->getFieldComponent(),
-            'field'      => $this,
-            'showLabel'  => $showLabel,
-            'showHelp'   => $showHelp,
-        ]);
+        if ($wrapped) {
+            $wrapper = $this->resolveFieldWrapper();
+            echo view($wrapper, $props);
+        }
+
+        else {
+            echo view($parsedConfig['component'] ?? $this->getFieldComponent(), $props);
+        }
     }
 
     /**
      * Renders the field and returns the HTML as a string.
      *
-     * @param bool $showLabel Whether to show the field's label in the wrapper. Some wrappers may ignore this and always show the label, or never show the label.
-     * @param bool $showHelp Whether to show the field's help text in the wrapper. Some wrappers may ignore this and always show the help text, or never show the help text.
+     * @param bool  $wrapped Whether to render the field within its wrapper. If false, only the field's input component will be rendered without any wrapper or additional elements.
+     * @param array $props   An optional array of properties for rendering the field. This can include 'id', 'label', 'helpText', 'excludeAttributes', and 'component'.
      *
      * @return string The rendered HTML of the field.
      */
-    public function html(bool $showLabel = true, bool $showHelp = true): string {
+    public function html(bool $wrapped = true, array $props = []): string {
         ob_start();
-        $this->render($showLabel, $showHelp);
-        return ob_get_clean();
-    }
+        $this->render($wrapped, $props);
 
-    /**
-     * Retrieves the name of the Blade component responsible for rendering this field type.
-     *
-     * @return string
-     */
-    abstract public function getFieldComponent(): string;
+        $html = ob_get_clean();
+
+        return $this->sanitizeHtml(is_string($html) ? $html : '');
+    }
 
     /**
      * Retrieves the Blade view path for the field's assigned field wrapper.
@@ -271,7 +522,7 @@ abstract class Field extends FeatureDefinition {
     protected function resolveFieldWrapper(): string {
         $hasSettingsField = 
             $this->settingsField !== null || 
-            ($this->isSubField() && $this->repeater->settingsField !== null);
+            ($this->isInRepeater() && $this->repeater->settingsField !== null);
         
         if ($hasSettingsField) {
             $wrapperHandle = 'admin_settings';
@@ -287,6 +538,141 @@ abstract class Field extends FeatureDefinition {
         }
 
         return $wrapper->getView();
+    }
+
+    /**
+     * Retrieves the rendering properties for the field, applying defaults where necessary.
+     *
+     * @param array $props An array of properties that may include 'id', 'label', 'helpText', 'excludeAttributes', and 'component'.
+     *
+     * @return array An array containing the parsed properties with defaults applied.
+     */
+    protected function getRenderProps(array $props = []): array {
+        $parsedProps = $this->parseRenderProps($props);
+
+        return [
+            'view'            => $parsedProps['component'] ?? $this->getFieldComponent(),
+            'field'           => $this,
+            'type'            => $this->handle,
+            'id'              => $parsedProps['id'],
+            'name'            => $parsedProps['name'],
+            'label'           => $parsedProps['label'],
+            'helpText'        => $parsedProps['helpText'],
+            'value'           => $this->getValue(),
+            'hasRules'        => $this->hasRules(),
+            'serialisedRules' => json_encode($parsedProps['rules']),
+            'rules'           => $parsedProps['rules'],
+            'mustBeRequired'  => $this->mustBeRequired,
+            'isSubField'      => $this->isInRepeater(),
+            'attributes'      => $this->attributes($parsedProps['attributes'] ?? [], $parsedProps['excludeAttributes'] ?? []),
+        ];   
+    }
+
+    /**
+     * Parses the rendering properties for the field, applying defaults where necessary.
+     *
+     * @param array $props An array of properties that may include 'id', 'label', 'helpText', 'excludeAttributes', and 'component'.
+     *
+     * @return array An array containing the parsed properties with defaults applied.
+     */
+    protected function parseRenderProps(array $props): array {
+        return [
+            'id'                => is_string($props['id'] ?? null) ? $props['id'] : $this->getId(),
+            'name'              => is_string($props['name'] ?? null) ? $this->getName(!$this->isInRepeater(), $props['name']) : $this->getName(!$this->isInRepeater()),
+            'label'             => is_string($props['label'] ?? null) ? $props['label'] : (is_bool($props['label'] ?? null) ? false : $this->getLabel()),
+            'helpText'          => is_string($props['helpText'] ?? null) ? $props['helpText'] : (is_bool($props['helpText'] ?? null) ? false : $this->getHelpText()),
+            'attributes'        => is_array($props['attributes'] ?? null) ? $props['attributes'] : [],
+            'excludeAttributes' => is_array($props['excludeAttributes'] ?? null) ? $props['excludeAttributes'] : [],
+            'rules'             => is_array($props['rules'] ?? null) ? $props['rules'] : $this->getRules(),
+            'component'         => is_string($props['component'] ?? null) ? $props['component'] : null,
+        ];
+    }
+
+    /**
+     * Retrieves the name of the Blade component responsible for rendering this field type.
+     *
+     * @return string
+     */
+    abstract public function getFieldComponent(): string;
+
+    // =========================================================================
+    // Form Builder Integration
+    // =========================================================================
+
+    /**
+     * Retrieves the name of the Blade component to use for rendering the field's default value in the 
+     * form builder's field settings panel. By default, this returns the same component as getFieldComponent(), 
+     * but can be overridden by fields that require a different component for rendering default values in the settings panel.
+     *
+     * @return string
+     */
+    public function getDefaultValueControl(): string {
+        return $this->getFieldComponent();
+    }
+
+    /**
+     * Renders the field's default value control using the component specified by getDefaultValueControl().
+     *
+     * @return void
+     */
+    public function renderDefaultValueControl(): void {
+        $component = $this->getDefaultValueControl();
+        
+        $this->render(true, [
+            'id'                => $this->getId() . '-default',
+            'name'              => $this->getName() . '_default',
+            'label'             => 'Default Value',
+            'helpText'          => "The field's default value.",
+            'attributes'        => ['data-default-value-control' => 'true', 'data-field-id' => $this->getId()],
+            'excludeAttributes' => ['id', 'required', 'aria-required', 'disabled', 'aria-disabled'],
+            'rules'             => [],
+            'component'         => $component
+        ]);
+    }
+
+    /**
+     * Renders the field's default value control and returns the HTML as a string.
+     *
+     * @return string The rendered HTML of the default value control.
+     */
+    public function getDefaultValueControlHtml(): string {
+        ob_start();
+        $this->renderDefaultValueControl();
+        $html = ob_get_clean();
+
+        return $this->sanitizeHtml(is_string($html) ? $html : '');
+    }
+
+    /**
+     * Renders the field's rule controls and returns the HTML as a string.
+     *
+     * @return string
+     */
+    public function getRuleControlsHtml(): string {
+        $html = '';
+
+        foreach ($this->rules as $ruleName => $ruleConfig) {
+            if (Str::contains($ruleName, 'chars') && ($this->hasRule('max-words') || $this->hasRule('min-words'))) {
+                continue;
+            }
+
+            if (Str::contains($ruleName, 'words') && ($this->hasRule('max-chars') || $this->hasRule('min-chars'))) {
+                continue;
+            }
+
+            $field = Fields::checkout($this->provider)->makeFrom('number', [
+                'id'         => $this->getId() . "-rule-{$ruleName}",
+                'name'       => $this->getName() . "_rule_{$ruleName}",
+                'label'      => $ruleConfig['label'] ?? Str::title(Str::replace(['-', '_'], ' ', $ruleName)),
+                'value'      => $ruleConfig['value'] ?? null,
+                'helpText'   => $ruleConfig['description'] ?? null,
+                'attributes' => ['data-rule-control' => 'true', 'data-field-id' => $this->getId(), 'data-rule-name' => $ruleName],
+            ]);
+
+            $html .= $field->html();
+        }
+
+        return $html;
     }
 
     // =========================================================================
@@ -313,31 +699,7 @@ abstract class Field extends FeatureDefinition {
      * @return self
      */
     public function name(string $name): self {
-        $this->name = Str::replace(' ', '_', $name);
-        return $this;
-    }
-
-    /**
-     * Sets the root name for the field, which is used to generate names.
-     *
-     * @param string $rootName The root name to set for the field.
-     *
-     * @return self
-     */
-    public function rootName(string $rootName): self {
-        $this->rootName = $rootName;
-        return $this;
-    }
-
-    /**
-     * Sets the field's data type.
-     *
-     * @param string $dataType The data type to set for the field (e.g., 'string', 'integer', 'array').
-     *
-     * @return self
-     */
-    public function dataType(string $dataType): self {
-        $this->dataType = $dataType;
+        $this->name = Str::lower(Str::replace(' ', '_', $name));
         return $this;
     }
 
@@ -357,13 +719,14 @@ abstract class Field extends FeatureDefinition {
      * Sets the field's help text.
      *
      * @param string $helpText
-     * @param string $position The position of the help text, either 'top' or 'bottom'.
      *
      * @return self
      */
-    public function helpText(string $helpText, string $position = 'top'): self {
-        $this->helpText = $helpText;
-        $this->helpTextPosition($position);
+    public function helpText(string $helpText): self {
+        if ($this->supports('helpText')) {
+            $this->helpText = $helpText;
+        }
+
         return $this;
     }
 
@@ -371,12 +734,11 @@ abstract class Field extends FeatureDefinition {
      * Shorthand alias for helpText() to set the field's help text.
      *
      * @param string $helpText
-     * @param string $position The position of the help text, either 'top' or 'bottom'.
      *
      * @return self
      */
-    public function help(string $helpText, string $position = 'top'): self {
-        return $this->helpText($helpText, $position);
+    public function help(string $helpText): self {
+        return $this->helpText($helpText);
     }
 
     /**
@@ -387,6 +749,15 @@ abstract class Field extends FeatureDefinition {
      * @return self
      */
     public function default(mixed $default): self {
+        $isDynamic = is_string($default) && 
+            Str::startsWith($default, '{{') && 
+            Str::endsWith($default, '}}');
+
+        if ($isDynamic && $this->supports('dynamicDefault')) {
+            $this->default = $default;
+            return $this;
+        }
+
         $this->default = $default;
         return $this;
     }
@@ -402,6 +773,21 @@ abstract class Field extends FeatureDefinition {
         $this->value = $value;
         return $this;
     }
+    
+    /**
+     * Sets the placeholder text for the field, if supported.
+     *
+     * @param string $placeholder
+     *
+     * @return self
+     */
+    public function placeholder(string $placeholder): self {
+        if ($this->supports('placeholder')) {
+            $this->attribute('placeholder', $placeholder);
+        }
+
+        return $this;
+    }
 
     /**
      * Marks the field as required if $required is true, or optional if false.
@@ -411,7 +797,10 @@ abstract class Field extends FeatureDefinition {
      * @return self
      */
     public function required(bool $required = true): self {
-        $this->required = $required;
+        if ($this->supports('required')) {
+            $this->attribute('required', $required);
+        }
+
         return $this;
     }
 
@@ -423,7 +812,10 @@ abstract class Field extends FeatureDefinition {
      * @return self
      */
     public function disabled(bool $disabled = true): self {
-        $this->disabled = $disabled;
+        if ($this->supports('disabled')) {
+            $this->attribute('disabled', $disabled);
+        }
+
         return $this;
     }
 
@@ -472,17 +864,16 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
-     * Sets the position of the field's help text.
+     * Removes an additional HTML attribute from the field's input element.
      *
-     * @param string $position Either 'top' or 'bottom'.
+     * @param string $key The name of the HTML attribute to remove (e.g., 'data-custom', 'aria-label').
      *
      * @return self
      */
-    public function helpTextPosition(string $position): self {
-        if (in_array($position, ['top', 'bottom'])) {
-            $this->helpTextPosition = $position;
+    public function removeAttribute(string $key): self {
+        if (array_key_exists($key, $this->attributes)) {
+            unset($this->attributes[$key]);
         }
-
         return $this;
     }
 
@@ -491,29 +882,56 @@ abstract class Field extends FeatureDefinition {
     // =========================================================================
 
     /**
-     * Sets the field's parent form row.
+     * Sets the root name for the field, which is used to generate names.
      *
-     * @param FormRow $row
+     * @param string $rootName The root name to set for the field.
      *
      * @return self
      */
-    public function row(FormRow $row): self {
-        $this->row = $row;
+    public function rootName(string $rootName): self {
+        $this->rootName = $rootName;
         return $this;
     }
 
     /**
-     * Sets the field's position within its parent row, for reference.
-     * 
-     * This does not automatically reorder the fields in the row. 
-     * The FormRow is responsible for ordering the fields when rendering.
+     * Sets the field's data type.
      *
-     * @param integer $position
+     * @param string $dataType The data type to set for the field (e.g., 'string', 'integer', 'array').
      *
      * @return self
      */
-    public function position(int $position): self {
-        $this->position = $position;
+    public function dataType(string $dataType): self {
+        $this->dataType = $dataType;
+        return $this;
+    }
+
+    /**
+     * Sets the field's parent form row.
+     *
+     * @param FormRow|null $row      The parent form row to associate with this field. If null is passed, the row property will be set to null.
+     * @param int|null     $rowIndex An optional index for the parent row, used for reference. This does not automatically link the field to a row instance.
+     * @param int|null     $position An optional position for the field within the parent row, used for reference. This does not automatically position the field within the row instance.
+     *
+     * @return self
+     */
+    public function row(?FormRow $row, ?int $rowIndex = null, ?int $position = null): self {
+        $this->row = $row;
+        $this->rowIndex = $rowIndex;
+        $this->rowPosition = $position;
+        return $this;
+    }
+
+    /**
+     * Sets the field's parent group.
+     *
+     * @param FieldGroup|null $group The parent group to associate with this field. If null is passed, the group property will be set to null.
+     * @param string|null     $groupId An optional ID for the parent group, used for reference. This does not automatically link the field to a group instance.
+     *
+     * @return self
+     */
+    public function group(?FieldGroup $group, ?string $groupId = null): self {
+        $this->group = $group;
+        $this->groupId = $groupId;
         return $this;
     }
 
@@ -521,11 +939,30 @@ abstract class Field extends FeatureDefinition {
      * Associates the field with a repeater, marking it as a sub-field.
      *
      * @param Repeater|null $repeater The repeater to associate with this field. If null is passed, the repeater property will be set to null.
+     * @param string|null   $repeaterId An optional ID for the parent repeater, used for reference. This does not automatically link the field to a repeater instance.
      *
      * @return self
      */
-    public function repeater(Repeater|null $repeater): self {
+    public function repeater(?Repeater $repeater, ?string $repeaterId = null): self {
         $this->repeater = $repeater;
+        $this->repeaterId = $repeaterId;
+        return $this;
+    }
+
+    /**
+     * Sets whether to hide the field in a repeater's table view, making the field available only in the repeater's config dialog.
+     *
+     * @param boolean $hide
+     *
+     * @return self
+     */
+    public function hideInRepeaterTable(bool $hide = true): self {
+        if ($hide) {
+            $this->attribute('data-hide-in-repeater-table', 'true');
+        } else {
+            $this->removeAttribute('data-hide-in-repeater-table');
+        }
+
         return $this;
     }
 
@@ -553,11 +990,14 @@ abstract class Field extends FeatureDefinition {
      *
      * @return self
      */
-    public function rules(array $rules): self {
-        foreach ($rules as $key => $value) {
-            if (in_array($key, $this->supportedRules)) {
-                $this->rules[$key] = $value;
-            }
+    public function rules(array|null $rules): self {
+        foreach ($rules as $key => $config) {
+            $this->rule(
+                $key, 
+                $config['value'] ?? null, 
+                $config['label'] ?? '', 
+                $config['message'] ?? ''
+            );
         }
 
         return $this;
@@ -568,12 +1008,58 @@ abstract class Field extends FeatureDefinition {
      *
      * @param string $key
      * @param mixed  $value
+     * @param string $message
      *
      * @return self
      */
-    public function rule(string $key, mixed $value): self {
-        if (in_array($key, $this->supportedRules)) {
-            $this->rules[$key] = $value;
+    public function rule(string $key, mixed $value, string $label = '', string $message = ''): self {
+        if (in_array($key, array_keys($this->rules))) {
+            $this->rules[$key] = [
+                'value'   => $value,
+                'label'   => !empty($label) ? $label : $this->rules[$key]['label'],
+                'message' => !empty($message) ? $message : $this->rules[$key]['message']
+            ];
+
+            if ($this->supports('required') && Str::startsWith($key, 'min-')) {
+                if (is_numeric($value) && ((int)$value > 0 || (float)$value > 0)) {
+                    $this->required(true);
+                    $this->mustBeRequired = true;
+                }
+
+                else if ((is_numeric($value) || is_null($value)) && ((int)$value === 0 || (float)$value === 0) || is_null($value)) {
+                    $this->mustBeRequired = false;
+                }
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Removes a validation rule from the field.
+     *
+     * @param string $key
+     *
+     * @return self
+     */
+    public function removeRule(string $key): self {
+        if (in_array($key, array_keys($this->rules))) {
+            unset($this->rules[$key]);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Removes multiple validation rules from the field.
+     *
+     * @param array $keys
+     *
+     * @return self
+     */
+    public function removeRules(array $keys): self {
+        foreach ($keys as $key) {
+            $this->removeRule($key);
         }
 
         return $this;
@@ -757,103 +1243,35 @@ abstract class Field extends FeatureDefinition {
         ]);
     }
 
-    /**
-     * Sets a JavaScript callback path to be executed when the field's value changes.
-     *
-     * The callback is invoked from the field blade with the native DOM change event.
-     * 
-     * @param string $callback
-     *
-     * @return self
-     */
-    public function onChange(string $callback): self {
-        $this->onChange = $this->normaliseCallbackPath($callback);
-        return $this;
-    }
-
-    /**
-     * Normalises and validates JavaScript callback paths used by field interactions.
-     * Returns an empty string when a callback path is invalid.
-     *
-     * Field onChange callbacks receive:
-     * - $event: the native change event from the field input/select element.
-     *
-        * @return string
-     */
-    protected function normaliseCallbackPath(string $callback): string {
-        $trimmed = trim($callback);
-
-        if ($trimmed === '' || strlen($trimmed) > 200) {
-            return '';
-        }
-
-        $pattern = '/^(?:(?:\$store|\$wire)\.)?[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/';
-
-        if (!preg_match($pattern, $trimmed)) {
-            return '';
-        }
-
-        $path = $trimmed;
-
-        if (str_starts_with($trimmed, '$store.')) {
-            $path = substr($trimmed, strlen('$store.'));
-        }
-
-        if (str_starts_with($trimmed, '$wire.')) {
-            $path = substr($trimmed, strlen('$wire.'));
-        }
-
-        $segments = array_values(array_filter(explode('.', $path), fn($segment) => $segment !== ''));
-        $blockedSegments = ['__proto__', 'prototype', 'constructor'];
-
-        foreach ($segments as $segment) {
-            if (in_array($segment, $blockedSegments, true)) {
-                return '';
-            }
-        }
-
-        return $trimmed;
-    }
-
     // =========================================================================
-    // Getters
+    // Property Getters
     // =========================================================================
 
     /**
-     * Converts the field's properties to an array format suitable for JSON serialization
-     * 
-     * @param boolean $asString Whether to return the JSON as a string or an array.
-     * @param string  ...$flags Optional flags to pass to json_encode if $asString is true.
+     * Retrieves the category this field belongs to.
      *
-     * @return array|string
+     * @return string
      */
-    public function toJson(bool $asString = false, string ...$flags): array|string {
-        $json = [
-            'type'             => static::class,
-            'handle'           => $this->handle,
-            'properties'       => [
-                'id'               => $this->getId(),
-                'name'             => $this->getName(),
-                'label'            => $this->getLabel(),
-                'helpText'         => $this->getHelpText(),
-                'helpTextPosition' => $this->getHelpTextPosition(),
-                'attributes'       => $this->attributes,
-                'classList'        => $this->classList,
-                'default'          => $this->default,
-                'required'         => $this->isRequired(),
-                'disabled'         => $this->isDisabled(),
-                'rules'            => $this->getRules(),
-                'conditions'       => $this->getConditions(),
-                'component'        => $this->getFieldComponent(),
-                'compatibleDataTypes' => $this->compatibleDataTypes,
-            ]
-        ];
+    public static function getCategory(): string {
+        return static::$category;
+    }
 
-        if ($asString) {
-            return json_encode($json, ...$flags);
-        }
+    /**
+     * Retrieves the icon for this field.
+     *
+     * @return string
+     */
+    public static function getIcon(): string {
+        return static::$icon;
+    }
 
-        return $json;
+    /**
+     * Returns the field type (handle).
+     *
+     * @return string
+     */
+    public function getType(): string {
+        return $this->handle;
     }
 
     /**
@@ -875,34 +1293,46 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
-     * Returns whether the field is a sub-field of a repeater.
-     *
-     * @return boolean
-     */
-    public function isSubField(): bool {
-        return $this->repeater !== null;
-    }
-
-    /**
-     * Returns the field type (handle).
-     *
-     * @return string
-     */
-    public function getType(): string {
-        return $this->handle;
-    }
-
-    /**
      * Retrieves the field's ID.
      *
      * @return string
      */
     public function getId(): string {
-        return empty($this->id) ? $this->getName() : $this->id;
+        return $this->id;
     }
 
     /**
-     * Retrieves the field's label, generating it from the name or ID if not explicitly set.
+     * Retrieves the field's name.
+     * 
+     * @param bool $includeRootName Whether to include the root name for sub-fields.
+     *
+     * @return string
+     * @throws \RuntimeException If the field does not have a name.
+     */
+    public function getName(bool $includeRootName = true, string $overrideName = ''): string {
+        if ($this->name === '' && $overrideName === '') {
+            throw new \RuntimeException('Field must have a name to generate a name attribute.');
+        }
+
+        $name = $overrideName !== '' ? $overrideName : $this->name;
+
+        if ($this->isInRepeater() && !$includeRootName) {
+            return $name;
+        }
+
+        if ($this->isInRepeater() && $includeRootName) {
+            return Str::replace(['[', ']'], '', Str::afterLast($name, '['));
+        }
+
+        if ($includeRootName && $this->rootName !== '') {
+            return "{$this->rootName}[{$name}]";
+        }
+
+        return $name;
+    }
+
+    /**
+     * Retrieves the field's label, generating it from the field's handle if not explicitly set.
      *
      * @return string
      */
@@ -911,35 +1341,25 @@ abstract class Field extends FeatureDefinition {
             return $this->label;
         }
 
-        if (!empty($this->name)) {
-            $this->label = Str::title(Str::replace(['-', '_', '[', ']'], ' ', $this->name));
-            return $this->label;
-        }
-
-        if (!empty($this->id)) {
-            $this->label = Str::title(Str::replace(['-', '_'], ' ', $this->id));
-            return $this->label;
-        }
-
-        return '';
+        return Str::title(Str::replace(['-', '_'], ' ', $this->handle));
     }
 
     /**
      * Retrieves the field's help text.
      *
-     * @return string
+     * @return string|null
      */
-    public function getHelpText(): string {
-        return $this->helpText;
+    public function getHelpText(): ?string {
+        return $this->supports('helpText') ? $this->helpText : null;
     }
 
     /**
-     * Retrieves the position of the field's help text.
+     * Retrieves the field's default value.
      *
-     * @return string
-     */
-    public function getHelpTextPosition(): string {
-        return empty($this->helpTextPosition) ? 'top' : $this->helpTextPosition;
+      * @return mixed
+      */
+    public function getDefault(): mixed {
+        return $this->default;
     }
 
     /**
@@ -958,57 +1378,148 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
-     * Retrieves the field's default value.
+     * Retrieves the field's CSS class list as a space-separated string.
      *
-      * @return mixed
-      */
-    public function getDefault(): mixed {
-        return $this->default;
+     * @return string
+     */
+    public function classList(): string {
+        return implode(' ', $this->classList);
     }
 
     /**
-     * Retrieves the field's name, generating it from the ID or label if not explicitly set.
+     * Retrieves the field's HTML attributes as a string of key="value" pairs.
      * 
-     * @param bool $includeRootName Whether to include the root name for sub-fields.
+     * @param array $extra An array of additional attributes to merge into the output.
+     * @param array $exclude An array of attribute keys to exclude from the output (e.g., ['id', 'name']).
      *
      * @return string
-     * @throws \RuntimeException If the field cannot generate a name because it lacks a name, ID, and label.
      */
-    public function getName(bool $includeRootName = true): string {
-        $name = null;
+    public function attributes(array $extra = [], array $exclude = []): string {
+        $attributes = array_merge([
+            'class'           => $this->classList(),
+            'disabled'        => $this->isDisabled(),
+            'aria-disabled'   => $this->isDisabled() ? 'true' : 'false',
+            'required'        => $this->isRequired(),
+            'aria-required'   => $this->isRequired() ? 'true' : 'false',
+            'data-field-type' => $this->handle,
+            'data-field-name' => $this->getName(),
+        ], $extra, $this->attributes, $this->getRuleAttributes());
+        
 
-        if (!empty($this->name)) {
-            $name = $this->name;
-        }
+        $rendered = [];
 
-        if ($name === null && !empty($this->id)) {
-            $this->name = $this->id;
-            $name = $this->name;
-        }
-
-        if ($name === null && !empty($this->label)) {
-            $this->name = Str::slug($this->label);
-            $name = $this->name;
-        }
-
-        if ($name !== null) {
-            if ($this->isSubField() && !$includeRootName) {
-                return $name;
+        foreach ($attributes as $key => $value) {
+            if (in_array($key, $exclude, true)) {
+                continue;
             }
 
-            if ($this->isSubField() && $includeRootName) {
-                return Str::replace(['[', ']'], '', Str::afterLast($name, '['));
+            if (is_null($value) || $value === '' || $value === false) {
+                continue;
             }
 
-            if ($includeRootName && $this->rootName !== '') {
-                return "{$this->rootName}[{$name}]";
+            if (is_bool($value)) {
+                if ($value) {
+                    $rendered[] = $key;
+                }
+                continue;
             }
 
-            return $name;
+            $rendered[] = sprintf(
+                '%s="%s"',
+                $key,
+                htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8')
+            );
         }
 
-        throw new \RuntimeException('Field must have a name, id, or label to generate a name.');
+        return implode(' ', $rendered);
     }
+
+    /**
+     * Filters out specific attributes from an attributes string.
+     *
+     * @param string $attributes The original attributes string to filter.
+     * @param array  $filters An array of attribute keys to remove from the attributes string (e.g., ['id', 'name']).
+     *
+     * @return string The filtered attributes string with specified attributes removed.
+     */
+    public function filterAttributes(string $attributes, array $filters): string {
+        $pattern = '/\b(' . implode('|', array_map('preg_quote', $filters)) . ')(?:="[^"]*")?/';
+        return preg_replace($pattern, '', $attributes);
+    }
+
+    /**
+     * Checks if the field has any validation rules defined.
+     *
+     * @return boolean
+     */
+    public function hasRules(): bool {
+        if (empty($this->rules)) {
+            return false;
+        }
+
+        foreach ($this->rules as $_ => $rule) {
+            if (isset($rule['value']) && $rule['value'] !== null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks if a specific validation rule is defined for the field.
+     *
+     * @param string $rule The name of the validation rule to check (e.g., 'required', 'min', 'max').
+     *
+     * @return boolean True if the rule is defined and has a non-null value; false otherwise.
+     */
+    public function hasRule(string $rule): bool {
+        return isset($this->rules[$rule]) && isset($this->rules[$rule]['value']) && $this->rules[$rule]['value'] !== null;
+    }
+
+    // =========================================================================
+    // Context Getters
+    // =========================================================================
+
+    /**
+     * Returns whether the field is a sub-field of a repeater.
+     *
+     * @return boolean
+     */
+    public function isInRepeater(): bool {
+        return $this->repeater !== null;
+    }
+
+    /**
+     * Returns whether the field is marked to be hidden in a repeater's table view.
+     *
+     * @return boolean
+     */
+    public function isHiddenInRepeaterTable(): bool {
+        return $this->attributes['data-hide-in-repeater-table'] ?? false;
+    }
+
+    /**
+     * Returns whether the field is part of a field group.
+     *
+     * @return boolean
+     */
+    public function isInGroup(): bool {
+        return $this->group !== null;
+    }
+
+    /**
+     * Retrieves the ID of the field's parent group, if any.
+     *
+     * @return string|null
+     */
+    public function getGroupId(): ?string {
+        return $this->groupId;
+    }
+
+    // =========================================================================
+    // Dynamic Property Getters
+    // =========================================================================
 
     /**
      * Retrieves the field's conditions array.
@@ -1047,18 +1558,6 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
-     * Retrieves the JavaScript callback path set to execute when the field's value changes.
-     * The callback is executed with the native DOM change event.
-     *
-     * @return string
-     */
-    public function getOnChange(): string {
-        return !empty($this->onChange) 
-            ? $this->normaliseCallbackPath($this->onChange) 
-            : '';
-    }
-
-    /**
      * Returns validation rules as an array of HTML attributes that can be applied to the 
      * field's input element for client-side validation.
      *
@@ -1067,20 +1566,22 @@ abstract class Field extends FeatureDefinition {
     public function getRuleAttributes(): array {
         $attributes = [];
 
-        foreach ($this->rules as $key => $value) {
-            if (in_array($key, $this->supportedRules)) {
-                if (in_array($key, ['min', 'max', 'maxlength', 'step'])) {
-                    $attributes[$key] = $value;
-                    continue;
-                }
-
-                if (is_bool($value)) {
-                    $attributes["data-rule-{$key}"] = $value ? 'true' : 'false';
-                    continue;
-                }
-
-                $attributes["data-rule-{$key}"] = $value;
+        foreach ($this->rules as $key => $config) {
+            if (!isset($config['value'])) {
+                continue;
             }
+
+             if (in_array($key, ['min', 'max'])) {
+                $attributes[$key] = $config['value'];
+                continue;
+            }
+
+            if (is_bool($config['value'])) {
+                $attributes["data-rule-{$key}"] = $config['value'] ? 'true' : 'false';
+                continue;
+            }
+
+            $attributes["data-rule-{$key}"] = $config['value'];
         }
 
         return $attributes;
@@ -1092,95 +1593,133 @@ abstract class Field extends FeatureDefinition {
      * @return array
      */
     public function getRules(): array {
-        return $this->rules;
+        $rules = [];
+
+        foreach ($this->rules as $key => $config) {
+            if (isset($config['value']) && $config['value'] !== null) {
+                $label = $config['label'] ?? Str::title(Str::replace(['-', '_'], ' ', $key));
+
+                if (isset($config['message']) && $config['message'] !== '') {
+                    $rules[$key] = [
+                        'value'   => $config['value'],
+                        'message' => Str::replace(":{$key}", $config['value'], $config['message']),
+                        'label'   => $label 
+                    ];
+                } 
+                
+                else {
+                    $rules[$key] = [
+                        'value'   => $config['value'],
+                        'label'   => $label
+                    ];
+                }
+            }
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Retrieves the value of a specific validation rule for the field, if it exists.
+     *
+     * @param string $rule
+     *
+     * @return mixed
+     */
+    public function getRuleValue(string $rule): mixed {
+        return $this->rules[$rule]['value'] ?? null;
+    }
+
+    /**
+     * Retrieves the configuration of a specific validation rule for the field, if it exists.
+     *
+     * @param string $rule
+     *
+     * @return array|null
+     */
+    public function getRule(string $rule): ?array {
+        return $this->rules[$rule] ?? null;
     }
 
     /**
      * Checks if the field is marked as required.
      *
-     * @return boolean
+     * @return bool|null
      */
-    public function isRequired(): bool {
-        return $this->required;
+    public function isRequired(): ?bool {
+        return $this->supports('required')
+            ? (array_key_exists('required', $this->attributes) ? $this->attributes['required'] : false)
+            : null;
     }
 
     /**
      * Checks if the field is marked as disabled.
      *
-     * @return boolean
+     * @return bool|null
      */
-    public function isDisabled(): bool {
-        return $this->disabled;
+    public function isDisabled(): ?bool {
+        return $this->supports('disabled')
+            ? (array_key_exists('disabled', $this->attributes) ? $this->attributes['disabled'] : false)
+            : null;
     }
 
-    /**
-     * Retrieves the field's CSS class list as a space-separated string.
-     *
-     * @return string
-     */
-    public function classList(): string {
-        return implode(' ', $this->classList);
-    }
+    // =========================================================================
+    // Serialisation
+    // =========================================================================
 
     /**
-     * Retrieves the field's HTML attributes as a string of key="value" pairs.
+     * Converts the field's properties to an array format suitable for JSON serialization
      * 
-     * @param array $exclude An array of attribute keys to exclude from the output (e.g., ['id', 'name']).
+     * @param boolean $asString Whether to return the JSON as a string or an array.
+     * @param string  ...$flags Optional flags to pass to json_encode if $asString is true.
      *
-     * @return string
+     * @return array|string
      */
-    public function attributes(array $exclude = []): string {
-        $attributes = array_merge([
-            'id'              => $this->getId(),
-            'name'            => $this->getName(!$this->isSubField()),
-            'class'           => $this->classList(),
-            'disabled'        => $this->disabled,
-            'aria-disabled'   => $this->disabled ? 'true' : 'false',
-            'required'        => $this->required,
-            'aria-required'   => $this->required ? 'true' : 'false',
-            'data-field-type' => $this->handle
-        ], $this->attributes, $this->getRuleAttributes());
+    public function toJson(bool $asString = false, string ...$flags): array|string {
+        $json = [
+            'type'             => static::class,
+            'handle'           => $this->handle,
+            'properties'       => [
+                'type'             => $this->handle,
+                'id'               => $this->getId(),
+                'name'             => $this->getName(),
+                'label'            => $this->getLabel(),
+                'helpText'         => $this->getHelpText(),
+                'attributes'       => $this->attributes,
+                'supports'         => $this->supports,
+                'classList'        => $this->classList,
+                'default'          => $this->default,
+                'required'         => $this->isRequired(),
+                'mustBeRequired'   => $this->mustBeRequired,
+                'disabled'         => $this->isDisabled(),
+                'hasRules'         => $this->hasRules(),
+                'rules'            => $this->getRules(),
+                'conditions'       => $this->getConditions(),
+                'isInputType'      => is_subclass_of($this, Input::class),
+                'isChoiceType'     => is_subclass_of($this, Choice::class),
+                'isMultiSelect'    => array_key_exists('multiple', $this->attributes),
+                'formId'           => $this->formId,
+                'isInRepeater'     => $this->isInRepeater(),
+                'hideInRepeater'   => $this->attributes['data-hide-in-repeater-table'] ?? false,
+                'isInGroup'        => $this->isInGroup(),
+                'groupId'          => $this->groupId,
+                'repeaterId'       => $this->repeaterId,
+                'rowIndex'         => $this->rowIndex,
+                'rowPosition'      => $this->rowPosition,
+                'component'        => $this->getFieldComponent(),
+            ]
+        ];
 
-        $rendered = [];
-
-        foreach ($attributes as $key => $value) {
-            if (in_array($key, $exclude, true)) {
-                continue;
-            }
-
-            if (is_null($value) || $value === '' || $value === false) {
-                continue;
-            }
-
-            if (is_bool($value)) {
-                if ($value) {
-                    $rendered[] = $key;
-                }
-                continue;
-            }
-
-            $rendered[] = sprintf(
-                '%s="%s"',
-                $key,
-                htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8')
-            );
+        if ($asString) {
+            return json_encode($json, ...$flags);
         }
 
-        return implode(' ', $rendered);
+        return $json;
     }
 
-    /**
-     * Retrieves the field's variation, which is determined by the 'type' attribute if it exists.
-     *
-     * @return string|null
-     */
-    public function getVariation(): ?string {
-        if (array_key_exists('type', $this->attributes)) {
-            return $this->attributes['type'];
-        }
-
-        return null;
-    }
+    // =========================================================================
+    // Helpers
+    // =========================================================================
 
     /**
      * Checks if the field is compatible with a given data type.
@@ -1194,26 +1733,15 @@ abstract class Field extends FeatureDefinition {
     }
 
     /**
-     * Retrieves the category this field belongs to.
+     * Checks if the field supports a given feature.
      *
-     * @return string
-     */
-    public static function getCategory(): string {
-        return static::$category;
-    }
-
-    /**
-     * Retrieves the icon for this field.
+     * @param string $feature The feature to check (e.g., 'multiple', 'advanced').
      *
-     * @return string
+     * @return bool True if the feature is supported, false otherwise.
      */
-    public static function getIcon(): string {
-        return static::$icon;
+    protected function supports(string $feature): bool {
+        return in_array($feature, $this->supports);
     }
-
-    // =========================================================================
-    // Helpers
-    // =========================================================================
 
     /**
      * Magic method to handle dynamic method calls for chaining, such as setting the section on the associated SettingsField.

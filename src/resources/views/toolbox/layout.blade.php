@@ -7,15 +7,10 @@
     @viteAssets('framework')
     @livewireStyles
 </head>
-<body x-data="{ currentTab: '{{ strtolower($navItems[0]) }}' }">
-    @include('meros::toolbox.partials.header')
-    <main>
-        {{ $slot }}
-    </main>
-
+<body>
+    {{ $slot }}
     <footer>
-        <!-- Footer content -->
+        @livewireScripts
     </footer>
-    @livewireScripts
 </body>
 </html>

@@ -3,8 +3,11 @@
 namespace MM\Meros\Services\Contracts\Forms;
 
 use Closure;
+use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use Livewire\Wireable;
 
+use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\Services\Contracts\FeatureDefinition;
 
 use MM\Meros\Services\Contracts\Forms\Field;
@@ -13,8 +16,10 @@ use MM\Meros\Services\Contracts\Forms\FieldGroup;
 use MM\Meros\Facades\Fields as FieldsRegister;
 use MM\Meros\Facades\FieldGroups as FieldGroupsRegister;
 
-class FormRow extends FeatureDefinition {
-    
+use MM\Meros\App\Fields\Repeater;
+use MM\Meros\Facades\Framework;
+
+class FormRow extends FeatureDefinition implements Wireable {
     /**
      * Required for FormRows register but not used.
      *
@@ -23,34 +28,111 @@ class FormRow extends FeatureDefinition {
     public string $handle = '';
 
     /**
+     * The type of form row, either 'fields' for a row containing individual 
+     * fields or 'group' for a row containing a child field group.
+     *
+     * @var string
+     */
+    public string $type = '';
+
+    /**
      * The fields that belong to this form row.
      *
-     * @var array<Field>
+     * @var array<Field|array>
      */
-    protected array $fields = [];
+    public array $fields = [];
 
     /**
      * The field group this row belongs to, if any.
      *
      * @var FieldGroup|null
      */
-    protected ?FieldGroup $parentGroup = null;
+    public ?FieldGroup $parentGroup = null;
+
+    /**
+     * The ID of the parent group this row belongs to, if any.
+     *
+     * @var string|null
+     */
+    public ?string $parentGroupId = null;
 
     /**
      * The child field group that belongs to this row, if any.
      *
-     * @var FieldGroup|null
+     * @var FieldGroup|array|null
      */
-    protected ?FieldGroup $childGroup = null;
+    public FieldGroup|array|null $group = null;
+
+    /**
+     * The ID of the child group that belongs to this row, if any.
+     *
+     * @var string|null
+     */
+    public ?string $groupId = null;
+
+    /**
+     * The index of this row within its parent group or form, if any.
+     *
+     * @var int|null
+     */
+    public ?int $index = null;
 
     /***************************
      * Feature Contract Methods
      ***************************/
 
+    final public function __construct(
+        FeatureProvider $provider,
+        array           $props = []
+    ) {
+        parent::__construct($provider, $props);
+
+        if (is_array($this->group)) {
+            $this->instantiateGroup();
+        }
+
+        if (!empty($this->fields)) {
+            $this->instantiateFields();
+        }
+    }
+
     protected function queue(): void {
         // Form rows don't use the queue method.
     }
 
+    /**
+     * Converts the form row instanceinto a format suitable for Livewire rendering.
+     *
+     * @return array
+     */
+    public function toLivewire(): array {
+        return $this->toJson();
+    }
+
+    /**
+     * Reconstructs a form row instance from Livewire data.
+     *
+     * @param array $data
+     *
+     * @return self
+     */
+    public static function fromLivewire($data): self {
+        return new static(
+            Framework::get(),
+            $data
+        );
+    }
+
+    /**
+     * Alias for fromLivewire() to initialize a form row instance from an array of data.
+     *
+     * @param array $data
+     *
+     * @return self
+     */
+    public static function initFromData(array $data): self {
+        return self::fromLivewire($data);
+    }
 
     /***************************
      * Public Chainable methods
@@ -100,9 +182,17 @@ class FormRow extends FeatureDefinition {
             array_slice($this->fields, $position)
         );
 
-        $field->position($position);
-        $field->row($this);
+        $rowIndex = $props['rowIndex'] ?? $this->index;
 
+        $field->row($this, $rowIndex, $position);
+        $field->group($this->parentGroup, $this->parentGroupId);
+
+        foreach ($this->fields as $index => $_field) {
+            $_field->row($this, $rowIndex, $index);
+            $_field->group($this->parentGroup, $this->parentGroupId);
+        }
+
+        $this->type = 'fields';
         return $field;
     }
 
@@ -142,18 +232,200 @@ class FormRow extends FeatureDefinition {
                 ->makeFrom($group, $callback, $props);
         }
 
-        else {
-            $group = FieldGroupsRegister::checkout($this->provider)
-                ->attach($group);
+        $this->group = $group;
+        $this->groupId = $group->id;
+
+        $group->parentRow($this, $this->index);
+
+        $this->type = 'group';
+        return $group;
+    }
+
+    /**
+     * Sets the parent group for this form row.
+     *
+     * @param FieldGroup|null $group   The parent field group this row belongs to, or null to detach from any group.
+     * @param string|null     $groupId Optional ID of the parent group for reference. Not required if $group is provided.
+     */
+    public function parentGroup(?FieldGroup $group = null, ?string $groupId = null): void {
+        $this->parentGroup = $group;
+        $this->parentGroupId = $groupId;
+
+        foreach ($this->fields as $field) {
+            $field->group($group, $groupId);
+        }
+    }
+
+    /**
+     * Moves a field within the row from one position to another.
+     *
+     * @param string  $fieldId
+     * @param integer $toPosition
+     *
+     * @return void
+     */
+    public function moveField(string $fieldId, int $toPosition): void {
+        $fieldIndex = collect($this->fields)->search(fn($field) => $field->id === $fieldId);
+
+        if ($fieldIndex === false) {
+            return; // Field not found in this row
         }
 
-        $this->childGroup = $group;
-        return $group;
+        $field = $this->fields[$fieldIndex];
+        array_splice($this->fields, $fieldIndex, 1); // Remove the field from its current position
+        array_splice($this->fields, $toPosition, 0, [$field]); // Insert the field at the new position
+
+        foreach ($this->fields as $index => $field) {
+            $field->row($this, $this->index, $index);
+            $field->group($this->parentGroup, $this->parentGroupId);
+        }
+    }
+
+    /**
+     * Removes an element from the row by its ID.
+     *
+     * @param string $elementId
+     *
+     * @return Field|FieldGroup|null
+     */
+    public function removeElement(string $elementId): Field|FieldGroup|null {
+        $removedElement = Str::startsWith($elementId, 'field-group-')
+            ? $this->getGroup()
+            : $this->getField($elementId);
+
+        if ($removedElement === null) {
+            return null; // Element not found in this row
+        }
+
+        if ($this->group !== null && $this->group->id === $elementId) {
+            $this->group = null; // Remove the group from the row
+            $this->groupId = null;
+            $this->type = empty($this->fields) ? '' : 'fields';
+            $removedElement->parentRow(null, null); // Detach the group from the row
+            return $removedElement;
+        }
+
+        $fieldIndex = collect($this->fields)->search(fn($field) => $field->id === $elementId);
+
+        if ($fieldIndex === false) {
+            return null; // Field not found in this row
+        }
+
+        array_splice($this->fields, $fieldIndex, 1); // Remove the field from the row
+        $removedElement->row(null, null, null); // Detach the field from the row
+        $removedElement->group(null, null); // Detach group context from the removed field
+
+        foreach ($this->fields as $index => $remainingField) {
+            $remainingField->row($this, $this->index, $index);
+            $remainingField->group($this->parentGroup, $this->parentGroupId);
+        }
+
+        if (empty($this->fields) && $this->group === null) {
+            $this->type = '';
+        }
+
+        return $removedElement;
+    }
+
+    /**
+     * Updates the index of the row and notifies all child fields and the child group, if any, of the change.
+     *
+     * @param int $newIndex The new index of the row.
+     *
+     * @return void
+     */
+    public function updateIndex(int $newIndex): void {
+        $this->index = $newIndex;
+
+        foreach ($this->fields as $index => $field) {
+            $field->row($this, $newIndex, $index);
+            $field->group($this->parentGroup, $this->parentGroupId);
+        }
+
+        if ($this->group !== null) {
+            $this->group->parentRow($this, $newIndex);
+        }
+    }
+
+    /**
+     * Updates the positions of multiple fields within the row based on an associative array of field IDs and new positions.
+     *
+     * @param array $fieldPositions An associative array where keys are field IDs and values are the new positions.
+     *
+     * @return void
+     */
+    public function updateFieldPositions(array $fieldPositions): void {
+        foreach ($fieldPositions as $fieldId => $newPosition) {
+            $this->moveField($fieldId, $newPosition);
+        }
     }
 
     /***************************
      * Helpers
      ***************************/
+
+    /**
+     * Returns the number of elements contained in this row, 
+     * which may be either individual fields or a child field group.
+     *
+     * @return int
+     */
+    public function getElementCount(): int {
+        if ($this->group !== null) {
+            return 1;
+        }
+
+        return count($this->fields);
+    }
+
+    /**
+     * Instantiates any fields in the row that are provided as an array.
+     *
+     * @return void
+     */
+    protected function instantiateFields(): void {
+        if (empty($this->fields)) {
+            return;
+        }
+
+        foreach ($this->fields as $index => $fieldData) {
+            if ($fieldData instanceof Field) {
+                continue;
+            }
+
+            if (!is_array($fieldData) || !isset($fieldData['type'])) {
+                continue; // Skip invalid field data
+            }
+
+            if ($fieldData['type'] === Repeater::class) {
+                $fieldData['properties']['fields'] = $fieldData['fields'] ?? [];
+            }
+
+            $field = $fieldData['type']::initFromData($fieldData);
+
+            $field->row($this, $this->index, $index);
+            $field->group($this->parentGroup, $this->parentGroupId);
+
+            $this->fields[$index] = $field;
+        }
+    }
+
+    /**
+     * Instantiates the child group if it is provided as an array.
+     *
+     * @return void
+     */
+    protected function instantiateGroup(): void {
+        if ($this->group === null || $this->group instanceof FieldGroup) {
+            return;
+        }
+
+        $group = FieldGroup::initFromData($this->group);
+
+        $group->parentRow($this, $this->index);
+
+        $this->group = $group;
+    }
 
     /**
      * Returns whether the row has capacity for more elements.
@@ -162,7 +434,7 @@ class FormRow extends FeatureDefinition {
      * @return bool
      */
     public function hasCapacity(): bool {
-        if ($this->childGroup !== null) {
+        if ($this->group !== null) {
             return false;
         }
 
@@ -184,8 +456,8 @@ class FormRow extends FeatureDefinition {
     public function getFields(bool $asArray = false): Collection|array {
         $fields = collect($this->fields);
 
-        if ($this->childGroup !== null) {
-            $childFields = $this->childGroup->getFields();
+        if ($this->group !== null) {
+            $childFields = $this->group->getFields();
 
             if ($asArray) {
                 return array_merge($fields->toArray(), $childFields->toArray());
@@ -198,36 +470,64 @@ class FormRow extends FeatureDefinition {
     }
 
     /**
+     * Returns a specific field by its ID if it belongs to this row or its child group.
+     *
+     * @param string $fieldId The ID of the field to retrieve.
+     *
+     * @return Field|null The field with the specified ID, or null if not found.
+     */
+    public function getField(string $fieldId): ?Field {
+        return $this->getFields()->firstWhere('id', $fieldId);
+    }
+
+    /**
      * Returns the elements contained in this row, which may be either individual fields or a child field group.
      *
      * @param bool $asArray Whether to return the fields as an array or a collection. Ignored if the row contains a child group.
      *
      * @return FieldGroup|Collection|array
      */
-    public function getForms(bool $asArray = false): FieldGroup|Collection|array {
-        if ($this->childGroup !== null) {
-            return $this->childGroup;
+    public function getElements(bool $asArray = false): FieldGroup|Collection|array {
+        if ($this->group !== null) {
+            return $this->group;
         }
 
         return $this->getFields($asArray);
     }
 
-    
     /**
      * Returns the child field group attached to this row, if any.
      *
      * @return FieldGroup|null
      */
-    public function getChildGroup(): ?FieldGroup {
-        return $this->childGroup;
+    public function getGroup(): ?FieldGroup {
+        return $this->group;
     }
 
-    public function toJson(bool $asString = false, string ...$flags): array|string {
-        $json = [];
+    /**
+     * Returns the ID of the child field group attached to this row, if any.
+     *
+     * @return string|null
+     */
+    public function getGroupId(): ?string {
+        return $this->groupId;
+    }
 
-        if ($this->childGroup !== null) {
-            $json['type']  = 'group';
-            $json['group'] = $this->childGroup->toJson($asString, ...$flags);
+    /**
+     * Converts the form row instance into a JSON-serializable array or JSON string.
+     *
+     * @param boolean $asString
+     * @param string  ...$flags
+     *
+     * @return array|string
+     */
+    public function toJson(bool $asString = false, string ...$flags): array|string {
+        $json = ['index' => $this->index];
+
+        if ($this->group !== null) {
+            $json['type']    = 'group';
+            $json['groupId'] = $this->groupId;
+            $json['group']   = $this->group->toJson($asString, ...$flags);
         }
 
         else {

@@ -1,13 +1,15 @@
 @php
-    $isSubField = $field->isSubField();
+    $isSubField = $field->isInRepeater();
     $name = $field->getName(!$isSubField);
 @endphp
 
 <input type="hidden" name="{{ $name }}" value="0">
 
-<input 
+<input
+    id="{{ $id }}"
+    name="{{ $name }}"
     type="checkbox"
-    {!! $field->attributes() !!}
     value="1"
+    {!! $attributes !!}
     {{ $field->getValue() ? 'checked' : '' }}
 >
