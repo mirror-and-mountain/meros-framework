@@ -704,7 +704,7 @@ class PostType extends FeatureDefinition {
      */
     public function allowedBlocks(array $blocks): self {
         add_filter('allowed_block_types_all', function ($allowedBlocks, $editorContext) use ($blocks) {
-            if ($editorContext->post->post_type === $this->handle) {
+            if ($editorContext->post !== null && $editorContext->post->post_type === $this->handle) {
                 return $blocks;
             }
 
