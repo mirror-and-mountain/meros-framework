@@ -82,6 +82,15 @@ class FrameworkServiceProvider extends ServiceProvider {
             classPath: $framework->getPath('app/Toolbox'),
             classViewPath: $framework->getPath('resources/views/toolbox')
         );
+
+        // Hook Livewire into WP header and footer
+        add_action('wp_head', function () {
+            echo Blade::render('@livewireStyles');
+        });
+
+        add_action('wp_footer', function () {
+            echo Blade::render('@livewireScripts');
+        });
         
         // Load views from the framework's views directory
         $this->registerViews($framework, 'meros');
