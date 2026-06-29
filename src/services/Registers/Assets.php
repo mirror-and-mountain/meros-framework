@@ -152,7 +152,7 @@ class Assets extends Register implements Discovery {
 
             if ($location !== 'admin' && $groupLabel !== '') {
                 $groupName     = $baseName . $group;
-                $groupInstance = AssetGroups::all(false)->firstWhere('name', $groupName);
+                $groupInstance = AssetGroups::all(null)->firstWhere('name', $groupName);
 
                 if (!$groupInstance) {
                     $groupInstance = AssetGroups::checkout($this->provider)
