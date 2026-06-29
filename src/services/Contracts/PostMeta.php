@@ -17,8 +17,6 @@ use MM\Meros\Services\Concerns\IsDataRegistrant;
 use MM\Meros\Facades\Context;
 use MM\Meros\Facades\FieldGroups;
 
-use Illuminate\Support\Facades\Log;
-
 class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRegistrant {
 
     /**
@@ -124,7 +122,7 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
      * @return void
      */
     final public function queueFromPostType(PostType $postType): void {
-        if ($this->isRoot() && !$this->queued) {
+        if (!$this->isRoot() && !$this->queued) {
             $this->postType = $postType->handle;
 
             register_post_meta(
