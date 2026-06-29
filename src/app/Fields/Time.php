@@ -18,5 +18,9 @@ class Time extends Input {
 
         $this->inputType('time');
         $this->addSupport('icon');
+        
+        if ($this->showsIcon === null) {
+            $this->showIcon(true, $this->iconPosition ?? 'left');
+        }
     }
 }

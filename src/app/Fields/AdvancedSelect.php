@@ -9,6 +9,7 @@ class AdvancedSelect extends Select {
      * @return void
      */
     protected function initialise(): void {
+        parent::initialise();
         $this->handle = 'advanced_select';
         $this->compatibleDataTypes = ['string'];
 

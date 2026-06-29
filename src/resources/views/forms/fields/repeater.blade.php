@@ -1,13 +1,30 @@
-<div 
-    x-data="merosRepeaterField('{{ $id }}')"
+<fieldset 
+    x-data="merosRepeaterField('{{ $id }}', '{{ $placeholder }}', {{ $fieldCount }}, {{ $serialisedRules }})"
     id="{{ $id }}" 
-    class="{{ $classList }} meros-repeater" 
+    class="meros-repeater meros-repeater-field" 
     data-field-type="repeater" 
     data-repeater-name="{{ str_replace(['-'], '_', $id) }}"
-    aria-labelledby="{{ $id }}-label"
-    data-rule-maxitems="{{ $maxRows ?? '-1' }}"
-    data-rule-minitems="{{ $minRows ?? '-1' }}"
+    data-rule-max-items="{{ $maxRows ?? '-1' }}"
+    data-rule-min-items="{{ $minRows ?? '-1' }}"
 >
+    {{-- Legend --}}
+    @if($label !== false)
+        <legend 
+            id="{{ $id }}-label"
+            class="form-label"
+        >
+            {{ $label }}
+            @if($isRequired)
+                <span class="required-indicator">*</span>
+            @endif
+        </legend>
+    @endif
+
+    {{-- Help Text --}}
+    @if($helpText !== false && !empty($helpText))
+        <small class="description">{{ $helpText }}</small>
+    @endif
+
     {{-- Repeater row configuration dialog --}}
     <template x-teleport="body">
         <dialog
@@ -90,7 +107,7 @@
                         @endphp
 
                         <th
-                            class="meros-repeater-data-header meros-repeater-head-cell {{ $isHiddenInTable ? 'meros-repeater-data-header--hidden' : '' }}"
+                            class="meros-repeater-data-header meros-repeater-head-cell meros-repeater-field-header {{ $isHiddenInTable ? 'meros-repeater-data-header--hidden' : '' }}"
                             @if($isHiddenInTable) aria-hidden="true" @endif
                         >
                             {{ $fieldLabels[$fieldIndex] ?? $fieldName }}
@@ -167,7 +184,7 @@
                                         @endif
                                         class="meros-repeater-button meros-repeater-button--configure meros-repeater-button--neutral"
                                         title="{{ $configureRowText }}"
-                                        :disabled="isOpeningRowDialog || isUpdatingRowDialog"
+                                        :disabled="(typeof isOpeningRowDialog !== 'undefined' && isOpeningRowDialog) || (typeof isUpdatingRowDialog !== 'undefined' && isUpdatingRowDialog)"
                                         @click.stop="openRowDialog($event, @js($customConfigurationDialogs))"
                                     >
                                         <span class="configure-row-text" x-text="'{{ $configureRowText }}'"></span>
@@ -256,7 +273,7 @@
                                     @endif
                                     class="meros-repeater-button meros-repeater-button--configure meros-repeater-button--neutral"
                                     title="{{ $configureRowText }}"
-                                    :disabled="isOpeningRowDialog || isUpdatingRowDialog"
+                                    :disabled="(typeof isOpeningRowDialog !== 'undefined' && isOpeningRowDialog) || (typeof isUpdatingRowDialog !== 'undefined' && isUpdatingRowDialog)"
                                     @click.stop="openRowDialog($event, @js($customConfigurationDialogs))"
                                 >
                                     <span class="configure-row-text" x-text="'{{ $configureRowText }}'"></span>
@@ -284,12 +301,14 @@
         @if($allowsAdd)
             <button
                 type="button"
-                @click.stop="addRow"
-                class="meros-repeater-button meros-repeater-button--neutral"
+                @click.stop="addRow(isEditor ?? false)"
+                class="meros-repeater-button meros-repeater-button--neutral meros-repeater-button--add"
                 title="{{ $addRowText }}"
+                :disabled="!canAddRows && !(typeof isRepeaterEditorOpen !== 'undefined' ? isRepeaterEditorOpen : false) === true"
+                :aria-disabled="!canAddRows && !(typeof isRepeaterEditorOpen !== 'undefined' ? isRepeaterEditorOpen : false) === true"
             >
                 {{ $addRowText }}
             </button>
         @endif
     </div>
-</div>
+</fieldset>

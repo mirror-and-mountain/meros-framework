@@ -18,6 +18,10 @@
     gap: calc(var(--nf-input-size) * 0.25);
 }
 
+.nice-form-group.invalid .ts-wrapper .ts-control {
+    border-bottom-color: var(--nf-invalid-input-border-bottom-color, red) !important;
+}
+
 .nice-form-group .ts-wrapper.focus .ts-control,
 .nice-form-group .ts-wrapper.focus .ts-control:focus-within {
     border-color: var(--nf-input-focus-border-color) !important;

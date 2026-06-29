@@ -138,6 +138,27 @@ class Builder extends Component {
      */
     public ?string $activeRepeaterId = null;
 
+    /**
+     * Return-screen targets keyed by screen name.
+     *
+     * @var array<string,string>
+     */
+    public array $screenReturnTargets = [];
+
+    /**
+     * Version counter used to force remounting the repeater editor subtree.
+     *
+     * @var int
+     */
+    public int $repeaterEditorVersion = 0;
+
+    /**
+     * Version counter used to force remounting field-settings subtrees.
+     *
+     * @var int
+     */
+    public int $fieldSettingsVersion = 0;
+
     public function mount(string|int|null $formID = null) {
         $this->initialiseFieldTypes();
         $this->initialiseFieldGroups();
@@ -638,7 +659,6 @@ class Builder extends Component {
         }
 
         $this->reHydrateScreen();
-        // dd($this->activeField->toJson()['properties'] ?? null);
         return $this->activeField->toJson()['properties'] ?? null;
     }
 
@@ -658,18 +678,18 @@ class Builder extends Component {
      *
      * @param string      $property
      * @param mixed       $value
-     * @param integer     $rowIndex
+     * @param int|null    $rowIndex
      * @param string|null $groupId
      *
      * @return void
      */
     #[Renderless]
-    public function updateActiveFieldProperty(string $property, mixed $value, int $rowIndex, ?string $groupId = null): void {
+    public function updateActiveFieldProperty(string $property, mixed $value, ?int $rowIndex = null, ?string $groupId = null): void {
         if ($this->activeField === null) {
             return;
         }
 
-        $canonicalField = $this->getField($this->activeFieldId, $rowIndex, $groupId);
+        $canonicalField = $this->resolveActiveField();
 
         if ($canonicalField === null) {
             return;
@@ -690,7 +710,8 @@ class Builder extends Component {
                 }
 
                 $this->activeField = $canonicalField;
-                $this->dispatch('mforms:refresh-field-settings');
+                $this->syncRepeaterEditorAfterActiveFieldUpdate();
+                $this->dispatchFieldSettingsUpdated();
                 return;
             }
         }
@@ -702,7 +723,8 @@ class Builder extends Component {
             if ($rule !== null) {
                 $canonicalField->rule($rule, $value);
                 $this->activeField = $canonicalField;
-                $this->dispatch('mforms:refresh-field-settings');
+                $this->syncRepeaterEditorAfterActiveFieldUpdate();
+                $this->dispatchFieldSettingsUpdated();
                 return;
             }
         }
@@ -711,7 +733,8 @@ class Builder extends Component {
             $canonicalField->rules(Arr::keyBy($value, 'rule'));
             
             $this->activeField = $canonicalField;
-            $this->dispatch('mforms:refresh-field-settings');
+            $this->syncRepeaterEditorAfterActiveFieldUpdate();
+            $this->dispatchFieldSettingsUpdated();
             return;
         }
 
@@ -727,7 +750,38 @@ class Builder extends Component {
         }
 
         $this->activeField = $canonicalField;
+        $this->syncRepeaterEditorAfterActiveFieldUpdate();
+        $this->dispatchFieldSettingsUpdated();
+    }
+
+    /**
+     * Dispatches field-settings update events used by Alpine to resync UI state,
+     * and increments a version counter used by keyed controls.
+     *
+     * @return void
+     */
+    private function dispatchFieldSettingsUpdated(): void {
+        $this->fieldSettingsVersion++;
         $this->dispatch('mforms:refresh-field-settings');
+    }
+
+    /**
+     * Triggers repeater-editor refresh when updating a repeater subfield.
+     *
+     * @return void
+     */
+    private function syncRepeaterEditorAfterActiveFieldUpdate(): void {
+        if (!$this->hasActiveRepeaterContext()) {
+            return;
+        }
+
+        $repeater = $this->resolveEditingRepeater();
+
+        if ($repeater !== null) {
+            $this->activeRepeater = $repeater;
+        }
+
+        $this->dispatchRepeaterEditorUpdated();
     }
 
     // =========================================================================
@@ -848,7 +902,7 @@ class Builder extends Component {
      * @return Field|null
      */
     private function getField(string $fieldId, int $rowIndex, ?string $groupId = null): ?Field {
-        if ($this->screen === 'canvas-repeater-editor') {
+        if ($this->isRepeaterEditorScreen()) {
             $repeater = $this->resolveEditingRepeater();
 
             if ($repeater === null) {
@@ -872,6 +926,51 @@ class Builder extends Component {
         }
 
         return $row->getField($fieldId);
+    }
+
+    /**
+     * Retrieves all field instances from the form schema as a collection or an array.
+     * 
+     * @param bool  $skipRepeaterFields Whether to skip fields that are part of a repeater when retrieving all fields.
+     * @param bool  $asArray            Whether to return the fields as an array (true) or a collection (false).
+     * @param array $pluckKeys          Optional array of property keys to pluck from each field's properties when returning as an array.
+     *
+     * @return Collection|array
+     */
+    #[Renderless]
+    public function getFields(bool $skipRepeaterFields = false, bool $asArray = false,  array $pluckKeys = []): Collection|array {
+        $fields = collect($this->rows)
+            ->filter(fn($row) => $row instanceof FormRow)
+            ->flatMap(function (FormRow $row) use ($skipRepeaterFields) {
+                $fields = $row->getFields();
+
+                if (!$skipRepeaterFields) {
+                    $fields = $fields->map(function (Field $field) {
+                        if ($field instanceof Repeater) {
+                            return $field->getFields();
+                        }
+                        return $field;
+                    })->flatten();
+                }
+
+                return $fields;
+            });
+
+        if ($asArray && empty($pluckKeys)) {
+            $fields = $fields->map(function (Field $field) {
+                return array_merge(['handle' => $field->handle], $field->toJson()['properties'] ?? []);
+            });
+        } 
+        
+        else if ($asArray && !empty($pluckKeys)) {
+            $fields = $fields->map(function (Field $field) use ($pluckKeys) {
+                $properties = $field->toJson()['properties'] ?? [];
+                $pluckedProperties = Arr::only($properties, $pluckKeys);
+                return array_merge(['handle' => $field->handle], $pluckedProperties);
+            });
+        }
+
+        return $asArray ? $fields->toArray() : $fields;
     }
 
     /**
@@ -899,13 +998,312 @@ class Builder extends Component {
      * @return void
      */
     private function reHydrateScreen(): void {
-        if ($this->screen === 'canvas-repeater-editor') {
+        if ($this->isRepeaterEditorScreen()) {
             $this->resolveEditingRepeater();
         }
     }
 
+
+    /**
+     * Resolves the currently active field instance.
+     *
+     * @return Field|null
+     */
+    private function resolveActiveField(): ?Field {
+        $resolvedField = $this->resolveActiveEntity(
+            $this->activeFieldId,
+            $this->activeField,
+            function(string $fieldId): ?Field {
+                if ($this->hasActiveRepeaterContext()) {
+                    $repeater = $this->resolveEditingRepeater();
+
+                    if ($repeater !== null) {
+                        $repeaterField = $repeater->getFields()->where('id', $fieldId)->first();
+
+                        if ($repeaterField instanceof Field) {
+                            return $repeaterField;
+                        }
+                    }
+                }
+
+                return $this->getFieldFromRowsById($fieldId);
+            }
+        );
+
+        if ($resolvedField instanceof Field) {
+            $this->activeField = $resolvedField;
+            return $resolvedField;
+        }
+
+        return null;
+    }
+
     public function dumpRows(): void {
         dd($this->rows);
+    }
+
+    // =========================================================================
+    // Screen Management
+    // =========================================================================
+
+    /**
+     * Changes the current screen and optionally records a return target.
+     *
+     * @param string      $screen
+     * @param string|null $returnScreen
+     *
+     * @return void
+     */
+    private function changeScreen(string $screen, ?string $returnScreen = null): void {
+        if ($returnScreen !== null && trim($returnScreen) !== '') {
+            $this->screenReturnTargets[$screen] = $returnScreen;
+        }
+
+        $this->screen = $screen;
+    }
+
+    /**
+     * Resolves and consumes the return-screen target for a given screen.
+     *
+     * @param string $screen
+     * @param string $default
+     *
+     * @return string
+     */
+    private function resolveReturnScreen(string $screen, string $default = 'canvas-main'): string {
+        $returnScreen = $this->screenReturnTargets[$screen] ?? $default;
+        unset($this->screenReturnTargets[$screen]);
+
+        return $returnScreen;
+    }
+
+    /**
+     * Resolves an active entity by ID from canonical source, with current-entity fallback.
+     *
+     * @param string|null $activeId
+     * @param mixed       $currentEntity
+     * @param callable    $canonicalResolver
+     *
+     * @return mixed
+     */
+    private function resolveActiveEntity(?string $activeId, mixed $currentEntity, callable $canonicalResolver): mixed {
+        if ($activeId === null || $activeId === '') {
+            return null;
+        }
+
+        $canonicalEntity = $canonicalResolver($activeId);
+
+        if ($canonicalEntity !== null) {
+            return $canonicalEntity;
+        }
+
+        if (
+            $currentEntity !== null
+            && method_exists($currentEntity, 'getId')
+            && $currentEntity->getId() === $activeId
+        ) {
+            return $currentEntity;
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns true when the builder is currently in repeater editor mode.
+     *
+     * @return bool
+     */
+    private function isRepeaterEditorScreen(): bool {
+        return $this->screen === 'canvas-repeater-editor';
+    }
+
+    /**
+     * Returns true when a repeater is currently active in builder context.
+     *
+     * @return bool
+     */
+    private function hasActiveRepeaterContext(): bool {
+        return $this->activeRepeaterId !== null && $this->activeRepeaterId !== '';
+    }
+
+    /**
+     * Resolves a field by ID from top-level rows.
+     *
+     * @param string $fieldId
+     *
+     * @return Field|null
+     */
+    private function getFieldFromRowsById(string $fieldId): ?Field {
+        return collect($this->rows)
+            ->filter(fn($row) => $row instanceof FormRow)
+            ->map(fn(FormRow $row) => $row->getField($fieldId))
+            ->filter(fn($field) => $field !== null)
+            ->first();
+    }
+
+    // =========================================================================
+    // Rules Editor Management
+    // =========================================================================
+
+    public function openRulesEditor(): void {
+        $activeField = $this->resolveActiveField();
+
+        if ($activeField === null) {
+            return;
+        }
+
+        $this->changeScreen('canvas-rules-editor', $this->screen);
+        $this->dispatch('mforms:hide-field-settings');
+    }
+
+    /**
+     * Closes the rules editor screen.
+     *
+     * @return void
+     */
+    public function closeRulesEditor(): void {
+        $returnScreen = $this->resolveReturnScreen('canvas-rules-editor', 'canvas-main');
+
+        if ($returnScreen === 'canvas-repeater-editor' && $this->activeRepeaterId) {
+            $this->changeScreen('canvas-repeater-editor');
+            $this->resolveEditingRepeater();
+            $this->dispatchRepeaterEditorUpdated();
+        } else {
+            $this->changeScreen('canvas-main');
+        }
+        $this->dispatch('mforms:unhide-field-settings');
+    }
+
+    // =========================================================================
+    // Choice / Options Editor Management
+    // =========================================================================
+
+    /**
+     * Opens the options editor for the currently active field, if it supports options.
+     *
+     * @return void
+     */
+    public function openOptionsEditor(): void {
+        $activeField = $this->resolveActiveField();
+
+        if ($activeField === null) {
+            return;
+        }
+
+        $this->changeScreen('canvas-options-editor', $this->screen);
+        $this->dispatch('mforms:hide-field-settings');
+    }
+
+    /**
+     * Gets the HTML for the options repeater field for the currently active choice field.
+     *
+     * @return string
+     */
+    #[Renderless]
+    public function getOptionsRepeaterFieldHtml(): string {
+        if ($this->activeField === null) {
+            return '';
+        }
+
+        $currentOptions = $this->activeField->getOptions();
+        $repeaterValue = [];
+
+        foreach ($currentOptions as $value => $label) {
+            $repeaterValue[] = [
+                'option_value' => $value,
+                'option_label' => $label,
+            ];
+        }
+
+        $repeater = Fields::checkout(Framework::get())->makeFrom('repeater', [
+            'id'             => 'field-options-editor',
+            'name'           => 'field_options_editor',
+            'label'          => 'Options',
+            'allowConfigure' => false,
+            'addRowText'     => 'Add Option'
+        ]);
+
+        $repeater->field('text', [
+            'id'    => 'option_value',
+            'name'  => 'option_value',
+            'label' => 'Value',
+        ]);
+
+        $repeater->field('text', [
+            'id'    => 'option_label',
+            'name'  => 'option_label',
+            'label' => 'Label',
+        ]);
+
+        $repeater->default($repeaterValue);
+        $this->dispatch('mforms:form-canvas-updated');   
+        return $repeater->html(true, ['label' => false]);
+    }
+
+    /**
+     * Updates the options for the currently active field.
+     *
+     * @param array $options
+     * @return void
+     */
+    public function updateFieldOptions(array $options): void {
+        $activeField = $this->resolveActiveField();
+
+        if ($activeField === null) {
+            return;
+        }
+
+        $formattedOptions = [];
+
+        foreach ($options as $option) {
+            if (!isset($option['option_value']) || !isset($option['option_label'])) {
+                continue;
+            }
+
+            $valueRaw = trim((string) $option['option_value']);
+            $label = trim((string) $option['option_label']);
+            $value = Str::snake($valueRaw !== '' ? $valueRaw : $label);
+
+            if ($value === '') {
+                continue;
+            }
+
+            if (array_key_exists($value, $formattedOptions)) {
+                continue;
+            }
+
+            $formattedOptions[$value] = $label !== ''
+                ? $label
+                : Str::title(str_replace(['-', '_'], ' ', $value));
+        }
+
+        if (method_exists($activeField, 'setOptions')) {
+            $activeField->setOptions($formattedOptions);
+        }
+
+        $this->activeField = $activeField;
+        $this->syncRepeaterEditorAfterActiveFieldUpdate();
+        $this->dispatchFieldSettingsUpdated();
+        $this->closeOptionsEditor();
+    }
+
+    /**
+     * Closes the options editor screen.
+     *
+     * @return void
+     */
+    private function closeOptionsEditor(): void {
+        $returnScreen = $this->resolveReturnScreen('canvas-options-editor', 'canvas-main');
+
+        if ($returnScreen === 'canvas-repeater-editor' && $this->activeRepeaterId) {
+            $this->changeScreen('canvas-repeater-editor');
+            $this->resolveEditingRepeater();
+            $this->dispatchRepeaterEditorUpdated();
+        } else {
+            $this->changeScreen('canvas-main');
+        }
+        
+        $this->dispatch('mforms:unhide-field-settings');
     }
 
     // =========================================================================
@@ -930,7 +1328,8 @@ class Builder extends Component {
 
         $this->activeRepeater = $field;
         $this->activeRepeaterId = $fieldId;
-        $this->screen = 'canvas-repeater-editor';
+        $this->repeaterEditorVersion++;
+        $this->changeScreen('canvas-repeater-editor');
         $this->dispatch('mforms:close-field-settings');
     }
 
@@ -939,9 +1338,11 @@ class Builder extends Component {
         $this->activeRepeaterId = null;
         $this->activeField = null;
         $this->activeFieldId = null;
+        $this->repeaterEditorVersion++;
 
-        $this->screen = 'canvas-main';
+        $this->changeScreen('canvas-main');
         $this->dispatch('mforms:close-field-settings');
+        $this->dispatch('mforms:form-canvas-updated');
     }
 
     /**
@@ -967,6 +1368,7 @@ class Builder extends Component {
 
         $repeater->moveField($fieldID, $newPosition);
         $this->activeRepeater = $repeater;
+        $this->dispatchRepeaterEditorUpdated();
     }
 
     /**
@@ -996,6 +1398,7 @@ class Builder extends Component {
 
         $repeater->field($fieldHandle, ['position' => $fieldPosition]);
         $this->activeRepeater = $repeater;
+        $this->dispatchRepeaterEditorUpdated();
     }
 
     /**
@@ -1018,8 +1421,13 @@ class Builder extends Component {
 
         $field = $this->getField($fieldId, 0);
 
+        if ($field === null) {
+            return;
+        }
+
         $repeater->removeField($field);
         $this->activeRepeater = $repeater;
+        $this->dispatchRepeaterEditorUpdated();
     }
 
     /**
@@ -1042,7 +1450,19 @@ class Builder extends Component {
 
         $repeater->default($value);
         $this->activeRepeater = $repeater;
+
         session()->flash('updateStatus', 'Default value updated');
+        $this->dispatchRepeaterEditorUpdated();
+    }
+
+    /**
+     * Dispatches repeater-editor update events used by Alpine to resync UI state.
+     *
+     * @return void
+     */
+    private function dispatchRepeaterEditorUpdated(): void {
+        $this->repeaterEditorVersion++;
+        $this->dispatch('mforms:repeater-field-updated');
         $this->dispatch('mforms:form-canvas-updated');
     }
 
@@ -1051,10 +1471,16 @@ class Builder extends Component {
      *
      * @return Field|null
      */
-    private function getEditingRepeater(): ?Repeater {
+    private function getEditingRepeater(?string $repeaterId = null): ?Repeater {
+        $targetRepeaterId = $repeaterId ?? $this->activeRepeaterId;
+
+        if ($targetRepeaterId === null || $targetRepeaterId === '') {
+            return null;
+        }
+
         return collect($this->rows)
             ->filter(fn($row) => $row instanceof FormRow)
-            ->map(fn(FormRow $row) => $row->getField($this->activeRepeaterId))
+            ->map(fn(FormRow $row) => $row->getField($targetRepeaterId))
             ->filter(fn($field) => $field instanceof Repeater)
             ->first();
     }
@@ -1065,22 +1491,15 @@ class Builder extends Component {
      * @return Repeater|null
      */
     private function resolveEditingRepeater(): ?Repeater {
-        if ($this->activeRepeaterId === null || $this->activeRepeaterId === '') {
-            return null;
-        }
+        $resolvedRepeater = $this->resolveActiveEntity(
+            $this->activeRepeaterId,
+            $this->activeRepeater,
+            fn(string $repeaterId): ?Repeater => $this->getEditingRepeater($repeaterId)
+        );
 
-        $canonicalRepeater = $this->getEditingRepeater();
-
-        if ($canonicalRepeater !== null) {
-            $this->activeRepeater = $canonicalRepeater;
-            return $canonicalRepeater;
-        }
-
-        if (
-            $this->activeRepeater !== null
-            && $this->activeRepeater->getId() === $this->activeRepeaterId
-        ) {
-            return $this->activeRepeater;
+        if ($resolvedRepeater instanceof Repeater) {
+            $this->activeRepeater = $resolvedRepeater;
+            return $resolvedRepeater;
         }
 
         return null;
@@ -1090,197 +1509,97 @@ class Builder extends Component {
     // Conditions Management Methods
     // =========================================================================
 
-    /**
-     * Builds and returns repeater field instances for managing the conditions of the field currently being edited.
-     *
-     * @return array
-     */
-    public function getFieldConditionsRepeaters(): array {
-        if ($this->editingField === null) {
-            return [];
+    public function openConditionsEditor(string $fieldId, int $rowIndex, ?string $groupId = null): void {
+        $this->setActiveField($fieldId, $rowIndex, $groupId);
+
+        if ($this->activeField === null) {
+            return;
         }
 
-        $conditions = $this->editingField->getConditions() ?? [];
-        $currentFields = $this->getCurrentFields();
+        $this->changeScreen('canvas-conditions-editor', $this->screen);
+        $this->dispatch('mforms:hide-field-settings');
+    }
 
-        $currentFieldLabels = $currentFields->pluck('label', 'id')->toArray();
-        $currentFieldHandlesById = $currentFields->pluck('type', 'id')->toArray();
+    public function getConditionsRepeaterHtml(): string {
+        $activeField = $this->resolveActiveField();
 
-        $repeaters = [];
-        foreach ($conditions as $type => $configuration) {
-            $rules = $configuration['rules'] ?? [];
-            $operatorOptions = $this->getFieldConditionOperatorOptionsForRules($rules, $currentFieldHandlesById);
-            $rulesForRepeaterDefault = $this->normaliseFieldConditionRulesForRepeaterDefault($rules);
+        if ($activeField === null) {
+            return '';
+        }
 
-            $repeater = Fields::checkout(Framework::get())->makeFrom('repeater', [
-                'id'             => 'field-conditions-' . $type,
-                'name'           => 'field_conditions_' . $type,
-                'allowConfigure' => false,
-                'onAddRow'       => '$store.formBuilder.handleFieldConditionsRepeaterAddRow',
-                'onRemoveRow'    => '$store.formBuilder.syncFieldConditionsRepeaterSelectionState',
-                'onMoveRow'      => '$store.formBuilder.syncFieldConditionsRepeaterSelectionState',
-                'addRowText'     => 'Add Condition',
-                'placeholder'    => 'No conditions added yet.'
+        $formFields = $this->getFields()
+            ->filter(fn($field) => $field->getId() !== $activeField->getId() && $field->isInRepeater() === false);
+
+        $currentConditions = $activeField->getConditions();
+
+        $html = '';
+        foreach ($currentConditions as $type => $configuration) {
+            $html .= 
+                '<fieldset 
+                    class="nice-form-group" 
+                    style="margin-bottom:1rem;padding:1rem;border:1px solid #ccc;border-radius:10px;background-color:#ffffff;box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"
+                >
+                    <legend>' . Str::title(str_replace('_', ' ', $type)) . '</legend>
+                    <small class="description" style="margin-bottom:1.5rem;">Test test test</small>';
+                    
+
+            $logic = Fields::checkout(Framework::get())->makeFrom('select', [
+                'id'    => "field-conditions-logic-{$type}",
+                'name'  => "field_conditions_logic_{$type}",
+                'label' => 'Logic',
+                'options' => [
+                    'and' => 'All Conditions Must Match',
+                    'or'  => 'Any Condition Can Match'
+                ],
+                'default' => $configuration['logic'] ?? 'and'
             ]);
 
-            $repeater->class('meros-field-conditions-repeater');
+            $logic->attribute('style', 'margin-bottom: 0.5rem;');
 
-            $repeater->subField('select')
-                ->name('field_id')
-                ->label('Field Name')
-                ->options(array_merge(['' => 'Select a field'], $currentFieldLabels))
-                ->onChange('$store.formBuilder.setFieldConditionsRow');
+            $html .= $logic->html();
 
-            $repeater->subField('select')
-                ->name('operator')
-                ->label('Operator')
-                ->options($operatorOptions)
-                ->onChange('$store.formBuilder.setFieldConditionOperatorRow');
+            $repeater = Fields::checkout(Framework::get())->makeFrom('repeater', [
+                'id'             => "field-conditions-editor-{$type}",
+                'name'           => "field_conditions_editor_{$type}",
+                'label'          => 'Conditions',
+                'allowConfigure' => false,
+                'addRowText'     => 'Add Condition'
+            ]);
 
-            $repeater->subField('text')
-                ->name('value')
-                ->label('Value')
-                ->disabled();
+            $repeater->field('select', [
+                'id'         => 'condition_field',
+                'name'       => 'condition_field',
+                'label'      => 'Field',
+                'attributes' => [
+                    'data-conditions-field-select' => 'true'
+                ],
+                'options' => $formFields->mapWithKeys(fn($field) => [$field->getId() => $field->getLabel()])->toArray(),
+            ]);
 
-            $repeater->default($rulesForRepeaterDefault);
+            $repeater->field('select', [
+                'id'         => 'condition_rule',
+                'name'       => 'condition_rule',
+                'label'      => 'Rule',
+                'attributes' => [
+                    'data-conditions-rule-select' => 'true'
+                ],
+                'options' => [
+                    'equals'           => 'Equals',
+                    'not_equals'       => 'Does Not Equal',
+                    'contains'         => 'Contains',
+                    'not_contains'     => 'Does Not Contain',
+                    'greater_or_equal' => 'Greater Than or Equal To',
+                    'greater_than'     => 'Greater Than',
+                    'less_or_equal'    => 'Less Than or Equal To',
+                    'less_than'        => 'Less Than'
+                ],
+            ]);
 
-            $repeaters[$type] = $repeater;
+            $html .= $repeater->html();
+            $html .= '</fieldset>';
         }
 
-        return $repeaters;
-    }
-
-    /**
-     * Normalises condition rules so repeater default hydration remains safe for text fallback fields.
-     *
-     * @param array $rules
-     *
-     * @return array
-     */
-    private function normaliseFieldConditionRulesForRepeaterDefault(array $rules): array {
-        return array_map(function($rule) {
-            if (!is_array($rule)) {
-                return $rule;
-            }
-
-            if (!array_key_exists('value', $rule)) {
-                return $rule;
-            }
-
-            $value = $rule['value'];
-
-            if (is_array($value) || is_object($value)) {
-                $rule['value'] = json_encode($value);
-            }
-
-            return $rule;
-        }, $rules);
-    }
-
-    /**
-     * Builds field-condition operator options for a ruleset by resolving each rule's field handle.
-     *
-     * @param array $rules
-     * @param array $fieldHandlesById
-     *
-     * @return array
-     */
-    private function getFieldConditionOperatorOptionsForRules(array $rules, array $fieldHandlesById): array {
-        if (empty($rules)) {
-            return [];
-        }
-
-        $allowedOperators = [];
-
-        foreach ($rules as $rule) {
-            if (!is_array($rule)) {
-                continue;
-            }
-
-            $fieldId = (string) ($rule['field_id'] ?? '');
-            $fieldType = $fieldHandlesById[$fieldId] ?? null;
-
-            foreach ($this->getFieldConditionOperatorsForFieldType($fieldType) as $operator) {
-                if (!in_array($operator, $allowedOperators, true)) {
-                    $allowedOperators[] = $operator;
-                }
-            }
-
-            $savedOperator = (string) ($rule['operator'] ?? '');
-
-            if ($savedOperator !== '' && !in_array($savedOperator, $allowedOperators, true)) {
-                $allowedOperators[] = $savedOperator;
-            }
-        }
-
-        if (empty($allowedOperators)) {
-            return [];
-        }
-
-        $options = ['' => 'Select operator'];
-
-        foreach ($allowedOperators as $operator) {
-            $options[$operator] = $this->formatFieldConditionOperatorLabel($operator);
-        }
-
-        return $options;
-    }
-
-    /**
-     * Returns available field-condition operators for a field type.
-     * Mirrors the operator map in formBuilderStore.
-     *
-     * @param string|null $fieldType
-     *
-     * @return array
-     */
-    private function getFieldConditionOperatorsForFieldType(?string $fieldType): array {
-        $operatorMap = $this->getFieldConditionOperatorMap();
-
-        if ($fieldType === null || $fieldType === '') {
-            return [];
-        }
-
-        return $operatorMap[$fieldType] ?? ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
-    }
-
-    /**
-     * Returns the canonical field-condition operator map.
-     *
-     * @return array
-     */
-    public function getFieldConditionOperatorMap(): array {
-        return [
-            'text'            => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-            'textarea'        => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-            'rich_text'       => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-            'email'           => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-            'url'             => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-            'tel'             => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-            'hidden'          => ['equals', 'not_equals', 'contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-            'number'          => ['equals', 'not_equals', 'greater_than', 'less_than', 'greater_than_or_equal_to', 'less_than_or_equal_to', 'is_empty', 'is_not_empty'],
-            'range'           => ['equals', 'not_equals', 'greater_than', 'less_than', 'greater_than_or_equal_to', 'less_than_or_equal_to', 'is_empty', 'is_not_empty'],
-            'select'          => ['equals', 'not_equals'],
-            'advanced_select' => ['equals', 'not_equals'],
-            'radio'           => ['equals', 'not_equals'],
-            'multi_select'    => ['contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-            'checkboxes'      => ['contains', 'does_not_contain', 'is_empty', 'is_not_empty'],
-            'date'            => ['equals', 'not_equals', 'before', 'after', 'on_or_before', 'on_or_after', 'is_empty', 'is_not_empty'],
-            'time'            => ['equals', 'not_equals', 'before', 'after', 'on_or_before', 'on_or_after', 'is_empty', 'is_not_empty'],
-            'checkbox'        => ['is_checked', 'is_unchecked'],
-            'repeater'        => ['is_empty', 'is_not_empty']
-        ];
-    }
-
-    /**
-     * Formats an operator key for select-option labels.
-     *
-     * @param string $operator
-     *
-     * @return string
-     */
-    private function formatFieldConditionOperatorLabel(string $operator): string {
-        return Str::title(str_replace('_', ' ', $operator));
+        return $html;
     }
 
     // =========================================================================

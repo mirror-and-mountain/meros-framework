@@ -32,7 +32,7 @@ function resolveField(fieldIdentifier) {
  * @param {string|HTMLElement} fieldIdentifier - The ID of the field, the field name, or the field element itself.
  * @returns {object|null}
  */
-export function getFieldComponent(fieldIdentifier) {
+export function  getFieldComponent(fieldIdentifier) {
     const field = resolveField(fieldIdentifier);
 
     if (!field) {
@@ -244,6 +244,14 @@ export function validateFieldValue(fieldIdentifier, value = null, showError = fa
     if (!field || !wrapper) return;
     const component = getFieldComponent(field);
 
+    const getErrorMessage = (rule, backup = 'Invalid value.') => {
+        if (component && typeof component.getErrorMessage === 'function') {
+            return component.getErrorMessage(rule) || backup;
+        }
+
+        return backup;
+    };
+
     if (component && typeof component.isValid === 'function') {
         const valid = component.isValid();
 
@@ -251,7 +259,7 @@ export function validateFieldValue(fieldIdentifier, value = null, showError = fa
             field.classList.toggle('invalid', !valid);
 
             if (!valid) {
-                const errorMessage = showError ? component?.getErrorMessage() || 'Invalid value.' : null;
+                const errorMessage = showError ? getErrorMessage() : null;
                 markField(field, false, errorMessage);
             } 
             
@@ -264,17 +272,24 @@ export function validateFieldValue(fieldIdentifier, value = null, showError = fa
     }
 
     value = value !== null ? value : snapshotValue(getFieldValue(field));
+    const getRuleValue = (rule, returnValue = 'value') => {
+        if (!component || typeof component.getValidationRule !== 'function') {
+            return null;
+        }
+
+        return component.getValidationRule(rule, returnValue);
+    };
 
     if (typeof value === 'string') {
-        const maxChars = field.getAttribute('data-rule-max-chars');
-        const minChars = field.getAttribute('data-rule-min-chars');
-        const maxWords = field.getAttribute('data-rule-max-words');
-        const minWords = field.getAttribute('data-rule-min-words');
+        const maxChars = getRuleValue('max-chars') ?? field.getAttribute('data-rule-max-chars');
+        const minChars = getRuleValue('min-chars') ?? field.getAttribute('data-rule-min-chars');
+        const maxWords = getRuleValue('max-words') ?? field.getAttribute('data-rule-max-words');
+        const minWords = getRuleValue('min-words') ?? field.getAttribute('data-rule-min-words');
         
         if (maxChars && value.length > parseInt(maxChars, 10)) {
             wrapper.classList.add('invalid');
 
-            const errorMessage = showError ? component?.getErrorMessage('max-chars') || `Maximum ${maxChars} characters allowed.` : null;
+            const errorMessage = showError ? getErrorMessage('max-chars', `Maximum ${maxChars} characters allowed.`) : null;
             markField(field, false, errorMessage, showError);
 
             return false;
@@ -283,7 +298,7 @@ export function validateFieldValue(fieldIdentifier, value = null, showError = fa
         if (minChars && value.length < parseInt(minChars, 10)) {
             wrapper.classList.add('invalid');
 
-            const errorMessage = showError ? component?.getErrorMessage('min-chars') || `Minimum ${minChars} characters required.` : null;
+            const errorMessage = showError ? getErrorMessage('min-chars', `Minimum ${minChars} characters required.`) : null;
             markField(field, false, errorMessage, showError);
 
             return false;
@@ -292,7 +307,7 @@ export function validateFieldValue(fieldIdentifier, value = null, showError = fa
         if (maxWords && value.split(/\s+/).length > parseInt(maxWords, 10)) {
             wrapper.classList.add('invalid');
 
-            const errorMessage = showError ? component?.getErrorMessage('max-words') || `Maximum ${maxWords} words allowed.` : null;
+            const errorMessage = showError ? getErrorMessage('max-words', `Maximum ${maxWords} words allowed.`) : null;
             markField(field, false, errorMessage, showError);
 
             return false;
@@ -301,7 +316,7 @@ export function validateFieldValue(fieldIdentifier, value = null, showError = fa
         if (minWords && value.split(/\s+/).length < parseInt(minWords, 10)) {
             wrapper.classList.add('invalid');
 
-            const errorMessage = showError ? component?.getErrorMessage('min-words') || `Minimum ${minWords} words required.` : null;
+            const errorMessage = showError ? getErrorMessage('min-words', `Minimum ${minWords} words required.`) : null;
             markField(field, false, errorMessage, showError);
 
             return false;
@@ -314,22 +329,22 @@ export function validateFieldValue(fieldIdentifier, value = null, showError = fa
     }
 
     if (Array.isArray(value)) {
-        const maxItems = field.getAttribute('data-rule-max-items');
-        const minItems = field.getAttribute('data-rule-min-items');
+        const maxItems = getRuleValue('max-items') ?? field.getAttribute('data-rule-max-items');
+        const minItems = getRuleValue('min-items') ?? field.getAttribute('data-rule-min-items');
 
-        if (maxItems && value.length > parseInt(maxItems, 10)) {
+        if (maxItems && maxItems !== '-1' && value.length > parseInt(maxItems, 10)) {
             wrapper.classList.add('invalid');
 
-            const errorMessage = showError ? component?.getErrorMessage('max-items') || `Maximum ${maxItems} items allowed.` : null;
+            const errorMessage = showError ? getErrorMessage('max-items', `Maximum ${maxItems} items allowed.`) : null;
             markField(field, false, errorMessage, showError);
 
             return false;
         }
 
-        if (minItems && value.length < parseInt(minItems, 10)) {
+        if (minItems && minItems !== '-1' && value.length < parseInt(minItems, 10)) {
             wrapper.classList.add('invalid');
 
-            const errorMessage = showError ? component?.getErrorMessage('min-items') || `Minimum ${minItems} items required.` : null;
+            const errorMessage = showError ? getErrorMessage('min-items', `Minimum ${minItems} items required.`) : null;
             markField(field, false, errorMessage, showError);
 
             return false;
@@ -342,13 +357,13 @@ export function validateFieldValue(fieldIdentifier, value = null, showError = fa
     }
 
     if (typeof value === 'number' || !isNaN(parseFloat(value))) {
-        const maxValue = field.getAttribute('data-max-value');
-        const minValue = field.getAttribute('data-min-value');
+        const maxValue = getRuleValue('max') ?? field.getAttribute('data-rule-max');
+        const minValue = getRuleValue('min') ?? field.getAttribute('data-rule-min');
 
         if (maxValue && value > parseFloat(maxValue)) {
             wrapper.classList.add('invalid');
 
-            const errorMessage = showError ? component?.getErrorMessage('max-value') || `Maximum value is ${maxValue}.` : null;
+            const errorMessage = showError ? getErrorMessage('max', `Maximum value is ${maxValue}.`) : null;
             markField(field, false, errorMessage, showError);
 
             return false;
@@ -357,7 +372,7 @@ export function validateFieldValue(fieldIdentifier, value = null, showError = fa
         if (minValue && value < parseFloat(minValue)) {
             wrapper.classList.add('invalid');
 
-            const errorMessage = showError ? component?.getErrorMessage('min-value') || `Minimum value is ${minValue}.` : null;
+            const errorMessage = showError ? getErrorMessage('min', `Minimum value is ${minValue}.`) : null;
             markField(field, false, errorMessage, showError);
 
             return false;

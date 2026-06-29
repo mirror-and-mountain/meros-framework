@@ -31,7 +31,7 @@ class Repeater extends Field {
      *
      * @var string
      */
-    protected string $placeholder = '';
+    protected string $placeholder = 'Nothing to show.';
 
     /**
      * Whether to allow adding/removing/reordering rows in the repeater. 
@@ -126,6 +126,10 @@ class Repeater extends Field {
     ) {
         parent::__construct($provider, $props);
 
+        if (isset($props['attributes']['placeholder'])) {
+            $this->placeholder((string) $props['attributes']['placeholder']);
+        }
+
         $this->instantiateFields();
     }
 
@@ -143,9 +147,6 @@ class Repeater extends Field {
             'placeholder',
             'helpText'
         ]);
-
-        $this->class('meros-repeater-field');
-
     }
 
     // =========================================================================
@@ -195,6 +196,8 @@ class Repeater extends Field {
             'label'                      => $parsedProps['label'] ?? $this->getLabel(),
             'helpText'                   => $parsedProps['helpText'] ?? $this->getHelpText(),
             'value'                      => $this->getValue(),
+            'columnCount'                => count($this->fields) + ($parsedProps['allowsReorder'] ? 1 : 0) + (($parsedProps['allowsConfigure'] || $parsedProps['allowsRemove']) ? 1 : 0),
+            'fieldCount'                 => count($this->fields),
             'rows'                       => $this->buildRows(),
             'templateRow'                => $this->buildTemplateRow(),
             'fieldNames'                 => $this->getFieldNames(),
@@ -211,8 +214,11 @@ class Repeater extends Field {
             'removeRowText'              => $parsedProps['removeRowText'],
             'hasRules'                   => $this->hasRules(),
             'rules'                      => $parsedProps['rules'],
-            'maxRows'                    => $this->getRuleValue('maxitems'),
-            'minRows'                    => $this->getRuleValue('minitems'),
+            'serialisedRules'            => json_encode($parsedProps['rules']),
+            'maxRows'                    => $this->getRuleValue('max-items'),
+            'minRows'                    => $this->getRuleValue('min-items'),
+            'showMinHint'                => $parsedProps['showMinHint'],
+            'showMaxHint'                => $parsedProps['showMaxHint'],
             'configureRequiredFields'    => $parsedProps['configureRequiredFields'],
             'customConfigurationDialogs' => $parsedProps['customConfigurationDialogs']
         ];
@@ -254,7 +260,7 @@ class Repeater extends Field {
 
         $parsedProps['configureRowText'] = is_string($props['configureRowText'] ?? null)
             ? $props['configureRowText']
-            : ($this->configureRowText ?: 'Configure');
+            : ($this->configureRowText ?: 'Open');
 
         $parsedProps['removeRowText'] = is_string($props['removeRowText'] ?? null)
             ? $props['removeRowText']
@@ -405,7 +411,12 @@ class Repeater extends Field {
      * @return static
      */
     public function placeholder(string $text): static {
+        if (empty($text)) {
+            $text = 'Nothing to show.';
+        }
+
         $this->placeholder = $text;
+        $this->attribute('placeholder', $text);
         return $this;
     }
 

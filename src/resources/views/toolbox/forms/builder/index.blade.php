@@ -1,10 +1,10 @@
 {{-- div root element --}}
-<div>
+<div class="flex h-dvh flex-col overflow-hidden">
     @include('meros::toolbox.forms.builder.header', [
         'returnUrl'  => $returnUrl, 
         'navItems'   => $navItems
     ])
-    <main wire:key="form-builder-main-content">
+    <main class="flex-1 min-h-0" wire:key="form-builder-main-content">
         @include('meros::toolbox.forms.builder.canvas.index')
         {{-- @if($screen === 'settings-main')
             @include('meros::toolbox.forms.builder.settings.index', [

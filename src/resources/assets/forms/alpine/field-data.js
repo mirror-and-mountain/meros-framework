@@ -20,7 +20,16 @@ document.addEventListener('alpine:init', () => {
 
         init() {
             if (this.id) {
+                if (this.id.endsWith('-template')) {
+                    if (this.$el.closest('.meros-repeater-template-row') === null) {
+                        this.id = this.$el.getAttribute('id');
+                    }
+                }
+
                 this.element = document.getElementById(this.id);
+            }
+
+            if (this.element) {
                 this.value = snapshotValue(this.getValue());
             }
         },
@@ -47,9 +56,70 @@ document.addEventListener('alpine:init', () => {
             this.__dispatchUpdate();
         },
 
+        getValidationRule(rule, returnValue = 'value') {    
+            if (this?.rules === undefined) return null;
+            
+            const rules = this.__getParsedRules();
+            return rules[rule] && rules[rule][returnValue] ? rules[rule][returnValue] : null;
+        },
+
         getErrorMessage(rule) {
             const rules = this.__getParsedRules();
             return rules[rule] && rules[rule].message ? rules[rule].message : null;
+        },
+
+        applyHints() {
+            if (!this.element) return;
+            const fieldWrapper = this.element.closest('.meros-field');
+            if (!fieldWrapper) return;
+
+            // Only target hints that belong to this wrapper itself.
+            // This avoids repeater-level updates accidentally mutating
+            // nested sub-field hints when rows are added/removed.
+            const hintsContainer = Array.from(fieldWrapper.children)
+                .find((child) => child.classList?.contains('meros-field-hints')) || null;
+
+            const charCountHint = hintsContainer?.querySelector('.char-count-hint') || null;
+            const wordCountHint = hintsContainer?.querySelector('.word-count-hint') || null;
+
+            if (charCountHint || wordCountHint) {
+                const rules = this.__getParsedRules();
+            
+                const type  = charCountHint ? 'max-chars' : 'max-words';
+                const value = snapshotValue(this.getValue());
+
+                const max = rules && rules[type] ? parseInt(rules[type]?.value, 10) : null;
+                let count = 0;
+
+                if (type === 'max-chars') {
+                    count = value ? value.length : 0;
+                } else if (type === 'max-words') {
+                    count = value ? value.trim().split(/\s+/).length : 0;
+                }
+
+                if (type === 'max-chars') {
+                    charCountHint.textContent = `${count}/${max || '∞'} characters`;
+                } else if (type === 'max-words') {
+                    wordCountHint.textContent = `${count}/${max || '∞'} words`;
+                }
+            }
+
+            const itemCountHint = hintsContainer?.querySelector('.item-count-hint') || null;
+
+            if (itemCountHint) {
+                const rules = this.__getParsedRules();
+
+                const max = rules && rules['max-items'] ? parseInt(rules['max-items']?.value, 10) : null;
+                const value = snapshotValue(this.getValue());
+
+                let count = 0;
+
+                if (Array.isArray(value)) {
+                    count = value.length;
+                }
+
+                itemCountHint.textContent = `${count}/${max || '∞'} items`;
+            }
         },
 
         __dispatchUpdate(context = {}) {
@@ -71,9 +141,9 @@ document.addEventListener('alpine:init', () => {
 
         __getParsedRules() {
             try {
-                return JSON.parse(this.rules);
+                return JSON.parse(this.rules || '{}');
             } catch (e) {
-                return this.rules;
+                return typeof this.rules === 'object' ? this.rules : {};
             }
         }
     });
@@ -96,12 +166,14 @@ document.addEventListener('alpine:init', () => {
             const isDefaultValueControl = this.control.getAttribute('data-default-value-control') === 'true';
             if (isDefaultValueControl) return;
 
-            this.hasHints = this.$el.querySelector('.char-count-hint, .word-count-hint') !== null;
+            this.hasHints = this.$el.querySelector('.char-count-hint, .word-count-hint, .item-count-hint') !== null;
 
             this.onRefresh = () => {
-                this.$nextTick(() => {
-                    this.__syncValidity();
-                });
+                // Not sure if we need this right now...
+
+                // this.$nextTick(() => {
+                //     this.__syncValidity();
+                // });
             };
 
             this.onFieldUpdated = (event) => {
@@ -119,10 +191,6 @@ document.addEventListener('alpine:init', () => {
             window.addEventListener('mforms:field-settings-closed', this.onRefresh);
             window.addEventListener('mforms:form-canvas-updated', this.onRefresh);
             window.addEventListener('mforms:field-updated', this.onFieldUpdated);
-
-            this.$nextTick(() => {
-                this.__syncValidity();
-            });
         },
 
         destroy() {
@@ -143,6 +211,8 @@ document.addEventListener('alpine:init', () => {
         __syncValidity() {
             if (!this.control) return;
 
+            // Not sure if we need this right now...
+
             const isValid = validateFieldValue(this.control);
             this.isValid = typeof isValid === 'boolean' ? isValid : true;
             this.$el.classList.toggle('invalid', !this.isValid);
@@ -160,6 +230,16 @@ document.addEventListener('alpine:init', () => {
 
             const value = getFieldValue(this.control);
             return value ? value.trim().split(/\s+/).length : 0;
+        },
+
+        getControlItemCount() {
+            if (!this.control || !this.hasHints) return 0;
+
+            const value = getFieldValue(this.control);
+            if (Array.isArray(value)) {
+                return value.length;
+            }
+            return 0;
         }
     }));
 
@@ -235,36 +315,6 @@ document.addEventListener('alpine:init', () => {
                 this.applyHints();
             },
 
-            applyHints() {
-                const fieldWrapper = this.element.closest('.meros-field');
-                if (!fieldWrapper) return;
-
-                const charCountHint = fieldWrapper.querySelector('.char-count-hint');
-                const wordCountHint = fieldWrapper.querySelector('.word-count-hint');
-
-                if (charCountHint || wordCountHint) {
-                    const rules = this.__getParsedRules();
-                
-                    const type  = charCountHint ? 'max-chars' : 'max-words';
-                    const value = snapshotValue(this.getValue());
-
-                    const max = rules && rules[type] ? parseInt(rules[type]?.value, 10) : null;
-                    let count = 0;
-
-                    if (type === 'max-chars') {
-                        count = value ? value.length : 0;
-                    } else if (type === 'max-words') {
-                        count = value ? value.trim().split(/\s+/).length : 0;
-                    }
-
-                    if (type === 'max-chars') {
-                        charCountHint.textContent = `${count}/${max || '∞'}`;
-                    } else if (type === 'max-words') {
-                        wordCountHint.textContent = `${count}/${max || '∞'}`;
-                    }
-                }
-            },
-
             __dispatchUpdate(context = {}) {
                 const newValue = snapshotValue(this.getValue());
                 const oldValue = snapshotValue(this.previousValue);
@@ -309,7 +359,7 @@ document.addEventListener('alpine:init', () => {
 
                 this.element = this.$el.querySelector('select');
                 this.value = snapshotValue(this.getValue());
-                this.previousValue = snapshotValue(this.value);
+                this.previousValue = snapshotValue(this.value)
                 this.__instantiate();
 
                 window.addEventListener('mforms:field-settings-opened', this.onRefresh);
@@ -362,12 +412,7 @@ document.addEventListener('alpine:init', () => {
                 this.isInstantiating = true;
 
                 const isReinstantiation = !!this.element.tomselect;
-
-                // Capture the underlying <select> value BEFORE calling destroy().
-                // TomSelect.destroy() restores revertSettings.innerHTML from init time,
-                // reverting any value changes made since (by the user or Livewire morph).
-                // Reading element.selectedOptions/element.value here captures the correct
-                // intended value before that state is overwritten.
+                
                 const preDestroyValue = isReinstantiation
                     ? (this.element.hasAttribute('multiple')
                         ? Array.from(this.element.selectedOptions).map(o => o.value)
@@ -397,6 +442,17 @@ document.addEventListener('alpine:init', () => {
                     maxItems: multiple ? null : 1,
                     onChange: (value) => {
                         this.element.tomselect.blur();
+
+                        const rules = this.__getParsedRules();
+
+                        if (rules['max-items'] && rules['max-items'].value) {
+                            const maxItems = parseInt(rules['max-items'].value, 10);
+                            if (multiple && Array.isArray(value) && value.length > maxItems) {
+                                this.element.tomselect.setValue(value.slice(0, maxItems), true);
+                            }
+                        }
+
+                        this.applyHints();
                         this.__dispatchUpdate();
                     }
                 });
@@ -472,15 +528,19 @@ document.addEventListener('alpine:init', () => {
     /**
      * Alpine component for repeater fields, handling row addition, removal, and reordering.
      */
-    Alpine.data('merosRepeaterField', (id, placeholder, rules = {}) => {
+    Alpine.data('merosRepeaterField', (id, placeholder, fieldCount, rules = {}) => {
         const fieldContract = createMerosField(id, rules);
 
         return {
             ...fieldContract,
 
-            placeholder: placeholder || 'Nothing to display',
-            showPlaceholder: false,
-            bodyScrollLockClass: 'meros-repeater-dialog-open',
+            placeholder: placeholder || 'Nothing to show.',
+            showPlaceholder: true,
+            canAddRows: true,
+            rowCount: 0,
+            fieldCount: fieldCount,
+
+            onRefresh: null,
             
             openDelayMs: 180,
             updateDelayMs: 180,
@@ -494,29 +554,79 @@ document.addEventListener('alpine:init', () => {
             activeDialogRowIndex: null,
             activeDialogRowEl: null,
             activeDialogFieldMounts: [],
+            bodyScrollLockClass: 'meros-repeater-dialog-open',
 
             init() {
-                if (this.id) {
-                    this.element = document.getElementById(this.id);
-
-                    if (this.element) {
-                        this.value = snapshotValue(this.getValue());
-                        this.previousValue = snapshotValue(this.value);
-                        this.__togglePlaceholder();
+                this.onRefresh = () => {
+                    if (this.rowDialogOpen || this.isOpeningRowDialog || this.isUpdatingRowDialog) {
+                        return;
                     }
-                }
+
+                    this.$nextTick(() => {
+                        this.__initialise();
+                    });
+                };
+
+                this.__initialise();
+
+                window.addEventListener('mforms:form-canvas-updated', this.onRefresh);
             },
 
             destroy() {
+                if (this.onRefresh) {
+                    window.removeEventListener('mforms:form-canvas-updated', this.onRefresh);
+                }
+
                 this.__finalizeRowDialogClose();
                 fieldContract.destroy.call(this);
                 this.element = null;
             },
 
-            addRow() {
-                if (!this.element) return;
-                const templateRow = this.element.querySelector('tr.meros-repeater-template-row');
+            __initialise() {
+                this.element = this.$el && this.$el.classList.contains('meros-repeater-field') 
+                    ? this.$el 
+                    : this.$el.closest('fieldset.meros-repeater-field') || null;
 
+                if (this.element?.id) {
+                    this.id = this.element.id;
+                }
+
+                if (!this.element || !this.id) return;
+
+                // Re-sync rules from the live x-data attribute. 
+                try {
+                    const xData = this.element.getAttribute('x-data') ?? '';
+                    const match = xData.match(/merosRepeaterField\([^,]+,[^,]+,\s*\d+,\s*({.*})\)/);
+                    if (match) {
+                        this.rules = match[1];
+                    }
+                } catch (e) {
+                    // Fall back to the existing this.rules value.
+                }
+
+                this.value = snapshotValue(this.getValue());
+                this.previousValue = snapshotValue(this.value);
+
+                this.__clearRowsWhenNoFields();
+                this.__setRowCount();
+                this.__setCanAddRows();
+                this.__togglePlaceholder();
+            },
+
+            addRow(configuring = false) {
+                if (!this.element) {
+                    this.__initialise();
+                }
+
+                if (!this.canAddRows && !configuring) {
+                    return;
+                }
+
+                if (this.fieldCount === 0) {
+                    return;
+                }
+
+                const templateRow = this.element.querySelector('tr.meros-repeater-template-row');
                 if (!templateRow) return;
 
                 const rowCount = this.element.querySelectorAll('tr.meros-repeater-row:not(.meros-repeater-template-row)').length;
@@ -546,12 +656,18 @@ document.addEventListener('alpine:init', () => {
                 this.__enableTemplateRowFields(newRow);
                 this.element.querySelector('tbody').insertBefore(newRow, templateRow);
 
+                this.__reindexRowFields();
+
                 if (window.Alpine && typeof window.Alpine.initTree === 'function') {
                     window.Alpine.initTree(newRow);
                 }
 
-                this.__reindexRowFields();
+                this.__setRowCount();
+                this.__setCanAddRows();
                 this.__togglePlaceholder();
+
+                validateFieldValue(this.element);
+                this.applyHints();
 
                 this.__dispatchUpdate({
                     action: 'add',
@@ -698,24 +814,41 @@ document.addEventListener('alpine:init', () => {
                 }, this.updateDelayMs);
             },
 
-            removeRow(event) {
-                const row = event.target.closest('tr.meros-repeater-row');
+            removeRow(event = null, rowIndex = null) {
+                if (event === null && rowIndex === null) return;
+
+                let row = null;
+                if (event) {
+                    row = event.target.closest('tr.meros-repeater-row');
+                } 
+                
+                else if (rowIndex !== null) {
+                    row = this.element.querySelector(`.meros-repeater-row[data-repeater-row-index="${rowIndex}"]`);
+                }
 
                 if (!row) return;
 
-                const rowIndex = Number.parseInt(row.dataset.repeaterRowIndex || '-1', 10);
+                const index = rowIndex !== null 
+                    ? rowIndex 
+                    : Number.parseInt(row.dataset.repeaterRowIndex || '-1', 10);
 
                 if (this.activeDialogRowEl === row) {
                     this.closeRowDialog();
                 }
 
                 row.remove();
+
                 this.__reindexRowFields();
+                this.__setRowCount();
+                this.__setCanAddRows();
                 this.__togglePlaceholder();
+
+                validateFieldValue(this.element);
+                this.applyHints();
 
                 this.__dispatchUpdate({
                     action: 'remove',
-                    oldIndex: rowIndex,
+                    oldIndex: index,
                 });
             },
 
@@ -766,12 +899,70 @@ document.addEventListener('alpine:init', () => {
             },
 
             __togglePlaceholder() {
-                const hasRows = this.element.querySelectorAll('.meros-repeater-row:not(.meros-repeater-template-row)').length > 0;
-                if (hasRows) {
+                let rowCount = 0;
+                
+                if (this.element) {
+                    rowCount = this.element.querySelectorAll('.meros-repeater-row:not(.meros-repeater-template-row)')?.length || 0;
+                } else {
+                    rowCount = this.rowCount || 0;
+                }
+
+                if (rowCount > 0) {
                     this.showPlaceholder = false;
                 } else {
                     this.showPlaceholder = true;
                 }
+            },
+
+            __setRowCount() {
+                if (!this.element) {
+                    this.rowCount = 0;
+                    return;
+                }
+
+                this.rowCount = this.element.querySelectorAll('.meros-repeater-row:not(.meros-repeater-template-row)')?.length || 0;
+            },
+
+            __clearRowsWhenNoFields() {
+                if (!this.element || this.fieldCount > 0) {
+                    return;
+                }
+
+                const rows = this.element.querySelectorAll('.meros-repeater-row:not(.meros-repeater-template-row)');
+
+                rows.forEach((row) => {
+                    row.remove();
+                });
+            },
+
+            __setCanAddRows() {
+                if (!this.element) {
+                    this.canAddRows = false;
+                    return;
+                }
+
+                if (this.fieldCount === null || this.fieldCount === undefined || this.fieldCount <= 0) {
+                    this.canAddRows = false;
+                    return;
+                }
+
+                const rules = this.__getParsedRules();
+                const maxRows = rules['max-items']?.value ? parseInt(rules['max-items'].value, 10) : null;
+                if (!maxRows) {
+                    this.canAddRows = true;
+                    return;
+                }
+
+                const currentCount = this.rowCount || 0;
+
+                this.$nextTick(() => {
+
+                    if (currentCount >= maxRows) {
+                        this.canAddRows = false;
+                    } else {
+                        this.canAddRows = true;
+                    }
+                });
             },
 
             __readRowData(row, rowIndex) {
@@ -888,7 +1079,7 @@ document.addEventListener('alpine:init', () => {
                             input.name = newName;
 
                             if (input.id) {
-                                input.id = input.id.replace(/-\d+-field-/, `-${rowIndex}-field-`);
+                                input.id = input.id.replace(/-\d+-/, `-${rowIndex}-`);
                                 input.id = input.id.replace('-template', '');
                             }
 
@@ -906,6 +1097,12 @@ document.addEventListener('alpine:init', () => {
                 const dialogBody = this.$refs.rowConfigDialogBody;
                 const placeholders = dialogBody.querySelectorAll('.meros-repeater-config-dialog__field-input[data-field-name]');
 
+                // If a prior mount did not fully restore (for example after a refresh),
+                // restore first so we never strand fields outside their source row cells.
+                if (this.activeDialogFieldMounts.length > 0) {
+                    this.__restoreRowDialogFields();
+                }
+
                 this.activeDialogFieldMounts = [];
 
                 placeholders.forEach((placeholder) => {
@@ -918,7 +1115,10 @@ document.addEventListener('alpine:init', () => {
                         return;
                     }
 
-                    const sourceField = sourceCell.querySelector('[data-field-type], .meros-field');
+                    const sourceControl = sourceCell.querySelector('[data-field-type]');
+                    const sourceField = sourceControl?.closest('.meros-field')
+                        || sourceCell.querySelector(':scope > .meros-field')
+                        || sourceControl;
 
                     if (!sourceField) {
                         return;
@@ -944,10 +1144,19 @@ document.addEventListener('alpine:init', () => {
                     if (anchor.parentNode) {
                         anchor.parentNode.insertBefore(fieldEl, anchor);
                         anchor.remove();
+                    } else {
+                        const fieldName = placeholder?.dataset?.fieldName;
+                        const sourceCell = fieldName && this.activeDialogRowEl
+                            ? this.activeDialogRowEl.querySelector(`.meros-repeater-data-cell[data-field-name="${fieldName}"]`)
+                            : null;
+
+                        if (sourceCell && !sourceCell.contains(fieldEl)) {
+                            sourceCell.appendChild(fieldEl);
+                        }
                     }
 
                     if (placeholder && placeholder.contains(fieldEl)) {
-                        placeholder.innerHTML = '';
+                        placeholder.removeChild(fieldEl);
                     }
                 });
 

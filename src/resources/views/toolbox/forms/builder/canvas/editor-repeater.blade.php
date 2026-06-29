@@ -1,5 +1,6 @@
 <div
     x-data="{
+        isRepeaterEditorOpen: true,
         repeaterId: '{{ $activeRepeaterId }}',
 
         setRepeaterDefaultValue() {
@@ -15,7 +16,7 @@
     }"
     id="meros-form-builder-repeater-editor" 
     class="flex-1 h-full p-4 pb-25 overflow-y-auto overscroll-contain min-w-0 bg-slate-100" 
-    wire:key="form-builder-repeater-editor-{{ $activeRepeaterId }}"
+    wire:key="form-builder-repeater-editor-{{ $activeRepeaterId }}-v{{ $repeaterEditorVersion }}"
 >
     <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-bold text-slate-900">Editing Repeater: {{ $activeRepeater->getLabel() }}</h2>
@@ -29,7 +30,7 @@
         class="canvas-repeater-field min-h-96" 
         data-repeater-id="{{ $activeRepeaterId }}"
     >
-        {!! $activeRepeater->render(true, ['label' => false, 'helpText' => false]) !!}
+        {!! $activeRepeater->render(true, ['label' => false, 'helpText' => false, 'rules' => []]) !!}
         <div>
             @php
                 $fields = $activeRepeater->getFields();
@@ -37,7 +38,7 @@
             @if($fields->isEmpty())
                 {{-- Default drop zone for new elements --}}
                  <div
-                    class="canvas-drop-zone row-drop-zone flex items-center justify-center h-64 rounded-2xl border-2 border-dashed border-slate-400 bg-slate-100 px-6 text-slate-700 transition-all duration-150 motion-reduce:transition-none"
+                    class="canvas-drop-zone row-drop-zone mt-4 flex items-center justify-center h-64 rounded-2xl border-2 border-dashed border-slate-400 bg-slate-100 px-6 text-slate-700 transition-all duration-150 motion-reduce:transition-none"
                     data-row-index="0"
                     @dragover.prevent="$el.classList.add('border-blue-500', 'bg-blue-50', 'text-blue-800', 'ring-2', 'ring-blue-300');"
                     @dragleave.prevent="$el.classList.remove('border-blue-500', 'bg-blue-50', 'text-blue-800', 'ring-2', 'ring-blue-300')"

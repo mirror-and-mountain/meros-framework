@@ -1,5 +1,5 @@
 <div 
-    x-data="merosTomSelectField('{{ $id }}')" 
+    x-data="merosTomSelectField('{{ $id }}', '{{ $serialisedRules }}')"
     class="meros-ts-wrapper" 
     :class="{'opacity-50 pointer-events-none': isInstantiating}"
 >

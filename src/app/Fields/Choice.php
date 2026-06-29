@@ -15,11 +15,7 @@ abstract class Choice extends Field {
      *
      * @var array
      */
-    protected array $options = [
-        'option_1' => 'Option 1',
-        'option_2' => 'Option 2',
-        'option_3' => 'Option 3'
-    ];
+    protected array $options = [];
 
     // =========================================================================
     // Initialisation
@@ -94,13 +90,22 @@ abstract class Choice extends Field {
             if (is_int($value)) {
                 $value = Str::snake($label);
             }
-
-            if (!array_key_exists($value, $this->options)) {
-                $this->options[$value] = $label;
-            }
+            $this->options[$value] = $label;
         }
 
         return $this;
+    }
+
+    /**
+     * Replaces the current option set with the provided options.
+     *
+     * @param array $options
+     *
+     * @return self
+     */
+    public function setOptions(array $options): self {
+        $this->options = [];
+        return $this->options($options);
     }
 
     /**
@@ -164,12 +169,21 @@ abstract class Choice extends Field {
     public function toJson(bool $asString = false, string ...$flags): array|string {
         $json = parent::toJson(false);
 
-        $json['options'] = $this->options;
+        $json['properties']['options'] = $this->options;
 
         if ($asString) {
             return json_encode($json, ...$flags);
         }
 
         return $json;
+    }
+
+    /**
+     * Retrieves the options for the field.
+     *
+     * @return array
+     */
+    public function getOptions(): array {
+        return $this->options;
     }
 }

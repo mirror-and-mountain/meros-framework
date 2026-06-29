@@ -28,23 +28,27 @@
 
         <div class="flex items-start justify-between gap-4 mb-5">
             <div>
-                <h2 class="text-lg font-bold text-slate-900">{{ 'Field Settings' }}</h2>
+                <h2 class="text-lg font-bold text-slate-900">Field Settings</h2>
             </div>
-            <button 
-                type="button" 
-                class="text-sm text-slate-600 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1 rounded-sm transition-colors duration-150 motion-reduce:transition-none cursor-pointer"
-                title="Close settings panel"
-                aria-label="Close settings panel"
-                aria-description="Closes the settings panel and deselects the active field"
-                @click="$dispatch('mforms:close-field-settings')"
-            >Close
-            </button>
+            @if($screen !== 'canvas-rules-editor' && $screen !== 'canvas-options-editor')
+                <button 
+                    type="button" 
+                    class="text-sm text-slate-600 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1 rounded-sm transition-colors duration-150 motion-reduce:transition-none cursor-pointer"
+                    title="Close settings panel"
+                    aria-label="Close settings panel"
+                    aria-description="Closes the settings panel and deselects the active field"
+                    @click="$dispatch('mforms:close-field-settings')"
+                >
+                    Close
+                </button>
+            @endif
         </div>
 
         <div 
             x-show="activeFieldId !== null && initialised"
             x-cloak
             class="space-y-4 text-slate-800"
+            wire:loading.class="opacity-80 pointer-events-none"
             wire:key="field-settings-content-{{ $activeField !== null ? $activeField->getId() : 'none' }}"
         >
             {{-- Field Label --}}
@@ -86,10 +90,51 @@
             </div>
 
             {{-- Default Value --}}
-            <div x-show="activeFieldProps?.type !== 'repeater'" x-cloak>
+            <div
+                x-show="activeFieldProps?.type !== 'repeater'"
+                x-cloak
+                wire:key="default-value-control-{{ $this->activeField?->getId() ?? 'none' }}-{{ $this->fieldSettingsVersion }}"
+            >
                 @if ($this->activeField !== null)
                     {!! $this->activeField->renderDefaultValueControl() !!}
                 @endif
+            </div>
+
+            {{-- Field Options --}}
+            <button
+                x-show="supportsProperty('options')"
+                type="button"
+                class="cursor-pointer w-full py-2 px-4 my-2 bg-blue-600 text-white rounded hover:bg-blue-700 active:bg-blue-800 font-medium text-sm transition-colors"
+                wire:click="openOptionsEditor()"
+            >
+                Edit Field Options
+            </button>
+
+            {{-- Field Icon --}}
+            <div class="nice-form-group" x-show="supportsProperty('icon')" x-cloak>
+                <label for="show-field-icon" class="form-label">Show Field Icon</label>
+                <small class="whitespace-normal">Whether to show the field's icon</small>
+                <input
+                    id="show-field-icon"
+                    type="checkbox"
+                    class="switch"
+                    :checked="activeFieldProps?.showsIcon ?? false"
+                    @change="updateActiveFieldProperty('showIcon', $event.target.checked);"
+                />
+            </div>
+
+            {{-- Field Icon Position --}}
+
+            <div class="nice-form-group" x-show="supportsProperty('icon') && activeFieldProps?.showsIcon" x-cloak>
+                <label for="field-icon-right" class="form-label">Field Icon Position</label>
+                <small class="whitespace-normal">Whether to show the field's icon on the right</small>
+                <input
+                    id="field-icon-right"
+                    type="checkbox"
+                    class="switch"
+                    :checked="activeFieldProps?.iconPosition === 'right'"
+                    @change="updateActiveFieldProperty('iconPosition', $event.target.checked ? 'right' : 'left');"
+                />
             </div>
 
             {{-- Field Help Text --}}
@@ -103,52 +148,46 @@
                 ></textarea>
             </div>
 
-            {{-- Required --}}
-            <div class="nice-form-group" x-show="supportsProperty('required')" x-cloak>
-                <label for="field-required" class="form-label">Required</label>
-                <small class="whitespace-normal">Whether the field is required or not</small>
-                <input
-                    id="field-required"
-                    class="switch"
-                    type="checkbox"
-                    :checked="activeFieldProps?.attributes?.required ?? false"
-                    :disabled="activeFieldProps?.mustBeRequired ?? false"
-                    @change="updateActiveFieldProperty('attributes.required', $event.target.checked);"
-                />
-            </div>
+            {{-- States --}}
+            <fieldset class="nice-form-group" x-show="supportsProperty('required') || supportsProperty('disabled')" x-cloak>
+                <legend class="form-label">Default States</legend>
+                <small class="whitespace-normal">The field's default states</small>
 
-            {{-- Disabled --}}
-            <div class="nice-form-group" x-show="supportsProperty('disabled')" x-cloak>
-                <label for="field-disabled" class="form-label">Disabled</label>
-                <small class="whitespace-normal">Whether the field is disabled or not</small>
-                <input
-                    id="field-disabled"
-                    class="switch"
-                    type="checkbox"
-                    :checked="activeFieldProps?.attributes?.disabled ?? false"
-                    @change="updateActiveFieldProperty('attributes.disabled', $event.target.checked);"
-                />
-            </div>
+                {{-- Required --}}
+                <div class="nice-form-group" x-show="supportsProperty('required')" x-cloak>
+                    <input
+                        id="field-required"
+                        class="switch"
+                        type="checkbox"
+                        :checked="activeFieldProps?.attributes?.required ?? false"
+                        :disabled="activeFieldProps?.mustBeRequired ?? false"
+                        @change="updateActiveFieldProperty('attributes.required', $event.target.checked);"
+                    />
+                    <label for="field-required" class="form-label">Required</label>
+                </div>
+
+                {{-- Disabled --}}
+                <div class="nice-form-group" x-show="supportsProperty('disabled')" x-cloak>
+                    <input
+                        id="field-disabled"
+                        class="switch"
+                        type="checkbox"
+                        :checked="activeFieldProps?.attributes?.disabled ?? false"
+                        @change="updateActiveFieldProperty('attributes.disabled', $event.target.checked);"
+                    />
+                    <label for="field-disabled" class="form-label">Disabled</label>
+                </div>
+            </fieldset>
 
             {{-- Field Rule Controls --}}
-
-            <div class="nice-form-group" x-cloak>
-                <label for="field-show-rules" class="form-label">Show Field Rules</label>
-                <input
-                    id="field-show-rules"
-                    class="switch"
-                    type="checkbox"
-                    :checked="showRules"
-                    :disabled="activeFieldProps?.hasRules"
-                    @change="showRules = $event.target.checked;"
-                />
-            </div>
-            
-            <div x-show="showRules" x-cloak>
-                @if ($this->activeField !== null)
-                    {!! $this->activeField->getRuleControlsHtml() !!}
-                @endif
-            </div>
+            <button
+                x-show="supportsProperty('rules')"
+                type="button"
+                class="cursor-pointer w-full py-2 px-4 my-2 bg-blue-600 text-white rounded hover:bg-blue-700 active:bg-blue-800 font-medium text-sm transition-colors"
+                wire:click="openRulesEditor()"
+            >
+                Edit Field Rules
+            </button>
         </div>
     </aside>
 </div>

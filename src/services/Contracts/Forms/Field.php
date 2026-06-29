@@ -135,6 +135,20 @@ abstract class Field extends FeatureDefinition implements Wireable {
     protected bool $mustBeRequired = false;
 
     /**
+     * Whether to show the minimum value hint for the field, if applicable.
+     *
+     * @var bool|null
+     */
+    public ?bool $showMinHint = null;
+
+    /**
+     * Whether to show the maximum value hint for the field, if applicable.
+     *
+     * @var bool|null
+     */
+    public ?bool $showMaxHint = null;
+
+    /**
      * An array of data types that this field is compatible with.
      *
      * @var array
@@ -290,9 +304,20 @@ abstract class Field extends FeatureDefinition implements Wireable {
      * @return void
      */
     protected function initialiseRules(): void {
-        $dataTypes = $this->compatibleDataTypes;
+        if ($this->supportsStringRules()) {
+            $this->addSupport('rules');
 
-        if (in_array('string', $dataTypes) && !is_subclass_of($this, Choice::class)) {
+            $ruleType = isset($this->rules['type']['value']) && in_array($this->rules['type']['value'], ['chars', 'words']) 
+                ? $this->rules['type']['value'] 
+                : 'chars';
+
+            $this->rules['type'] = [
+                'value'       => $ruleType,
+                'label'       => 'Type',
+                'description' => 'The type of counting to use for minimum and maximum rules. "chars" counts characters, while "words" counts words.',
+                'message'     => 'The value must be a valid :type.'
+            ];
+
             $this->rules['max-chars'] = [
                 'value'       => isset($this->rules['max-chars']['value']) ? $this->rules['max-chars']['value'] : null,
                 'label'       => 'Maximum Characters',
@@ -319,10 +344,9 @@ abstract class Field extends FeatureDefinition implements Wireable {
             ];
         }
 
-        if (in_array('integer', $dataTypes) || 
-            in_array('float', $dataTypes) || 
-            in_array('decimal', $dataTypes)
-        ) {
+        if ($this->supportsNumberRules()) {
+            $this->addSupport('rules');
+
             $this->rules['max'] = [
                 'value'       => isset($this->rules['max']['value']) ? $this->rules['max']['value'] : null,
                 'label'       => 'Maximum Value',
@@ -337,7 +361,9 @@ abstract class Field extends FeatureDefinition implements Wireable {
             ];
         }
 
-        if (in_array('array.scalar', $dataTypes) || in_array('array.object', $dataTypes)) {
+        if ($this->supportsArrayRules()) {
+            $this->addSupport('rules');
+
             $this->rules['max-items'] = [
                 'value'       => isset($this->rules['max-items']['value']) ? $this->rules['max-items']['value'] : null,
                 'label'       => 'Maximum Number of Items',
@@ -351,6 +377,41 @@ abstract class Field extends FeatureDefinition implements Wireable {
                 'message'     => 'The value must be at least :min-items items.'
             ];
         }
+    }
+
+    /**
+     * Helper to determine if the field supports string-based rules, based on its compatible data types and handle.
+     *
+     * @return boolean
+     */
+    protected function supportsStringRules(): bool {
+        $dataTypes = $this->compatibleDataTypes;
+
+        return in_array('string', $dataTypes) && !in_array($this->handle, ['date', 'time']) && !is_subclass_of($this, Choice::class);
+    }
+
+    /**
+     * Helper to determine if the field supports number-based rules, based on its compatible data types.
+     *
+     * @return boolean
+     */
+    protected function supportsNumberRules(): bool {
+        $dataTypes = $this->compatibleDataTypes;
+
+        return in_array('integer', $dataTypes) || 
+               in_array('float', $dataTypes) || 
+               in_array('decimal', $dataTypes);
+    }
+
+    /**
+     * Helper to determine if the field supports array-based rules, based on its compatible data types.
+     *
+     * @return boolean
+     */
+    protected function supportsArrayRules(): bool {
+        $dataTypes = $this->compatibleDataTypes;
+
+        return in_array('array.scalar', $dataTypes) || in_array('array.object', $dataTypes);
     }
 
     /**
@@ -562,6 +623,8 @@ abstract class Field extends FeatureDefinition implements Wireable {
             'hasRules'        => $this->hasRules(),
             'serialisedRules' => json_encode($parsedProps['rules']),
             'rules'           => $parsedProps['rules'],
+            'showMinHint'     => $parsedProps['showMinHint'],
+            'showMaxHint'     => $parsedProps['showMaxHint'],
             'mustBeRequired'  => $this->mustBeRequired,
             'isSubField'      => $this->isInRepeater(),
             'attributes'      => $this->attributes($parsedProps['attributes'] ?? [], $parsedProps['excludeAttributes'] ?? []),
@@ -581,6 +644,8 @@ abstract class Field extends FeatureDefinition implements Wireable {
             'name'              => is_string($props['name'] ?? null) ? $this->getName(!$this->isInRepeater(), $props['name']) : $this->getName(!$this->isInRepeater()),
             'label'             => is_string($props['label'] ?? null) ? $props['label'] : (is_bool($props['label'] ?? null) ? false : $this->getLabel()),
             'helpText'          => is_string($props['helpText'] ?? null) ? $props['helpText'] : (is_bool($props['helpText'] ?? null) ? false : $this->getHelpText()),
+            'showMinHint'       => is_bool($props['showMinHint'] ?? null) ? $props['showMinHint'] : $this->showMinHint,
+            'showMaxHint'       => is_bool($props['showMaxHint'] ?? null) ? $props['showMaxHint'] : $this->showMaxHint, 
             'attributes'        => is_array($props['attributes'] ?? null) ? $props['attributes'] : [],
             'excludeAttributes' => is_array($props['excludeAttributes'] ?? null) ? $props['excludeAttributes'] : [],
             'rules'             => is_array($props['rules'] ?? null) ? $props['rules'] : $this->getRules(),
@@ -649,14 +714,52 @@ abstract class Field extends FeatureDefinition implements Wireable {
      * @return string
      */
     public function getRuleControlsHtml(): string {
+        if (!$this->supports('rules')) {
+            return '';
+        }
+
         $html = '';
 
-        foreach ($this->rules as $ruleName => $ruleConfig) {
-            if (Str::contains($ruleName, 'chars') && ($this->hasRule('max-words') || $this->hasRule('min-words'))) {
+        if ($this->hasRule('type')) {
+            $typeField = Fields::checkout($this->provider)->makeFrom('select', [
+                'id'       => $this->getId() . '-rule-type',
+                'name'     => $this->getName() . '_rule_type',
+                'label'    => 'Rule Type',
+                'helpText' => 'The type of counting to use for minimum and maximum rules. "chars" counts characters, while "words" counts words.',
+                'value'    => $this->rules['type']['value'] ?? 'chars',
+                'attributes' => [
+                    'data-rule-control' => 'true', 
+                    'data-field-id'     => $this->getId(), 
+                    'data-rule-name'    => 'type',
+                    '@change'           => 'updateRuleProperty($event.target.dataset.ruleName, $event.target.value)'
+                ],
+                'options'  => [
+                    'chars' => 'Characters',
+                    'words' => 'Words'
+                ],
+            ]);
+
+            $html .= $typeField->html();
+        }
+
+        $rules = collect($this->rules)->sortKeys()->toArray();
+
+        foreach ($rules as $ruleName => $ruleConfig) {
+            if ($ruleName === 'type') {
                 continue;
             }
 
-            if (Str::contains($ruleName, 'words') && ($this->hasRule('max-chars') || $this->hasRule('min-chars'))) {
+            $ruleType = $this->getRule('type');
+
+            if ($ruleType !== null) {
+                $ruleType = $ruleType['value'] ?? 'chars';
+            }
+
+            if (Str::contains($ruleName, 'chars') && $ruleType === 'words') {
+                continue;
+            }
+
+            if (Str::contains($ruleName, 'words') && $ruleType === 'chars') {
                 continue;
             }
 
@@ -666,8 +769,15 @@ abstract class Field extends FeatureDefinition implements Wireable {
                 'label'      => $ruleConfig['label'] ?? Str::title(Str::replace(['-', '_'], ' ', $ruleName)),
                 'value'      => $ruleConfig['value'] ?? null,
                 'helpText'   => $ruleConfig['description'] ?? null,
-                'attributes' => ['data-rule-control' => 'true', 'data-field-id' => $this->getId(), 'data-rule-name' => $ruleName],
+                'attributes' => [
+                    'data-rule-control' => 'true', 
+                    'data-field-id'     => $this->getId(), 
+                    'data-rule-name'    => $ruleName,
+                    '@change'           => 'updateRuleProperty($event.target.dataset.ruleName, $event.target.value)'
+                ],
             ]);
+
+            $field->rule('min', 0);
 
             $html .= $field->html();
         }
@@ -844,6 +954,30 @@ abstract class Field extends FeatureDefinition implements Wireable {
         $this->classList = array_diff($this->classList, $classes);
         return $this;
     }
+
+    /**
+     * Sets whether to show the minimum value hint for the field, if applicable.
+     *
+     * @param boolean $show
+     *
+     * @return self
+     */
+    public function showMinHint(bool $show = true): self {
+        $this->showMinHint = $show;
+        return $this;
+    }
+
+    /**
+     * Sets whether to show the maximum value hint for the field, if applicable.
+     *
+     * @param boolean $show
+     *
+     * @return self
+     */
+    public function showMaxHint(bool $show = true): self {
+        $this->showMaxHint = $show;
+        return $this;
+    }
     
     /**
      * Adds an additional HTML attribute to the field's input element.
@@ -1014,6 +1148,18 @@ abstract class Field extends FeatureDefinition implements Wireable {
      */
     public function rule(string $key, mixed $value, string $label = '', string $message = ''): self {
         if (in_array($key, array_keys($this->rules))) {
+            if ($key === 'type' && $this->hasRule('type')) {
+                $value = in_array($value, ['chars', 'words']) ? $value : 'chars';
+
+                if ($value === 'chars') {
+                    $this->removeRules(['min-words', 'max-words']);
+                }
+
+                else if ($value === 'words') {
+                    $this->removeRules(['min-chars', 'max-chars']);
+                }
+            }
+
             $this->rules[$key] = [
                 'value'   => $value,
                 'label'   => !empty($label) ? $label : $this->rules[$key]['label'],
@@ -1573,6 +1719,7 @@ abstract class Field extends FeatureDefinition implements Wireable {
 
              if (in_array($key, ['min', 'max'])) {
                 $attributes[$key] = $config['value'];
+                $attributes["data-rule-{$key}"] = $config['value'];
                 continue;
             }
 
@@ -1582,6 +1729,10 @@ abstract class Field extends FeatureDefinition implements Wireable {
             }
 
             $attributes["data-rule-{$key}"] = $config['value'];
+
+            if ($key === 'max-chars' && is_numeric($config['value'])) {
+                $attributes['maxlength'] = $config['value'];
+            }
         }
 
         return $attributes;
@@ -1681,6 +1832,7 @@ abstract class Field extends FeatureDefinition implements Wireable {
             'handle'           => $this->handle,
             'properties'       => [
                 'type'             => $this->handle,
+                'class'            => static::class,
                 'id'               => $this->getId(),
                 'name'             => $this->getName(),
                 'label'            => $this->getLabel(),
@@ -1694,6 +1846,8 @@ abstract class Field extends FeatureDefinition implements Wireable {
                 'disabled'         => $this->isDisabled(),
                 'hasRules'         => $this->hasRules(),
                 'rules'            => $this->getRules(),
+                'showMinHint'      => $this->showMinHint === null ? false : $this->showMinHint,
+                'showMaxHint'      => $this->showMaxHint === null ? true : $this->showMaxHint,
                 'conditions'       => $this->getConditions(),
                 'isInputType'      => is_subclass_of($this, Input::class),
                 'isChoiceType'     => is_subclass_of($this, Choice::class),

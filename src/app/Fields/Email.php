@@ -17,5 +17,9 @@ class Email extends Input {
 
         $this->inputType('email');
         $this->addSupport('icon');
+        
+        if ($this->showsIcon === null) {
+            $this->showIcon(true, $this->iconPosition === null ? 'left' : $this->iconPosition);
+        }
     }
 }

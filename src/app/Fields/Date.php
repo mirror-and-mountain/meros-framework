@@ -18,5 +18,9 @@ class Date extends Input {
 
         $this->inputType('date');
         $this->addSupport('icon');
+        
+        if ($this->showsIcon === null) {
+            $this->showIcon(true, $this->iconPosition ?? 'left');
+        }
     }
 }

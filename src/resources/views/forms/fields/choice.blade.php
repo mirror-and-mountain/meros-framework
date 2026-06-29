@@ -13,10 +13,10 @@
                 <span class="required-indicator">*</span>
             @endif
         </legend>
-    
-        @if($helpText !== false && !empty($helpText))
-            <small class="description">{{ $helpText }}</small>
-        @endif
+    @endif
+
+    @if($helpText !== false && !empty($helpText))
+        <small class="description">{{ $helpText }}</small>
     @endif
 
     @foreach($options as $optValue => $label)

@@ -2,7 +2,9 @@
     $attributesString = trim((string) $attributes);
     $isRequired = (bool) preg_match('/(?:^|\s)required(?:\s|=|$)/', $attributesString);
     $isDisabled = (bool) preg_match('/(?:^|\s)disabled(?:\s|=|$)/', $attributesString);
-    $isFieldSet = in_array($field->handle, ['radio', 'checkboxes']);
+    $isFieldSet = in_array($field->handle, ['radio', 'checkboxes', 'repeater']);
+    $showMaxHint = $showMaxHint ?? true;
+    $showMinHint = $showMinHint ?? false;
 
     if ($isRequired && $isDisabled) {
         $isRequired = false;
@@ -16,7 +18,7 @@
     @if ($label !== false)
         @if (!$isFieldSet)
             <label 
-                @if(in_array($field->handle, ['rich_text', 'repeater']))
+                @if(in_array($field->handle, ['rich_text']))
                     id="{{ $id }}-label"
                 @else
                     id="{{ $id }}-label"
@@ -41,30 +43,45 @@
     @if($hasRules)
         @if($field->hasRule('min-chars') || $field->hasRule('max-chars'))
             <div class="meros-field-hints">
-                @if($field->hasRule('min-chars') && isset($rules['min-chars']))
+                @if($showMinHint && $field->hasRule('min-chars') && isset($rules['min-chars']['value']) && $rules['min-chars']['value'] > 0)
                     <small class="meros-field-hint">
                         Minimum characters: {{ $rules['min-chars']['value'] }}
                     </small>
                 @endif
 
-                @if($field->hasRule('max-chars') && isset($rules['max-chars']))
+                @if($showMaxHint && $field->hasRule('max-chars') && isset($rules['max-chars']['value']) && $rules['max-chars']['value'] > 0)
                     <small class="meros-field-hint char-count-hint">
-                        <span x-text="getControlCharCount()"></span>/{{ $rules['max-chars']['value'] }}
+                        <span x-text="getControlCharCount()"></span>/{{ $rules['max-chars']['value'] }} characters
                     </small>
                 @endif
             </div>
 
         @elseif($field->hasRule('min-words') || $field->hasRule('max-words'))
             <div class="meros-field-hints">
-                @if($field->hasRule('min-words') && isset($rules['min-words']))
+                @if($showMinHint && $field->hasRule('min-words') && isset($rules['min-words']['value']) && $rules['min-words']['value'] > 0)
                     <small class="meros-field-hint">
                         Minimum words: {{ $rules['min-words']['value'] }}
                     </small>
                 @endif
 
-                @if($field->hasRule('max-words') && isset($rules['max-words']))
+                @if($showMaxHint && $field->hasRule('max-words') && isset($rules['max-words']['value']) && $rules['max-words']['value'] > 0)
                     <small class="meros-field-hint word-count-hint">
-                        <span x-text="getControlWordCount()"></span>/{{ $rules['max-words']['value'] }}
+                        <span x-text="getControlWordCount()"></span>/{{ $rules['max-words']['value'] }} words
+                    </small>
+                @endif
+            </div>
+
+        @elseif($field->hasRule('min-items') || $field->hasRule('max-items'))
+            <div class="meros-field-hints">
+                @if($showMinHint && $field->hasRule('min-items') && isset($rules['min-items']['value']) && $rules['min-items']['value'] > 0)
+                    <small class="meros-field-hint">
+                        Minimum items: {{ $rules['min-items']['value'] }}
+                    </small>
+                @endif
+
+                @if($showMaxHint && $field->hasRule('max-items') && isset($rules['max-items']['value']) && $rules['max-items']['value'] > 0)
+                    <small class="meros-field-hint item-count-hint">
+                        <span x-text="getControlItemCount()"></span>/{{ $rules['max-items']['value'] }} items
                     </small>
                 @endif
             </div>

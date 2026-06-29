@@ -66,7 +66,7 @@
                 :class="openCategory === '{{ $category }}' ? 'max-h-96 overflow-y-auto pr-1' : 'max-h-0 overflow-hidden'"
             >
                 @foreach ($fields as $field)
-                    @if($screen === 'canvas-main' || ($screen === 'canvas-repeater-editor' && $field['handle'] !== 'repeater'))
+                    @if(($screen === 'canvas-main' || $screen === 'canvas-rules-editor') || ($screen === 'canvas-repeater-editor' && $field['handle'] !== 'repeater'))
                         <div 
                             class="mb-2 p-2 bg-white border border-slate-300 rounded shadow-sm text-slate-800 cursor-grab active:cursor-grabbing flex items-center select-none transition-colors duration-150 motion-reduce:transition-none hover:bg-blue-50 hover:border-blue-500"
                             draggable="true"

@@ -16,6 +16,5 @@ class Text extends Input {
         $this->compatibleDataTypes = ['string'];
 
         $this->inputType('text');
-        $this->addSupport('icon');
     }
 }

@@ -17,5 +17,9 @@ class Url extends Input {
 
         $this->inputType('url');
         $this->addSupport('icon');
+        
+        if ($this->showsIcon === null) {
+            $this->showIcon(true, $this->iconPosition ?? 'left');
+        }
     }
 }

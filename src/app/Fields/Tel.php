@@ -17,5 +17,9 @@ class Tel extends Input {
 
         $this->inputType('tel');
         $this->addSupport('icon');
+        
+        if ($this->showsIcon === null) {
+            $this->showIcon(true, $this->iconPosition ?? 'left');
+        }
     }
 }

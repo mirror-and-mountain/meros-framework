@@ -1,7 +1,10 @@
-<select 
+
+<select
+    x-data="merosInputField('{{ $id }}', '{{ $serialisedRules }}')"
     id="{{ $id }}"
     name="{{ $name }}"
     {!! $attributes !!}
+    @change="onChange()"
 >
     @foreach($options as $optValue => $label)
         @php

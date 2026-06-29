@@ -97,11 +97,6 @@
 	hyphens: auto;
 }
 
-.meros-field .description,
-.meros-admin-field .description {
-	line-height: 1.4;
-}
-
 .meros-form-group .meros-form-row + .meros-form-row {
 	margin-top: 0.75rem;
 }
@@ -133,8 +128,25 @@
 
 	.meros-field-hints {
 		display: flex;
+		align-items: center;
+		gap: 0.5rem;
 		justify-content: space-between;
 		margin-top: 0.5rem;
+
+		.meros-field-hint {
+			display: inline-flex;
+			align-items: center;
+			line-height: 1.25;
+			margin: 0;
+		}
+
+		.char-count-hint,
+		.word-count-hint,
+		.item-count-hint {
+			margin-left: auto;
+			justify-content: flex-end;
+			text-align: right;
+		}
 	}
 }
 

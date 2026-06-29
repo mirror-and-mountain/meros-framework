@@ -49,17 +49,18 @@
                         </button>
                     </div>
                 @endif
-                <div>
+                {{-- <div>
                     <button
                         type="button"
                         class="shrink-0 text-gray-500 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1 rounded-sm transition-colors text-xl leading-none cursor-pointer"
                         title="Field conditions"
                         aria-label="Field conditions"
                         aria-description="Opens the field conditions panel for this field"
+                        wire:click="openConditionsEditor('{{ $field->getId() }}', '{{ $fieldRowIndex }}', '{{ $field->getGroupId() }}')"
                     >
                         @include('meros::toolbox.svgs.conditions-eye')
                     </button>
-                </div>
+                </div> --}}
                 <div @confirm="confirm('Are you sure you want to delete this field? This action cannot be undone.') ? $wire.removeField('{{ $field->getId() }}', '{{ (int) $rowIndex }}', '{{ $field->getGroupId() }}') : null">
                     <button
                         type="button"

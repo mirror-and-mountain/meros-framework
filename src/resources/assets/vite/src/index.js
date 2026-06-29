@@ -1,4 +1,4 @@
-import { setFieldValue } from '../../forms/alpine/helpers.js';
+import { setFieldValue, getFieldValue } from '../../forms/alpine/helpers.js';
 import '../../forms/alpine/field-data.js';
 import './style.css';
 
@@ -47,6 +47,7 @@ document.addEventListener('alpine:init', () => {
      * as well as communicating with Livewire via a callback for schema updates.
      */
     Alpine.data('canvas', (wireCallback) => ({
+        isEditor: true,
         isDragging: false,
         draggingElementType: null,
         draggingGroupId: null,
@@ -563,6 +564,8 @@ document.addEventListener('alpine:init', () => {
         onRefresh: null,
         onClose: null,
         onCloseRemoved: null,
+        onHide: null,
+        onUnHide: null,
 
         showRules: false,
         
@@ -609,13 +612,6 @@ document.addEventListener('alpine:init', () => {
                     this.__onDefaultValueChange(element, value);
                     return;
                 }
-
-                const isRuleControl = element.getAttribute('data-rule-control') !== null;
-
-                if (isRuleControl) {
-                    this.__onRuleChange(element, value);
-                    return;
-                }
             }
 
             this.onRefresh = async () => {
@@ -655,10 +651,22 @@ document.addEventListener('alpine:init', () => {
                 }
             };
 
+            this.onHide = () => {
+                this.open = false;
+            };
+
+            this.onUnHide = () => {
+                if (this.activeFieldId) {
+                    this.open = true;
+                }
+            };
+
             window.addEventListener('mforms:open-field-settings', this.onOpen);
             window.addEventListener('mforms:refresh-field-settings', this.onRefresh);
             window.addEventListener('mforms:close-field-settings', this.onClose);
             window.addEventListener('mforms:close-removed-field-settings', this.onCloseRemoved);
+            window.addEventListener('mforms:hide-field-settings', this.onHide);
+            window.addEventListener('mforms:unhide-field-settings', this.onUnHide);
             window.addEventListener('mforms:field-updated', this.onSettingChange);
         },
 
@@ -707,14 +715,12 @@ document.addEventListener('alpine:init', () => {
         destroy() {
             stopPanelResize(this);
 
-            if (!this.onOpen && !this.onRefresh && !this.onClose && !this.onCloseRemoved && !this.onSettingChange) {
-                return;
-            }
-
             window.removeEventListener('mforms:open-field-settings', this.onOpen);
             window.removeEventListener('mforms:refresh-field-settings', this.onRefresh);
             window.removeEventListener('mforms:close-field-settings', this.onClose);
             window.removeEventListener('mforms:close-removed-field-settings', this.onCloseRemoved);
+            window.removeEventListener('mforms:hide-field-settings', this.onHide);
+            window.removeEventListener('mforms:unhide-field-settings', this.onUnHide);
             window.removeEventListener('mforms:field-updated', this.onSettingChange);
 
             this.onOpen = null;
@@ -722,6 +728,8 @@ document.addEventListener('alpine:init', () => {
             this.onRefresh = null;
             this.onClose = null;
             this.onCloseRemoved = null;
+            this.onHide = null;
+            this.onUnHide = null;
             this.initialised = false;
         },
 
@@ -749,36 +757,108 @@ document.addEventListener('alpine:init', () => {
                 setFieldValue(fieldId, value);
             }
         },
+    }));
 
-        __onRuleChange(element, value) {
-            if (!element) return;
-            const isRuleControl = element.getAttribute('data-rule-control') !== null;
+    Alpine.data('fieldConditions', (formFields) => ({
+        formFields: formFields,
 
-            if (!isRuleControl) return;
-            const ruleName = element.getAttribute('data-rule-name');
+        showField: null,
+        hideField: null,
+        requireField: null,
+        optionalField: null,
+        disableField: null,
+        enableField: null,
 
-            if (value === undefined || value === this.activeFieldProps.rules?.[ruleName]?.value) {
-                return;
-            }
+        showLogicField: null,
+        hideLogicField: null,
+        requireLogicField: null,
+        optionalLogicField: null,
+        disableLogicField: null,
+        enableLogicField: null,
 
-            const oppositeRuleName = ruleName.startsWith('min') ? ruleName.replace(/^min/, 'max') : ruleName.replace(/^max/, 'min');
-            const oppositeRuleValue = this.activeFieldProps.rules?.[oppositeRuleName]?.value;
+        onRuleChange: null,
+        onRuleLogicChange: null,
+        onRuleFieldChange: null,
+        onRuleOperatorChange: null,
 
-            if (oppositeRuleValue !== undefined && oppositeRuleValue !== null) {
-                if (value !== null) {
-                    if (ruleName.startsWith('min') && value > oppositeRuleValue) {
-                        this.updateActiveFieldProperty('rules', [{ rule: ruleName, value: value }, { rule: oppositeRuleName, value: value }]);
-                        return;
-                    } 
+        init() {
+            this.__initialiseFields();
+
+            this.onRuleChange = (event) => {
+                const { element, value, context } = event.detail ?? {};
+
+                if (element && element.getAttribute('data-conditions-field-select') !== null) {
+                    const formField = this.formFields[value] ?? null;
                     
-                    else if (ruleName.startsWith('max') && value < oppositeRuleValue) {
-                        this.updateActiveFieldProperty('rules', [{ rule: ruleName, value: value }, { rule: oppositeRuleName, value: value }]);
-                        return;
+                    if (formField && context) {
+                        console.log('found field', formField);
+                        this.__getRuleParams('show', context.repeater.row);
                     }
                 }
             }
 
-            this.updateActiveFieldProperty('rule', { rule: ruleName, value: value });
+            window.addEventListener('mforms:field-updated', this.onRuleChange);
+        },
+
+        destroy() {
+            window.removeEventListener('mforms:field-updated', this.onRuleChange);
+            this.onRuleChange = null;
+        },
+
+        getConditions() {
+            console.log({
+                show: {
+                    'logic': this.showLogicField ? mforms.getFieldValue(this.showLogicField) : null,
+                    'rules': this.showField ? mforms.getFieldValue(this.showField) : null
+                },
+                hide: {
+                    'logic': this.hideLogicField ? mforms.getFieldValue(this.hideLogicField) : null,
+                    'rules': this.hideField ? mforms.getFieldValue(this.hideField) : null
+                },
+                require: {
+                    'logic': this.requireLogicField ? mforms.getFieldValue(this.requireLogicField) : null,
+                    'rules': this.requireField ? mforms.getFieldValue(this.requireField) : null
+                },
+                optional: {
+                    'logic': this.optionalLogicField ? mforms.getFieldValue(this.optionalLogicField) : null,
+                    'rules': this.optionalField ? mforms.getFieldValue(this.optionalField) : null
+                },
+                disable: {
+                    'logic': this.disableLogicField ? mforms.getFieldValue(this.disableLogicField) : null,
+                    'rules': this.disableField ? mforms.getFieldValue(this.disableField) : null
+                },
+                enable: {
+                    'logic': this.enableLogicField ? mforms.getFieldValue(this.enableLogicField) : null,
+                    'rules': this.enableField ? mforms.getFieldValue(this.enableField) : null
+                }
+            });
+        },
+
+        __initialiseFields() {
+            this.showField     = mforms.getField('field-conditions-editor-show');
+            console.log('showField', this.showField);
+            this.hideField     = document.getElementById('field-conditions-editor-hide');
+            this.requireField  = document.getElementById('field-conditions-editor-require');
+            this.optionalField = document.getElementById('field-conditions-editor-optional');
+            this.disableField  = document.getElementById('field-conditions-editor-disable');
+            this.enableField   = document.getElementById('field-conditions-editor-enable');
+
+            this.showLogicField     = document.getElementById('field-conditions-logic-show');
+            this.hideLogicField     = document.getElementById('field-conditions-logic-hide');
+            this.requireLogicField  = document.getElementById('field-conditions-logic-require');
+            this.optionalLogicField = document.getElementById('field-conditions-logic-optional');
+            this.disableLogicField  = document.getElementById('field-conditions-logic-disable');
+            this.enableLogicField   = document.getElementById('field-conditions-logic-enable');
+        },
+
+        __getRuleParams(ruleType, index) {
+            const ruleField = this[`${ruleType}Field`];
+            console.log('ruleField', ruleField, index);
+
+            if (ruleField) {
+                const rule = ruleField.getRowValue(index);
+                console.log(rule);
+            }
         }
     }));
 

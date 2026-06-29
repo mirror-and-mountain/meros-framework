@@ -1,14 +1,34 @@
 .meros-repeater {
-	overflow: hidden;
-	border: 1px solid #d1d5db;
-	border-radius: 0.5rem;
-	background-color: #ffffff;
-	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+	min-inline-size: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.meros-repeater > legend {
+	font-weight: var(--nf-label-font-weight);
+	font-size: var(--nf-label-font-size);
+	font-family: var(--nf-label-font-family);
+	color: var(--nf-label-color);
+	margin-bottom: calc(var(--nf-input-size)/2);
+	display: block;
+	white-space: normal;
+}
+
+.meros-repeater > .description {
+	display: block;
+	margin: 0 0 0.75rem;
 }
 
 .meros-repeater-scroll {
 	overflow-x: auto;
 	overflow-y: hidden;
+	border: 1px solid #d1d5db;
+	border-radius: 0.5rem 0.5rem 0 0;
+	background-color: #ffffff;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 	-webkit-overflow-scrolling: touch;
 	overscroll-behavior-x: contain;
 	touch-action: pan-x;
@@ -147,8 +167,16 @@
 
 .meros-repeater-footer {
 	padding: 0.75rem 1rem;
-	border-top: 1px solid #e5e7eb;
+	border: 1px solid #d1d5db;
+	border-top-color: #e5e7eb;
+	border-radius: 0 0 0.5rem 0.5rem;
 	background-color: #f9fafb;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.meros-field.invalid .meros-repeater-scroll,
+.meros-field.invalid .meros-repeater-footer {
+	border-color: var(--nf-invalid-input-border-bottom-color, red);
 }
 
 .meros-repeater-button {

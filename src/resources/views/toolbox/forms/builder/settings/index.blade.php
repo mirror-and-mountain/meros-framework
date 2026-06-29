@@ -1,5 +1,5 @@
 <div 
-    class="flex h-screen overflow-hidden" 
+    class="flex h-full min-h-0 overflow-hidden" 
     x-data="{ settingsPage: 'general' }"
     wire:key="form-builder-settings-main"
 >
