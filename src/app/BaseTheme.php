@@ -4,7 +4,7 @@ namespace MM\Meros\App;
 
 use MM\Meros\Services\Contracts\FeatureProvider;
 
-abstract class Theme extends FeatureProvider {
+abstract class BaseTheme extends FeatureProvider {
     /**
      * Adds a Wordpress theme support.
      * 
@@ -37,9 +37,9 @@ abstract class Theme extends FeatureProvider {
     /**
      * Gets the instance of the theme.
      *
-     * @return Theme
+     * @return BaseTheme
      */
-    final public function get(): Theme {
+    final public function get(): BaseTheme {
         return $this;
     }
 }

@@ -711,7 +711,7 @@ final class Framework extends FeatureProvider {
      * @return void
      */
     private function configurePackageSettings(Setting $settings): void {
-        add_action('meros_providers_registered', function (Theme $theme, Collection $packages) use ($settings) {
+        add_action('meros_providers_registered', function (BaseTheme $theme, Collection $packages) use ($settings) {
             foreach ($packages as $package) {
                 $enabledSetting = $settings->add()->boolean($package->getHandle() . '_enable')
                     ->label('Enable ' . $package->getName())

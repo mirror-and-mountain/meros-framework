@@ -5,8 +5,8 @@ namespace MM\Meros;
 use Roots\Acorn\Application as RootsApplication;
 use MM\Meros\App\Providers\FrameworkServiceProvider;
 
-class Bootstrap {    
-    final public static function bootstrap(
+final class Loader {    
+    final public static function boot(
         array  $providers = []
     ): void {
         if (class_exists(RootsApplication::class)) {

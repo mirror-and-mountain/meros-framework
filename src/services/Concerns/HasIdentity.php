@@ -6,7 +6,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Config;
 
 use MM\Meros\App\Framework;
-use MM\Meros\App\Theme;
+use MM\Meros\App\BaseTheme;
 use MM\Meros\App\Package;
 
 trait HasIdentity {
@@ -91,7 +91,7 @@ trait HasIdentity {
         string $uri  = ''
     ): void {
         // Set theme identity
-        if ($this instanceof Theme) {
+        if ($this instanceof BaseTheme) {
             $theme = \wp_get_theme();
 
             $this->name        = $theme->get('Name');

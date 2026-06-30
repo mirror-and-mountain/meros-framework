@@ -5,7 +5,7 @@ namespace MM\Meros\App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Config;
 
-use MM\Meros\App\Theme as MerosTheme;
+use MM\Meros\App\BaseTheme as MerosTheme;
 ;
 use MM\Meros\Support\ClassInfo;
 
