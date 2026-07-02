@@ -7,6 +7,6 @@
 
     <div class="w-full h-full p-4 overflow-hidden min-w-0" wire:key="form-builder-settings-panel">
         @include('meros::toolbox.forms.builder.settings.settings-general')
-        @include('meros::toolbox.forms.builder.settings.settings-actions')
+        {{-- @include('meros::toolbox.forms.builder.settings.settings-actions') --}}
     </div>
 </div>

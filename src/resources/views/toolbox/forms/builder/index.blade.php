@@ -5,8 +5,7 @@
         'navItems'   => $navItems
     ])
     <main class="flex-1 min-h-0" wire:key="form-builder-main-content">
-        @include('meros::toolbox.forms.builder.canvas.index')
-        {{-- @if($screen === 'settings-main')
+        @if($screen === 'settings-main')
             @include('meros::toolbox.forms.builder.settings.index', [
                 'formID'          => $formID,
                 'formTitle'       => $formTitle,
@@ -14,7 +13,7 @@
                 'formSlug'        => $formSlug
             ])
         @else
-            @include('meros::toolbox.forms.builder.canvas.main')
-        @endif --}}
+            @include('meros::toolbox.forms.builder.canvas.index')
+        @endif
     </main>
 </div>

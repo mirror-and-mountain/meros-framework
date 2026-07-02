@@ -13,8 +13,8 @@
             id="form-title" 
             type="text"
             class="nice-form-control"
-            :value="$store.formBuilder.formTitle"
-            @change="$store.formBuilder.setFormTitle($event.target.value)"
+            value="{{ $formTitle }}"
+            wire:change="updateSetting('title', $event.target.value)"
         />
     </div>
 
@@ -26,20 +26,25 @@
             id="form-slug" 
             type="text" 
             class="nice-form-control"
-            :value="$store.formBuilder.formSlug"
-            @change="$store.formBuilder.setFormSlug($event.target.value)"
+            value="{{ $formSlug }}"
+            wire:change="updateSetting('slug', $event.target.value)"
         />
     </div>
 
     {{-- Form Description --}}
-    <div class="nice-form-group meros-rich-textarea-wrapper" wire:ignore>
-        <label id="form-description" class="form-label">Form Description</label>
+    <fieldset class="nice-form-group meros-field" wire:ignore>
+        <legend id="form-description-label" class="form-label">Form Description</legend>
         <small class="whitespace-normal">The form's description</small>
         <div
-            class="meros-rich-textarea meros-form-description"
-            aria-labelledby="form-description"
-        ></div>
-    </div>
+            x-data="merosRichTextField('form-description', {}, (event) => $wire.updateSetting('description', event.target.innerHTML))"
+            id="form-description"
+            name="form-description"
+            class="nice-form-control"
+            aria-labelledby="form-description-label"
+        >
+            {!! $formDescription !!}
+        </div>
+    </fieldset>
 
     {{-- Form Status --}}
     <div class="nice-form-group mb-8">
@@ -48,12 +53,12 @@
         <select 
             id="form-status" 
             class="nice-form-control"
-            :value="$store.formBuilder.formStatus"
-            @change="$store.formBuilder.setFormStatus($event.target.value)"
+            value="{{ $formStatus }}"
+            wire:change="updateSetting('status', $event.target.value)"
         >
-            <option value="draft">Draft</option>
-            <option value="publish">Published</option>
-            <option value="pending">Pending Review</option>
+            <option @selected($formStatus === 'draft') value="draft">Draft</option>
+            <option @selected($formStatus === 'publish') value="publish">Published</option>
+            <option @selected($formStatus === 'pending') value="pending">Pending Review</option>
         </select>
     </div>
 

@@ -23,8 +23,6 @@ use MM\Meros\Facades\FormActions;
 use MM\Meros\App\Models\Form;
 use MM\Meros\App\Models\PostMeta as FormMeta;
 
-use MM\Meros\App\Toolbox\Forms\Concerns\ManagesFormSchema;
-
 class Builder extends Component {
     /**
      * Nav Items to be rendered in the builder's navigation bar.
@@ -200,6 +198,8 @@ class Builder extends Component {
             'formID'          => $this->formID,
             'formTitle'       => $this->formSettings['title'] ?? '',
             'formDescription' => $this->formSettings['description'] ?? '',
+            'formSlug'        => $this->formSettings['slug'] ?? '',
+            'formStatus'      => $this->formSettings['status'] ?? '',
         ])
             ->layout('meros::toolbox.layout');
     }
@@ -1601,6 +1601,47 @@ class Builder extends Component {
 
         return $html;
     }
+
+    // =========================================================================
+    // Settings Management Methods / Main Screens
+    // =========================================================================
+
+    /**
+     * Public alias for changeScreen.
+     *
+     * @param string $screen
+     *
+     * @return void
+     */
+    public function setScreen(string $screen): void {
+        $this->changeScreen($screen);
+    }
+
+    /**
+     * Opens the form settings screen.
+     *
+     * @return void
+     */
+    public function openFormSettings(): void {
+        $this->changeScreen('settings-main', $this->screen);
+    }
+
+    /**
+     * Updates a specific form setting.
+     *
+     * @param string $settingKey
+     * @param string $settingValue
+     *
+     * @return void
+     */
+    public function updateSetting(string $settingKey, string $settingValue): void {
+        $this->formSettings[$settingKey] = $settingValue;
+
+        if ($settingKey === 'title' && (!isset($this->formSettings['slug']) || empty($this->formSettings['slug']))) {
+            $this->formSettings['slug'] = Str::slug($settingValue);
+        }
+    }
+
 
     // =========================================================================
     // Saving and Default Schema

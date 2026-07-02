@@ -750,12 +750,22 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.updateActiveFieldProperty('default', value);
-            
-            const fieldId = element.getAttribute('data-field-id');
 
-            if (fieldId) {
-                setFieldValue(fieldId, value);
+            const fieldIdFromSuffix = (typeof element.id === 'string' && element.id.endsWith('-default'))
+                ? element.id.replace(/-default$/, '')
+                : null;
+
+            const fieldId = element.getAttribute('data-field-id')
+                || element.getAttribute('data-field')
+                || element.dataset?.fieldId
+                || element.dataset?.field
+                || fieldIdFromSuffix;
+
+            if (!fieldId) {
+                return;
             }
+
+            setFieldValue(fieldId, value);
         },
     }));
 
@@ -945,6 +955,7 @@ document.addEventListener('alpine:init', () => {
     }));
 });
 
-// window.addEventListener('mforms:field-updated', ({ detail }) => {
-//     console.log('Field updated:', detail);
-// });
+
+window.addEventListener('mforms:field-updated', ({ detail }) => {
+    console.log('Field updated:', detail);
+});

@@ -48,14 +48,11 @@ use MM\Meros\App\Admin\Templates\MerosFeaturesPage;
 use MM\Meros\App\Theme;
 use MM\Meros\App\Models\Form;
 use MM\Meros\App\Models\EmailTemplate;
-use MM\Meros\App\Models\EmailTemplateMeta;
 
 use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Packages as PackagesAccessor;
 use MM\Meros\Facades\Blocks as BlocksAccessor;
 use MM\Meros\Facades\AssetGroups as AssetGroupsAccessor;
-
-use Illuminate\Support\Facades\Log;
 
 final class Framework extends FeatureProvider {
     /**

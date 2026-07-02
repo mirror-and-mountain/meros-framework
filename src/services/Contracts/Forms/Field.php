@@ -548,6 +548,10 @@ abstract class Field extends FeatureDefinition implements Wireable {
     public function render(bool $wrapped = true, array $props = []): void {
         $props = $this->getRenderProps($props);
 
+        // if ($this->handle === 'rich-text') {
+        //     dd($props);
+        // }
+
         if ($wrapped) {
             $wrapper = $this->resolveFieldWrapper();
             echo view($wrapper, $props);
@@ -688,7 +692,11 @@ abstract class Field extends FeatureDefinition implements Wireable {
             'name'              => $this->getName() . '_default',
             'label'             => 'Default Value',
             'helpText'          => "The field's default value.",
-            'attributes'        => ['data-default-value-control' => 'true', 'data-field-id' => $this->getId()],
+            'attributes'        => [
+                'data-default-value-control' => 'true',
+                'data-field-id' => $this->getId(),
+                'data-field' => $this->getId(),
+            ],
             'excludeAttributes' => ['id', 'required', 'aria-required', 'disabled', 'aria-disabled'],
             'rules'             => [],
             'component'         => $component
