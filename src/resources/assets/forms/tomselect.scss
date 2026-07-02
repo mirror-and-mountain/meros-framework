@@ -2,6 +2,14 @@
     width: 100%;
 }
 
+/* Keep TomSelect's hidden source <select> from expanding layout width. */
+.meros-field select.ts-hidden-accessible {
+    width: 1px !important;
+    min-width: 1px !important;
+    max-width: 1px !important;
+    height: 1px !important;
+}
+
 .nice-form-group .ts-wrapper .ts-control {
     background: var(--nf-input-background-color) !important;
     font-size: var(--nf-input-font-size) !important;

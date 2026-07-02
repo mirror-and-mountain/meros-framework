@@ -258,6 +258,7 @@ document.addEventListener('alpine:init', () => {
         return {
             ...fieldContract,
             type: null,
+            onDateTimeClick: null,
 
             init() {
                 fieldContract.init.call(this);
@@ -265,6 +266,22 @@ document.addEventListener('alpine:init', () => {
                 if (this.element) {
                     this.type = this.element.dataset.fieldType || (this.element.tagName === 'INPUT' ? this.element.type : null);
                     this.previousValue = snapshotValue(this.value);
+
+                    const pickerTypes = ['date', 'time', 'month', 'week', 'datetime-local'];
+                    const inputType = (this.element.getAttribute('type') || '').toLowerCase();
+
+                    if (pickerTypes.includes(inputType) && typeof this.element.showPicker === 'function') {
+                        this.onDateTimeClick = () => {
+                            // Ensure picker opens consistently when decorative icons are clicked.
+                            try {
+                                this.element.showPicker();
+                            } catch (e) {
+                                // Ignore unsupported or blocked calls and fall back to native behavior.
+                            }
+                        };
+
+                        this.element.addEventListener('click', this.onDateTimeClick);
+                    }
                 }
             },
 
@@ -306,8 +323,13 @@ document.addEventListener('alpine:init', () => {
             },
 
             destroy() {
+                if (this.element && this.onDateTimeClick) {
+                    this.element.removeEventListener('click', this.onDateTimeClick);
+                }
+
                 fieldContract.destroy.call(this);
                 this.type = null;
+                this.onDateTimeClick = null;
             },
 
             onChange() {

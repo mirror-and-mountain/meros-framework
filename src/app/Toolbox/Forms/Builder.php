@@ -50,7 +50,7 @@ class Builder extends Component {
      *
      * @var string
      */
-    public string $screen = 'canvas-main';
+    public string $screen = 'settings-main';
 
     /**
      * The form model.
@@ -181,7 +181,6 @@ class Builder extends Component {
                     $this->rows[$index] = FormRow::initFromData(array_merge($row, ['index' => $index]));
                 }
             }
-
         } 
         
         else {

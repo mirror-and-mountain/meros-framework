@@ -28,7 +28,6 @@
 	flex-wrap: wrap;
 	gap: 0.75rem;
 	align-items: stretch;
-	margin-bottom: 1.5rem;
 	min-width: 0;
 }
 
@@ -112,7 +111,7 @@
 	input[type="date"],
 	input[type="time"],
 	textarea,
-	select {
+	select:not(.ts-hidden-accessible) {
 		width: 100% !important;
 		max-width: 100%;
 		box-sizing: border-box;
@@ -206,7 +205,7 @@
 	.meros-form .meros-field input[type="date"],
 	.meros-form .meros-field input[type="time"],
 	.meros-form .meros-field textarea,
-	.meros-form .meros-field select {
+	.meros-form .meros-field select:not(.ts-hidden-accessible) {
 		font-size: 16px;
 		line-height: 1.35;
 	}
@@ -220,7 +219,7 @@
 	.meros-form .meros-field input[type="tel"],
 	.meros-form .meros-field input[type="date"],
 	.meros-form .meros-field input[type="time"],
-	.meros-form .meros-field select {
+	.meros-form .meros-field select:not(.ts-hidden-accessible) {
 		min-height: 2.5rem;
 	}
 

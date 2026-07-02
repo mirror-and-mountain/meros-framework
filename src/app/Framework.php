@@ -336,6 +336,7 @@ final class Framework extends FeatureProvider {
             $postType->label('Form');
             $postType->description('A custom post type for managing Forms.');
             $postType->supports(['title']);
+            $postType->useBlocks();
             $postType->menuIcon('dashicons-feedback');
             $postType->public();
             $postType->rewrite(['slug' => 'forms']);

@@ -12,8 +12,8 @@
         <legend 
             id="{{ $id }}-label"
             class="form-label"
-        >
-            {{ $label }}
+            style="color:inherit;padding:0"
+        >{{ $label }}
             @if($isRequired)
                 <span class="required-indicator">*</span>
             @endif

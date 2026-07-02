@@ -3,7 +3,7 @@
     $fieldSetClass  = $isSubField ? 'nice-form-group !-mt-2.5' : 'nice-form-group';
 @endphp
 
-<fieldset id="{{ $id }}" class="{{ $fieldSetClass }}" data-field-type="{{ $fieldType }}">
+<fieldset id="{{ $id }}" class="{{ $fieldSetClass }}" data-field-type="{{ $field->handle }}">
     @if(!$isSubField && $label !== false)
         <legend 
             class="form-label"

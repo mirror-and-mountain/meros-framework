@@ -1,0 +1,493 @@
+
+@use 'nice-forms.css/dist/nice-forms.css';
+@use 'tom-select/dist/css/tom-select.css';
+@use 'repeaters.scss';
+@use 'tomselect.scss';
+
+.meros-form-container {
+	--meros-text: inherit;
+	--meros-muted: inherit;
+	--meros-accent: #111827;
+	--nf-label-color: inherit;
+	--meros-space-row-gap: 1rem;
+	--meros-space-row-stack: 1.5rem;
+	--meros-space-label-gap: 0.2rem;
+	--meros-space-help-gap: 0.5rem;
+	--meros-space-hint-gap: 0.45rem;
+	--meros-space-group-header-gap: 1rem;
+
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
+	color: inherit;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.meros-form-header {
+	padding: 0;
+
+	.meros-form-description {
+		font-size: 1rem;
+		line-height: 1.5;
+		color: inherit;
+		max-width: 70ch;
+	}
+}
+
+.meros-form {
+	display: grid;
+	gap: 1.1rem;
+	min-width: 0;
+}
+
+.meros-form-group-pagination {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.25rem 0;
+	min-width: 0;
+
+	&[x-cloak] {
+		display: none !important;
+	}
+}
+
+.meros-form-page-status {
+	font-size: 0.875rem;
+	line-height: 1.3;
+	color: inherit;
+	text-align: left;
+	white-space: nowrap;
+}
+
+.meros-form-group-page-header {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 0.6rem;
+	margin: 0 0 var(--meros-space-group-header-gap);
+}
+
+.meros-form-page-progress {
+	flex: 0 1 clamp(5rem, 18vw, 10rem);
+	block-size: 0.2rem;
+	border-radius: 999px;
+	background: #e5e7eb;
+	overflow: hidden;
+}
+
+.meros-form-page-progress-bar {
+	display: block;
+	block-size: 100%;
+	border-radius: inherit;
+	background: var(--meros-accent);
+	transition: width 220ms ease;
+}
+
+.meros-form-group-page-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 0.7rem;
+	margin-top: var(--meros-space-group-header-gap);
+}
+
+.meros-form-page-button {
+	appearance: none;
+	border: 0;
+	padding: 0.25rem 0.1rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+	line-height: 1.2;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+	transition: opacity 0.15s ease;
+
+	&:hover:not(:disabled) {
+		opacity: 0.7;
+	}
+
+	&:disabled {
+		opacity: 0.35;
+		cursor: not-allowed;
+	}
+}
+
+.meros-form-page-dots {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.35rem;
+	flex-wrap: wrap;
+}
+
+.meros-form-page-dot {
+	appearance: none;
+	inline-size: 0.48rem;
+	block-size: 0.48rem;
+	border-radius: 999px;
+	border: 0;
+	background: #d1d5db;
+	cursor: pointer;
+	padding: 0;
+	transition: transform 0.15s ease, background-color 0.15s ease;
+
+	&.is-active {
+		background: var(--meros-accent);
+		transform: scale(1.15);
+	}
+}
+
+.meros-form-group-page-transition {
+	will-change: transform, opacity;
+	animation-duration: 260ms;
+	animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+	animation-fill-mode: both;
+}
+
+.meros-form-group-page-transition--forward {
+	animation-name: meros-group-page-slide-forward;
+}
+
+.meros-form-group-page-transition--backward {
+	animation-name: meros-group-page-slide-backward;
+}
+
+@keyframes meros-group-page-slide-forward {
+	from {
+		opacity: 0;
+		transform: translateX(18px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes meros-group-page-slide-backward {
+	from {
+		opacity: 0;
+		transform: translateX(-18px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.meros-form-group-page-transition {
+		animation: none;
+	}
+}
+
+.meros-form-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--meros-space-row-gap);
+	align-items: stretch;
+	min-width: 0;
+}
+
+.meros-form-row > * {
+	flex: 1 1 calc((100% - 1.5rem) / 3);
+	width: 100%;
+	min-width: 0;
+}
+
+.meros-form-field {
+	justify-self: stretch;
+	align-self: start;
+	width: 100%;
+	min-width: 0;
+}
+
+.meros-form-field > * {
+	display: block;
+	width: 100%;
+	min-width: 0;
+}
+
+.meros-form-row .nice-form-group {
+	margin-top: 0;
+	margin-bottom: 0;
+	width: 100%;
+	min-width: 0;
+}
+
+.meros-form-row .nice-form-group > label {
+	white-space: normal;
+}
+
+.meros-form .nice-form-group > label,
+.meros-form .nice-form-group > .form-label,
+.meros-form fieldset.nice-form-group[data-field-type] > legend.form-label,
+.meros-form .nice-form-group[data-field-type='rich_text'] > legend,
+.meros-form .meros-field > label {
+	line-height: 1.4;
+	margin: 0 0 var(--meros-space-label-gap);
+}
+
+.meros-form .nice-form-group > label,
+.meros-form .nice-form-group > .form-label,
+.meros-form .nice-form-group label,
+.meros-form .meros-field > label {
+	color: inherit;
+}
+
+.meros-form-group:not(.meros-form-group--admin):not(.meros-form-group--no-style),
+.meros-form-group.meros-form-group--synthetic {
+	border: 0;
+	padding: 0;
+	margin: 0;
+	background: transparent;
+	box-shadow: none;
+	min-width: 0;
+	overflow: visible;
+}
+
+.meros-form-group-header {
+	margin: 0 0 var(--meros-space-group-header-gap);
+	padding: 0;
+}
+
+.meros-form-group-page-header + .meros-form-group-header {
+	margin-top: 0;
+}
+
+.meros-form-group-header h3 {
+	margin: 0;
+	font-size: 1rem;
+	line-height: 1.35;
+	color: inherit;
+}
+
+.meros-form-group-header p {
+	margin: 0.25rem 0 0;
+	font-size: 0.875rem;
+	line-height: 1.45;
+	color: inherit;
+}
+
+.meros-form-group-header a {
+	color: inherit;
+	text-decoration: underline;
+}
+
+.meros-field .description,
+.meros-admin-field .description,
+.meros-field .field-help-text-top,
+.meros-field .field-help-text-bottom {
+	display: block;
+	min-width: 0;
+	max-width: 100%;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+	hyphens: auto;
+	color: inherit;
+	font-size: 0.85rem;
+	line-height: 1.38;
+}
+
+.meros-field .description,
+.meros-admin-field .description,
+.meros-field .field-help-text-top,
+.meros-form fieldset.nice-form-group[data-field-type] > .description,
+.meros-form .nice-form-group[data-field-type='rich_text'] > .description {
+	margin: 0 0 var(--meros-space-help-gap) !important;
+}
+
+.meros-field .field-help-text-bottom {
+	margin: var(--meros-space-help-gap) 0 0;
+}
+
+.meros-form-group .meros-form-row + .meros-form-row {
+	margin-top: var(--meros-space-row-stack);
+}
+
+.meros-field {
+	input[type='text'],
+	input[type='email'],
+	input[type='url'],
+	input[type='number'],
+	input[type='password'],
+	input[type='search'],
+	input[type='tel'],
+	input[type='date'],
+	input[type='month'],
+	input[type='week'],
+	input[type='time'],
+	textarea,
+	select:not(.ts-hidden-accessible) {
+		width: 100% !important;
+		max-width: 100%;
+		min-width: 0;
+		box-sizing: border-box;
+	}
+
+	&.invalid {
+		input,
+		textarea,
+		select {
+			border-bottom-color: var(--nf-invalid-input-border-bottom-color, #dc2626) !important;
+		}
+	}
+
+	.meros-field-hints {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		justify-content: space-between;
+		margin-top: var(--meros-space-hint-gap);
+		color: inherit;
+
+		.meros-field-hint {
+			display: inline-flex;
+			align-items: center;
+			line-height: 1.25;
+			margin: 0;
+		}
+
+		.char-count-hint,
+		.word-count-hint,
+		.item-count-hint {
+			margin-left: auto;
+			justify-content: flex-end;
+			text-align: right;
+		}
+	}
+}
+
+.meros-field input[type='checkbox'],
+.meros-field input[type='radio'] {
+	width: auto;
+	max-width: none;
+	inline-size: 1rem;
+	block-size: 1rem;
+	min-inline-size: 1rem;
+	min-block-size: 1rem;
+	vertical-align: middle;
+}
+
+.meros-field label .required-indicator,
+.meros-field legend .required-indicator {
+	color: #dc2626;
+	margin-left: 0.25rem;
+	font-weight: 700;
+}
+
+.meros-form fieldset.nice-form-group[data-field-type] {
+	border: 0;
+	padding: 0;
+	margin: 0;
+	min-inline-size: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.meros-form fieldset.nice-form-group[data-field-type] > legend.form-label {
+	float: none;
+	display: block;
+	width: 100%;
+	padding: 0;
+	margin: 0 0 var(--meros-space-label-gap);
+	font-family: var(--nf-label-font-family, inherit);
+	font-size: var(--nf-label-font-size, 0.875rem);
+	font-weight: var(--nf-label-font-weight, 500);
+	line-height: 1.3;
+	color: inherit;
+	white-space: normal;
+}
+
+.meros-form .nice-form-group[data-field-type='rich_text'] {
+	border: 0;
+	padding: 0;
+	margin: 0;
+	min-width: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.meros-form .nice-form-group[data-field-type='rich_text'] > legend {
+	float: none;
+	padding: 0;
+	margin: 0 0 var(--meros-space-label-gap);
+	font-size: var(--nf-label-font-size, 0.875rem);
+	font-weight: var(--nf-label-font-weight, 500);
+	line-height: 1.3;
+	color: inherit;
+}
+
+@media (max-width: 980px) {
+	.meros-form-row > * {
+		flex-basis: calc((100% - 0.75rem) / 2);
+	}
+}
+
+@media (max-width: 640px) {
+	.meros-form-container {
+		gap: 1rem;
+	}
+
+	.meros-form {
+		gap: 0.875rem;
+	}
+
+	.meros-form-row {
+		gap: 0.75rem;
+		margin-bottom: 1rem;
+	}
+
+	.meros-form-row > * {
+		flex-basis: 100%;
+	}
+
+	.meros-form-page-status {
+		font-size: 0.82rem;
+	}
+
+	.meros-form-page-button {
+		font-size: 0.82rem;
+	}
+
+	.meros-form .meros-field input[type='text'],
+	.meros-form .meros-field input[type='email'],
+	.meros-form .meros-field input[type='url'],
+	.meros-form .meros-field input[type='number'],
+	.meros-form .meros-field input[type='password'],
+	.meros-form .meros-field input[type='search'],
+	.meros-form .meros-field input[type='tel'],
+	.meros-form .meros-field input[type='date'],
+	.meros-form .meros-field input[type='time'],
+	.meros-form .meros-field textarea,
+	.meros-form .meros-field select:not(.ts-hidden-accessible) {
+		font-size: 16px;
+		line-height: 1.35;
+	}
+
+	.meros-form .meros-field input[type='text'],
+	.meros-form .meros-field input[type='email'],
+	.meros-form .meros-field input[type='url'],
+	.meros-form .meros-field input[type='number'],
+	.meros-form .meros-field input[type='password'],
+	.meros-form .meros-field input[type='search'],
+	.meros-form .meros-field input[type='tel'],
+	.meros-form .meros-field input[type='date'],
+	.meros-form .meros-field input[type='time'],
+	.meros-form .meros-field select:not(.ts-hidden-accessible) {
+		min-height: 2.5rem;
+	}
+
+	.meros-form .meros-field textarea {
+		min-height: 7.5rem;
+	}
+}
