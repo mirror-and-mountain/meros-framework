@@ -44,6 +44,66 @@
 	min-width: 0;
 }
 
+.meros-form-view-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	width: max-content;
+	margin-left: auto;
+	padding: 0.15rem;
+	border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+	border-radius: 0;
+}
+
+.meros-form-view-toggle-button {
+	appearance: none;
+	border: 0;
+	inline-size: 2.1rem;
+	block-size: 2.1rem;
+	padding: 0;
+	font-size: 0.82rem;
+	font-weight: 600;
+	line-height: 1.2;
+	border-radius: 0;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	transition: background-color 0.15s ease, opacity 0.15s ease;
+
+	&:hover {
+		opacity: 0.8;
+	}
+
+	&.is-active {
+		background: color-mix(in srgb, currentColor 14%, transparent);
+	}
+}
+
+.meros-form-view-toggle-icon {
+	inline-size: 1rem;
+	block-size: 1rem;
+	stroke: currentColor;
+	stroke-width: 1.7;
+	fill: none;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.meros-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
 .meros-form-group-pagination {
 	display: flex;
 	align-items: center;
@@ -68,13 +128,27 @@
 .meros-form-group-page-header {
 	display: flex;
 	align-items: center;
-	justify-content: flex-start;
+	justify-content: space-between;
 	gap: 0.6rem;
 	margin: 0 0 var(--meros-space-group-header-gap);
 }
 
+.meros-form.is-paged-view .meros-form-group-page-header .meros-form-view-toggle {
+	margin-left: auto;
+}
+
+.meros-form-group-page-meta {
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 0.6rem;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
 .meros-form-page-progress {
-	flex: 0 1 clamp(5rem, 18vw, 10rem);
+	flex: 0 0 clamp(5rem, 18vw, 10rem);
+	min-inline-size: 5rem;
 	block-size: 0.2rem;
 	border-radius: 999px;
 	background: #e5e7eb;
@@ -95,6 +169,10 @@
 	justify-content: flex-start;
 	gap: 0.7rem;
 	margin-top: var(--meros-space-group-header-gap);
+}
+
+.meros-form-group-page-actions .mt-form-submit-button {
+	margin-left: auto;
 }
 
 .meros-form-page-button {
@@ -146,9 +224,13 @@
 
 .meros-form-group-page-transition {
 	will-change: transform, opacity;
-	animation-duration: 260ms;
-	animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+	animation-duration: 320ms;
+	animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
 	animation-fill-mode: both;
+}
+
+.meros-form-group-page-body {
+	min-width: 0;
 }
 
 .meros-form-group-page-transition--forward {
@@ -162,7 +244,7 @@
 @keyframes meros-group-page-slide-forward {
 	from {
 		opacity: 0;
-		transform: translateX(18px);
+		transform: translateX(12px);
 	}
 
 	to {
@@ -174,7 +256,7 @@
 @keyframes meros-group-page-slide-backward {
 	from {
 		opacity: 0;
-		transform: translateX(-18px);
+		transform: translateX(-12px);
 	}
 
 	to {
@@ -185,7 +267,9 @@
 
 @media (prefers-reduced-motion: reduce) {
 	.meros-form-group-page-transition {
-		animation: none;
+		animation: none !important;
+		opacity: 1 !important;
+		transform: none !important;
 	}
 }
 
@@ -252,6 +336,13 @@
 	box-shadow: none;
 	min-width: 0;
 	overflow: visible;
+	width: 100%;
+}
+
+.meros-form.is-full-view .meros-form-group + .meros-form-group {
+	border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+	padding-top: var(--meros-space-row-stack);
+	margin-top: 0.2rem;
 }
 
 .meros-form-group-header {
@@ -376,6 +467,7 @@
 	min-inline-size: 1rem;
 	min-block-size: 1rem;
 	vertical-align: middle;
+	margin-bottom: 0.25rem;
 }
 
 .meros-field label .required-indicator,
@@ -425,6 +517,37 @@
 	font-weight: var(--nf-label-font-weight, 500);
 	line-height: 1.3;
 	color: inherit;
+}
+
+.meros-form .nice-form-group[data-field-type='rich_text'] > div {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
+	overflow: hidden;
+}
+
+.meros-form .nice-form-group[data-field-type='rich_text'] .ql-toolbar,
+.meros-form .nice-form-group[data-field-type='rich_text'] .ql-container {
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
+}
+
+.meros-form .nice-form-group[data-field-type='rich_text'] .ql-toolbar {
+	overflow-x: auto;
+}
+
+.meros-form .nice-form-group[data-field-type='rich_text'] .ql-editor {
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
+	white-space: normal;
+	word-break: break-word;
+	overflow-wrap: anywhere;
 }
 
 @media (max-width: 980px) {

@@ -21,7 +21,7 @@
         name="{{ $name }}"
         {!! $attributes !!}
         aria-labelledby="{{ $id . '-label' }}"
-        style="background-color: var(--nf-input-background-color); border: 1px solid var(--nf-input-border-color); color: var(--nf-input-color); font-size: var(--nf-input-font-size);"
+        style="background-color: var(--nf-input-background-color); border: 1px solid var(--nf-input-border-color); color: var(--nf-input-color); font-size: var(--nf-input-font-size); width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box;"
     >
         {!! $value !!}
     </div>

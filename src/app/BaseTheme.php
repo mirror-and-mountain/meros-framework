@@ -23,13 +23,25 @@ abstract class BaseTheme extends FeatureProvider {
      * @return void
      */
     public function initialiseStyleSheet(): void {
-        add_action('wp_enqueue_scripts', function () {
-            $handle = $this->handle . '_style'; // e.g. meros_style.
+        $handle = $this->handle . '_style'; // e.g. meros_style.
+        $uri = get_stylesheet_uri();
+        $version = filemtime(trailingslashit(get_stylesheet_directory()) . 'style.css');
+
+        add_action('wp_enqueue_scripts', function () use ($handle, $uri, $version) {
             wp_enqueue_style(
                 $handle,
-                get_stylesheet_uri(),
+                $uri,
                 [],
-                filemtime(trailingslashit(get_stylesheet_directory()) . 'style.css')
+                $version
+            );
+        });
+
+        add_action('enqueue_block_editor_assets', function () use ($handle, $uri, $version) {
+            wp_enqueue_style(
+                $handle,
+                $uri,
+                [],
+                $version
             );
         });
     }

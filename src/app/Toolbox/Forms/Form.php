@@ -24,11 +24,13 @@ class Form extends Component {
     public int $activeGroupPage = 0;
     public int $totalGroupPages = 0;
     public string $groupPageDirection = 'forward';
+    public bool $isPagedView = false;
 
-    public function mount(string|int $formID, bool $showTitle = false, bool $showDescription = true) {
+    public function mount(string|int $formID, bool $showTitle = false, bool $showDescription = true, bool $isPagedView = false) {
         $this->formID = $formID;
         $this->showTitle = $showTitle;
         $this->showDescription = $showDescription;
+        $this->isPagedView = $isPagedView;
 
         if ($this->formID) {
             $this->form = FormModel::find($formID);
@@ -81,6 +83,15 @@ class Form extends Component {
 
     public function prevGroupPage(): void {
         $this->goToGroupPage($this->activeGroupPage - 1);
+    }
+
+    public function setPagedView(): void {
+        $this->isPagedView = true;
+        $this->recalculateGroupPages();
+    }
+
+    public function setFullView(): void {
+        $this->isPagedView = false;
     }
 
     /**
