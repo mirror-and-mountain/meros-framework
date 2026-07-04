@@ -107,7 +107,7 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
                 register_post_meta(
                     $this->postType,
                     $this->name,
-                    $this->args
+                    $this->getRegistrationArgs()
                 );
             });
         }
@@ -129,7 +129,7 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
             register_post_meta(
                 $this->postType,
                 $this->name,
-                $this->args
+                $this->getRegistrationArgs()
             );
 
             if ($this->fieldGroup !== null && !$this->metaBoxQueued) {
@@ -644,5 +644,30 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         }
 
         return array_values($value);
+    }
+
+    /**
+     * Builds registration args for register_post_meta with safe defaults for
+     * typed meta containers.
+     *
+     * @return array
+     */
+    protected function getRegistrationArgs(): array {
+        $args = $this->args;
+
+        // A null default is not valid for typed meta registration in WordPress.
+        // Only pass defaults when explicitly set to a concrete value.
+        if (array_key_exists('default', $args) && $args['default'] === null) {
+            unset($args['default']);
+        }
+
+        if (
+            in_array($this->type, ['array', 'object'], true)
+            && (($args['show_in_rest'] ?? false) === true)
+        ) {
+            $args['show_in_rest'] = ['schema' => $this->toSchema()];
+        }
+
+        return $args;
     }
 }
