@@ -3,6 +3,7 @@
 namespace MM\Meros\Services\Concerns;
 
 use Closure;
+use Illuminate\Support\Str;
 
 use MM\Meros\Services\Contracts\Admin\Setting;
 use MM\Meros\Services\Contracts\Admin\MenuPage;
@@ -214,9 +215,7 @@ trait HasSettings {
             return $this->settingsContainers['default'];
         }
 
-        $name = $this instanceof Theme
-            ? 'meros_theme_settings'
-            : $this->getHandle() . '_settings';
+        $name = $this->getHandle() . '_settings';
 
         $label = $this instanceof Theme
             ? 'Theme Settings'

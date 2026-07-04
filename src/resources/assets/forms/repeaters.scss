@@ -118,6 +118,60 @@
 	user-select: none;
 }
 
+.meros-repeater--settings .meros-repeater-table,
+.meros-settings-field .meros-repeater-table {
+	width: 100% !important;
+	table-layout: fixed !important;
+	border-collapse: separate !important;
+}
+
+.meros-repeater--settings .meros-repeater-table th,
+.meros-repeater--settings .meros-repeater-table td,
+.meros-settings-field .meros-repeater-table th,
+.meros-settings-field .meros-repeater-table td {
+	box-sizing: border-box;
+}
+
+.meros-repeater--settings .meros-repeater-table th.meros-repeater-head-cell,
+.meros-repeater--settings .meros-repeater-table td.meros-repeater-data-cell,
+.meros-repeater--settings .meros-repeater-table td.meros-repeater-move-cell,
+.meros-repeater--settings .meros-repeater-table td.meros-repeater-actions-cell,
+.meros-settings-field .meros-repeater-table th.meros-repeater-head-cell,
+.meros-settings-field .meros-repeater-table td.meros-repeater-data-cell,
+.meros-settings-field .meros-repeater-table td.meros-repeater-move-cell,
+.meros-settings-field .meros-repeater-table td.meros-repeater-actions-cell {
+	padding-top: 0.625rem !important;
+	padding-bottom: 0.625rem !important;
+}
+
+.meros-repeater--settings .meros-repeater-table .meros-repeater-data-header,
+.meros-repeater--settings .meros-repeater-table .meros-repeater-data-cell,
+.meros-settings-field .meros-repeater-table .meros-repeater-data-header,
+.meros-settings-field .meros-repeater-table .meros-repeater-data-cell {
+	min-width: 0;
+}
+
+.meros-repeater--settings .meros-repeater-table th.meros-repeater-head-cell--move,
+.meros-repeater--settings .meros-repeater-table td.meros-repeater-move-cell,
+.meros-settings-field .meros-repeater-table th.meros-repeater-head-cell--move,
+.meros-settings-field .meros-repeater-table td.meros-repeater-move-cell {
+	width: 3rem !important;
+	min-width: 3rem !important;
+	max-width: 3rem;
+	padding-left: 0.5rem !important;
+	padding-right: 0.5rem !important;
+	text-align: center;
+}
+
+.meros-repeater--settings .meros-repeater-table th.meros-repeater-head-cell--actions,
+.meros-repeater--settings .meros-repeater-table td.meros-repeater-actions-cell,
+.meros-settings-field .meros-repeater-table th.meros-repeater-head-cell--actions,
+.meros-settings-field .meros-repeater-table td.meros-repeater-actions-cell {
+	width: 9.5rem !important;
+	min-width: 9.5rem !important;
+	max-width: 9.5rem;
+}
+
 .meros-repeater-actions-cell {
 	text-align: right;
 	width: 6rem;

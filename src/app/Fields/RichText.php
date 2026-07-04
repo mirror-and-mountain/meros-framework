@@ -9,7 +9,7 @@ class RichText extends Field {
     public static string $category = 'specialised';
 
     protected function initialise(): void {
-        $this->handle = 'rich-text';
+        $this->handle = 'rich_text';
         $this->compatibleDataTypes = ['string'];
         $this->addSupports([
             'required',

@@ -2,6 +2,7 @@
 
 namespace MM\Meros\Services\Concerns;
 
+use Closure;
 use Illuminate\Support\Str;
 
 use MM\Meros\Services\Contracts\Forms\Field;
@@ -25,16 +26,39 @@ trait IsAdminFieldRegistrant {
     /**
      * Adds a field to the registrant.
      *
-     * @param Field|string|null $type    The type of field to add (e.g. 'text', 'checkbox', etc.), a Field instance, a Field class name, or null to infer the field type.
-     * @param array             $props   Optional properties for the field.
-     * @param array             $args    Additional arguments for the field. Not used by default, but may be used in child overrides of this method.
+    * @param Field|string|null  $type     The type of field to add (e.g. 'text', 'checkbox', etc.), a Field instance, a Field class name, or null to infer the field type.
+    * @param Closure|array|null $callback Optional callback to configure the field, or props array for legacy calls.
+    * @param array              $props    Optional properties for the field.
+    * @param array              $args     Additional arguments for child overrides. Not used by default.
      * 
      * @return Field The created Field instance.
      * @throws \BadMethodCallException if the registrant is not compatible with fields.
      * @throws \InvalidArgumentException if the provided field type is not compatible with the registrant's data type.
      */
-    public function field(Field|string|null $type = null, array $props = [], array $args = []): Field {
+    public function field(Field|string|null $type = null, Closure|array|null $callback = null, array $props = [], array $args = []): Field {
+        $params = func_num_args();
+
+        // Legacy signature support: field($type, $props, $args)
+        if ($params >= 3 && is_array($callback)) {
+            $legacyProps = $callback;
+
+            if ($params === 2) {
+                $props = $legacyProps;
+                $callback = null;
+            }
+
+            else if ($params === 3 && is_array($props)) {
+                $args = $props;
+                $props = $legacyProps;
+                $callback = null;
+            }
+        }
+
         if ($this->field !== null && $this->field instanceof Field) {
+            if ($callback instanceof Closure) {
+                $callback($this->field);
+            }
+
             return $this->field;
         }
 
@@ -57,7 +81,7 @@ trait IsAdminFieldRegistrant {
 
         // Instantiate a new field from a class name
         if (Str::contains($type, '\\')) {
-            $this->field = $this->makeFieldFrom($type, $props);
+            $this->field = $this->makeFieldFrom($type, $callback, $props);
 
             if (!$this->field->isCompatibleWith($this->getDataType(true))) {
                 throw new \InvalidArgumentException("Field of type '{$type}' is not compatible with data type '{$this->getDataType(true)}'.");
@@ -72,7 +96,7 @@ trait IsAdminFieldRegistrant {
         $fieldKey = $type ?? $this->inferFieldType();
 
         // Check register for id e.g. 'text'
-        $this->field = $this->makeFieldFrom($fieldKey, $props);
+        $this->field = $this->makeFieldFrom($fieldKey, $callback, $props);
 
         if (!$this->field->isCompatibleWith($this->getDataType(true))) {
             throw new \InvalidArgumentException("Field of type '{$fieldKey}' is not compatible with data type '{$this->getDataType(true)}'.");
@@ -115,13 +139,14 @@ trait IsAdminFieldRegistrant {
     /**
      * Creates a field instance from a given class name or register ID.
      *
-     * @param string $classOrId
-     * @param array  $props
+    * @param string               $classOrId
+    * @param Closure|array|null   $callback
+    * @param array                $props
      *
      * @return Field
      */
-    protected function makeFieldFrom(string $classOrId, array $props = []): Field {
-        $field = Fields::checkout($this->provider)->makeFrom($classOrId, [
+    protected function makeFieldFrom(string $classOrId, Closure|array|null $callback = null, array $props = []): Field {
+        $field = Fields::checkout($this->provider)->makeFrom($classOrId, $callback, [
             'id'        => $this->name . '_field',
             'name'      => $this->name
         ] + $props);

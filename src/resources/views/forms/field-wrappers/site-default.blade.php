@@ -2,7 +2,7 @@
     $attributesString = trim((string) $attributes);
     $isRequired = (bool) preg_match('/(?:^|\s)required(?:\s|=|$)/', $attributesString);
     $isDisabled = (bool) preg_match('/(?:^|\s)disabled(?:\s|=|$)/', $attributesString);
-    $isFieldSet = in_array($field->handle, ['radio', 'checkboxes', 'repeater', 'rich-text']);
+    $isFieldSet = in_array($field->handle, ['radio', 'checkboxes', 'repeater', 'rich_text']);
     $showMaxHint = $showMaxHint ?? true;
     $showMinHint = $showMinHint ?? false;
 

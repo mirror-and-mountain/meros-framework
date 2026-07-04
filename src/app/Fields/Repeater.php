@@ -575,6 +575,29 @@ class Repeater extends Field {
     }
 
     /**
+     * Attaches one or more existing field instances to the repeater.
+     * Alias for field() when passing existing fields.
+     *
+     * @param Field|array<Field> $field
+     *
+     * @return self
+     */
+    public function attach(Field|array $field): self {
+        if (is_array($field)) {
+            foreach ($field as $subField) {
+                if ($subField instanceof Field) {
+                    $this->field($subField);
+                }
+            }
+
+            return $this;
+        }
+
+        $this->field($field);
+        return $this;
+    }
+
+    /**
      * Refreshes the repeater's fields with a new array of field instances.
      *
      * @param array $fields<Field>

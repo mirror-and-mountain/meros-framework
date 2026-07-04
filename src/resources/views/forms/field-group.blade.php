@@ -1,4 +1,4 @@
-<div class="{{ $classList }}" id="{{ $groupID }}" data-group-handle="{{ $groupHandle }}">
+<div x-data="{ isEditor: false }" class="{{ $classList }}" id="{{ $groupID }}" data-group-handle="{{ $groupHandle }}">
     @if(!empty($groupTitle) || !empty($groupDescription))
         <div class="meros-form-group-header">
             @if(!empty($groupTitle))
@@ -16,7 +16,7 @@
             @foreach($groupRow->getFields() ?? [] as $groupField)
                 <div class="meros-form-field">
                     @if(($groupField->handle ?? null) === 'repeater')
-                        {!! $groupField->render(true, true) !!}
+                        {!! $groupField->render() !!}
                     @else
                         {!! $groupField->render() !!}
                     @endif

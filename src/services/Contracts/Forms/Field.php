@@ -548,10 +548,6 @@ abstract class Field extends FeatureDefinition implements Wireable {
     public function render(bool $wrapped = true, array $props = []): void {
         $props = $this->getRenderProps($props);
 
-        // if ($this->handle === 'rich-text') {
-        //     dd($props);
-        // }
-
         if ($wrapped) {
             $wrapper = $this->resolveFieldWrapper();
             echo view($wrapper, $props);
@@ -1524,7 +1520,13 @@ abstract class Field extends FeatureDefinition implements Wireable {
     public function getValue(): mixed {
         $value = is_string($this->value) ? trim($this->value) : $this->value;
 
-        if ($value === null || $value === '' || $value === []) {
+        // Preserve explicit empty arrays so cleared repeater/multi-value fields
+        // do not fall back to defaults after save.
+        if ($value === []) {
+            return [];
+        }
+
+        if ($value === null || $value === '') {
             return is_string($this->default) ? trim($this->default) : $this->default;
         }
 

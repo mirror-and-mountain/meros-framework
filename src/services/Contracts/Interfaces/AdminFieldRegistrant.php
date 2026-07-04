@@ -2,6 +2,7 @@
 
 namespace MM\Meros\Services\Contracts\Interfaces;
 
+use Closure;
 use MM\Meros\Services\Contracts\Forms\Field;
 
 interface AdminFieldRegistrant {
@@ -9,15 +10,17 @@ interface AdminFieldRegistrant {
      * Adds a field to the registrant.
      *
      * @param Field|string|null $type
-     * @param array       $props
-     * @param array       $args
+     * @param Closure|array|null $callback Optional callback to configure the field, or props array for legacy calls.
+     * @param array              $props Optional field properties.
+     * @param array              $args Optional additional args for concrete implementations.
      *
      * @return Field
      */
     public function field(
-        Field|string|null $type  = null,
-        array             $props = [],
-        array             $args  = []
+        Field|string|null  $type     = null,
+        Closure|array|null $callback = null,
+        array              $props    = [],
+        array              $args     = []
     ): Field;
     
     /**

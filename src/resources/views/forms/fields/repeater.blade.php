@@ -1,12 +1,22 @@
+@php
+    $classList = ' ' . $field->classList() . ' ';
+    $isAdminRepeater = str_contains($classList, ' meros-admin-field ');
+    $isSettingsRepeater = str_contains($classList, ' meros-settings-field ');
+@endphp
+
 <fieldset 
     x-data="merosRepeaterField('{{ $id }}', '{{ $placeholder }}', {{ $fieldCount }}, {{ $serialisedRules }})"
     id="{{ $id }}" 
-    class="meros-repeater meros-repeater-field" 
+    class="meros-repeater meros-repeater-field{{ $isSettingsRepeater ? ' meros-repeater--settings' : '' }}" 
     data-field-type="repeater" 
     data-repeater-name="{{ str_replace(['-'], '_', $id) }}"
     data-rule-max-items="{{ $maxRows ?? '-1' }}"
     data-rule-min-items="{{ $minRows ?? '-1' }}"
 >
+    @if($isAdminRepeater)
+        <input type="hidden" name="{{ $name }}[__empty]" value="1" data-repeater-empty-value="true">
+    @endif
+
     {{-- Legend --}}
     @if($label !== false)
         <legend 

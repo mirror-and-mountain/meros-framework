@@ -2,6 +2,7 @@
 
 namespace MM\Meros\Services\Contracts\Admin;
 
+use Closure;
 use Illuminate\Support\Str;
 
 use MM\Meros\Services\Contracts\FeatureProvider;
@@ -10,6 +11,7 @@ use MM\Meros\Services\Contracts\FeatureDefinition;
 use MM\Meros\Services\Contracts\Forms\Field;
 use MM\Meros\Services\Contracts\Interfaces\DataRegistrant;
 use MM\Meros\Services\Contracts\Interfaces\AdminFieldRegistrant;
+use MM\Meros\App\Fields\Repeater;
 
 use MM\Meros\Services\Concerns\IsDataRegistrant;
 
@@ -163,16 +165,41 @@ class Setting extends FeatureDefinition implements DataRegistrant, AdminFieldReg
     /**
      * Overrides field() method from IsAdminFieldRegistrant to create a settingsField instance in addition to the field instance.
      *
-     * @param  Field|string|null $type    The type of field to add (e.g. 'text', 'checkbox', etc.), a Field instance, a Field class name, or null to infer the field type.
-     * @param  array             $props   Optional properties for the field.
-     * @param  array             $args    Additional arguments for the field. Not used by default, but may be used in child overrides of this method.
+    * @param  Field|string|null  $type     The type of field to add (e.g. 'text', 'checkbox', etc.), a Field instance, a Field class name, or null to infer the field type.
+    * @param  Closure|array|null $callback Optional callback to configure the field, or props array for legacy calls.
+    * @param  array              $props    Optional properties for the field.
+    * @param  array              $args     Additional arguments for the field.
      *
      * @return Field
      * @throws \BadMethodCallException if the setting is not compatible with fields.
      */
-    final public function field(Field|string|null $type = null, array $props = [], array $args = []): Field {
-        $this->makeField($type, $props, $args);
+    final public function field(Field|string|null $type = null, Closure|array|null $callback = null, array $props = [], array $args = []): Field {
+        $params = func_num_args();
+
+        // Legacy signature support: field($type, $props, $args)
+        if ($params >= 3 && is_array($callback)) {
+            $legacyProps = $callback;
+
+            if ($params === 2) {
+                $props = $legacyProps;
+                $callback = null;
+            }
+
+            else if ($params === 3 && is_array($props)) {
+                $args = $props;
+                $props = $legacyProps;
+                $callback = null;
+            }
+        }
+
+        $this->ensureCompatibleDataTypeForField($type);
+
+        $this->makeField($type, $callback, $props, $args);
+        $this->syncFieldNameToSettingKey();
+        $this->syncRepeaterSubItemsFromField();
         $this->makeSettingsField($args);
+        $this->syncDefaultFromField();
+        $this->syncDescriptionFromField();
 
         return $this->field;
     }
@@ -227,6 +254,151 @@ class Setting extends FeatureDefinition implements DataRegistrant, AdminFieldReg
         );
 
         $this->field->settingsField($this->settingsField);
+    }
+
+    /**
+     * Ensures array settings are compatible when a repeater field is requested.
+     *
+     * @param Field|string|null $type
+     *
+     * @return void
+     */
+    final protected function ensureCompatibleDataTypeForField(Field|string|null $type): void {
+        if ($this->type !== 'array' || $this->getDataType(true) !== 'array.scalar') {
+            return;
+        }
+
+        $isRepeater = false;
+
+        if ($type instanceof Repeater) {
+            $isRepeater = true;
+        }
+
+        else if (is_string($type)) {
+            $normalisedType = Str::lower(str_replace('-', '_', $type));
+
+            if ($normalisedType === 'repeater' || $type === Repeater::class) {
+                $isRepeater = true;
+            }
+        }
+
+        if ($isRepeater) {
+            $this->itemType('object');
+        }
+    }
+
+    /**
+     * Syncs field-level defaults to the setting default when provided.
+     *
+     * @return void
+     */
+    final protected function syncDefaultFromField(): void {
+        if (!$this->field instanceof Field) {
+            return;
+        }
+
+        $fieldDefault = $this->field->getDefault();
+
+        if ($fieldDefault === null) {
+            return;
+        }
+
+        $this->default($fieldDefault);
+    }
+
+    /**
+     * Syncs field help text to setting description when provided.
+     *
+     * @return void
+     */
+    final protected function syncDescriptionFromField(): void {
+        if (!$this->field instanceof Field) {
+            return;
+        }
+
+        $fieldHelpText = $this->field->getHelpText();
+
+        if (!is_string($fieldHelpText)) {
+            return;
+        }
+
+        $fieldHelpText = trim($fieldHelpText);
+
+        if ($fieldHelpText === '') {
+            return;
+        }
+
+        $this->description($fieldHelpText);
+    }
+
+    /**
+     * Keeps the rendered field name aligned with the setting key so posted
+     * payload always maps back to this setting definition.
+     *
+     * @return void
+     */
+    final protected function syncFieldNameToSettingKey(): void {
+        if (!$this->field instanceof Field) {
+            return;
+        }
+
+        $this->field->name($this->name);
+    }
+
+    /**
+     * Mirrors repeater sub-fields into setting sub-items so sanitize/schema logic
+     * can preserve row values in settings context.
+     *
+     * @return void
+     */
+    final protected function syncRepeaterSubItemsFromField(): void {
+        if (!$this->field instanceof Repeater) {
+            return;
+        }
+
+        if ($this->type !== 'array') {
+            return;
+        }
+
+        if ($this->getItemDataType() !== 'object') {
+            $this->itemType('object');
+        }
+
+        $existingSubItems = collect($this->subItems)
+            ->keyBy(fn ($item) => $item->getName())
+            ->all();
+
+        foreach ($this->field->getFields() as $subField) {
+            if (!$subField instanceof Field) {
+                continue;
+            }
+
+            $subItemName = Str::snake($subField->getName(false));
+
+            if ($subItemName === '') {
+                continue;
+            }
+
+            $subItem = $existingSubItems[$subItemName] ?? null;
+
+            if ($subItem === null) {
+                $subItem = $this->add([
+                    'name' => $subItemName,
+                    'type' => $subField->getDataType(),
+                ]);
+
+                $existingSubItems[$subItemName] = $subItem;
+            }
+
+            $subItem->label($subField->getLabel());
+            $subItem->description((string) ($subField->getHelpText() ?? ''));
+
+            $default = $subField->getDefault();
+
+            if ($default !== null && gettype($default) === $subField->getDataType()) {
+                $subItem->default($default);
+            }
+        }
     }
 
     /** Walk through all sub-items and apply a callback to their setting fields if they exist.

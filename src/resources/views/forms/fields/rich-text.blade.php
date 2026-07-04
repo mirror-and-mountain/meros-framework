@@ -25,4 +25,13 @@
     >
         {!! $value !!}
     </div>
+
+    <input
+        type="hidden"
+        id="{{ $id }}-input"
+        name="{{ $name }}"
+        value="{{ $value }}"
+        data-rich-text-input-for="{{ $id }}"
+        data-base-field-name="{{ $field->getName(false) }}"
+    >
 </fieldset>

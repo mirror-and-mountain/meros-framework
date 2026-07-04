@@ -404,7 +404,7 @@ class FieldGroup extends FeatureDefinition implements Wireable {
                         'type' => $subField->getDataType(),
                     ]);
 
-                    $subItem->field($subField);
+                    // Keep repeater sub-fields scoped to the repeater UI; only register their schema metadata.
                     $subItem->label($subField->getLabel());
                     $subItem->description($subField->getHelpText());
 

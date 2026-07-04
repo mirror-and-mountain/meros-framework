@@ -884,8 +884,12 @@ final class Framework extends FeatureProvider {
                             }
 
                             echo '<h2' . ($hasTables ? ' style="margin-top: 2em;"' : '') . '>Theme Settings</h2>';
-                            settings_fields('meros_theme_settings_container');
-                            do_settings_sections('meros-features-theme');
+                            $theme = ThemeAccessor::get();
+                            $themeSettingsGroup = Str::snake($theme->getHandle()) . '_settings_container';
+                            $themeSettingsPage = $theme->getSettingsPageSlug();
+
+                            settings_fields($themeSettingsGroup);
+                            do_settings_sections($themeSettingsPage);
                             submit_button();
                         }
                     ],

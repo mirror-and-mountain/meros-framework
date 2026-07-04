@@ -8,6 +8,7 @@ use MM\Meros\Services\Contracts\FeatureDefinition;
 
 use MM\Meros\Services\Contracts\Forms\Field;
 use MM\Meros\Services\Contracts\Forms\FieldGroup;
+use MM\Meros\App\Fields\Repeater;
 
 use MM\Meros\Services\Contracts\Interfaces\DataRegistrant;
 use MM\Meros\Services\Contracts\Interfaces\AdminFieldRegistrant;
@@ -141,11 +142,15 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
                 add_action('add_meta_boxes', function() {
                     $fields = $this->fieldGroup->getFields(true);
                     $postID = get_post()->ID;
-                    $value  = $this->getValue($postID) ?? [];
+                    $value  = $this->getValue($postID);
+
+                    if (!is_array($value)) {
+                        $value = [];
+                    }
 
                     foreach($fields as $field) {
-                        $field->value($value[$field->getName(false)] ?? null);
-                        $field->default($this->getDefault());
+                        $subKey = $field->getName(false);
+                        $field->value($value[$subKey] ?? null);
                     }
 
                     add_meta_box(
@@ -222,17 +227,35 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
 
         // Get submitted data
         $submittedData = $_POST[$this->name] ?? [];
+
+        if (!is_array($submittedData)) {
+            $submittedData = [];
+        }
         
         // Get existing meta to merge with
         $existingData = $this->getValue($postId);
+
+        if (!is_array($existingData)) {
+            $existingData = [];
+        }
 
         // Merge submitted data with existing data, ensuring we only save defined sub-fields
         foreach ($this->fieldGroup->getFields(true) as $field) {
             $subKey = $field->getName(false); // Get the field name without the root path
 
-            if (array_key_exists($subKey, $submittedData)) {
+            if ($field instanceof Repeater) {
+                $existingData[$subKey] = $this->resolveSubmittedRepeaterRows(
+                    $submittedData,
+                    $subKey,
+                    $field
+                );
+            }
+
+            else if (array_key_exists($subKey, $submittedData)) {
                 $existingData[$subKey] = $submittedData[$subKey];
-            } else {
+            }
+
+            else {
                 // Handle unchecked checkboxes, empty selects, etc.
                 $existingData[$subKey] = $field->getValue();
             }
@@ -302,14 +325,33 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
     /**
      * Overrides field() method from IsAdminFieldRegistrant to ensure the field is attached to the correct field group.
      *
-     * @param  Field|string|null $type    The type of field to add (e.g. 'text', 'checkbox', etc.), a Field instance, a Field class name, or null to infer the field type.
-     * @param  array             $props   Optional properties for the field.
-     * @param  array             $args    Additional arguments for the field. Not used by default, but may be used in child overrides of this method.
+    * @param  Field|string|null  $type     The type of field to add (e.g. 'text', 'checkbox', etc.), a Field instance, a Field class name, or null to infer the field type.
+    * @param  Closure|array|null $callback Optional callback to configure the field, or props array for legacy calls.
+    * @param  array              $props    Optional properties for the field.
+    * @param  array              $args     Additional arguments for the field.
      *
      * @return Field
      */
-    final public function field(Field|string|null $type = null, array $props = [], array $args = []): Field {
-        $this->makeField($type, $props, $args);
+    final public function field(Field|string|null $type = null, Closure|array|null $callback = null, array $props = [], array $args = []): Field {
+        $params = func_num_args();
+
+        // Legacy signature support: field($type, $props, $args)
+        if ($params >= 3 && is_array($callback)) {
+            $legacyProps = $callback;
+
+            if ($params === 2) {
+                $props = $legacyProps;
+                $callback = null;
+            }
+
+            else if ($params === 3 && is_array($props)) {
+                $args = $props;
+                $props = $legacyProps;
+                $callback = null;
+            }
+        }
+
+        $this->makeField($type, $callback, $props, $args);
         $this->getFieldGroup()->field($this->field);
 
         return $this->field;
@@ -450,5 +492,133 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         $this->fieldGroup = $fieldGroup;
         $this->fieldGroup->parentMeta($this);
         return $this;
+    }
+
+    /**
+     * Detects a raw repeater rows payload keyed by numeric row indexes.
+     *
+     * @param mixed $value
+     *
+     * @return bool
+     */
+    protected function looksLikeRepeaterRows(mixed $value): bool {
+        if (!is_array($value) || empty($value)) {
+            return false;
+        }
+
+        $keys = array_keys($value);
+
+        foreach ($keys as $key) {
+            if (!(is_int($key) || ctype_digit((string) $key))) {
+                return false;
+            }
+        }
+
+        $firstRow = reset($value);
+        return is_array($firstRow);
+    }
+
+    /**
+     * Extracts repeater rows from malformed/mixed submitted payloads.
+     *
+     * Handles shapes like:
+     * - _meta[0][child]
+     * - _meta[text] plus _meta[0][child]
+     *
+     * Returns null when no numeric row payload can be inferred.
+     *
+     * @param mixed    $submittedData
+     * @param Repeater $field
+     *
+     * @return array|null
+     */
+    protected function extractRepeaterRowsFromSubmittedData(mixed $submittedData, Repeater $field): ?array {
+        if (!is_array($submittedData)) {
+            return null;
+        }
+
+        $candidateRows = [];
+
+        foreach ($submittedData as $key => $row) {
+            if ((is_int($key) || ctype_digit((string) $key)) && is_array($row)) {
+                $candidateRows[] = $row;
+            }
+        }
+
+        if (empty($candidateRows)) {
+            return null;
+        }
+
+        $subFieldNames = [];
+
+        foreach ($field->getFields(true) as $subField) {
+            if ($subField instanceof Field) {
+                $name = $subField->getName(false);
+
+                if (is_string($name) && $name !== '') {
+                    $subFieldNames[] = $name;
+                }
+            }
+        }
+
+        if (empty($subFieldNames)) {
+            return array_values($candidateRows);
+        }
+
+        $filteredRows = [];
+
+        foreach ($candidateRows as $row) {
+            $hasExpectedKey = false;
+
+            foreach ($subFieldNames as $subFieldName) {
+                if (array_key_exists($subFieldName, $row)) {
+                    $hasExpectedKey = true;
+                    break;
+                }
+            }
+
+            if ($hasExpectedKey) {
+                $filteredRows[] = $row;
+            }
+        }
+
+        return array_values($filteredRows);
+    }
+
+    /**
+     * Resolves submitted repeater rows for a specific repeater key.
+     *
+     * @param array    $submittedData
+     * @param string   $subKey
+     * @param Repeater $field
+     *
+     * @return array
+     */
+    protected function resolveSubmittedRepeaterRows(array $submittedData, string $subKey, Repeater $field): array {
+        $hasExplicitRepeaterKey = array_key_exists($subKey, $submittedData);
+        $submittedRepeater      = $hasExplicitRepeaterKey ? $submittedData[$subKey] : null;
+
+        if (is_array($submittedRepeater) && array_key_exists('__empty', $submittedRepeater)) {
+            unset($submittedRepeater['__empty']);
+        }
+
+        // Preferred shape: _meta[repeater_key][0][child]
+        $rows = $this->extractRepeaterRowsFromSubmittedData($submittedRepeater, $field);
+
+        if ($rows !== null) {
+            return $rows;
+        }
+
+        // If the repeater key exists but no rows are present, this is an explicit
+        // empty-state submission (e.g. marker-only payload) and should persist [].
+        if ($hasExplicitRepeaterKey) {
+            return [];
+        }
+
+        // Backward-compat fallback for malformed/mixed payloads like:
+        // _meta[0][child] or _meta[text] + _meta[0][child].
+        $rows = $this->extractRepeaterRowsFromSubmittedData($submittedData, $field);
+
+        return $rows ?? [];
     }
 }

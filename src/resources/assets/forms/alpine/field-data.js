@@ -587,16 +587,19 @@ document.addEventListener('alpine:init', () => {
                 if (!this.__isInstantiated()) {
                     if (this.element && !this.element.closest('.meros-repeater-template-row')) {
                         this.element.innerHTML = htmlValue;
+                        this.__syncHiddenInput(htmlValue);
                         this.__instantiate();
                     }
 
                     if (!this.__isInstantiated()) {
                         this.value = snapshotValue(htmlValue);
+                        this.__syncHiddenInput(htmlValue);
                         return;
                     }
                 }
 
                 this.__setEditorHtml(this.element.__quill, htmlValue);
+                this.__syncHiddenInput(htmlValue);
                 this.__dispatchUpdate();
             },
 
@@ -686,9 +689,27 @@ document.addEventListener('alpine:init', () => {
 
                     this.value = snapshotValue(this.getValue());
                     this.previousValue = snapshotValue(this.value);
+                    this.__syncHiddenInput(this.value);
                 } finally {
                     this.isInstantiating = false;
                 }
+            },
+
+            __syncHiddenInput(value = null) {
+                if (!this.element || !this.id) {
+                    return;
+                }
+
+                const hiddenInput = this.element
+                    .closest('fieldset')
+                    ?.querySelector(`[data-rich-text-input-for="${this.id}"]`);
+
+                if (!hiddenInput) {
+                    return;
+                }
+
+                const html = typeof value === 'string' ? value : (this.getValue() || '');
+                hiddenInput.value = html;
             },
 
             __cleanupQuillDom(host, fallbackHtml = '') {
@@ -747,10 +768,11 @@ document.addEventListener('alpine:init', () => {
             __dispatchUpdate(context = {}) {
                 const oldValue = snapshotValue(this.value);
                 const value = snapshotValue(this.getValue());
+                this.__syncHiddenInput(value);
 
                 this.$dispatch('mforms:field-updated', {
                     formId: this.element ? this.element.closest('form')?.id || null : null,
-                    type: this.element ? this.element.dataset.fieldType || 'rich-text' : 'rich-text',
+                    type: this.element ? this.element.dataset.fieldType || 'rich_text' : 'rich_text',
                     id: this.id,
                     name: this.element ? this.element.name : null,
                     element: this.element,
@@ -1302,7 +1324,26 @@ document.addEventListener('alpine:init', () => {
 
             __reindexRowFields() {
                 if (!this.element) return;
-                const rows = this.element.querySelectorAll('.meros-repeater-row');
+                const rows = this.element.querySelectorAll('.meros-repeater-row:not(.meros-repeater-template-row)');
+
+                const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const buildReindexedName = (currentName, nextIndex, nextFieldName) => {
+                    const escapedFieldName = escapeRegExp(nextFieldName);
+                    const trailingRowPattern = new RegExp(`\\[[^\\[\\]]+\\]\\[${escapedFieldName}\\](\\[\\])?$`);
+
+                    if (trailingRowPattern.test(currentName)) {
+                        return currentName.replace(trailingRowPattern, `[${nextIndex}][${nextFieldName}]$1`);
+                    }
+
+                    const firstBracket = currentName.indexOf('[');
+
+                    if (firstBracket === -1) {
+                        return `${currentName}[${nextIndex}][${nextFieldName}]`;
+                    }
+
+                    const rootName = currentName.substring(0, firstBracket);
+                    return `${rootName}[${nextIndex}][${nextFieldName}]`;
+                };
 
                 rows.forEach((row, rowIndex) => {
                     row.setAttribute('data-repeater-row-index', rowIndex);
@@ -1311,13 +1352,12 @@ document.addEventListener('alpine:init', () => {
 
                     cells.forEach((cell) => {
                         const fieldName = cell.dataset.fieldName;
-                        const input = cell.querySelector(`[data-base-field-name="${fieldName}"]`);
+                        const inputs = cell.querySelectorAll(`[data-base-field-name="${fieldName}"]`);
 
-                        if (input) {
-                            const nameIndex = input.name.indexOf('[');
-                            const baseName = input.name.substring(0, nameIndex);
-                            const newName = `${baseName}[${rowIndex}][${fieldName}]`;
-                            input.name = newName;
+                        inputs.forEach((input) => {
+                            if (typeof input.name === 'string' && input.name !== '') {
+                                input.name = buildReindexedName(input.name, rowIndex, fieldName);
+                            }
 
                             if (input.id) {
                                 input.id = input.id.replace(/-\d+-/, `-${rowIndex}-`);
@@ -1325,7 +1365,7 @@ document.addEventListener('alpine:init', () => {
                             }
 
                             input.setAttribute('data-row-index', rowIndex);
-                        }
+                        });
                     });
                 });
             },
@@ -1369,7 +1409,13 @@ document.addEventListener('alpine:init', () => {
                     anchor.hidden = true;
                     anchor.dataset.repeaterDialogAnchor = fieldName;
 
-                    sourceCell.insertBefore(anchor, sourceField);
+                    const sourceParent = sourceField.parentNode;
+
+                    if (!sourceParent || !sourceParent.contains(sourceField)) {
+                        return;
+                    }
+
+                    sourceParent.insertBefore(anchor, sourceField);
                     placeholder.appendChild(sourceField);
 
                     this.activeDialogFieldMounts.push({

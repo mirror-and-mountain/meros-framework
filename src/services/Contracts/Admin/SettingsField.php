@@ -130,8 +130,10 @@ final class SettingsField extends FeatureDefinition {
 
         $render = function() use ($field) {
             $field->value($this->setting->getValue());
-            $field->default($this->setting->getDefault());
-            $field->render();
+            $field->render(true, [
+                'label' => false,
+                'helpText' => false
+            ]);
         };
 
         add_settings_field(
@@ -163,9 +165,37 @@ final class SettingsField extends FeatureDefinition {
         } 
         
         else if (is_string($section)) {
-            $this->sectionInstance = SettingsSections::checkout($this->provider)->makeFrom($section, $props);
-            $this->section = $this->sectionInstance->getID();
-            $this->page    = $this->sectionInstance->getPageSlug();
+            $resolvedSection = null;
+
+            // 1) Resolve by existing section ID first.
+            $existingSection = SettingsSections::checkout($this->provider)->get($section);
+
+            if ($existingSection instanceof SettingsSection) {
+                $resolvedSection = $existingSection;
+            }
+
+            // 2) Resolve by registered key if a matching section wasn't found.
+            if ($resolvedSection === null) {
+                try {
+                    $resolvedSection = SettingsSections::checkout($this->provider)->makeFrom($section, $props);
+                } catch (\Throwable $e) {
+                    $resolvedSection = null;
+                }
+            }
+
+            // 3) If a page slug is passed (e.g. meros-features-theme), use default section on that page.
+            if ($resolvedSection === null && str_starts_with($section, 'meros-features-')) {
+                $this->section = 'default';
+                $this->page = $section;
+                $this->queue();
+                return $this;
+            }
+
+            if ($resolvedSection !== null) {
+                $this->sectionInstance = $resolvedSection;
+                $this->section = $resolvedSection->getID();
+                $this->page    = $resolvedSection->getPageSlug();
+            }
         }
 
         $this->queue();

@@ -46,6 +46,8 @@ trait HasSanitizer {
         $map = [
             'text'      => 'string',
             'textarea'  => 'string',
+            'rich_text' => 'rich_text',
+            'rich-text' => 'rich_text',
             'select'    => 'string',
             'email'     => 'string',
             'url'       => 'string',
@@ -60,7 +62,17 @@ trait HasSanitizer {
         ];
 
         if (isset($this->field)) {
-            $fieldType    = $this->field->getVariation() ?? 'text';
+            $fieldType = null;
+
+            if (method_exists($this->field, 'getVariation')) {
+                $fieldType = $this->field->getVariation();
+            }
+
+            if (empty($fieldType) && method_exists($this->field, 'getType')) {
+                $fieldType = $this->field->getType();
+            }
+
+            $fieldType = strtolower(str_replace('-', '_', (string) ($fieldType ?? 'text')));
             $requiredType = $map[$fieldType] ?? 'string';
         }
 
@@ -82,9 +94,19 @@ trait HasSanitizer {
 
             $items = is_array($items) ? $items : [];
 
+            // Empty-state marker used by repeater settings fields to ensure the
+            // option key is submitted when all rows are removed.
+            if (array_key_exists('__empty', $items)) {
+                unset($items['__empty']);
+            }
+
             $sanitizedItems = [];
 
             foreach ($items as $_index => $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+
                 $row          = is_array($row) ? $row : [];
                 $sanitizedRow = [];
 
@@ -161,7 +183,13 @@ trait HasSanitizer {
             
             else if ($childType === 'array' || $childType === 'object') {
                 // For structured children, prefer submitted input to avoid retaining removed indices.
-                $value = $child->sanitize($nameExistsInInput ? $inputValue : $mergedValue);
+                $fallbackInput = $this->extractStructuredFallbackInput($input, $child);
+
+                $value = $child->sanitize(
+                    $nameExistsInInput
+                        ? $inputValue
+                        : ($fallbackInput ?? $mergedValue)
+                );
             } 
             
             else {
@@ -197,6 +225,11 @@ trait HasSanitizer {
             case 'textarea':
             case 'select':
                 $value = $this->sanitizeTextValue($value, $type, $requiredType);
+                break;
+
+            case 'rich_text':
+            case 'rich-text':
+                $value = $this->sanitizeRichTextValue($value);
                 break;
 
             case 'color':
@@ -246,6 +279,10 @@ trait HasSanitizer {
             else if ($requiredType === 'textarea') {
                 $value = sanitize_textarea_field($value);
             }
+
+            else if ($requiredType === 'rich_text') {
+                $value = $this->sanitizeRichTextValue($value);
+            }
         } 
         
         else {
@@ -253,5 +290,96 @@ trait HasSanitizer {
         }
 
         return $value;
+    }
+
+    /**
+     * Sanitizes rich text HTML using WordPress' post-content allowlist.
+     *
+     * @param mixed $value
+     *
+     * @return string
+     */
+    protected function sanitizeRichTextValue(mixed $value): string {
+        if (!is_scalar($value)) {
+            return '';
+        }
+
+        $value = (string) $value;
+
+        if (function_exists('wp_kses_post')) {
+            return wp_kses_post($value);
+        }
+
+        return strip_tags($value);
+    }
+
+    /**
+     * Attempts to recover malformed structured input for nested items.
+     *
+     * Supports payloads where repeater rows are submitted at the current level
+     * as numeric keys (e.g. option[0][sub_field]) instead of under child key.
+     *
+     * @param array $input
+     * @param mixed $child
+     *
+     * @return array|null
+     */
+    protected function extractStructuredFallbackInput(array $input, mixed $child): ?array {
+        if (!is_object($child) || !method_exists($child, 'getDataType')) {
+            return null;
+        }
+
+        $childType = $child->getDataType();
+
+        if ($childType !== 'array' || !method_exists($child, 'getItemDataType') || $child->getItemDataType() !== 'object') {
+            return null;
+        }
+
+        $candidateRows = [];
+
+        foreach ($input as $key => $row) {
+            if ((is_int($key) || ctype_digit((string) $key)) && is_array($row)) {
+                $candidateRows[] = $row;
+            }
+        }
+
+        if (empty($candidateRows)) {
+            return null;
+        }
+
+        $expectedKeys = [];
+
+        if (method_exists($child, 'getSubItems')) {
+            foreach ($child->getSubItems() as $subItem) {
+                if (is_object($subItem) && method_exists($subItem, 'getName')) {
+                    $name = $subItem->getName();
+
+                    if (is_string($name) && $name !== '') {
+                        $expectedKeys[] = $name;
+                    }
+                }
+            }
+        }
+
+        if (empty($expectedKeys)) {
+            return array_values($candidateRows);
+        }
+
+        $filteredRows = [];
+
+        foreach ($candidateRows as $row) {
+            foreach ($expectedKeys as $expectedKey) {
+                if (array_key_exists($expectedKey, $row)) {
+                    $filteredRows[] = $row;
+                    break;
+                }
+            }
+        }
+
+        if (empty($filteredRows)) {
+            return null;
+        }
+
+        return array_values($filteredRows);
     }
 }

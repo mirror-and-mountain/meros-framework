@@ -88,7 +88,15 @@ class FrameworkServiceProvider extends ServiceProvider {
             echo Blade::render('@livewireStyles');
         });
 
+        add_action('admin_head', function () {
+            echo Blade::render('@livewireStyles');
+        });
+
         add_action('wp_footer', function () {
+            echo Blade::render('@livewireScripts');
+        });
+
+        add_action('admin_footer', function () {
             echo Blade::render('@livewireScripts');
         });
         
