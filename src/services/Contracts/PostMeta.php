@@ -122,7 +122,7 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
      * @return void
      */
     final public function queueFromPostType(PostType $postType): void {
-        if (!$this->isRoot() && !$this->queued) {
+        if (!$this->queued) {
             $this->postType = $postType->handle;
 
             register_post_meta(

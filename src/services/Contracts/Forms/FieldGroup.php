@@ -345,7 +345,8 @@ class FieldGroup extends FeatureDefinition implements Wireable {
         }
 
         if ($this->parentMetaObject !== null) {
-            $field = $this->addMetaField($field);
+            // The field is already attached to this group via row->field(); only sync meta schema.
+            $field = $this->addMetaField($field, false);
         }
 
         $field->group($this, $this->id);

@@ -19,8 +19,10 @@ class Form extends Component {
     public ?FormModel $form = null;
     public string $formTitle = '';
     public string $formDescription = '';
+
     public array $schema = [];
     public array $rows = [];
+    
     public int $activeGroupPage = 0;
     public int $totalGroupPages = 0;
     public string $groupPageDirection = 'forward';

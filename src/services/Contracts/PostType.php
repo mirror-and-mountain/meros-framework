@@ -266,6 +266,13 @@ class PostType extends FeatureDefinition {
         return $this;
     }
 
+    /**
+     * Adds a field group to the post type's meta containers.
+     *
+     * @param FieldGroup|string $fieldGroup A FieldGroup instance or a string handle of a registered field group.
+     *
+     * @return self
+     */
     public function fields(FieldGroup|string $fieldGroup): self {
         if (is_string($fieldGroup)) {
             $fieldGroup = FieldGroups::checkout($this->provider)
@@ -288,6 +295,14 @@ class PostType extends FeatureDefinition {
         return $this;
     }
 
+    /**
+     * Adds a field group to the post type's meta containers using a callback.
+     *
+     * @param string  $label    The label for the field group.
+     * @param Closure $callback A callback that receives a FieldGroup instance to define fields.
+     *
+     * @return self
+     */
     public function fieldGroup(string $label, Closure $callback): self {
         $slug = Str::snake($label);
 
