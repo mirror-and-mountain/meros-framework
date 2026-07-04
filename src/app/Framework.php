@@ -53,7 +53,6 @@ use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Packages as PackagesAccessor;
 use MM\Meros\Facades\Blocks as BlocksAccessor;
 use MM\Meros\Facades\AssetGroups as AssetGroupsAccessor;
-use MM\Meros\Facades\UserMetaDefinitions;
 
 final class Framework extends FeatureProvider {
     /**
@@ -334,15 +333,7 @@ final class Framework extends FeatureProvider {
      * @return void
      */
     private function registerUserMeta(): void {
-        $container = UserMetaDefinitions::checkout($this)->get($this->getFrameworkUserMetaKey());
-
-        if (!$container) {
-            $container = UserMetaDefinitions::checkout($this)->make([
-                'name' => $this->getFrameworkUserMetaKey(),
-                'type' => 'object',
-                'auto_queue' => true,
-            ]);
-        }
+        $container = $this->userMetaContainer();
 
         $container->label('Meros User Settings')
             ->description('Controls how this user can be surfaced by Meros-powered features.');
