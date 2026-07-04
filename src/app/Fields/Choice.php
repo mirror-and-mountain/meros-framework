@@ -143,8 +143,16 @@ abstract class Choice extends Field {
             }
 
             else {
-                if (!array_key_exists($default, $this->options)) {
-                    $this->options[$default] = Str::title(str_replace(['-', '_'], ' ', $default));
+                if (is_scalar($default)) {
+                    $defaultKey = is_string($default)
+                        ? Str::snake($default)
+                        : (string) $default;
+
+                    if (!array_key_exists($defaultKey, $this->options)) {
+                        $this->options[$defaultKey] = Str::title(str_replace(['-', '_'], ' ', $defaultKey));
+                    }
+
+                    $default = $defaultKey;
                 }
             }
         }
