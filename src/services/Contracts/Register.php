@@ -302,27 +302,22 @@ abstract class Register {
     /**
      * Adds an existing feature instance to the appropriate collection in the register.
      *
-     * @param FeatureDefinition    $feature The feature to add.
-     * @param FeatureProvider|null $provider Optional provider to check out the register to for this operation.
+     * @param FeatureDefinition $feature The feature to add.
      * 
      * @return FeatureDefinition The feature that was added.
      */
-    public function attach(FeatureDefinition $feature, ?FeatureProvider $provider = null): FeatureDefinition {
-        $this->ensureCheckedOut($provider);
-
+    public function attach(FeatureDefinition $feature): FeatureDefinition {
         if (!$this->supports('multiple')) {
             $identifier = $feature->{$this->identifier};
             $existing = $this->getExistingInstance($identifier);
 
             if ($existing !== false) {
-                $this->checkin();
                 return $existing;
             }
         }
 
         $this->instances->push($feature);
 
-        $this->checkin();
         return $feature;
     }
 
@@ -454,11 +449,13 @@ abstract class Register {
      * @return FeatureDefinition|false The existing feature instance if found, false otherwise.
      */
     private function getExistingInstance(string $id): FeatureDefinition|false {
-        $provider = $this->provider;
-        $instance = $this->get($id);
-        $this->checkout($provider); // Re-checkout to ensure the provider is set after retrieval
+        if ($id === '') {
+            return false;
+        }
 
-        if ($instance) {
+        $instance = $this->get($id);
+
+        if ($instance instanceof FeatureDefinition) {
             return $instance;
         }
 

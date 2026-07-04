@@ -19,7 +19,8 @@ abstract class Input extends Field {
             'required',
             'disabled',
             'placeholder',
-            'helpText'
+            'helpText',
+            'dynamicDefault'
         ]);
     }
 

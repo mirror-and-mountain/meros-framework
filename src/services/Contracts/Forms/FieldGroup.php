@@ -11,6 +11,7 @@ use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\Services\Contracts\FeatureDefinition;
 
 use MM\Meros\Services\Contracts\PostMeta;
+use MM\Meros\Services\Contracts\UserMeta;
 
 use MM\Meros\Services\Contracts\Forms\Field;
 use MM\Meros\Services\Contracts\Forms\FormRow;
@@ -75,9 +76,9 @@ class FieldGroup extends FeatureDefinition implements Wireable {
     /**
      * The parent meta object this field group belongs to, if any.
      *
-     * @var PostMeta|null
+    * @var PostMeta|UserMeta|null
      */
-    protected ?PostMeta $parentMetaObject = null;
+    protected PostMeta|UserMeta|null $parentMetaObject = null;
 
     use Concerns\SanitizesHtml;
     
@@ -440,11 +441,11 @@ class FieldGroup extends FeatureDefinition implements Wireable {
     /**
      * Associates the field group with a parent meta object.
      *
-     * @param PostMeta $meta
+     * @param PostMeta|UserMeta $meta
      *
      * @return self
      */
-    public function parentMeta(PostMeta $meta): self {
+    public function parentMeta(PostMeta|UserMeta $meta): self {
         $this->parentMetaObject = $meta;
         return $this;
     }

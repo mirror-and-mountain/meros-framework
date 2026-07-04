@@ -17,27 +17,19 @@ use MM\Meros\Services\Concerns\IsDataRegistrant;
 
 use MM\Meros\Facades\Context;
 use MM\Meros\Facades\FieldGroups;
+use MM\Meros\Facades\UserMetaDefinitions;
 
-use MM\Meros\Facades\PostMetaDefinitions;
-
-class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRegistrant {
-
+class UserMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRegistrant {
     /**
-     * The post type that this meta belongs to.
-     *
-     * @var string
-     */
-    protected string $postType = '';
-
-    /**
-     * Indicates whether the meta box associated with this post meta has been queued for rendering.
+     * Indicates whether the profile section associated with this user meta has
+     * been queued for rendering.
      *
      * @var boolean
      */
-    protected bool $metaBoxQueued = false;
+    protected bool $profileSectionQueued = false;
 
     /**
-     * The field group associated with this post meta, if any
+     * The field group associated with this user meta, if any.
      *
      * @var FieldGroup|null
      */
@@ -71,12 +63,11 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
             $this->instantiateSubItems();
         }
 
-        // Make sure the instance is attached to the register.
-        PostMetaDefinitions::attach($this);
+        UserMetaDefinitions::attach($this);
     }
 
     /**
-     * Sets default arguments for the setting.
+     * Sets default arguments for the user meta registration.
      *
      * @return void
      */
@@ -94,7 +85,8 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
     }
 
     /**
-     * Hooks into the 'init' action to register the post meta with WordPress.
+     * Hooks into WordPress to register the user meta and queue profile field
+     * rendering and persistence.
      *
      * @return void
      */
@@ -103,150 +95,94 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
             return;
         }
 
-        if (empty($this->postType)) {
-            return;
-        }
-
         if (!$this->queued) {
             add_action('init', function () {
-                register_post_meta(
-                    $this->postType,
+                register_meta(
+                    'user',
                     $this->name,
                     $this->getRegistrationArgs()
                 );
             });
-        }
 
-        $this->queued = true;
-    }
+            add_action('personal_options_update', function ($userId) {
+                $this->save((int) $userId);
+            });
 
-    /**
-     * Queues the post meta for registration through a specific post type. Should be called from the PostType contract when registering meta containers.
-     *
-     * @param PostType $postType
-     *
-     * @return void
-     */
-    final public function queueFromPostType(PostType $postType): void {
-        if (!$this->queued) {
-            $this->postType = $postType->handle;
-
-            register_post_meta(
-                $this->postType,
-                $this->name,
-                $this->getRegistrationArgs()
-            );
-
-            if ($this->fieldGroup !== null && !$this->metaBoxQueued) {
-                $isEditing = Context::isEditingPostType($this->postType);
-
-                if (!$isEditing || $this->metaBoxQueued) {
-                    return;
-                }
-
-                add_action('add_meta_boxes', function() {
-                    $fields = $this->fieldGroup->getFields(true);
-                    $postID = get_post()->ID;
-                    $value  = $this->getValue($postID);
-
-                    if (!is_array($value)) {
-                        $value = [];
-                    }
-
-                    foreach($fields as $field) {
-                        $subKey = $field->getName(false);
-                        $field->value($value[$subKey] ?? null);
-                    }
-
-                    add_meta_box(
-                        $this->name . '_meta_box',
-                        $this->args['label'] ?: Str::title(str_replace('_', ' ', $this->name)),
-                        function() {
-                            wp_nonce_field(
-                                $this->name . '_save_meta',
-                                $this->name . '_meta_nonce'
-                            );
-                            $this->fieldGroup->render();
-                        },
-                        $this->postType,
-                        'advanced',
-                        'default'
-                    );
-                });
-
-                $this->metaBoxQueued = true;
-            }
+            add_action('edit_user_profile_update', function ($userId) {
+                $this->save((int) $userId);
+            });
 
             $this->queued = true;
         }
+
+        $this->queueProfileSection();
     }
 
     /***************************
      * Default Callbacks
      ***************************/
     /**
-     * The default authentication callback for the post meta, which checks if the current user has permission to edit posts.
+     * The default authentication callback for the user meta.
      *
      * @return bool
      */
     final public function authenticate(): bool {
-        return current_user_can('edit_posts');
+        return current_user_can('edit_users');
     }
 
     /**
-     * Saves the post meta value when the post is saved.
+     * Saves the user meta value when a profile is updated.
      *
-     * @param string $postId
+     * @param int|string $userId
      *
      * @return void
      */
-    final public function save(string $postId): void {
-        // Bail if not in admin context
+    final public function save(int|string $userId): void {
         if (!Context::isAdmin()) {
             return;
         }
 
-        // Bail if this is not a root definition
         if (!$this->isRoot()) {
             return;
         }
 
-        // Bail if autosaving
-        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+        if ($this->fieldGroup === null) {
             return;
         }
 
-        // Verify nonce
+        $userId = (int) $userId;
+
+        if ($userId <= 0) {
+            return;
+        }
+
         $nonceKey = $this->name . '_meta_nonce';
 
-        if (!isset($_POST[$nonceKey]) || 
-            !wp_verify_nonce($_POST[$nonceKey], $this->name . '_save_meta')
+        if (
+            !isset($_POST[$nonceKey])
+            || !wp_verify_nonce($_POST[$nonceKey], $this->name . '_save_meta')
         ) {
             return;
         }
 
-        // Check user permissions
-        if ($this->authenticate() === false) {
+        if ($this->canEditUser($userId) === false) {
             return;
         }
 
-        // Get submitted data
         $submittedData = $_POST[$this->name] ?? [];
 
         if (!is_array($submittedData)) {
             $submittedData = [];
         }
-        
-        // Get existing meta to merge with
-        $existingData = $this->getValue($postId);
+
+        $existingData = $this->getValue($userId);
 
         if (!is_array($existingData)) {
             $existingData = [];
         }
 
-        // Merge submitted data with existing data, ensuring we only save defined sub-fields
         foreach ($this->fieldGroup->getFields(true) as $field) {
-            $subKey = $field->getName(false); // Get the field name without the root path
+            $subKey = $field->getName(false);
 
             if ($field instanceof Repeater) {
                 $existingData[$subKey] = $this->resolveSubmittedRepeaterRows(
@@ -264,13 +200,11 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
             }
 
             else {
-                // Handle unchecked checkboxes, empty selects, etc.
                 $existingData[$subKey] = $field->getValue();
             }
         }
 
-        // Save the merged data
-        update_post_meta($postId, $this->name, $existingData);
+        update_user_meta($userId, $this->name, $existingData);
     }
 
     /***************************
@@ -278,23 +212,23 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
      ***************************/
 
     /**
-     * Sets the key for the post meta. This is required for the post meta to be registered.
+     * Sets the key for the user meta.
      *
-     * @param string $key The meta key to register.
+     * @param string $key
      *
      * @return self
      */
     public function key(string $key): self {
-        $this->name = Str::snake($key); // default name to key if not explicitly set
+        $this->name = Str::snake($key);
 
         $this->queue();
         return $this;
     }
 
     /**
-     * Sets the authentication callback for the post meta.
+     * Sets the authentication callback for the user meta.
      *
-     * @param callable|Closure $callback A callable or method reference for authenticating access to the post meta.
+     * @param callable|Closure $callback
      *
      * @return self
      */
@@ -306,9 +240,9 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
     }
 
     /**
-     * Sets whether the post meta should be treated as a single value or multiple values (array).
+     * Sets whether the user meta should be treated as a single value.
      *
-     * @param bool $single If true, the post meta will be treated as a single value; if false, as multiple values (array).
+     * @param bool $single
      *
      * @return self
      */
@@ -320,9 +254,9 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
     }
 
     /**
-     * Sets whether the post meta should be treated as multiple values (array) or a single value.
+     * Sets whether the user meta should be treated as multiple values.
      *
-     * @param bool $multiple If true, the post meta will be treated as multiple values; if false, as a single value.
+     * @param bool $multiple
      *
      * @return self
      */
@@ -331,19 +265,18 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
     }
 
     /**
-     * Overrides field() method from IsAdminFieldRegistrant to ensure the field is attached to the correct field group.
+     * Overrides field() to ensure the field is attached to the correct field group.
      *
-    * @param  Field|string|null  $type     The type of field to add (e.g. 'text', 'checkbox', etc.), a Field instance, a Field class name, or null to infer the field type.
-    * @param  Closure|array|null $callback Optional callback to configure the field, or props array for legacy calls.
-    * @param  array              $props    Optional properties for the field.
-    * @param  array              $args     Additional arguments for the field.
+     * @param Field|string|null  $type
+     * @param Closure|array|null $callback
+     * @param array              $props
+     * @param array              $args
      *
      * @return Field
      */
     final public function field(Field|string|null $type = null, Closure|array|null $callback = null, array $props = [], array $args = []): Field {
         $params = func_num_args();
 
-        // Legacy signature support: field($type, $props, $args)
         if ($params >= 3 && is_array($callback)) {
             $legacyProps = $callback;
 
@@ -362,6 +295,7 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         $this->makeField($type, $callback, $props, $args);
         $this->syncFieldPresentationFromMetaDefinition();
         $this->getFieldGroup()->field($this->field);
+        $this->queue();
 
         return $this->field;
     }
@@ -371,58 +305,38 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
      ***************************/
 
     /**
-     * Retrieves the value of the post meta for a given post ID. If no post ID is provided, it will attempt to use the global $post.
+     * Retrieves the value of the user meta for a given user ID.
      *
-     * @param int|null $postId Optional post ID to retrieve the meta for. If not provided, uses the global $post.
+     * @param int|null $userId
      *
-     * @return mixed The value of the post meta, or null if not found or if required properties are missing.
+     * @return mixed
      */
-    final public function getValue(?int $postId = null): mixed {
-        // If required properties are missing, return null
+    final public function getValue(?int $userId = null): mixed {
         if (empty($this->name)) {
             return null;
         }
 
-        if ($this->isRoot() && empty($this->postType)) {
+        $user = $userId !== null ? get_userdata($userId) : wp_get_current_user();
+        $resolvedUserId = $user instanceof \WP_User ? (int) $user->ID : 0;
+
+        if ($resolvedUserId <= 0) {
             return null;
         }
 
-        $postType = $this->getPostType();
-        $post     = get_post($postId);
-
-        // If no post ID is provided, attempt to use the global $post
-        if ($post === null) {
-            $post = get_post();
-            $postId = $post->ID ?? null;
-        }
-
-        // If we still don't have a post ID, return null
-        if (is_null($postId)) {
-            return null;
-        }
-
-        // If the post type doesn't match, return null
-        if ($post->post_type !== $postType) {
-            return null;
-        }
-
-        // Traverse up to the root of the post meta structure
         $root = $this;
         while ($root->parent !== null) {
             $root = $root->parent;
         }
 
-        // Retrieve the post meta value using get_post_meta
-        $value = get_post_meta($postId, $root->getName(), $this->args['single']);
+        $value = get_user_meta($resolvedUserId, $root->getName(), $this->args['single']);
 
         if ($this->isRoot()) {
-            // Merge with default values from sub-items 
             if (!empty($this->subItems)) {
                 $value = is_array($value) ? $value : [];
 
                 foreach ($root->getSubItems() as $subItem) {
                     if (!isset($value[$subItem->name])) {
-                        $value[$subItem->name] = $subItem->getValue($postId);
+                        $value[$subItem->name] = $subItem->getValue($resolvedUserId);
                     }
                 }
 
@@ -436,7 +350,7 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
     }
 
     /**
-     * Retrieves the default value of the post meta.
+     * Retrieves the default value of the user meta.
      *
      * @return mixed
      */
@@ -444,25 +358,12 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         return $this->args['default'] ?? null;
     }
 
-    /**
-     * Retrieves the post type that this meta belongs to. If this is a nested meta, it will traverse up to the root to get the post type.
-     *
-     * @return string|null The post type this meta belongs to, or null if not set.
-     */
-    public function getPostType(): ?string {
-        if ($this->isRoot()) {
-            return $this->postType;
-        }
-
-        return $this->parent->getPostType();
-    }
-
     /***************************
      * Helpers
      ***************************/
 
     /**
-     * Retrieves the root field group for this post meta, creating it if it doesn't exist.
+     * Retrieves the root field group for this user meta.
      *
      * @return FieldGroup
      */
@@ -478,16 +379,20 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
                 $this->fieldGroup->parentMeta($this);
             }
 
+            $this->queueProfileSection();
+
             return $this->fieldGroup;
         }
 
-        else {
-            return $this->parent->getFieldGroup();
+        if (!$this->parent instanceof self) {
+            throw new \LogicException('User meta parent must be another user meta definition.');
         }
+
+        return $this->parent->getFieldGroup();
     }
 
     /**
-     * Sets an existing field group to be used for this post meta.
+     * Sets an existing field group to be used for this user meta.
      *
      * @param FieldGroup $fieldGroup
      *
@@ -495,12 +400,77 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
      */
     public function setFieldGroup(FieldGroup $fieldGroup): self {
         if (!$this->isRoot()) {
-            throw new \LogicException("Cannot set field group on a non-root post meta. Field groups can only be set on root post meta instances.");
+            throw new \LogicException('Cannot set field group on a non-root user meta. Field groups can only be set on root user meta instances.');
         }
 
         $this->fieldGroup = $fieldGroup;
         $this->fieldGroup->parentMeta($this);
+        $this->queue();
+        $this->queueProfileSection();
+
         return $this;
+    }
+
+    /**
+     * Queues the profile section rendering hooks when fields exist.
+     *
+     * @return void
+     */
+    protected function queueProfileSection(): void {
+        if (!$this->isRoot() || $this->fieldGroup === null || $this->profileSectionQueued) {
+            return;
+        }
+
+        $render = function (\WP_User $user): void {
+            $fields = $this->fieldGroup->getFields(true);
+            $value = $this->getValue((int) $user->ID);
+
+            if (!is_array($value)) {
+                $value = [];
+            }
+
+            foreach ($fields as $field) {
+                $subKey = $field->getName(false);
+                $field->value($value[$subKey] ?? null);
+            }
+
+            echo '<h2>' . esc_html($this->args['label'] ?: Str::title(str_replace('_', ' ', $this->name))) . '</h2>';
+
+            if (!empty($this->args['description'])) {
+                echo '<p>' . esc_html($this->args['description']) . '</p>';
+            }
+
+            echo '<div class="meros-user-meta-group">';
+
+            wp_nonce_field(
+                $this->name . '_save_meta',
+                $this->name . '_meta_nonce'
+            );
+
+            $this->fieldGroup->render([
+                'showTitle' => false,
+                'showDescription' => false,
+                'class' => 'meros-user-meta-group__fields',
+            ]);
+
+            echo '</div>';
+        };
+
+        add_action('show_user_profile', $render);
+        add_action('edit_user_profile', $render);
+
+        $this->profileSectionQueued = true;
+    }
+
+    /**
+     * Determines whether the current request can edit the target user.
+     *
+     * @param int $userId
+     *
+     * @return bool
+     */
+    protected function canEditUser(int $userId): bool {
+        return current_user_can('edit_user', $userId) || current_user_can('edit_users');
     }
 
     /**
@@ -529,12 +499,6 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
 
     /**
      * Extracts repeater rows from malformed/mixed submitted payloads.
-     *
-     * Handles shapes like:
-     * - _meta[0][child]
-     * - _meta[text] plus _meta[0][child]
-     *
-     * Returns null when no numeric row payload can be inferred.
      *
      * @param mixed    $submittedData
      * @param Repeater $field
@@ -605,35 +569,29 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
      */
     protected function resolveSubmittedRepeaterRows(array $submittedData, string $subKey, Repeater $field): array {
         $hasExplicitRepeaterKey = array_key_exists($subKey, $submittedData);
-        $submittedRepeater      = $hasExplicitRepeaterKey ? $submittedData[$subKey] : null;
+        $submittedRepeater = $hasExplicitRepeaterKey ? $submittedData[$subKey] : null;
 
         if (is_array($submittedRepeater) && array_key_exists('__empty', $submittedRepeater)) {
             unset($submittedRepeater['__empty']);
         }
 
-        // Preferred shape: _meta[repeater_key][0][child]
         $rows = $this->extractRepeaterRowsFromSubmittedData($submittedRepeater, $field);
 
         if ($rows !== null) {
             return $rows;
         }
 
-        // If the repeater key exists but no rows are present, this is an explicit
-        // empty-state submission (e.g. marker-only payload) and should persist [].
         if ($hasExplicitRepeaterKey) {
             return [];
         }
 
-        // Backward-compat fallback for malformed/mixed payloads like:
-        // _meta[0][child] or _meta[text] + _meta[0][child].
         $rows = $this->extractRepeaterRowsFromSubmittedData($submittedData, $field);
 
         return $rows ?? [];
     }
 
     /**
-     * Resolves submitted scalar-array payloads (e.g. multi_select) and strips
-     * explicit empty markers while preserving intentional empty submissions.
+     * Resolves submitted scalar-array payloads and strips explicit empty markers.
      *
      * @param mixed $value
      * @param Field $field
@@ -653,16 +611,13 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
     }
 
     /**
-     * Builds registration args for register_post_meta with safe defaults for
-     * typed meta containers.
+     * Builds registration args for register_meta with safe defaults.
      *
      * @return array
      */
     protected function getRegistrationArgs(): array {
         $args = $this->args;
 
-        // A null default is not valid for typed meta registration in WordPress.
-        // Only pass defaults when explicitly set to a concrete value.
         if (array_key_exists('default', $args) && $args['default'] === null) {
             unset($args['default']);
         }

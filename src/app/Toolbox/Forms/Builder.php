@@ -9,6 +9,8 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 
+use MM\Meros\Support\MergeFields;
+
 use MM\Meros\Services\Contracts\Forms\Field;
 use MM\Meros\Services\Contracts\Forms\FormRow;
 use MM\Meros\Services\Contracts\Forms\FieldGroup;
@@ -50,7 +52,7 @@ class Builder extends Component {
      *
      * @var string
      */
-    public string $screen = 'settings-main';
+    public string $screen = 'canvas-main';
 
     /**
      * The form model.
@@ -751,6 +753,31 @@ class Builder extends Component {
         $this->activeField = $canonicalField;
         $this->syncRepeaterEditorAfterActiveFieldUpdate();
         $this->dispatchFieldSettingsUpdated();
+    }
+
+    public function getDynamicDefaultControl(): ?Field {
+        if ($this->activeField === null) {
+            return null;
+        }
+        
+        $control = MergeFields::get()->toField(
+            $this->activeField->getExactDataType(),
+            $this->activeField->getType(),
+            method_exists($this->activeField, 'getDynamicOptionsSource')
+            && method_exists($this->activeField, 'usesDynamicOptions')
+            && $this->activeField->usesDynamicOptions()
+                ? $this->activeField->getDynamicOptionsSource()
+                : null,
+            'field-dynamic-default', 
+            'field_dynamic_default',
+            'Dynamic Default Value',
+            'Select a merge field to use as the default value for this field.'
+        );
+
+        $control->default($this->activeField->getDynamicDefaultType() ?? '');
+        $control->allowAdd();
+
+        return $control;
     }
 
     /**
@@ -1643,7 +1670,7 @@ class Builder extends Component {
 
 
     // =========================================================================
-    // Saving and Default Schema
+    // Saving
     // =========================================================================
 
     /**

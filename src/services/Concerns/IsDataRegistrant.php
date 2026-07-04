@@ -506,6 +506,15 @@ trait IsDataRegistrant {
         return $this;
     }
 
+    /**
+     * Adds a sub-item to the current item, if the current item can have sub-items (i.e. is an object or array type).
+     *
+     * @param Closure|array|null $callback An optional callback function to define the sub-item or an array of properties for the sub-item.
+     * @param array              $props    An optional array of properties for the sub-item.
+     *
+     * @return self The newly created sub-item instance.
+     * @throws \InvalidArgumentException if the current item cannot have sub-items or if a sub-item with the same name already exists.
+     */
     public function add(Closure|array|null $callback = null, array $props = []): self {
         // Check we can add subitems to this item
         if (!$this->canBeParent()) {
@@ -682,6 +691,15 @@ trait IsDataRegistrant {
      */
     public function getItemDataType(): string {
         return $this->itemType;
+    }
+
+    /**
+     * Retrieves the default value for the item, if set.
+     *
+     * @return mixed The default value for the item, or null if not set.
+     */
+    public function getDefault(): mixed {
+        return $this->args['default'] ?? null;
     }
 
     /**

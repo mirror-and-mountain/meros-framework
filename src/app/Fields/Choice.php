@@ -17,6 +17,62 @@ abstract class Choice extends Field {
      */
     protected array $options = [];
 
+    /**
+     * Whether the field should load its options dynamically.
+     *
+     * @var bool
+     */
+    public bool $useDynamicOptions = false;
+
+    /**
+     * Dynamic options source identifier.
+     *
+     * @var string|null
+     */
+    protected ?string $dynamicOptionsSource = null;
+
+    /**
+     * The post type to query when using the posts dynamic options source.
+     *
+     * @var string|null
+     */
+    protected ?string $dynamicOptionsPostType = null;
+
+    /**
+     * The post status to query when using the posts dynamic options source.
+     *
+     * @var string|null
+     */
+    protected ?string $dynamicOptionsPostStatus = null;
+
+    /**
+     * The taxonomy slug to filter queried posts by.
+     *
+     * @var string|null
+     */
+    protected ?string $dynamicOptionsTaxonomy = null;
+
+    /**
+     * Comma-separated taxonomy terms used to filter queried posts.
+     *
+     * @var string|null
+     */
+    protected ?string $dynamicOptionsTerms = null;
+
+    /**
+     * The user role to filter queried users by.
+     *
+     * @var string|null
+     */
+    protected ?string $dynamicOptionsUserRole = null;
+
+    /**
+     * Maximum number of dynamic option results to request.
+     *
+     * @var int|null
+     */
+    protected ?int $dynamicOptionsLimit = null;
+
     // =========================================================================
     // Initialisation
     // =========================================================================
@@ -50,7 +106,11 @@ abstract class Choice extends Field {
      */
     protected function getRenderProps(array $props = []): array {
         $parsedProps = parent::getRenderProps($props);
-        $parsedProps['options'] = $this->options;
+        $baseOptions = isset($props['options']) && is_array($props['options'])
+            ? $props['options']
+            : $this->options;
+
+        $parsedProps['options'] = $this->buildRenderableOptions($baseOptions, $parsedProps['value']);
         
         return $parsedProps;
     }
@@ -65,6 +125,36 @@ abstract class Choice extends Field {
     protected function parseRenderProps(array $props): array {
         $parsedProps = parent::parseRenderProps($props);
         $parsedProps['options'] = isset($props['options']) && is_array($props['options']) ? $props['options'] : $this->options;
+
+        if ($this->supports('dynamicOptions') && $this->useDynamicOptions && $this->dynamicOptionsSource !== null) {
+            $parsedProps['attributes']['data-dynamic-options-enabled'] = 'true';
+            $parsedProps['attributes']['data-dynamic-options-source'] = $this->dynamicOptionsSource;
+            $parsedProps['attributes']['data-dynamic-options-endpoint'] = rest_url('meros/v1/dynamic-choice-options');
+
+            if ($this->dynamicOptionsPostType !== null) {
+                $parsedProps['attributes']['data-dynamic-options-post-type'] = $this->dynamicOptionsPostType;
+            }
+
+            if ($this->dynamicOptionsPostStatus !== null) {
+                $parsedProps['attributes']['data-dynamic-options-post-status'] = $this->dynamicOptionsPostStatus;
+            }
+
+            if ($this->dynamicOptionsTaxonomy !== null) {
+                $parsedProps['attributes']['data-dynamic-options-taxonomy'] = $this->dynamicOptionsTaxonomy;
+            }
+
+            if ($this->dynamicOptionsTerms !== null) {
+                $parsedProps['attributes']['data-dynamic-options-terms'] = $this->dynamicOptionsTerms;
+            }
+
+            if ($this->dynamicOptionsUserRole !== null) {
+                $parsedProps['attributes']['data-dynamic-options-user-role'] = $this->dynamicOptionsUserRole;
+            }
+
+            if ($this->dynamicOptionsLimit !== null) {
+                $parsedProps['attributes']['data-dynamic-options-limit'] = (string) $this->dynamicOptionsLimit;
+            }
+        }
 
         return $parsedProps;
     }
@@ -106,6 +196,126 @@ abstract class Choice extends Field {
     public function setOptions(array $options): self {
         $this->options = [];
         return $this->options($options);
+    }
+
+    /**
+     * Enables or disables dynamic options if the field supports them.
+     *
+     * @param bool $useDynamicOptions
+     * @return self
+     */
+    public function useDynamicOptions(bool $useDynamicOptions = true): self {
+        if ($this->supports('dynamicOptions')) {
+            $this->useDynamicOptions = $useDynamicOptions;
+
+            if ($useDynamicOptions) {
+                $this->dynamicOptionsSource ??= 'posts';
+                $this->dynamicOptionsPostType ??= 'post';
+                $this->dynamicOptionsPostStatus ??= 'publish';
+                $this->dynamicOptionsLimit ??= 20;
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Sets the dynamic options source.
+     *
+     * @param string $source
+     * @return self
+     */
+    public function dynamicOptionsSource(string $source): self {
+        if ($this->supports('dynamicOptions')) {
+            $this->dynamicOptionsSource = trim($source) !== '' ? trim($source) : null;
+            $this->useDynamicOptions = $this->dynamicOptionsSource !== null;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Sets the queried post type for the posts dynamic options source.
+     *
+     * @param string $postType
+     * @return self
+     */
+    public function dynamicOptionsPostType(string $postType): self {
+        if ($this->supports('dynamicOptions')) {
+            $this->dynamicOptionsPostType = trim($postType) !== '' ? trim($postType) : null;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Sets the queried post status for the posts dynamic options source.
+     *
+     * @param string $postStatus
+     * @return self
+     */
+    public function dynamicOptionsPostStatus(string $postStatus): self {
+        if ($this->supports('dynamicOptions')) {
+            $this->dynamicOptionsPostStatus = trim($postStatus) !== '' ? trim($postStatus) : null;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Sets the taxonomy slug used to filter queried posts.
+     *
+     * @param string $taxonomy
+     * @return self
+     */
+    public function dynamicOptionsTaxonomy(string $taxonomy): self {
+        if ($this->supports('dynamicOptions')) {
+            $this->dynamicOptionsTaxonomy = trim($taxonomy) !== '' ? trim($taxonomy) : null;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Sets the comma-separated terms used to filter queried posts.
+     *
+     * @param string $terms
+     * @return self
+     */
+    public function dynamicOptionsTerms(string $terms): self {
+        if ($this->supports('dynamicOptions')) {
+            $this->dynamicOptionsTerms = trim($terms) !== '' ? trim($terms) : null;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Sets the user role used to filter queried users.
+     *
+     * @param string $role
+     * @return self
+     */
+    public function dynamicOptionsUserRole(string $role): self {
+        if ($this->supports('dynamicOptions')) {
+            $this->dynamicOptionsUserRole = trim($role) !== '' ? trim($role) : null;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Sets the maximum number of dynamic option results.
+     *
+     * @param int $limit
+     * @return self
+     */
+    public function dynamicOptionsLimit(int $limit): self {
+        if ($this->supports('dynamicOptions')) {
+            $this->dynamicOptionsLimit = $limit > 0 ? $limit : null;
+        }
+
+        return $this;
     }
 
     /**
@@ -178,6 +388,14 @@ abstract class Choice extends Field {
         $json = parent::toJson(false);
 
         $json['properties']['options'] = $this->options;
+        $json['properties']['useDynamicOptions'] = $this->useDynamicOptions;
+        $json['properties']['dynamicOptionsSource'] = $this->dynamicOptionsSource;
+        $json['properties']['dynamicOptionsPostType'] = $this->dynamicOptionsPostType;
+        $json['properties']['dynamicOptionsPostStatus'] = $this->dynamicOptionsPostStatus;
+        $json['properties']['dynamicOptionsTaxonomy'] = $this->dynamicOptionsTaxonomy;
+        $json['properties']['dynamicOptionsTerms'] = $this->dynamicOptionsTerms;
+        $json['properties']['dynamicOptionsUserRole'] = $this->dynamicOptionsUserRole;
+        $json['properties']['dynamicOptionsLimit'] = $this->dynamicOptionsLimit;
 
         if ($asString) {
             return json_encode($json, ...$flags);
@@ -193,5 +411,47 @@ abstract class Choice extends Field {
      */
     public function getOptions(): array {
         return $this->options;
+    }
+
+    /**
+     * Retrieves the dynamic options source, if configured.
+     *
+     * @return string|null
+     */
+    public function getDynamicOptionsSource(): ?string {
+        return $this->dynamicOptionsSource;
+    }
+
+    /**
+     * Returns whether dynamic options are enabled for the field.
+     *
+     * @return bool
+     */
+    public function usesDynamicOptions(): bool {
+        return $this->useDynamicOptions;
+    }
+
+    private function buildRenderableOptions(array $options, mixed $value): array {
+        $resolvedValues = is_array($value) ? $value : [$value];
+
+        foreach ($resolvedValues as $resolvedValue) {
+            if (!is_scalar($resolvedValue)) {
+                continue;
+            }
+
+            $optionValue = (string) $resolvedValue;
+
+            if ($optionValue === '' || array_key_exists($optionValue, $options)) {
+                continue;
+            }
+
+            $options[$optionValue] = $this->buildDynamicOptionLabel($optionValue);
+        }
+
+        return $options;
+    }
+
+    private function buildDynamicOptionLabel(string $value): string {
+        return Str::title(str_replace(['-', '_'], ' ', $value));
     }
 }

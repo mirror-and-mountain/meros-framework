@@ -12,6 +12,7 @@ use MM\Meros\Services\Concerns\HasIdentity;
 use MM\Meros\Services\Concerns\HasPostTypes;
 use MM\Meros\Services\Concerns\HasSettings;
 use MM\Meros\Services\Concerns\HasPreferences;
+use MM\Meros\Services\Concerns\HasUserMeta;
 
 use MM\Meros\App\Context;
 use MM\Meros\Facades\Context as ContextAccessor;
@@ -29,6 +30,7 @@ abstract class FeatureProvider {
         HasPreferences,
         HasSettings,
         HasPostTypes,
+        HasUserMeta,
         HasAssets,
         HasBlocks,
         HasFields,

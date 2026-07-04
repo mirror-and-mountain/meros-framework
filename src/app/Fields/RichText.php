@@ -14,7 +14,8 @@ class RichText extends Field {
         $this->addSupports([
             'required',
             'disabled',
-            'helpText'
+            'helpText',
+            'dynamicDefault'
         ]);
     }
 

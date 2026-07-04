@@ -19,6 +19,8 @@ use MM\Meros\Facades\FieldWrappers;
 use MM\Meros\Facades\Fields;
 use MM\Meros\Facades\Framework;
 
+use MM\Meros\Support\MergeFields;
+
 abstract class Field extends FeatureDefinition implements Wireable {
     /**
      * The field's unique slug, should be implemented by concrete field classes 
@@ -84,6 +86,20 @@ abstract class Field extends FeatureDefinition implements Wireable {
      * @var mixed
      */
     protected mixed $default = null;
+
+    /**
+     * Whether to use a dynamic default value, if supported.
+     *
+     * @var boolean
+     */
+    public bool $useDynamicDefault = false;
+
+    /**
+     * The field's dynamic default value type, if applicable.
+     *
+     * @var string|null
+     */
+    protected ?string $dynamicDefaultType = null;
 
     /**
      * The field's current value, which may be set explicitly or fall back to the default.
@@ -863,16 +879,37 @@ abstract class Field extends FeatureDefinition implements Wireable {
      * @return self
      */
     public function default(mixed $default): self {
-        $isDynamic = is_string($default) && 
-            Str::startsWith($default, '{{') && 
-            Str::endsWith($default, '}}');
+        $this->default = $default;
+        $this->useDynamicDefault = false;
+        $this->dynamicDefaultType = null;
+        return $this;
+    }
 
-        if ($isDynamic && $this->supports('dynamicDefault')) {
-            $this->default = $default;
-            return $this;
+    public function useDynamicDefault(bool $useDynamicDefault = true): self {
+        if ($this->supports('dynamicDefault')) {
+            $this->useDynamicDefault = $useDynamicDefault;
+            if ($useDynamicDefault) {
+                $this->default = null;
+            }
         }
 
-        $this->default = $default;
+        return $this;
+    }
+
+    /**
+     * Sets a dynamic default value for the field.
+     *
+     * @param string $dynamicDefault
+     *
+     * @return self
+     */
+    public function dynamicDefault(string $dynamicDefault): self {
+        if ($this->supports('dynamicDefault')) {
+            $this->dynamicDefaultType = $dynamicDefault;
+            $this->useDynamicDefault = true;
+            $this->default = null;
+        }
+
         return $this;
     }
 
@@ -1443,6 +1480,24 @@ abstract class Field extends FeatureDefinition implements Wireable {
     }
 
     /**
+     * Retrieves the field's primary compatible data type without collapsing
+     * subtypes like array.scalar or array.object.
+     *
+     * @return string
+     */
+    public function getExactDataType(): string {
+        if ($this->dataType !== '') {
+            return $this->dataType;
+        }
+
+        if ($this->compatibleDataTypes[0] ?? null) {
+            return $this->compatibleDataTypes[0];
+        }
+
+        throw new \RuntimeException('Field must have a data type defined either in the $dataType property or the $compatibleDataTypes array.');
+    }
+
+    /**
      * Retrieves the field's ID.
      *
      * @return string
@@ -1518,6 +1573,10 @@ abstract class Field extends FeatureDefinition implements Wireable {
      * @return mixed
      */
     public function getValue(): mixed {
+        if ($this->useDynamicDefault && $this->dynamicDefaultType !== null) {
+            return MergeFields::get()->resolve($this->dynamicDefaultType, $this->getExactDataType());
+        }
+
         $value = is_string($this->value) ? trim($this->value) : $this->value;
 
         // Preserve explicit empty arrays so cleared repeater/multi-value fields
@@ -1531,6 +1590,19 @@ abstract class Field extends FeatureDefinition implements Wireable {
         }
 
         return $value;
+    }
+
+    /**
+     * Retrieves the field's dynamic default type, if applicable.
+     *
+     * @return string|null The dynamic default type, or null if not set or not applicable.
+     */
+    public function getDynamicDefaultType(): ?string {
+        if (!$this->useDynamicDefault) {
+            return null;
+        }
+
+        return $this->dynamicDefaultType;
     }
 
     /**
@@ -1841,36 +1913,38 @@ abstract class Field extends FeatureDefinition implements Wireable {
             'type'             => static::class,
             'handle'           => $this->handle,
             'properties'       => [
-                'type'             => $this->handle,
-                'class'            => static::class,
-                'id'               => $this->getId(),
-                'name'             => $this->getName(),
-                'label'            => $this->getLabel(),
-                'helpText'         => $this->getHelpText(),
-                'attributes'       => $this->attributes,
-                'supports'         => $this->supports,
-                'classList'        => $this->classList,
-                'default'          => $this->default,
-                'required'         => $this->isRequired(),
-                'mustBeRequired'   => $this->mustBeRequired,
-                'disabled'         => $this->isDisabled(),
-                'hasRules'         => $this->hasRules(),
-                'rules'            => $this->getRules(),
-                'showMinHint'      => $this->showMinHint === null ? false : $this->showMinHint,
-                'showMaxHint'      => $this->showMaxHint === null ? true : $this->showMaxHint,
-                'conditions'       => $this->getConditions(),
-                'isInputType'      => is_subclass_of($this, Input::class),
-                'isChoiceType'     => is_subclass_of($this, Choice::class),
-                'isMultiSelect'    => array_key_exists('multiple', $this->attributes),
-                'formId'           => $this->formId,
-                'isInRepeater'     => $this->isInRepeater(),
-                'hideInRepeater'   => $this->attributes['data-hide-in-repeater-table'] ?? false,
-                'isInGroup'        => $this->isInGroup(),
-                'groupId'          => $this->groupId,
-                'repeaterId'       => $this->repeaterId,
-                'rowIndex'         => $this->rowIndex,
-                'rowPosition'      => $this->rowPosition,
-                'component'        => $this->getFieldComponent(),
+                'type'               => $this->handle,
+                'class'              => static::class,
+                'id'                 => $this->getId(),
+                'name'               => $this->getName(),
+                'label'              => $this->getLabel(),
+                'helpText'           => $this->getHelpText(),
+                'attributes'         => $this->attributes,
+                'supports'           => $this->supports,
+                'classList'          => $this->classList,
+                'default'            => $this->default,
+                'useDynamicDefault'  => $this->useDynamicDefault,
+                'dynamicDefaultType' => $this->dynamicDefaultType,
+                'required'           => $this->isRequired(),
+                'mustBeRequired'     => $this->mustBeRequired,
+                'disabled'           => $this->isDisabled(),
+                'hasRules'           => $this->hasRules(),
+                'rules'              => $this->getRules(),
+                'showMinHint'        => $this->showMinHint === null ? false : $this->showMinHint,
+                'showMaxHint'        => $this->showMaxHint === null ? true : $this->showMaxHint,
+                'conditions'         => $this->getConditions(),
+                'isInputType'        => is_subclass_of($this, Input::class),
+                'isChoiceType'       => is_subclass_of($this, Choice::class),
+                'isMultiSelect'      => array_key_exists('multiple', $this->attributes),
+                'formId'             => $this->formId,
+                'isInRepeater'       => $this->isInRepeater(),
+                'hideInRepeater'     => $this->attributes['data-hide-in-repeater-table'] ?? false,
+                'isInGroup'          => $this->isInGroup(),
+                'groupId'            => $this->groupId,
+                'repeaterId'         => $this->repeaterId,
+                'rowIndex'           => $this->rowIndex,
+                'rowPosition'        => $this->rowPosition,
+                'component'          => $this->getFieldComponent(),
             ]
         ];
 

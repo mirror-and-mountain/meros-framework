@@ -8,6 +8,7 @@
         $isAdminField = str_contains($classList, ' meros-admin-field ');
         $selectName = str_ends_with($name, '[]') ? $name : $name . '[]';
         $markerName = \MM\Meros\Support\FormFieldName::emptyMarkerName($selectName);
+        $selectedValues = array_map('strval', (array) $value);
     @endphp
 
     @if($isAdminField && is_string($markerName))
@@ -26,7 +27,7 @@
             <option 
                 value="{{ $optValue }}" 
                 @disabled($optValue === 'placeholder')
-                @selected(in_array($optValue, (array) $value, true))>{{ $label }}
+                @selected(in_array($optValue, $selectedValues, true))>{{ $label }}
             </option>
         @endforeach
     </select>

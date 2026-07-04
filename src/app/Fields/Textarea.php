@@ -23,6 +23,7 @@ class Textarea extends Field {
             'disabled',
             'helpText',
             'placeholder',
+            'dynamicDefault'
         ]);
     }
 

@@ -433,6 +433,114 @@ document.addEventListener('alpine:init', () => {
                 this.onRefresh = null;
             },
 
+            __getDynamicOptionsConfig() {
+                if (!this.element || this.element.dataset.dynamicOptionsEnabled !== 'true') {
+                    return null;
+                }
+
+                return {
+                    endpoint: this.element.dataset.dynamicOptionsEndpoint || '',
+                    source: this.element.dataset.dynamicOptionsSource || '',
+                    postType: this.element.dataset.dynamicOptionsPostType || 'post',
+                    postStatus: this.element.dataset.dynamicOptionsPostStatus || 'publish',
+                    taxonomy: this.element.dataset.dynamicOptionsTaxonomy || '',
+                    terms: this.element.dataset.dynamicOptionsTerms || '',
+                    userRole: this.element.dataset.dynamicOptionsUserRole || '',
+                    limit: parseInt(this.element.dataset.dynamicOptionsLimit || '20', 10) || 20,
+                };
+            },
+
+            async __requestDynamicOptions(config, { search = '', selected = [] } = {}) {
+                if (!config || !config.endpoint || !config.source) {
+                    return [];
+                }
+
+                const url = new URL(config.endpoint, window.location.origin);
+                url.searchParams.set('source', config.source);
+                url.searchParams.set('postType', config.postType);
+                url.searchParams.set('postStatus', config.postStatus);
+                url.searchParams.set('limit', String(config.limit));
+
+                if (config.taxonomy) {
+                    url.searchParams.set('taxonomy', config.taxonomy);
+                }
+
+                if (config.terms) {
+                    url.searchParams.set('terms', config.terms);
+                }
+
+                if (config.userRole) {
+                    url.searchParams.set('userRole', config.userRole);
+                }
+
+                if (search !== '') {
+                    url.searchParams.set('search', search);
+                }
+
+                if (selected.length > 0) {
+                    url.searchParams.set('selected', selected.join(','));
+                }
+
+                const response = await fetch(url.toString(), {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        Accept: 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Dynamic options request failed with status ${response.status}`);
+                }
+
+                const payload = await response.json();
+                return Array.isArray(payload?.options) ? payload.options : [];
+            },
+
+            async __hydrateSelectedDynamicOptions(config) {
+                if (!config || !this.element || !this.element.tomselect) {
+                    return;
+                }
+
+                const selectedValue = this.getValue();
+                const selected = (Array.isArray(selectedValue) ? selectedValue : [selectedValue])
+                    .filter((value) => value !== null && value !== undefined && value !== '')
+                    .map((value) => String(value));
+
+                if (selected.length === 0) {
+                    return;
+                }
+
+                try {
+                    const options = await this.__requestDynamicOptions(config, { selected });
+
+                    options.forEach((option) => {
+                        if (typeof this.element.tomselect.updateOption === 'function' && this.element.tomselect.options[option.value]) {
+                            this.element.tomselect.updateOption(option.value, option);
+                        } else {
+                            this.element.tomselect.addOption(option);
+                        }
+                    });
+
+                    this.element.tomselect.setValue(
+                        this.element.hasAttribute('multiple') ? selected : selected[0],
+                        true
+                    );
+                    this.element.tomselect.refreshOptions(false);
+                } catch (error) {
+                    console.error(error);
+                }
+            },
+
+            __loadDynamicOptions(config, query, callback) {
+                this.__requestDynamicOptions(config, { search: query })
+                    .then((options) => callback(options))
+                    .catch((error) => {
+                        console.error(error);
+                        callback([]);
+                    });
+            },
+
             __instantiate() {
                 if (!this.element) return;
                 if (this.element.closest('.meros-repeater-template-row')) return;
@@ -453,6 +561,18 @@ document.addEventListener('alpine:init', () => {
 
                 const multiple = this.element.hasAttribute('multiple');
                 const allowAdd = this.element.dataset.allowAdd === 'true';
+                const dynamicOptions = this.__getDynamicOptionsConfig();
+
+                const tomSelectDynamicOptions = dynamicOptions
+                    ? {
+                        valueField: 'value',
+                        labelField: 'text',
+                        searchField: ['text'],
+                        preload: true,
+                        shouldLoad: () => true,
+                        load: (query, callback) => this.__loadDynamicOptions(dynamicOptions, query, callback),
+                    }
+                    : {};
 
                 new TomSelect(this.element, {
                     plugins: multiple ? {
@@ -468,6 +588,7 @@ document.addEventListener('alpine:init', () => {
                     } : false,
                     sortField: [{ field: '$order' }, { field: '$score' }],
                     maxItems: multiple ? null : 1,
+                    ...tomSelectDynamicOptions,
                     onChange: (value) => {
                         this.element.tomselect.blur();
 
@@ -500,6 +621,10 @@ document.addEventListener('alpine:init', () => {
                 this.value = snapshotValue(this.value);
                 this.previousValue = snapshotValue(this.value);
                 this.isInstantiating = false;
+
+                if (dynamicOptions) {
+                    this.__hydrateSelectedDynamicOptions(dynamicOptions);
+                }
             },
 
             __dispatchUpdate(context = {}) {

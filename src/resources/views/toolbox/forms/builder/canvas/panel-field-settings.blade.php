@@ -90,19 +90,146 @@
             </div>
 
             {{-- Default Value --}}
-            <div
-                x-show="activeFieldProps?.type !== 'repeater'"
-                x-cloak
-                wire:key="default-value-control-{{ $this->activeField?->getId() ?? 'none' }}-{{ $this->fieldSettingsVersion }}"
-            >
-                @if ($this->activeField !== null)
-                    {!! $this->activeField->renderDefaultValueControl() !!}
-                @endif
+            <div class="nice-form-group" x-show="supportsProperty('dynamicDefault')" x-cloak>
+                <label for="field-use-dynamic-default" class="form-label">Use Dynamic Default</label>
+                <small class="whitespace-normal">Whether to use a dynamic default value for the field</small>
+                <input
+                    id="field-use-dynamic-default"
+                    type="checkbox"
+                    class="switch"
+                    :checked="activeFieldProps?.useDynamicDefault ?? false"
+                    @change="updateActiveFieldProperty('useDynamicDefault', $event.target.checked);"
+                />
             </div>
 
+            @if ($this->activeField !== null && $this->activeField->useDynamicDefault === true)
+                <div
+                    x-data="{
+                        control: null,
+
+                        init() {
+                            this.control = this.$el.querySelector('#field-dynamic-default');
+                            
+                            if (this.control) {
+                                this.control.addEventListener('change', (event) => {
+                                
+                                    $wire.updateActiveFieldProperty('dynamicDefault', event.target.tomselect.getValue());
+                                });
+                            }
+                        }
+                    }"
+                    x-cloak 
+                    wire:key="dynamic-default-control-{{ $this->activeField?->getId() ?? 'none' }}-{{ $this->fieldSettingsVersion }}"
+                >
+                    {!! $this->getDynamicDefaultControl()?->render() !!}
+                </div>
+            @else
+                <div
+                    x-show="activeFieldProps?.type !== 'repeater'"
+                    x-cloak
+                    wire:key="default-value-control-{{ $this->activeField?->getId() ?? 'none' }}-{{ $this->fieldSettingsVersion }}"
+                >
+                    @if ($this->activeField !== null)
+                        {!! $this->activeField->renderDefaultValueControl() !!}
+                    @endif
+                </div>
+            @endif
+
             {{-- Field Options --}}
+            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions')" x-cloak>
+                <label for="field-use-dynamic-options" class="form-label">Use Dynamic Options</label>
+                <small class="whitespace-normal">Load option choices from a live query instead of a fixed list.</small>
+                <input
+                    id="field-use-dynamic-options"
+                    type="checkbox"
+                    class="switch"
+                    :checked="activeFieldProps?.useDynamicOptions ?? false"
+                    @change="updateActiveFieldProperty('useDynamicOptions', $event.target.checked);"
+                />
+            </div>
+
+            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false)" x-cloak>
+                <label for="field-dynamic-options-source" class="form-label">Dynamic Options Source</label>
+                <small class="whitespace-normal">Choose where option choices should be queried from.</small>
+                <select
+                    id="field-dynamic-options-source"
+                    @change="updateActiveFieldProperty('dynamicOptionsSource', $event.target.value);"
+                >
+                    <option value="posts" :selected="(activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'posts'">Posts</option>
+                    <option value="users" :selected="(activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'users'">Users</option>
+                </select>
+            </div>
+
+            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false) && (activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'posts'" x-cloak>
+                <label for="field-dynamic-options-post-type" class="form-label">Queried Post Type</label>
+                <small class="whitespace-normal">The post type to query for option values.</small>
+                <input
+                    id="field-dynamic-options-post-type"
+                    type="text"
+                    :value="activeFieldProps?.dynamicOptionsPostType ?? 'post'"
+                    @change="updateActiveFieldProperty('dynamicOptionsPostType', $event.target.value);"
+                />
+            </div>
+
+            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false) && (activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'posts'" x-cloak>
+                <label for="field-dynamic-options-post-status" class="form-label">Queried Post Status</label>
+                <small class="whitespace-normal">The post status to query for option values.</small>
+                <input
+                    id="field-dynamic-options-post-status"
+                    type="text"
+                    :value="activeFieldProps?.dynamicOptionsPostStatus ?? 'publish'"
+                    @change="updateActiveFieldProperty('dynamicOptionsPostStatus', $event.target.value);"
+                />
+            </div>
+
+            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false)" x-cloak>
+                <label for="field-dynamic-options-limit" class="form-label">Dynamic Options Limit</label>
+                <small class="whitespace-normal">The maximum number of option results to load per request.</small>
+                <input
+                    id="field-dynamic-options-limit"
+                    type="number"
+                    min="1"
+                    step="1"
+                    :value="activeFieldProps?.dynamicOptionsLimit ?? 20"
+                    @change="updateActiveFieldProperty('dynamicOptionsLimit', Math.max(1, parseInt($event.target.value || '20', 10) || 20));"
+                />
+            </div>
+
+            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false) && (activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'posts'" x-cloak>
+                <label for="field-dynamic-options-taxonomy" class="form-label">Filter Taxonomy</label>
+                <small class="whitespace-normal">Optional taxonomy slug used to filter the queried posts.</small>
+                <input
+                    id="field-dynamic-options-taxonomy"
+                    type="text"
+                    :value="activeFieldProps?.dynamicOptionsTaxonomy ?? ''"
+                    @change="updateActiveFieldProperty('dynamicOptionsTaxonomy', $event.target.value);"
+                />
+            </div>
+
+            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false) && (activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'posts'" x-cloak>
+                <label for="field-dynamic-options-terms" class="form-label">Filter Terms</label>
+                <small class="whitespace-normal">Comma-separated term IDs or slugs used with the taxonomy filter.</small>
+                <input
+                    id="field-dynamic-options-terms"
+                    type="text"
+                    :value="activeFieldProps?.dynamicOptionsTerms ?? ''"
+                    @change="updateActiveFieldProperty('dynamicOptionsTerms', $event.target.value);"
+                />
+            </div>
+
+            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false) && (activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'users'" x-cloak>
+                <label for="field-dynamic-options-user-role" class="form-label">Filter User Role</label>
+                <small class="whitespace-normal">Optional role slug used to filter queried users.</small>
+                <input
+                    id="field-dynamic-options-user-role"
+                    type="text"
+                    :value="activeFieldProps?.dynamicOptionsUserRole ?? ''"
+                    @change="updateActiveFieldProperty('dynamicOptionsUserRole', $event.target.value);"
+                />
+            </div>
+
             <button
-                x-show="supportsProperty('options')"
+                x-show="supportsProperty('options') && !(activeFieldProps?.useDynamicOptions ?? false)"
                 type="button"
                 class="cursor-pointer w-full py-2 px-4 my-2 bg-blue-600 text-white rounded hover:bg-blue-700 active:bg-blue-800 font-medium text-sm transition-colors"
                 wire:click="openOptionsEditor()"

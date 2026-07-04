@@ -13,6 +13,9 @@ class AdvancedSelect extends Select {
         $this->handle = 'advanced_select';
         $this->compatibleDataTypes = ['string'];
 
+        $this->addSupport('dynamicDefault');
+        $this->addSupport('dynamicOptions');
+
         $this->attribute('data-allow-add', 'false');
         $this->attribute('data-advanced', 'true');
     }
