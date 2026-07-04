@@ -2,6 +2,7 @@
     $classList = ' ' . $field->classList() . ' ';
     $isAdminRepeater = str_contains($classList, ' meros-admin-field ');
     $isSettingsRepeater = str_contains($classList, ' meros-settings-field ');
+    $emptyMarkerName = \MM\Meros\Support\FormFieldName::emptyMarkerName($name);
 @endphp
 
 <fieldset 
@@ -14,7 +15,7 @@
     data-rule-min-items="{{ $minRows ?? '-1' }}"
 >
     @if($isAdminRepeater)
-        <input type="hidden" name="{{ $name }}[__empty]" value="1" data-repeater-empty-value="true">
+        <input type="hidden" name="{{ $emptyMarkerName }}" value="1" data-repeater-empty-value="true">
     @endif
 
     {{-- Legend --}}

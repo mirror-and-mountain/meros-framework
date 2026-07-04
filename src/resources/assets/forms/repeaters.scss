@@ -172,6 +172,12 @@
 	max-width: 9.5rem;
 }
 
+.meros-repeater--settings .meros-repeater-table th.meros-repeater-head-cell--actions,
+.meros-settings-field .meros-repeater-table th.meros-repeater-head-cell--actions {
+	text-align: right !important;
+	padding-right: 0.75rem !important;
+}
+
 .meros-repeater-actions-cell {
 	text-align: right;
 	width: 6rem;

@@ -252,7 +252,10 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
             }
 
             else if (array_key_exists($subKey, $submittedData)) {
-                $existingData[$subKey] = $submittedData[$subKey];
+                $existingData[$subKey] = $this->resolveSubmittedScalarArray(
+                    $submittedData[$subKey],
+                    $field
+                );
             }
 
             else {
@@ -620,5 +623,26 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         $rows = $this->extractRepeaterRowsFromSubmittedData($submittedData, $field);
 
         return $rows ?? [];
+    }
+
+    /**
+     * Resolves submitted scalar-array payloads (e.g. multi_select) and strips
+     * explicit empty markers while preserving intentional empty submissions.
+     *
+     * @param mixed $value
+     * @param Field $field
+     *
+     * @return mixed
+     */
+    protected function resolveSubmittedScalarArray(mixed $value, Field $field): mixed {
+        if ($field->getDataType() !== 'array' || !is_array($value)) {
+            return $value;
+        }
+
+        if (array_key_exists('__empty', $value)) {
+            unset($value['__empty']);
+        }
+
+        return array_values($value);
     }
 }

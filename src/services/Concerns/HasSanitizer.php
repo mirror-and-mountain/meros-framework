@@ -135,6 +135,12 @@ trait HasSanitizer {
             return $sanitizedItems;
         }
 
+        // Empty-state marker used by array.scalar controls (e.g. multi_select)
+        // to ensure an explicit empty array can be submitted.
+        if (array_key_exists('__empty', $items)) {
+            unset($items['__empty']);
+        }
+
         // Simple array
         foreach ($items as $key => $value) {
             $items[$key] = is_array($value)
