@@ -7,7 +7,13 @@
     $emptyMarkerName = \MM\Meros\Support\FormFieldName::emptyMarkerName($fieldName);
 @endphp
 
-<fieldset id="{{ $id }}" class="{{ $fieldSetClass }}" data-field-type="{{ $field->handle }}">
+<fieldset
+    x-data="merosChoiceField('{{ $id }}', '{{ $serialisedRules }}')"
+    id="{{ $id }}"
+    class="{{ $fieldSetClass }}"
+    data-field-type="{{ $field->handle }}"
+    @change="onChange()"
+>
     @if(!$isSubField && $label !== false)
         <legend 
             class="form-label"

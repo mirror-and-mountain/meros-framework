@@ -109,6 +109,13 @@ abstract class Field extends FeatureDefinition implements Wireable {
     protected mixed $value = null;
 
     /**
+     * Tracks whether a value has been explicitly assigned to this field.
+     *
+     * @var bool
+     */
+    protected bool $hasAssignedValue = false;
+
+    /**
      * An array of CSS classes to apply to the field's wrapper element.
      *
      * @var array
@@ -298,6 +305,10 @@ abstract class Field extends FeatureDefinition implements Wireable {
 
         if ($this->supports('helpText') && $this->helpText === null) {
             $this->helpText = '';
+        }
+
+        if (array_key_exists('value', $props)) {
+            $this->hasAssignedValue = true;
         }
     }
     
@@ -922,6 +933,7 @@ abstract class Field extends FeatureDefinition implements Wireable {
      */
     public function value(mixed $value): self {
         $this->value = $value;
+        $this->hasAssignedValue = true;
         return $this;
     }
     
@@ -1573,16 +1585,32 @@ abstract class Field extends FeatureDefinition implements Wireable {
      * @return mixed
      */
     public function getValue(): mixed {
-        if ($this->useDynamicDefault && $this->dynamicDefaultType !== null) {
-            return MergeFields::get()->resolve($this->dynamicDefaultType, $this->getExactDataType());
-        }
-
         $value = is_string($this->value) ? trim($this->value) : $this->value;
+
+        // If a value was explicitly set (including empty string/null),
+        // treat it as authoritative and do not re-resolve defaults.
+        if ($this->hasAssignedValue) {
+            if ($value === []) {
+                return [];
+            }
+
+            return $value;
+        }
 
         // Preserve explicit empty arrays so cleared repeater/multi-value fields
         // do not fall back to defaults after save.
         if ($value === []) {
             return [];
+        }
+
+        // Respect explicit user-provided values before default resolution.
+        if ($value !== null && $value !== '') {
+            return $value;
+        }
+
+        // Dynamic defaults are initial fallbacks and should not override set values.
+        if ($this->useDynamicDefault && $this->dynamicDefaultType !== null) {
+            return MergeFields::get()->resolve($this->dynamicDefaultType, $this->getExactDataType());
         }
 
         if ($value === null || $value === '') {

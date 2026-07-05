@@ -369,6 +369,109 @@ document.addEventListener('alpine:init', () => {
     });
 
     /**
+     * Alpine component for radio and checkboxes fieldsets.
+     */
+    Alpine.data('merosChoiceField', (id, rules = {}) => {
+        const fieldContract = createMerosField(id, rules);
+
+        return {
+            ...fieldContract,
+
+            init() {
+                fieldContract.init.call(this);
+
+                if (this.element) {
+                    this.value = snapshotValue(this.getValue());
+                    this.previousValue = snapshotValue(this.value);
+                }
+            },
+
+            getValue() {
+                if (!this.element) return null;
+
+                const inputs = Array.from(this.element.querySelectorAll('input[type="checkbox"], input[type="radio"]'));
+
+                if (inputs.length === 0) {
+                    return null;
+                }
+
+                const hasRadio = inputs.some((input) => input.type === 'radio');
+
+                if (hasRadio) {
+                    const checkedRadio = inputs.find((input) => input.checked);
+                    return checkedRadio ? checkedRadio.value : null;
+                }
+
+                return inputs
+                    .filter((input) => input.checked)
+                    .map((input) => input.value);
+            },
+
+            setValue(value) {
+                if (!this.element) return;
+
+                this.previousValue = snapshotValue(this.getValue());
+
+                const inputs = Array.from(this.element.querySelectorAll('input[type="checkbox"], input[type="radio"]'));
+
+                if (inputs.length === 0) {
+                    return;
+                }
+
+                const hasRadio = inputs.some((input) => input.type === 'radio');
+
+                if (hasRadio) {
+                    const normalisedValue = value === null || value === undefined ? null : String(value);
+
+                    inputs.forEach((input) => {
+                        input.checked = normalisedValue !== null && input.value === normalisedValue;
+                    });
+                } else {
+                    const normalisedValues = Array.isArray(value)
+                        ? value.map((item) => String(item))
+                        : (value === null || value === undefined || value === '' ? [] : [String(value)]);
+
+                    inputs.forEach((input) => {
+                        input.checked = normalisedValues.includes(input.value);
+                    });
+                }
+
+                this.value = snapshotValue(this.getValue());
+                this.__dispatchUpdate();
+            },
+
+            onChange() {
+                this.previousValue = snapshotValue(this.value);
+                validateFieldValue(this.element);
+
+                this.__dispatchUpdate();
+            },
+
+            __dispatchUpdate(context = {}) {
+                const newValue = snapshotValue(this.getValue());
+                const oldValue = snapshotValue(this.previousValue);
+                const firstInput = this.element
+                    ? this.element.querySelector('input[type="checkbox"], input[type="radio"]')
+                    : null;
+
+                this.$dispatch('mforms:field-updated', {
+                    formId: this.element ? this.element.closest('form')?.id || null : null,
+                    type: this.element ? this.element.dataset.fieldType || null : null,
+                    id: this.id,
+                    name: firstInput ? firstInput.name : null,
+                    element: this.element,
+                    oldValue,
+                    value: newValue,
+                    context: getContext(this.element, context),
+                    field: this,
+                });
+
+                this.value = snapshotValue(newValue);
+            }
+        };
+    });
+
+    /**
      * Alpine component for TomSelect fields.
      */
     Alpine.data('merosTomSelectField', (id, rules = {}) => {
@@ -394,6 +497,9 @@ document.addEventListener('alpine:init', () => {
                 window.addEventListener('mforms:field-settings-refreshed', this.onRefresh);
                 window.addEventListener('mforms:field-settings-closed', this.onRefresh);
                 window.addEventListener('mforms:form-canvas-updated', this.onRefresh);
+                window.addEventListener('mforms:form-dom-updated', this.onRefresh);
+                window.addEventListener('mforms:external-fields-refresh', this.onRefresh);
+                window.addEventListener('meros:forms-ready', this.onRefresh);
             },
 
             getValue() {
@@ -427,6 +533,9 @@ document.addEventListener('alpine:init', () => {
                 window.removeEventListener('mforms:field-settings-refreshed', this.onRefresh);
                 window.removeEventListener('mforms:field-settings-closed', this.onRefresh);
                 window.removeEventListener('mforms:form-canvas-updated', this.onRefresh);
+                window.removeEventListener('mforms:form-dom-updated', this.onRefresh);
+                window.removeEventListener('mforms:external-fields-refresh', this.onRefresh);
+                window.removeEventListener('meros:forms-ready', this.onRefresh);
 
                 fieldContract.destroy.call(this);
                 this.element = null;
@@ -693,6 +802,9 @@ document.addEventListener('alpine:init', () => {
                 window.addEventListener('mforms:field-settings-refreshed', this.onRefresh);
                 window.addEventListener('mforms:field-settings-closed', this.onRefresh);
                 window.addEventListener('mforms:form-canvas-updated', this.onRefresh);
+                window.addEventListener('mforms:form-dom-updated', this.onRefresh);
+                window.addEventListener('mforms:external-fields-refresh', this.onRefresh);
+                window.addEventListener('meros:forms-ready', this.onRefresh);
             },
 
             getValue() {
@@ -735,6 +847,9 @@ document.addEventListener('alpine:init', () => {
                 window.removeEventListener('mforms:field-settings-refreshed', this.onRefresh);
                 window.removeEventListener('mforms:field-settings-closed', this.onRefresh);
                 window.removeEventListener('mforms:form-canvas-updated', this.onRefresh);
+                window.removeEventListener('mforms:form-dom-updated', this.onRefresh);
+                window.removeEventListener('mforms:external-fields-refresh', this.onRefresh);
+                window.removeEventListener('meros:forms-ready', this.onRefresh);
                 
                 fieldContract.destroy.call(this);
                 this.element = null;

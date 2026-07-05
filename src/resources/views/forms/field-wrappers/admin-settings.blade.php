@@ -3,6 +3,7 @@
     $isRequired = (bool) preg_match('/(?:^|\s)required(?:\s|=|$)/', $attributesString);
     $isDisabled = (bool) preg_match('/(?:^|\s)disabled(?:\s|=|$)/', $attributesString);
     $isFieldSet = in_array($field->handle, ['radio', 'checkboxes', 'repeater', 'rich_text']);
+    $hasFieldError = isset($errors) && $errors->has('fields.' . $id);
     $showMaxHint = $showMaxHint ?? true;
     $showMinHint = $showMinHint ?? false;
 
@@ -14,7 +15,7 @@
 <div x-data="{ isEditor: false }">
     <div
         x-data="merosFieldWrapper"
-        class="meros-field nice-form-group" {{ $label === false ? 'style=margin-top:0;' : '' }}
+        class="meros-field nice-form-group{{ $hasFieldError ? ' invalid' : '' }}" {{ $label === false ? 'style=margin-top:0;' : '' }}
     >
         @if ($label !== false)
             @if (!$isFieldSet)

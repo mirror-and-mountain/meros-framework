@@ -8,6 +8,27 @@
 		@endif
 	</div>
 
+	@if(session()->has('meros_form_status'))
+		@php
+			$formStatus = session('meros_form_status');
+		@endphp
+		<div class="meros-form-flash meros-form-flash--{{ $formStatus['type'] ?? 'info' }}" role="alert" aria-live="polite">
+			@if(!empty($formStatus['message']))
+				<p>{{ $formStatus['message'] }}</p>
+			@endif
+
+			@if(($formStatus['type'] ?? null) === 'validation-error' && !empty($formStatus['errors']))
+				<ul class="meros-form-flash-errors">
+					@foreach($formStatus['errors'] as $messages)
+						@foreach((array) $messages as $message)
+							<li>{{ $message }}</li>
+						@endforeach
+					@endforeach
+				</ul>
+			@endif
+		</div>
+	@endif
+
 	@if(!$isPagedView && $totalGroupPages > 1)
 		<div class="meros-form-view-toggle" role="group" aria-label="Form view mode">
 			<button
@@ -41,9 +62,8 @@
 
 	<form
 		id="meros-form-{{ $formID }}"
-		x-data="merosFormData"
-		class="meros-form @if($isPagedView) is-paged-view @else is-full-view @endif" 
-		wire:submit.prevent="submitForm"
+		x-data="merosFormData($wire, @js($fields))"
+		class="meros-form @if($isPagedView) is-paged-view @else is-full-view @endif"
 	>
 		@php
 			$pages = [];
@@ -102,7 +122,7 @@
 								<button
 									type="button"
 									class="meros-form-view-toggle-button @if($isPagedView) is-active @endif"
-									wire:click="setPagedView"
+									x-on:click.prevent="setPagedView"
 									aria-label="Paged view"
 									title="Paged view"
 									aria-pressed="@if($isPagedView) true @else false @endif"
@@ -115,7 +135,7 @@
 								<button
 									type="button"
 									class="meros-form-view-toggle-button @if(!$isPagedView) is-active @endif"
-									wire:click="setFullView"
+									x-on:click.prevent="setFullView"
 									aria-label="View all"
 									title="View all"
 									aria-pressed="@if(!$isPagedView) true @else false @endif"
@@ -153,6 +173,9 @@
 										@else
 											{!! $field->render() !!}
 										@endif
+										@error('fields.' . ($field->id ?? ''))
+											<small class="meros-form-field-error" role="alert">{{ $message }}</small>
+										@enderror
 									</div>
 								@endif
 							@endforeach
@@ -161,9 +184,9 @@
 
 					@if($isPagedView && $totalGroupPages > 1)
 						<div class="meros-form-group-page-actions">
-							<button type="button" class="meros-form-page-button" wire:click="prevGroupPage" @if($activeGroupPage === 0) disabled @endif>Previous</button>
-							<button type="button" class="meros-form-page-button" wire:click="nextGroupPage" @if($activeGroupPage >= $totalGroupPages - 1) disabled @endif>Next</button>
-							<button type="submit" class="mt-form-submit-button" @if($activeGroupPage < $totalGroupPages - 1) disabled @endif>Submit</button>
+							<button type="button" class="meros-form-page-button" x-on:click.prevent="prevGroupPage" @if($activeGroupPage === 0) disabled @endif>Previous</button>
+							<button type="button" class="meros-form-page-button" x-on:click.prevent="nextGroupPage" @if($activeGroupPage >= $totalGroupPages - 1) disabled @endif>Next</button>
+							<button type="submit" class="mt-form-submit-button" x-on:click.prevent="submitForm" @if($activeGroupPage < $totalGroupPages - 1) disabled @endif>Submit</button>
 						</div>
 					@endif
 					</div>
@@ -192,7 +215,7 @@
 									<button
 										type="button"
 										class="meros-form-view-toggle-button @if($isPagedView) is-active @endif"
-										wire:click="setPagedView"
+										x-on:click.prevent="setPagedView"
 										aria-label="Paged view"
 										title="Paged view"
 										aria-pressed="@if($isPagedView) true @else false @endif"
@@ -205,7 +228,7 @@
 									<button
 										type="button"
 										class="meros-form-view-toggle-button @if(!$isPagedView) is-active @endif"
-										wire:click="setFullView"
+										x-on:click.prevent="setFullView"
 										aria-label="View all"
 										title="View all"
 										aria-pressed="@if(!$isPagedView) true @else false @endif"
@@ -237,6 +260,9 @@
 											@else
 												{!! $field->render() !!}
 											@endif
+											@error('fields.' . ($field->id ?? ''))
+												<p class="meros-form-field-error" role="alert">{{ $message }}</p>
+											@enderror
 										</div>
 									@endif
 								@endforeach
@@ -245,9 +271,9 @@
 
 						@if($isPagedView && $totalGroupPages > 1)
 							<div class="meros-form-group-page-actions">
-								<button type="button" class="meros-form-page-button" wire:click="prevGroupPage" @if($activeGroupPage === 0) disabled @endif>Previous</button>
-								<button type="button" class="meros-form-page-button" wire:click="nextGroupPage" @if($activeGroupPage >= $totalGroupPages - 1) disabled @endif>Next</button>
-								<button type="submit" class="mt-form-submit-button" @if($activeGroupPage < $totalGroupPages - 1) disabled @endif>Submit</button>
+								<button type="button" class="meros-form-page-button" x-on:click.prevent="prevGroupPage" @if($activeGroupPage === 0) disabled @endif>Previous</button>
+								<button type="button" class="meros-form-page-button" x-on:click.prevent="nextGroupPage" @if($activeGroupPage >= $totalGroupPages - 1) disabled @endif>Next</button>
+								<button type="submit" class="mt-form-submit-button" x-on:click.prevent="submitForm" @if($activeGroupPage < $totalGroupPages - 1) disabled @endif>Submit</button>
 							</div>
 						@endif
 						</div>
@@ -258,7 +284,13 @@
 
 		@if(!$isPagedView)
 			<div class="meros-form-group-page-actions">
-				<button type="submit" class="mt-form-submit-button">Submit</button>
+				<button 
+					type="submit" 
+					class="mt-form-submit-button"
+					@click.prevent="submitForm"
+				>
+					Submit
+				</button>
 			</div>
 		@endif
 	</form>
