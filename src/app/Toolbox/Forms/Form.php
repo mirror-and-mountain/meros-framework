@@ -57,9 +57,14 @@ class Form extends Component {
         return view('meros::forms.form', [
             'showTitle' => $this->showTitle,
             'showDescription' => $this->showDescription,
+            'formID' => $this->formID,
             'formTitle' => $this->formTitle,
             'formDescription' => $this->formDescription,
         ]);
+    }
+
+    public function submitForm(): void {
+        dd('gere');
     }
 
     public function goToGroupPage(int $index): void {

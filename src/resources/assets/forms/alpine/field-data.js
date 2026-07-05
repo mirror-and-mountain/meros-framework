@@ -1207,7 +1207,8 @@ document.addEventListener('alpine:init', () => {
 
                 let row = null;
                 if (event) {
-                    row = event.target.closest('tr.meros-repeater-row');
+                    const trigger = event.currentTarget || event.target;
+                    row = trigger ? trigger.closest('tr.meros-repeater-row') : null;
                 } 
                 
                 else if (rowIndex !== null) {
@@ -1231,13 +1232,15 @@ document.addEventListener('alpine:init', () => {
                 this.__setCanAddRows();
                 this.__togglePlaceholder();
 
-                validateFieldValue(this.element);
-                this.applyHints();
-
-                this.__dispatchUpdate({
-                    action: 'remove',
-                    oldIndex: index,
-                });
+                try {
+                    validateFieldValue(this.element);
+                    this.applyHints();
+                } finally {
+                    this.__dispatchUpdate({
+                        action: 'remove',
+                        oldIndex: index,
+                    });
+                }
             },
 
             handleReorder(item, position) {
@@ -1404,7 +1407,7 @@ document.addEventListener('alpine:init', () => {
                 const oldValue = snapshotValue(this.value);
                 const value = snapshotValue(this.getValue());
 
-                this.$dispatch('mforms:field-updated', {
+                const detail = {
                     formId: this.element ? this.element.closest('form')?.id || null : null,
                     type: 'repeater',
                     id: this.id,
@@ -1414,7 +1417,34 @@ document.addEventListener('alpine:init', () => {
                     value,
                     context: getContext(this.element, context),
                     field: this,
+                };
+
+                const dispatchTarget = this.element || this.$el || null;
+                const updateEvent = new CustomEvent('mforms:field-updated', {
+                    detail,
+                    bubbles: true,
+                    composed: true,
                 });
+
+                if (dispatchTarget) {
+                    dispatchTarget.dispatchEvent(updateEvent);
+
+                    // If the source node is detached (e.g. during row removal),
+                    // bubbling cannot reach global listeners on window.
+                    if (!dispatchTarget.isConnected) {
+                        window.dispatchEvent(new CustomEvent('mforms:field-updated', {
+                            detail,
+                            bubbles: false,
+                            composed: true,
+                        }));
+                    }
+                } else {
+                    window.dispatchEvent(new CustomEvent('mforms:field-updated', {
+                        detail,
+                        bubbles: false,
+                        composed: true,
+                    }));
+                }
 
                 this.previousValue = snapshotValue(oldValue);
                 this.value = snapshotValue(value);

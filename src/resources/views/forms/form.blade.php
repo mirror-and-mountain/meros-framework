@@ -39,7 +39,12 @@
 		</div>
 	@endif
 
-	<form class="meros-form @if($isPagedView) is-paged-view @else is-full-view @endif">
+	<form
+		id="meros-form-{{ $formID }}"
+		x-data="merosFormData"
+		class="meros-form @if($isPagedView) is-paged-view @else is-full-view @endif" 
+		wire:submit.prevent="submitForm"
+	>
 		@php
 			$pages = [];
 			$ungroupedRows = [];
