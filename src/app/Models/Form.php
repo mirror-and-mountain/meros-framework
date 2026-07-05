@@ -4,6 +4,7 @@ namespace MM\Meros\App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Form extends Post {
     /**
@@ -35,5 +36,9 @@ class Form extends Post {
         return Attribute::make(
             get: fn (): array => $this->formMeta?->meta_value['schema']['actions'] ?? [],
         );
+    }
+
+    public function responses(): HasMany {
+        return $this->hasMany(FormResponse::class, 'form_id');
     }
 }

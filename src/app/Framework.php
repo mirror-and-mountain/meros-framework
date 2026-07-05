@@ -39,6 +39,7 @@ use MM\Meros\App\FormActions\SendEmailWithTemplate;
 
 use MM\Meros\App\Admin\SettingsSections\Assets;
 use MM\Meros\App\Admin\SettingsSections\Blocks;
+use MM\Meros\App\Admin\SettingsSections\Forms;
 use MM\Meros\App\Admin\SettingsSections\Packages;
 
 use MM\Meros\App\Admin\Templates\SimpleSettingsPage;
@@ -56,6 +57,13 @@ use MM\Meros\Facades\AssetGroups as AssetGroupsAccessor;
 
 final class Framework extends FeatureProvider {
     /**
+     * Core features provided by the framework. And whether or not they are enabled.
+     *
+     * @var array
+     */
+    private array $coreFeatures = [];
+
+    /**
      * Called from the FrameworkServiceProvider on boot
      * 
      * @param FrameworkServiceProvider $serviceProvider Used to ensure only the FrameworkServiceProvider can call this method.
@@ -70,10 +78,34 @@ final class Framework extends FeatureProvider {
             $this->configureLocalMailTransport();
         }
 
+        // Initialise framework features
+        $this->initCoreFeatures();
+
+        // Boot
         $this->load();
         $this->configure();
 
         return $this;
+    }
+
+    /**
+     * Initialises the framework's core features based on the framework settings.
+     *
+     * @return void
+     */
+    private function initCoreFeatures(): void {
+        $this->coreFeatures['forms'] = get_option('meros_framework_settings')['forms']['enable_forms'] ?? true;
+    }
+
+    /**
+     * Returns whether the given core feature is enabled.
+     *
+     * @param string $feature The name of the core feature to check.
+     *
+     * @return bool
+     */
+    public function featureEnabled(string $feature): bool {
+        return $this->coreFeatures[$feature] ?? false;
     }
 
     /**
@@ -85,7 +117,15 @@ final class Framework extends FeatureProvider {
         // Register REST API routes
         $this->registerRestRoutes();
 
-        // Register framework fields
+        // Load forms service if the forms feature is enabled
+        if ($this->featureEnabled('forms')) {
+            // Make sure the forms service is installed before registering form-related features
+            $this->requireFormsService();
+            // Register framework form actions
+            $this->formActions()->register('send_email_with_template', SendEmailWithTemplate::class);
+        }
+
+        // Register framework field types
 
         // Basic Fields
         $this->fields()->register('admin_button', AdminButton::class);
@@ -122,12 +162,11 @@ final class Framework extends FeatureProvider {
         // Register the Settings field wrapper for admin settings pages
         $this->fieldWrappers()->register('admin_default', AdminDefault::class);
         $this->fieldWrappers()->register('admin_settings', AdminSettings::class);
-
-        // Register framework form actions
-        $this->formActions()->register('send_email_with_template', SendEmailWithTemplate::class);
+        
 
         // Register framework settings sections
         $this->settingsSections()->register('meros-features-packages', Packages::class);
+        $this->settingsSections()->register('meros-features-forms', Forms::class);
         $this->settingsSections()->register('meros-features-blocks', Blocks::class);
         $this->settingsSections()->register('meros-features-assets', Assets::class);
 
@@ -260,6 +299,33 @@ final class Framework extends FeatureProvider {
     }
 
     /**
+     * Installs the meros_form_responses table if it doesn't exist.
+     *
+     * @return void
+     * @throws \RuntimeException if the meros_form_responses table cannot be found in the framework's tables collection.
+     */
+    private function requireFormsService() {
+        $this->requireMigrationsService(); // Ensure the migrations service is installed before attempting to install forms tables
+
+        $tables = $this->tables()
+            ->discover()
+            ->checkout($this)
+            ->all();
+
+        $responsesTable = $tables
+            ->where('tableName', 'meros_form_responses')
+            ->first();
+
+        if ($responsesTable === null) {
+            throw new \RuntimeException('Meros Framework requires the meros_form_responses table to manage form responses. No such table was found.');
+        }
+
+        if (!$responsesTable->isInstalled()) {
+            $responsesTable->install(Str::ulid());
+        }
+    }
+
+    /**
      * Installs the meros_integration_accounts and meros_integration_connections tables if they don't exist.
      *
      * @return void
@@ -298,34 +364,9 @@ final class Framework extends FeatureProvider {
 
     /***********************************************************************
      * 
-     * The following methods are for registering the framework's post types
+     * The following methods are for registering the framework's user meta
      * 
      ***********************************************************************/
-    
-    /**
-     * Registers the framework's custom post types.
-     *
-     * @return void
-     */
-    private function registerPostTypes(): void {
-        // Add wp core post types to the register
-        $this->postTypes()->make(function ($postType) {
-            $postType->name('post');
-            $postType->label('Post');
-            $postType->isCore();
-        }); // The 'post' post type
-
-        $this->postTypes()->make(function ($postType) {
-            $postType->name('page');
-            $postType->label('Page');
-            $postType->isCore();
-        }); // The 'page' post type
-
-        // Register framework post types
-        $this->registerFormPostType();
-        $this->registerFieldGroupPostType();
-        $this->registerEmailTemplatePostType();
-    }
 
     /**
      * Registers core user meta used by framework features.
@@ -390,6 +431,39 @@ final class Framework extends FeatureProvider {
         }
 
         return !empty($value[$this->getPubliclyQueryableUserFlagKey()]);
+    }
+
+    /***********************************************************************
+     * 
+     * The following methods are for registering the framework's post types
+     * 
+     ***********************************************************************/
+    
+    /**
+     * Registers the framework's custom post types.
+     *
+     * @return void
+     */
+    private function registerPostTypes(): void {
+        // Add wp core post types to the register
+        $this->postTypes()->make(function ($postType) {
+            $postType->name('post');
+            $postType->label('Post');
+            $postType->isCore();
+        }); // The 'post' post type
+
+        $this->postTypes()->make(function ($postType) {
+            $postType->name('page');
+            $postType->label('Page');
+            $postType->isCore();
+        }); // The 'page' post type
+
+        // Register framework post types
+        if ($this->coreFeatures['forms'] ?? false) {
+            $this->registerFormPostType();
+            $this->registerFieldGroupPostType();
+            $this->registerEmailTemplatePostType();
+        }
     }
 
     /**
@@ -778,9 +852,15 @@ final class Framework extends FeatureProvider {
                 ->label('Scripts & Styles');
         });
 
+        $formSettings = $this->settings()->add(function ($setting) {
+            $setting->object('forms')
+                ->label('Forms');
+        });
+
         $this->configurePackageSettings($packageSettings);
         $this->configureBlocksSettings($blockSettings);
         $this->configureAssetGroupSettings($assetGroupSettings);
+        $this->configureFormsSettings($formSettings);
     }
 
     /**
@@ -927,6 +1007,22 @@ final class Framework extends FeatureProvider {
     }
 
     /**
+     * Configures settings for the Meros Forms feature, allowing it to be enabled/disabled.
+     *
+     * @param Setting $settings The settings object to add form settings to.
+     *
+     * @return void
+     */
+    private function configureFormsSettings(Setting $settings): void {
+        $settings->add()->boolean('enable_forms')
+            ->label('Enable Forms')
+            ->description('Enable the Meros Forms feature, allowing you to create and manage forms.')
+            ->default(true)
+            ->field()
+                ->section('meros-features-forms');
+    }
+
+    /**
      * Configures the framework's menu pages, including the main features page and any subpages.
      *
      * @return void
@@ -988,6 +1084,14 @@ final class Framework extends FeatureProvider {
                         'callback' => function () {
                             settings_fields('meros_framework_settings_container');
                             do_settings_sections('meros-features-blocks');
+                            submit_button();
+                        }
+                    ],
+                    'forms' => [
+                        'label'    => 'Forms',
+                        'callback' => function () {
+                            settings_fields('meros_framework_settings_container');
+                            do_settings_sections('meros-features-forms');
                             submit_button();
                         }
                     ],
