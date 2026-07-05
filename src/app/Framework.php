@@ -37,7 +37,6 @@ use MM\Meros\App\FieldWrappers\AdminSettings;
 use MM\Meros\App\FieldWrappers\AdminDefault;
 
 use MM\Meros\App\FormActions\SendEmailWithTemplate;
-use MM\Meros\App\FormActions\RunCrmSyncJobs;
 use MM\Meros\App\Integrations\ExchangeOnline;
 use MM\Meros\App\Integrations\Stripe;
 
@@ -139,7 +138,6 @@ final class Framework extends FeatureProvider {
             $this->requireFormsService();
             // Register framework form actions
             $this->formActions()->register('send_email_with_template', SendEmailWithTemplate::class);
-            $this->formActions()->register('run_crm_sync_jobs', RunCrmSyncJobs::class);
         }
 
         // Register framework field types
