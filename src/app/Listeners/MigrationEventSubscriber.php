@@ -11,6 +11,7 @@ use MM\Meros\App\Events\Migrations\TableUpdated;
 use MM\Meros\App\Events\Migrations\TableDropped;
 
 use MM\Meros\App\Models\Migration;
+use MM\Meros\Services\Contracts\Table;
 
 use MM\Meros\Facades\Theme;
 use MM\Meros\Facades\Tables;
@@ -29,6 +30,10 @@ class MigrationEventSubscriber {
         $connection        = $event->connection;
 
         if (! Schema::connection($connection)->hasTable($table)) {
+            return;
+        }
+
+        if (!$this->hasMigrationsTable($connection)) {
             return;
         }
 
@@ -51,6 +56,10 @@ class MigrationEventSubscriber {
             return;
         }
 
+        if (!$this->hasMigrationsTable($connection)) {
+            return;
+        }
+
         $this->makeMigrationRecord($table, 'update', $installerHandle);
     }
 
@@ -66,6 +75,10 @@ class MigrationEventSubscriber {
         $connection = $event->connection;
 
         if (Schema::connection($connection)->hasTable($table)) {
+            return;
+        }
+
+        if (!$this->hasMigrationsTable($connection)) {
             return;
         }
 
@@ -100,22 +113,77 @@ class MigrationEventSubscriber {
      * @return void
      */
     private function makeMigrationRecord(string $table, string $type, string $installerHandle): void {
-        $installer = Tables::get($installerHandle);
+        $installer = $this->resolveInstallerByHandle($installerHandle);
 
         if ($installer === null) {
             return;
         }
 
-        $trimmedPath = ltrim(Str::replace(get_stylesheet_directory(), '', $installer->getPath()), '/');
+        $recordHandle = $installer->getHandle();
+        $recordLabel  = $installer->getLabel();
+        $recordPath   = $installer->getPath();
+
+        if ($type === 'update') {
+            $updates = $installer->getUpdates();
+
+            if (isset($updates[$installerHandle])) {
+                $recordHandle = $updates[$installerHandle]['handle'] ?? $installerHandle;
+                $recordLabel  = $updates[$installerHandle]['label'] ?? $recordLabel;
+                $recordPath   = $updates[$installerHandle]['path'] ?? $recordPath;
+            }
+        }
+
+        $trimmedPath = ltrim(Str::replace(get_stylesheet_directory(), '', $recordPath), '/');
 
         Migration::create([
             'provider'      => $installer->provider->getHandle(),
             'type'          => $type,
-            'label'         => $installer->getLabel(),
-            'handle'        => $installer->getHandle(),
+            'label'         => $recordLabel,
+            'handle'        => $recordHandle,
             'related_table' => $table,
             'path'          => $trimmedPath,
             'batch_id'      => $installer->getBatchID()
         ]);
+    }
+
+    /**
+     * Resolves an installer table definition from either a base migration handle
+     * or one of that table's update handles.
+     *
+     * @param string $installerHandle
+     * @return Table|null
+     */
+    private function resolveInstallerByHandle(string $installerHandle): ?Table {
+        $installer = Tables::get($installerHandle);
+
+        if ($installer instanceof Table) {
+            return $installer;
+        }
+
+        $tables = Tables::all();
+
+        foreach ($tables as $table) {
+            if (!$table instanceof Table) {
+                continue;
+            }
+
+            $updates = $table->getUpdates();
+
+            if (isset($updates[$installerHandle])) {
+                return $table;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns whether the migrations tracking table exists for the given connection.
+     *
+     * @param string|null $connection
+     * @return bool
+     */
+    private function hasMigrationsTable(?string $connection = null): bool {
+        return Schema::connection($connection)->hasTable('meros_migrations');
     }
 }

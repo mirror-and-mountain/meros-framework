@@ -49,6 +49,7 @@ use MM\Meros\App\Admin\Templates\MerosFeaturesPage;
 use MM\Meros\App\Theme;
 use MM\Meros\App\Models\Form;
 use MM\Meros\App\Models\EmailTemplate;
+use MM\Meros\Services\Database\InstallerController;
 
 use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Packages as PackagesAccessor;
@@ -883,7 +884,7 @@ final class Framework extends FeatureProvider {
                 $hasTables = $package->hasTables();
                 
                 if ($hasTables) {
-                    $titleHTML .= $this->getInstallerHTML($package);
+                    $titleHTML .= $this->installerController()->renderInstallerHTML($package);
                 }
 
                 $enabledSetting->titleHTML($titleHTML);
@@ -1039,36 +1040,117 @@ final class Framework extends FeatureProvider {
                         'label'    => 'Theme',
                         'callback' => function () {
                             echo '<h2>Theme Configuration</h2>';
-                            echo '<p>Manage settings and installable features registered by the active theme.</p>';
+                            echo '<p>Manage settings and installable features registered by the framework and the active theme.</p>';
                             
-                            $hasTables = ThemeAccessor::hasTables();
-                            if ($hasTables) {
-                                echo '<h2 style="margin-top: 2em;">Theme Installer</h2>';
-                                $operation = $_GET['operation'] ?? null;
-                                $operationMessage = $operation ? match($operation) {
-                                    'installed'   => 'Theme features installed successfully.',
-                                    'updated'     => 'Theme features updated successfully.',
-                                    'rolled-back' => 'Theme features rolled back successfully.',
-                                    'uninstalled' => 'Theme features uninstalled successfully.',
-                                    default       => null,
-                                } : null;
+                            $theme = ThemeAccessor::get();
+                            $hasThemeTables = $theme->hasTables();
+                            $hasFrameworkTables = $this->hasTables();
+                            $hasInstallerTables = $hasThemeTables || $hasFrameworkTables;
+                            $isManagingTables = $this->isManagingTablesView();
+                            $manageTablesUrl = $this->getThemeTablesManagerUrl();
+                            $themeTabUrl = $this->getThemeTabUrl();
 
-                                if ($operationMessage) {
-                                    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html($operationMessage) . '</p></div>';
+                            if ($hasInstallerTables) {
+                                $frameworkPlan = $this->installerController()->getInstallerPlanData($this);
+                                $themePlan = $this->installerController()->getInstallerPlanData($theme);
+                                $frameworkUpdateCount = collect($frameworkPlan['update'])->where('change', 'update')->count();
+                                $themeUpdateCount = collect($themePlan['update'])->where('change', 'update')->count();
+                                $installCount = count($frameworkPlan['install']) + count($themePlan['install']);
+                                $updateCount = $frameworkUpdateCount + $themeUpdateCount;
+                                $hasAttention = $installCount > 0 || $updateCount > 0;
+
+                                $operation = sanitize_text_field($_GET['operation'] ?? '');
+                                $providerType = sanitize_text_field($_GET['providerType'] ?? '');
+                                $providerHandle = sanitize_text_field($_GET['provider'] ?? '');
+
+                                if ($operation !== '') {
+                                    $providerLabel = $providerType === 'framework'
+                                        ? 'Framework'
+                                        : ($providerType === 'theme' ? 'Theme' : 'Provider');
+
+                                    if ($providerType === 'theme' && $providerHandle !== '' && $providerHandle !== $theme->getHandle()) {
+                                        $providerLabel = 'Provider';
+                                    }
+
+                                    if ($providerType === 'framework' && $providerHandle !== '' && $providerHandle !== $this->getHandle()) {
+                                        $providerLabel = 'Provider';
+                                    }
+
+                                    $operationLabel = match($operation) {
+                                        'installed'   => 'installed',
+                                        'updated'     => 'updated',
+                                        'rolled-back' => 'rolled back',
+                                        'uninstalled' => 'uninstalled',
+                                        default       => '',
+                                    };
+
+                                    if ($operationLabel !== '') {
+                                        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html($providerLabel . ' tables ' . $operationLabel . ' successfully.') . '</p></div>';
+                                    }
                                 }
-                                
-                                echo $this->getInstallerHTML(ThemeAccessor::get());
 
+                                if ($isManagingTables) {
+                                    echo '<div class="meros-installer-manager-header">';
+                                    echo '<h2 style="margin-top: 2em;">Manage Framework & Theme Tables</h2>';
+                                    echo '<p class="description">Review and run installer actions for framework and theme tables from one place.</p>';
+                                    echo '<p><a class="button button-secondary button-small" href="' . esc_url($themeTabUrl) . '">Back to Theme Settings</a></p>';
+                                    echo '</div>';
+
+                                    echo '<div class="meros-installer-groups">';
+
+                                    if ($hasFrameworkTables) {
+                                        echo '<section class="meros-installer-group meros-installer-group-framework">';
+                                        echo '<h2 style="margin-top: 2em;">Framework Installer</h2>';
+                                        echo '<p class="description">These are tables bundled with Meros Framework and managed separately from your theme tables.</p>';
+                                        echo $this->installerController()->renderInstallerHTML($this, 'framework');
+                                        echo '</section>';
+                                    }
+
+                                    if ($hasThemeTables) {
+                                        echo '<section class="meros-installer-group meros-installer-group-theme">';
+                                        echo '<h2 style="margin-top: 2em;">Theme Installer</h2>';
+                                        echo '<p class="description">These are tables provided by your active theme.</p>';
+                                        echo $this->installerController()->renderInstallerHTML($theme, 'theme');
+                                        echo '</section>';
+                                    }
+
+                                    echo '</div>';
+                                    echo $this->installerController()->renderInstallerModalHTML();
+                                } else {
+                                    $summary = [];
+
+                                    if ($installCount > 0) {
+                                        $summary[] = $installCount . ' pending install' . ($installCount === 1 ? '' : 's');
+                                    }
+
+                                    if ($updateCount > 0) {
+                                        $summary[] = $updateCount . ' pending update' . ($updateCount === 1 ? '' : 's');
+                                    }
+
+                                    if ($summary === []) {
+                                        $summary[] = 'No pending table installs or updates';
+                                    }
+
+                                    echo '<div class="meros-theme-installer-callout' . ($hasAttention ? ' has-attention' : '') . '">';
+                                    echo '<div>';
+                                    echo '<h3>Table Management</h3>';
+                                    echo '<p>Manage database tables provided by the framework and your active theme.</p>';
+                                    echo '<p>' . esc_html(implode(' · ', $summary)) . '</p>';
+                                    echo '</div>';
+                                    echo '<a class="button button-small" href="' . esc_url($manageTablesUrl) . '">Manage Tables</a>';
+                                    echo '</div>';
+                                }
                             }
 
-                            echo '<h2' . ($hasTables ? ' style="margin-top: 2em;"' : '') . '>Theme Settings</h2>';
-                            $theme = ThemeAccessor::get();
-                            $themeSettingsGroup = Str::snake($theme->getHandle()) . '_settings_container';
-                            $themeSettingsPage = $theme->getSettingsPageSlug();
+                            if (!$isManagingTables) {
+                                echo '<h2' . ($hasInstallerTables ? ' style="margin-top: 2em;"' : '') . '>Theme Settings</h2>';
+                                $themeSettingsGroup = Str::snake($theme->getHandle()) . '_settings_container';
+                                $themeSettingsPage = $theme->getSettingsPageSlug();
 
-                            settings_fields($themeSettingsGroup);
-                            do_settings_sections($themeSettingsPage);
-                            submit_button();
+                                settings_fields($themeSettingsGroup);
+                                do_settings_sections($themeSettingsPage);
+                                submit_button();
+                            }
                         }
                     ],
                     'packages' => [
@@ -1111,7 +1193,7 @@ final class Framework extends FeatureProvider {
                     ]
                 ]
             ]);
-        })->in('options');
+        });
     }
 
     /**
@@ -1153,79 +1235,49 @@ final class Framework extends FeatureProvider {
     }
 
     /**
-     * Generates the HTML for a provider's installer status and action buttons on the features page.
+     * Returns the framework installer controller service.
      *
-     * @param FeatureProvider $provider
+     * @return InstallerController
+     */
+    private function installerController(): InstallerController {
+        return app(InstallerController::class);
+    }
+
+    /**
+     * Returns whether the current Theme tab request is in installer management mode.
+     *
+     * @return bool
+     */
+    private function isManagingTablesView(): bool {
+        $tab = sanitize_key($_GET['tab'] ?? '');
+        $view = sanitize_key($_GET['installer_view'] ?? '');
+
+        return $tab === 'theme' && $view === 'tables';
+    }
+
+    /**
+     * Returns the URL for the Theme tab in installer management mode.
+     *
      * @return string
      */
-    private function getInstallerHTML(FeatureProvider $provider): string {
-        $html        = '';
-        $handle      = $provider->getHandle();
-        $isPackage   = $provider instanceof Package;
-        $isTheme     = !$isPackage;
-        $enabled     = $isPackage && method_exists($provider, 'isEnabled') ? (bool) $provider->isEnabled() : true;
-        $installed   = $provider->isInstalled();
-        $hasUpdates  = $provider->hasUpdates();
-        $installedAt = null;
+    private function getThemeTablesManagerUrl(): string {
+        return add_query_arg([
+            'page' => 'meros-features',
+            'tab' => 'theme',
+            'installer_view' => 'tables',
+        ], admin_url('options-general.php'));
+    }
 
-        $html .= '<div class="meros-provider-tasks">';
-
-        if ($installed) {
-            $installedAt = $provider->installedAt() ?? 'Unknown time';
-        }
-
-        $dataAttrs  = 'data-provider="' . esc_attr($handle) . '" ';
-        $dataAttrs .= 'data-provider-type="' . esc_attr($isTheme ? 'theme' : 'package') . '" ';
-        $dataAttrs .= 'data-nonce="' . esc_attr(wp_create_nonce('meros_provider_install_operation_' . $handle)) . '"';
-
-        if (!$enabled && !$isTheme && $installed) {
-            $html .= '<p class="meros-installer-info">Installed: ' . esc_html($installedAt) . '</p>';
-            $html .= '<a href="#" class="meros-provider-action-button meros-provider-uninstaller-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Uninstall</a>';
-            $html .= '</div>';
-            
-            return $html;
-        }
-
-        if ($installed) {
-            $html .= '<p class="meros-installer-info"><span><strong>Installed:</strong> ' . esc_html($installedAt) . '</span>';
-
-            $lastUpdated = $provider->lastUpdated();
-            $newInstall  = $lastUpdated === $installedAt;
-            $canRollback = $lastUpdated !== $installedAt;
-
-            if (!$newInstall) {
-                $html .= '<span> | <strong>Last updated:</strong> ' . esc_html($lastUpdated) . '</span>';
-            }
-
-            if ($hasUpdates) {
-                $html .= '<span style="color:green"> | <strong>Update available:</strong></span></p>';
-            } else {
-                $html .= '</p>';
-            }
-
-            $html .= '<div class="meros-provider-action-buttons">';
-
-            if ($isTheme) {
-                $html .= '<a href="#" class="meros-provider-action-button meros-provider-uninstaller-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Uninstall</a>';
-            }
-             
-            if ($hasUpdates) {
-                $html .= '<a href="#" class="meros-provider-action-button meros-provider-update-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Update</a>';
-            }
-
-            if ($canRollback) {
-                $html .= '<a href="#" class="meros-provider-action-button meros-provider-rollback-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Rollback</a>';
-            }
-
-            $html .= '</div>';
-
-        } else {
-            $html .= '<p class="meros-installer-info">This ' . ($isTheme ? 'theme' : 'package') . ' has features that may need to be installed for it to function properly.</p>';
-            $html .= '<a href="#" class="meros-provider-action-button meros-provider-installer-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Install</a>';
-        }
-
-        $html .= '</div>';
-        return $html;
+    /**
+     * Returns the URL for the standard Theme tab view.
+     *
+     * @return string
+     */
+    private function getThemeTabUrl(): string {
+        return add_query_arg([
+            'page' => 'meros-features',
+            'tab' => 'theme',
+        ], admin_url('options-general.php'));
     }
 
     /***************************************************************
@@ -1552,64 +1604,7 @@ final class Framework extends FeatureProvider {
      * @return void
      */
     public function handleProviderInstallerTasks(): void {
-        $providerHandle = sanitize_key($_POST['provider'] ?? '');
-        $providerType   = sanitize_key($_POST['providerType'] ?? '');
-        $subAction      = $_POST['subAction'] ?? '';
-        $nonce          = $_POST['nonce'] ?? '';
-
-        $hasAction   = in_array($subAction, ['install', 'update', 'rollback', 'uninstall']);
-        $hasProvider = is_string($providerHandle) && $providerHandle !== '';
-        $isValidProviderType = in_array($providerType, ['package', 'theme']);
-
-        $isValid = $hasAction && 
-                   $hasProvider && 
-                   $isValidProviderType && 
-                   wp_verify_nonce($nonce, 'meros_provider_install_operation_' . $providerHandle);
-
-        if (!$isValid) {
-            wp_send_json_error([
-                'message' => 'Invalid request'
-            ]);
-        }
-
-        if ($providerType === 'package') {
-            $provider = PackagesAccessor::get($providerHandle);
-        } else {
-            $provider = ThemeAccessor::get();
-        }
-
-        if ($provider === null) {
-            wp_send_json_error([
-                'message' => 'Provider not found.'
-            ]);
-            return;
-        }
-
-        try {
-            switch ($subAction) {
-                case 'install':
-                    $provider->install();
-                    break;
-                case 'update':
-                    $provider->update();
-                    break;
-                case 'rollback':
-                    $provider->rollback();
-                    break;
-                case 'uninstall':
-                    $provider->uninstall();
-                    break;
-            }
-        } catch (\Exception $e) {
-            wp_send_json_error([
-                'message' => 'Error performing operation: ' . $e->getMessage(),
-            ]);
-            return;
-        }
-
-        wp_send_json_success([
-            'message'  => 'Operation successful'
-        ]);
+        $this->installerController()->handleProviderInstallerTasks($this);
     }
 
     /*************************************************************

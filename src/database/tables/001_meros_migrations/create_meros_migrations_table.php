@@ -15,11 +15,14 @@ return new class extends Migration {
             $table->string('provider');
             $table->string('type');
             $table->string('label');
-            $table->string('handle')->unique();
-            $table->string('related_table')->unique();
-            $table->string('path')->unique();
+            $table->string('handle')->index();
+            $table->string('related_table')->index();
+            $table->string('path')->index();
             $table->ulid('batch_id')->index();
             $table->timestamps();
+
+            $table->index(['provider', 'batch_id']);
+            $table->index(['provider', 'created_at']);
         });
     }
 

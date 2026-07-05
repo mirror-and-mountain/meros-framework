@@ -4,11 +4,13 @@ namespace MM\Meros\Services\Concerns;
 
 use Closure;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 use MM\Meros\Services\Contracts\Table;
 use MM\Meros\Services\Registers\Tables as TableRegister;
 
 use MM\Meros\App\Framework;
 use MM\Meros\App\Models\Migration;
+use MM\Meros\Support\SchemaManager;
 
 use MM\Meros\Facades\Framework as FrameworkAccessor;
 use MM\Meros\Facades\Tables;
@@ -36,12 +38,35 @@ trait HasInstallers {
     }
 
     /**
+     * Returns discovered tables that belong to the current provider instance.
+     *
+     * @return Collection<int, Table>
+     */
+    private function providerTables(): Collection {
+        return $this->tables()
+            ->discover()
+            ->checkout($this)
+            ->all()
+            ->filter(fn (Table $table) => $table->provider() === $this)
+            ->values();
+    }
+
+    /**
+     * Returns discovered tables that belong to this provider.
+     *
+     * @return Collection<int, Table>
+     */
+    final public function installerTables(): Collection {
+        return $this->providerTables();
+    }
+
+    /**
      * Checks if the provider has any associated tables.
      *
      * @return bool
      */
     final public function hasTables(): bool {
-        return $this->tables()->discover()->checkout($this)->all()->isNotEmpty();
+        return $this->providerTables()->isNotEmpty();
     }
 
     /**
@@ -51,7 +76,7 @@ trait HasInstallers {
      */
     final public function install(): void {
         $this->requireFramework(); // Ensure the framework is loaded before attempting to install tables
-        $tables = $this->tables()->discover()->checkout($this)->all();
+        $tables = $this->providerTables();
 
         $batchID = Str::ulid();
 
@@ -71,7 +96,7 @@ trait HasInstallers {
      */
     final public function update(): void {
         $this->requireFramework(); // Ensure the framework is loaded before attempting to update tables
-        $tables = $this->tables()->discover()->checkout($this)->all();
+        $tables = $this->providerTables();
 
         $batchID = Str::ulid();
 
@@ -95,10 +120,7 @@ trait HasInstallers {
      */
     final public function uninstall(): void {
         $this->requireFramework(); // Ensure the framework is loaded before attempting to uninstall tables
-        $tables = $this->tables()
-            ->discover()
-            ->checkout($this)
-            ->all()
+        $tables = $this->providerTables()
             ->reverse(); // Reverse the collection to uninstall in the correct order (dependents before dependencies)
 
         foreach ($tables as $table) {
@@ -113,23 +135,46 @@ trait HasInstallers {
 
     final public function rollback(): void {
         $this->requireFramework(); // Ensure the framework is loaded before attempting to rollback tables
-        
-        $lastUpdate = Migration::where('provider', $this->getHandle())
-            ->orderBy('created_at', 'desc')
-            ->first();
 
-        $table = $this->tables()
-            ->discover()
-            ->checkout($this)
-            ->all()
-            ->where('tableName', $lastUpdate->related_table)
-            ->first();
-
-        if ($table === null || !$table->isInstalled()) {
-            return; // Table not found or not installed, cannot rollback
+        if (!SchemaManager::hasTable('meros_migrations')) {
+            return;
         }
 
-        $table->rollback();
+        $records = Migration::where('provider', $this->getHandle())
+            ->orderByDesc('id')
+            ->get();
+
+        if ($records->isEmpty()) {
+            return;
+        }
+
+        $latestBatchID = $records->first()->batch_id;
+
+        if (!is_string($latestBatchID) || $latestBatchID === '') {
+            return;
+        }
+
+        $tables = $this->providerTables()->keyBy('tableName');
+        $batchRecords = $records->where('batch_id', $latestBatchID)->values();
+
+        foreach ($batchRecords as $record) {
+            $table = $tables->get($record->related_table);
+
+            if (!$table instanceof Table || !$table->isInstalled()) {
+                continue;
+            }
+
+            if ($record->type === 'update') {
+                $table->rollback();
+                continue;
+            }
+
+            if ($record->type === 'create') {
+                $table->uninstall();
+            }
+        }
+
+        $this->updatedAt = (new \DateTime())->format('d-m-Y H:i:s');
     }
 
     /**
@@ -138,7 +183,7 @@ trait HasInstallers {
      * @return bool
      */
     final public function isInstalled(): bool {
-        $tables = $this->tables()->discover()->checkout($this)->all();
+        $tables = $this->providerTables();
     
         if ($tables->count() === 0) {
             return true; // If there are no tables, consider it installed
@@ -164,7 +209,7 @@ trait HasInstallers {
      * @return bool
      */
     final public function hasUpdates(): bool {
-        $tables = $this->tables()->discover()->checkout($this)->all();
+        $tables = $this->providerTables();
 
         if ($tables->count() === 0) {
             return false; // If there are no tables, there can't be updates
@@ -199,6 +244,10 @@ trait HasInstallers {
     final public function lastUpdated(): ?string {
         if (isset($this->updatedAt)) {
             return $this->updatedAt;
+        }
+
+        if (!SchemaManager::hasTable('meros_migrations')) {
+            return null;
         }
 
         $this->updatedAt = Migration::where('provider', $this->getHandle())

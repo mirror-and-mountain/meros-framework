@@ -38,6 +38,13 @@ final class SchemaManager {
         $schema     = static::schema($connection);
         $collection = collect(Arr::keyBy($schema->getTables(), 'name'));
 
+        if (!static::hasTable('meros_migrations', $connection)) {
+            return $collection->map(function ($table) {
+                $table['provider'] = 'wordpress/plugin';
+                return $table;
+            });
+        }
+
         global $wpdb;
         $tablePrefix = $wpdb->prefix;
 
