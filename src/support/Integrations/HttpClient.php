@@ -1,9 +1,9 @@
 <?php
 
-namespace MM\Meros\App\Integrations;
+namespace MM\Meros\Support\Integrations;
 
-use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Http;
 
 class HttpClient {
     public function send(array $request): Response {
@@ -18,7 +18,7 @@ class HttpClient {
             $client = $client->asJson();
 
             return $client->send($method, $url, [
-                'json' => $payload
+                'json' => $payload,
             ]);
         }
 
@@ -26,12 +26,12 @@ class HttpClient {
             $client = $client->asForm();
 
             return $client->send($method, $url, [
-                'form_params' => $payload
+                'form_params' => $payload,
             ]);
         }
 
         return $client->send($method, $url, [
-            'body' => $payload
+            'body' => $payload,
         ]);
     }
 }

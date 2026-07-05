@@ -4,10 +4,11 @@ namespace MM\Meros\App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 
-use MM\Meros\App\Integrations\IntegrationManager;
-use MM\Meros\App\Integrations\RequestBuilder;
-use MM\Meros\App\Integrations\Auth\AuthResolver;
-use MM\Meros\App\Integrations\Http\HttpClient;
+use MM\Meros\Support\Integrations\RequestBuilder;
+use MM\Meros\Support\Integrations\AuthResolver;
+use MM\Meros\Support\Integrations\HttpClient;
+use MM\Meros\Support\Integrations\CRM\SyncValueResolver;
+use MM\Meros\Support\Integrations\CRM\SyncJobRunner;
 
 class IntegrationServiceProvider extends ServiceProvider {
     public function register(): void {
@@ -25,10 +26,13 @@ class IntegrationServiceProvider extends ServiceProvider {
             );
         });
 
-        $this->app->singleton(IntegrationManager::class, function ($app) {
-            return new IntegrationManager(
-                $app->make(RequestBuilder::class),
-                $app->make(HttpClient::class)
+        $this->app->singleton(SyncValueResolver::class, function () {
+            return new SyncValueResolver();
+        });
+
+        $this->app->singleton(SyncJobRunner::class, function ($app) {
+            return new SyncJobRunner(
+                $app->make(SyncValueResolver::class)
             );
         });
     }

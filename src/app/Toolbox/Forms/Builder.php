@@ -25,6 +25,8 @@ use MM\Meros\Facades\FormActions;
 use MM\Meros\App\Models\Form;
 use MM\Meros\App\Models\PostMeta as FormMeta;
 
+use MM\Meros\Services\Contracts\Forms\FormAction;
+
 class Builder extends Component {
     /**
      * Nav Items to be rendered in the builder's navigation bar.
@@ -1668,6 +1670,76 @@ class Builder extends Component {
         }
     }
 
+    /**
+     * Builds the actions repeater used in the form builder settings -> actions tab.
+     *
+     * @return Field
+     */
+    public function getActionsRepeaterField(): Field {
+        $actions = $this->schema['actions'] ?? [];
+
+        $formFields = $this->getFields(true, true, ['name', 'label']);
+        $formFieldOptions = [];
+
+        foreach ($formFields as $field) {
+            $name = $field['name'] ?? '';
+            $label = $field['label'] ?? $name;
+
+            if (is_string($name) && $name !== '') {
+                $formFieldOptions[$name] = is_string($label) && $label !== '' ? $label : $name;
+            }
+        }
+
+        $actionOptions = [];
+        $resolvedActions = [];
+
+        $register = FormActions::checkout(Framework::get());
+
+        foreach ($register->getRegistered() as $handle => $_) {
+            $action = FormActions::checkout(Framework::get())->makeFrom($handle);
+
+            if (!$action instanceof FormAction) {
+                continue;
+            }
+
+            $resolvedActions[$handle] = $action;
+            $actionOptions[$handle] = $action->getLabel();
+        }
+
+        $repeater = Fields::checkout(Framework::get())->makeFrom('repeater', [
+            'id' => 'form-builder-actions',
+            'name' => 'actions',
+            'label' => 'Actions',
+            'helpText' => 'Define one or more actions to run after a successful form submission.',
+        ]);
+
+        $repeater->allowConfigure(true)
+            ->allowAdd(true)
+            ->allowRemove(true)
+            ->allowReorder(true)
+            ->configureRequiredFields(['action'])
+            ->addRowText('Add Action')
+            ->configureRowText('Configure')
+            ->removeRowText('Remove Action');
+
+        $repeater->field('select', [
+            'id' => 'action',
+            'name' => 'action',
+            'label' => 'Action',
+            'options' => array_merge(['' => 'Select an action...'], $actionOptions),
+        ]);
+
+        foreach ($resolvedActions as $handle => $action) {
+            $html = $action->renderConfigurationDialog($formFieldOptions, []);
+
+            $repeater->customConfigurationDialogHtml($html, ['action', '=', $handle]);
+        }
+
+        $repeater->default(is_array($actions) ? $actions : []);
+
+        return $repeater;
+    }
+
 
     // =========================================================================
     // Saving
@@ -1693,7 +1765,7 @@ class Builder extends Component {
 
 
         $serializedSchema = [
-            'actions'  => [],
+            'actions'  => is_array($this->schema['actions'] ?? null) ? $this->schema['actions'] : [],
             'rows'     => $serializedRows
         ];
         

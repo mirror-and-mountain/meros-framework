@@ -94,6 +94,18 @@ abstract class FormAction extends FeatureDefinition {
         return $this->config;
     }
 
+    /**
+     * Executes this action for a submitted form payload.
+     *
+     * @param array $submission Submission values keyed by field name.
+     * @param array $context Additional runtime context (form model, response model, etc.).
+     *
+     * @return mixed
+     */
+    public function execute(array $submission, array $context = []): mixed {
+        return null;
+    }
+
     /***************************
      * Abstract methods
      ***************************/

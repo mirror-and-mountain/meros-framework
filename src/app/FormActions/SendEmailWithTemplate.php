@@ -263,8 +263,7 @@ final class SendEmailWithTemplate extends FormAction {
             $fieldGroup->field('select')->id('action-send-email-template-config-template')
                 ->label('Select Template')
                 ->options(array_merge(['' => 'Select a template...'], $templateOptions))
-                ->default($template !== '' ? $template : '')
-                ->onChange('$store.formBuilder.refreshActionConfigurationDialog');
+                ->default($template !== '' ? $template : '');
 
             if ($template !== '') {
                 $fieldGroup->field('repeater', function ($repeater) use ($mergeTags, $formFields, $tagMap) {

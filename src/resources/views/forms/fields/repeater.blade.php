@@ -312,7 +312,7 @@
         @if($allowsAdd)
             <button
                 type="button"
-                @click.stop="addRow(isEditor ?? false)"
+                @click.stop="addRow((typeof isEditor !== 'undefined') ? isEditor : false)"
                 class="meros-repeater-button meros-repeater-button--neutral meros-repeater-button--add"
                 title="{{ $addRowText }}"
                 :disabled="!canAddRows && !(typeof isRepeaterEditorOpen !== 'undefined' ? isRepeaterEditorOpen : false) === true"

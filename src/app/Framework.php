@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 
 use MM\Meros\Services\Contracts\Admin\Setting;
 use MM\Meros\Services\Contracts\FeatureProvider;
+use MM\Meros\Services\Contracts\Table;
 use MM\Meros\App\Providers\FrameworkServiceProvider;
 
 use MM\Meros\App\Fields\AdminButton;
@@ -36,9 +37,13 @@ use MM\Meros\App\FieldWrappers\AdminSettings;
 use MM\Meros\App\FieldWrappers\AdminDefault;
 
 use MM\Meros\App\FormActions\SendEmailWithTemplate;
+use MM\Meros\App\FormActions\RunCrmSyncJobs;
+use MM\Meros\App\Integrations\ExchangeOnline;
+use MM\Meros\App\Integrations\Stripe;
 
 use MM\Meros\App\Admin\SettingsSections\Assets;
 use MM\Meros\App\Admin\SettingsSections\Blocks;
+use MM\Meros\App\Admin\SettingsSections\Integrations;
 use MM\Meros\App\Admin\SettingsSections\Forms;
 use MM\Meros\App\Admin\SettingsSections\Packages;
 
@@ -50,6 +55,7 @@ use MM\Meros\App\Theme;
 use MM\Meros\App\Models\Form;
 use MM\Meros\App\Models\EmailTemplate;
 use MM\Meros\Services\Database\InstallerController;
+use MM\Meros\Services\Registers\Integrations as IntegrationsRegister;
 
 use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Packages as PackagesAccessor;
@@ -96,6 +102,7 @@ final class Framework extends FeatureProvider {
      */
     private function initCoreFeatures(): void {
         $this->coreFeatures['forms'] = get_option('meros_framework_settings')['forms']['enable_forms'] ?? true;
+        $this->coreFeatures['integrations'] = $this->integrationsFeatureEnabled() && $this->hasEnabledIntegrationSettings();
     }
 
     /**
@@ -118,12 +125,21 @@ final class Framework extends FeatureProvider {
         // Register REST API routes
         $this->registerRestRoutes();
 
+        // Register the framework's built-in integrations when the global integrations feature is enabled.
+        if ($this->integrationsFeatureEnabled()) {
+            $this->integrations()->registerMany([
+                'exchange_online' => ExchangeOnline::class,
+                'stripe'          => Stripe::class,
+            ]);
+        }
+
         // Load forms service if the forms feature is enabled
         if ($this->featureEnabled('forms')) {
             // Make sure the forms service is installed before registering form-related features
             $this->requireFormsService();
             // Register framework form actions
             $this->formActions()->register('send_email_with_template', SendEmailWithTemplate::class);
+            $this->formActions()->register('run_crm_sync_jobs', RunCrmSyncJobs::class);
         }
 
         // Register framework field types
@@ -170,6 +186,7 @@ final class Framework extends FeatureProvider {
         $this->settingsSections()->register('meros-features-forms', Forms::class);
         $this->settingsSections()->register('meros-features-blocks', Blocks::class);
         $this->settingsSections()->register('meros-features-assets', Assets::class);
+        $this->settingsSections()->register('meros-features-integrations', Integrations::class);
 
         // Register menu page templates
         $this->menuPageTemplates()->register('simple-settings', SimpleSettingsPage::class);
@@ -211,6 +228,12 @@ final class Framework extends FeatureProvider {
     protected function configure(): void {
         // Run theme activation tasks
         add_action('after_switch_theme', [$this, 'runActivationTasks']);
+
+        add_action('meros_providers_registered', function () {
+            if ($this->featureEnabled('integrations')) {
+                $this->require('integrations');
+            }
+        }, 20);
         
         $this->configureSettings();
 
@@ -858,10 +881,16 @@ final class Framework extends FeatureProvider {
                 ->label('Forms');
         });
 
+        $integrationSettings = $this->settings()->add(function ($setting) {
+            $setting->object('integrations')
+                ->label('Integrations');
+        });
+
         $this->configurePackageSettings($packageSettings);
         $this->configureBlocksSettings($blockSettings);
         $this->configureAssetGroupSettings($assetGroupSettings);
         $this->configureFormsSettings($formSettings);
+        $this->configureIntegrationSettings($integrationSettings);
     }
 
     /**
@@ -1021,6 +1050,218 @@ final class Framework extends FeatureProvider {
             ->default(true)
             ->field()
                 ->section('meros-features-forms');
+    }
+
+    /**
+     * Configures settings for discovered integrations, allowing them to be enabled/disabled and to expose their declared configuration fields.
+     *
+     * @param Setting $settings The settings object to add integration settings to.
+     *
+     * @return void
+     */
+    private function configureIntegrationSettings(Setting $settings): void {
+        add_action('meros_providers_registered', function () use ($settings) {
+            $integrations = $this->resolvedIntegrations();
+
+            $settings->add()->boolean('enable_integrations')
+                ->label('Enable Integrations')
+                ->description('Enable the Integrations feature to configure and manage integration connections.')
+                ->default(false)
+                ->field()
+                    ->section('meros-features-integrations');
+
+            if (!$this->integrationsFeatureEnabled()) {
+                return;
+            }
+
+            // First pass: always register all integration enable toggles (blocks/assets style).
+            foreach ($integrations as $integration) {
+                $integrationHandle = $integration->getHandle();
+                $integrationEnabled = $this->integrationEnabled($integrationHandle);
+
+                // Keep enable toggles flat so all integrations remain independently visible/switchable.
+                $enabledSetting = $settings->add()->boolean($integration->getHandle() . '_enable')
+                    ->label('Enable ' . $integration->getLabel())
+                    ->description($integration->getDescription())
+                    ->default(false)
+                    ->field()
+                        ->section('meros-features-integrations');
+
+                if ($integrationEnabled) {
+                    $enabledSetting->titleHTML($this->getIntegrationSettingHTML($integration));
+                }
+            }
+
+            // Second pass: only enabled integrations get configuration fields on their detail page.
+            foreach ($integrations as $integration) {
+                $integrationHandle = $integration->getHandle();
+                $integrationPageSlug = $this->getIntegrationSettingsPageSlug($integrationHandle);
+
+                if (!$this->integrationEnabled($integrationHandle)) {
+                    continue;
+                }
+
+                $settings->add(function ($setting) use ($integration) {
+                    $setting->string($integration->getHandle() . '_base_uri')
+                        ->field('text', function ($field) use ($integration) {
+                            $field->label('Base URI');
+                            $field->default($integration->getBaseUri());
+                        })
+                        ->section($this->getIntegrationSettingsPageSlug($integration->getHandle()));
+                });
+
+                $settings->add(function ($setting) use ($integration) {
+                    $setting->string($integration->getHandle() . '_api_version')
+                        ->field('text', function ($field) use ($integration) {
+                            $field->label('API Version');
+                            $field->default($integration->getApiVersion());
+                        })
+                        ->section($this->getIntegrationSettingsPageSlug($integration->getHandle()));
+                });
+
+                $settings->add(function ($setting) use ($integration) {
+                    $setting->string($integration->getHandle() . '_connection_label')
+                        ->field('text', function ($field) {
+                            $field->label('Connection Label');
+                            $field->helpText('Optional label used to pick a saved connection for fluent API calls.');
+                        })
+                        ->section($this->getIntegrationSettingsPageSlug($integration->getHandle()));
+                });
+
+                foreach ($integration->getConfigurationFields() as $configurationField) {
+                    $settings->add(function ($setting) use ($integration, $configurationField, $integrationPageSlug) {
+                        $configurationField->applyTo(
+                            $setting,
+                            $integration->getHandle() . '_' . $configurationField->getName()
+                        );
+
+                        $setting->section($integrationPageSlug);
+                    });
+                }
+            }
+        }, 10, 2);
+    }
+
+    /**
+     * Returns all discovered integrations registered by framework, theme, and packages.
+     *
+     * @return Collection
+     */
+    private function resolvedIntegrations(): Collection {
+        $providers = collect([$this, ThemeAccessor::get()])
+            ->merge(PackagesAccessor::all() ?? [])
+            ->filter(fn ($provider) => $provider instanceof FeatureProvider)
+            ->values();
+
+        /** @var IntegrationsRegister $integrationsRegister */
+        $integrationsRegister = app(IntegrationsRegister::class);
+        $integrations = collect([]);
+
+        foreach ($providers as $provider) {
+            $integrationsRegister->checkout($provider);
+            $integrations = $integrations->merge($integrationsRegister->allResolved());
+        }
+
+        return $integrations->unique(fn ($integration) => $integration->getHandle())->values();
+    }
+
+    /**
+     * Returns whether the global integrations feature is enabled in framework settings.
+     *
+     * @return bool
+     */
+    private function integrationsFeatureEnabled(): bool {
+        $settings = get_option('meros_framework_settings', []);
+        return (bool) ($settings['integrations']['enable_integrations'] ?? false);
+    }
+
+    /**
+     * Returns whether a specific integration is enabled in framework settings.
+     *
+     * @param string $integrationHandle
+     * @return bool
+     */
+    private function integrationEnabled(string $integrationHandle): bool {
+        if (!$this->integrationsFeatureEnabled()) {
+            return false;
+        }
+
+        $settings = get_option('meros_framework_settings', []);
+
+        $integrationSettings = $settings['integrations'] ?? [];
+
+        if (!is_array($integrationSettings)) {
+            return false;
+        }
+
+        // Preferred nested shape: integrations[handle][handle_enable]
+        $nested = $integrationSettings[$integrationHandle] ?? null;
+
+        if (is_array($nested) && array_key_exists($integrationHandle . '_enable', $nested)) {
+            return (bool) $nested[$integrationHandle . '_enable'];
+        }
+
+        // Backward-compatible fallback: integrations[handle_enable]
+        return (bool) ($integrationSettings[$integrationHandle . '_enable'] ?? false);
+    }
+
+    /**
+     * Returns whether any discovered integration is enabled.
+     *
+     * @return bool
+     */
+    private function hasEnabledIntegrations(): bool {
+        return $this->featureEnabled('integrations');
+    }
+
+    /**
+     * Returns whether any integration has been enabled in framework settings.
+     *
+     * @return bool
+     */
+    private function hasEnabledIntegrationSettings(): bool {
+        $settings = get_option('meros_framework_settings', []);
+        $integrationSettings = $settings['integrations'] ?? [];
+
+        if (!is_array($integrationSettings)) {
+            return false;
+        }
+
+        foreach ($integrationSettings as $key => $value) {
+            if ($key === 'enable_integrations') {
+                continue;
+            }
+
+            if (is_array($value) && !empty($value[$key . '_enable'])) {
+                return true;
+            }
+
+            if (is_string($key) && str_ends_with($key, '_enable') && !empty($value)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Filters framework installer tables so integration tables only appear when at least one integration is enabled.
+     *
+     * @param Table $table
+     * @return bool
+     */
+    protected function shouldIncludeInstallerTable(Table $table): bool {
+        $integrationTables = [
+            'meros_integration_accounts',
+            'meros_integration_connections',
+            'meros_integration_environments',
+        ];
+
+        if (in_array($table->getTableName(), $integrationTables, true) && !$this->hasEnabledIntegrations()) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -1188,7 +1429,35 @@ final class Framework extends FeatureProvider {
                     'integrations' => [
                         'label'    => 'Integrations',
                         'callback' => function () {
-                            echo 'This is the integrations tab';
+                            $integrationHandle = sanitize_key($_GET['integration'] ?? '');
+
+                            if ($integrationHandle !== '' && $this->integrationEnabled($integrationHandle)) {
+                                $integration = $this->resolvedIntegrations()
+                                    ->first(fn ($registeredIntegration) => $registeredIntegration->getHandle() === $integrationHandle);
+
+                                if ($integration !== null) {
+                                    $backUrl = add_query_arg([
+                                        'page' => 'meros-features',
+                                        'tab'  => 'integrations',
+                                    ], admin_url('options-general.php'));
+
+                                    echo '<h2>' . esc_html($integration->getLabel()) . ' Configuration</h2>';
+                                    echo '<p><a class="button button-secondary button-small" href="' . esc_url($backUrl) . '">Back to Integrations</a></p>';
+
+                                    if ($integration->getAuthType() === 'oauth') {
+                                        echo $this->getIntegrationOAuthSetupHTML($integration);
+                                    }
+
+                                    settings_fields('meros_framework_settings_container');
+                                    do_settings_sections($this->getIntegrationSettingsPageSlug($integrationHandle));
+                                    submit_button();
+                                    return;
+                                }
+                            }
+
+                            settings_fields('meros_framework_settings_container');
+                            do_settings_sections('meros-features-integrations');
+                            submit_button();
                         }
                     ]
                 ]
@@ -1232,6 +1501,82 @@ final class Framework extends FeatureProvider {
         }
 
         return $html;
+    }
+
+    /**
+     * Returns the page slug used for an integration-specific settings screen.
+     *
+     * @param string $integrationHandle
+     * @return string
+     */
+    private function getIntegrationSettingsPageSlug(string $integrationHandle): string {
+        return 'meros-features-integration-' . sanitize_key($integrationHandle);
+    }
+
+    /**
+     * Generates the integration row actions HTML shown next to the integration toggle.
+     *
+     * @param object $integration
+     * @return string
+     */
+    private function getIntegrationSettingHTML(object $integration): string {
+        $href = add_query_arg([
+            'page' => 'meros-features',
+            'tab' => 'integrations',
+            'integration' => $integration->getHandle(),
+        ], admin_url('options-general.php'));
+
+        return '<div class="meros-provider-links"><a href="' . esc_url($href) . '">Configure</a></div>';
+    }
+
+    /**
+     * Builds an OAuth setup panel with an authorization link for OAuth-based integrations.
+     *
+     * @param object $integration
+     * @return string
+     */
+    private function getIntegrationOAuthSetupHTML(object $integration): string {
+        $handle = $integration->getHandle();
+        $settings = get_option('meros_framework_settings', []);
+        $integrationSettings = is_array($settings['integrations'] ?? null) ? $settings['integrations'] : [];
+
+        $prefixed = static function (string $key) use ($integrationSettings, $handle) {
+            $nested = $integrationSettings[$handle] ?? null;
+
+            if (is_array($nested) && array_key_exists($handle . '_' . $key, $nested)) {
+                return $nested[$handle . '_' . $key];
+            }
+
+            return $integrationSettings[$handle . '_' . $key] ?? '';
+        };
+
+        $authorizeUrl = trim((string) $prefixed('authorize_url'));
+        $clientId = trim((string) $prefixed('client_id'));
+        $scopes = trim((string) $prefixed('scopes'));
+        $redirectUri = trim((string) $prefixed('redirect_uri'));
+
+        if ($redirectUri === '') {
+            $redirectUri = admin_url('options-general.php?page=meros-features&tab=integrations&integration=' . rawurlencode($handle));
+        }
+
+        if ($authorizeUrl === '' || $clientId === '') {
+            return '<div class="notice notice-warning inline"><p>Set the OAuth Authorize URL and Client ID, then save to generate an authorization link.</p></div>';
+        }
+
+        $query = [
+            'response_type' => 'code',
+            'client_id' => $clientId,
+            'redirect_uri' => $redirectUri,
+            'state' => wp_create_nonce('meros_integration_oauth_' . $handle),
+        ];
+
+        if ($scopes !== '') {
+            $query['scope'] = trim(preg_replace('/\s*,\s*/', ' ', $scopes));
+        }
+
+        $oauthHref = add_query_arg($query, $authorizeUrl);
+
+        return '<p><a class="button button-primary" href="' . esc_url($oauthHref) . '" target="_blank" rel="noopener noreferrer">Login & Authorize OAuth</a></p>';
     }
 
     /**

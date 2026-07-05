@@ -47,8 +47,18 @@ trait HasInstallers {
             ->discover()
             ->checkout($this)
             ->all()
-            ->filter(fn (Table $table) => $table->provider() === $this)
+            ->filter(fn (Table $table) => $table->provider() === $this && $this->shouldIncludeInstallerTable($table))
             ->values();
+    }
+
+    /**
+     * Determines whether a discovered installer table should be included in prompts and lifecycle checks.
+     *
+     * @param Table $table
+     * @return bool
+     */
+    protected function shouldIncludeInstallerTable(Table $table): bool {
+        return true;
     }
 
     /**

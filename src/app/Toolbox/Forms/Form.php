@@ -15,6 +15,10 @@ use MM\Meros\App\Fields\Repeater;
 
 use MM\Meros\Services\Contracts\Forms\Field;
 use MM\Meros\Services\Contracts\Forms\FormRow;
+use MM\Meros\Services\Contracts\Forms\FormAction as FormActionContract;
+
+use MM\Meros\Facades\FormActions;
+use MM\Meros\Facades\Framework;
 
 class Form extends Component {
     /**
@@ -293,10 +297,12 @@ class Form extends Component {
         $this->fieldState = $sanitisedData;
 
         try {
-            FormResponse::create([
+            $response = FormResponse::create([
                 'form_id'  => $this->formID,
                 'response' => $this->fieldState,
             ]);
+
+            $this->executeFormActions($this->fieldState, $response);
 
             $this->resetFormAfterSuccessfulSubmit();
 
@@ -311,6 +317,73 @@ class Form extends Component {
                 'type' => 'system-error',
                 'message' => 'We could not save your submission right now. Please try again.',
             ]);
+        }
+    }
+
+    /**
+     * Executes form actions configured in the form schema.
+     *
+     * @param array $submissionState
+     * @param FormResponse $response
+     * @return void
+     */
+    private function executeFormActions(array $submissionState, FormResponse $response): void {
+        $actions = $this->schema['actions'] ?? [];
+
+        if (!is_array($actions) || $actions === []) {
+            return;
+        }
+
+        $submissionByFieldName = collect($submissionState)
+            ->filter(fn ($field) => is_array($field))
+            ->mapWithKeys(function ($field) {
+                $name = is_string($field['name'] ?? null) ? $field['name'] : null;
+
+                if ($name === null || $name === '') {
+                    return [];
+                }
+
+                return [$name => $field['value'] ?? null];
+            })
+            ->toArray();
+
+        foreach ($actions as $index => $actionRow) {
+            if (!is_array($actionRow)) {
+                continue;
+            }
+
+            $actionHandle = trim((string) ($actionRow['action'] ?? ''));
+
+            if ($actionHandle === '') {
+                continue;
+            }
+
+            $rawConfig = $actionRow['__configuration'] ?? [];
+            $config = [];
+
+            if (is_string($rawConfig) && $rawConfig !== '') {
+                $decoded = json_decode($rawConfig, true);
+                $config = is_array($decoded) ? $decoded : [];
+            } elseif (is_array($rawConfig)) {
+                $config = $rawConfig;
+            }
+
+            try {
+                $action = FormActions::checkout(Framework::get())->makeFrom($actionHandle);
+
+                if (!$action instanceof FormActionContract) {
+                    continue;
+                }
+
+                $action->config($config)->execute($submissionByFieldName, [
+                    'form' => $this->form,
+                    'form_id' => $this->formID,
+                    'response' => $response,
+                    'raw_submission' => $submissionState,
+                ]);
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
         }
     }
 

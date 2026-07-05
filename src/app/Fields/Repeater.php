@@ -355,9 +355,48 @@ class Repeater extends Field {
             'html'  => $dialog->html(['class' => 'meros-form-group--no-style']),
         ];
 
-        if ($this->hiddenConfigurationField === null) {
-            $this->hiddenConfigurationField = FieldsRegister::checkout($this->provider)
-                ->makeFrom('hidden', function (Field $field) use ($default) {
+        $this->ensureHiddenConfigurationField($default);
+
+        return $this;
+    }
+
+    /**
+     * Defines a custom configuration dialog from pre-rendered HTML.
+     *
+     * @param string $html
+     * @param array $rule
+     * @param array $default
+     *
+     * @return self
+     */
+    public function customConfigurationDialogHtml(string $html, array $rule = [], array $default = []): self {
+        if (trim($html) === '') {
+            return $this;
+        }
+
+        $this->customConfigurationDialogs[] = [
+            'rule' => $rule,
+            'html' => $html,
+        ];
+
+        $this->ensureHiddenConfigurationField($default);
+
+        return $this;
+    }
+
+    /**
+     * Ensures the repeater has a hidden JSON field to store row dialog configuration.
+     *
+     * @param array $default
+     * @return void
+     */
+    private function ensureHiddenConfigurationField(array $default = []): void {
+        if ($this->hiddenConfigurationField !== null) {
+            return;
+        }
+
+        $this->hiddenConfigurationField = FieldsRegister::checkout($this->provider)
+            ->makeFrom('hidden', function (Field $field) use ($default) {
                 $field->name('__configuration')
                     ->hideInRepeaterTable()
                     ->attribute('data-repeater-configuration-field', true)
@@ -365,10 +404,7 @@ class Repeater extends Field {
                     ->default(json_encode($default));
             });
 
-            $this->field($this->hiddenConfigurationField);
-        }
-
-        return $this;
+        $this->field($this->hiddenConfigurationField);
     }
 
     /**

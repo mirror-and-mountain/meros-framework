@@ -8,6 +8,7 @@ use MM\Meros\Services\Concerns\HasAssets;
 use MM\Meros\Services\Concerns\HasBlocks;
 use MM\Meros\Services\Concerns\HasFields;
 use MM\Meros\Services\Concerns\HasInstallers;
+use MM\Meros\Services\Concerns\HasIntegrations;
 use MM\Meros\Services\Concerns\HasIdentity;
 use MM\Meros\Services\Concerns\HasPostTypes;
 use MM\Meros\Services\Concerns\HasSettings;
@@ -34,6 +35,7 @@ abstract class FeatureProvider {
         HasAssets,
         HasBlocks,
         HasFields,
+        HasIntegrations,
         HasInstallers;
 
     public function __construct(

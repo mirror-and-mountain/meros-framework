@@ -1,0 +1,72 @@
+<?php
+
+namespace MM\Meros\Support\Integrations;
+
+use MM\Meros\App\Models\IntegrationAccount;
+use MM\Meros\App\Models\IntegrationConnection;
+
+class AuthResolver {
+    public function resolve(
+        mixed $integration,
+        IntegrationConnection $connection
+    ): array {
+        $secrets = new IntegrationConnectionSecrets($connection);
+        $authType = $this->resolveAuthType($integration);
+
+        switch ($authType) {
+            case 'oauth':
+                $accessToken = $secrets->bearerToken();
+
+                if ($accessToken === null) {
+                    return [];
+                }
+
+                return [
+                    'Authorization' => 'Bearer ' . $accessToken,
+                ];
+
+            case 'api_key':
+                $apiKey = $secrets->apiKey();
+
+                if ($apiKey === null) {
+                    return [];
+                }
+
+                return [
+                    'Authorization' => 'Bearer ' . $apiKey,
+                ];
+
+            case 'basic':
+                $username = $secrets->metadata('username');
+                $password = $secrets->metadata('password');
+
+                if (!is_string($username) || !is_string($password) || $username === '' || $password === '') {
+                    return [];
+                }
+
+                return [
+                    'Authorization' => 'Basic ' . base64_encode($username . ':' . $password),
+                ];
+        }
+
+        return [];
+    }
+
+    protected function resolveAuthType(mixed $integration): string {
+        if (is_object($integration)) {
+            if (method_exists($integration, 'getAuthType')) {
+                return (string) $integration->getAuthType();
+            }
+
+            if (isset($integration->auth_type) && is_string($integration->auth_type)) {
+                return $integration->auth_type;
+            }
+
+            if (isset($integration->authType) && is_string($integration->authType)) {
+                return $integration->authType;
+            }
+        }
+
+        return 'api_key';
+    }
+}
