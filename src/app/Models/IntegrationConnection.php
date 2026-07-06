@@ -20,6 +20,13 @@ class IntegrationConnection extends Model {
         'metadata',
         'token_expires_at',
         'last_used_at',
+        'connected_at',
+        'revoked_at',
+        'last_refreshed_at',
+        'status',
+        'status_reason',
+        'last_error',
+        'last_error_at',
         'is_active',
     ];
 
@@ -32,7 +39,11 @@ class IntegrationConnection extends Model {
         'scopes' => 'encrypted:array',
         'metadata' => 'array',
         'token_expires_at' => 'datetime',
-        'last_used_at' => 'datetime'
+        'last_used_at' => 'datetime',
+        'connected_at' => 'datetime',
+        'revoked_at' => 'datetime',
+        'last_refreshed_at' => 'datetime',
+        'last_error_at' => 'datetime',
     ];
 
     public function account(): BelongsTo {

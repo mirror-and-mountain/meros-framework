@@ -53,8 +53,11 @@ use MM\Meros\App\Admin\Templates\MerosFeaturesPage;
 use MM\Meros\App\Theme;
 use MM\Meros\App\Models\Form;
 use MM\Meros\App\Models\EmailTemplate;
+use MM\Meros\App\Models\IntegrationAccount;
+use MM\Meros\App\Models\IntegrationConnection;
 use MM\Meros\Services\Database\InstallerController;
 use MM\Meros\Services\Registers\Integrations as IntegrationsRegister;
+use MM\Meros\Support\Integrations\OAuthManager;
 
 use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Packages as PackagesAccessor;
@@ -195,6 +198,8 @@ final class Framework extends FeatureProvider {
         if ($this->context->isAdmin) {
             $this->initAdminAjaxHandlers();
         }
+
+        $this->initIntegrationOAuthHandlers();
     }
 
     /**
@@ -1094,6 +1099,9 @@ final class Framework extends FeatureProvider {
             foreach ($integrations as $integration) {
                 $integrationHandle = $integration->getHandle();
                 $integrationPageSlug = $this->getIntegrationSettingsPageSlug($integrationHandle);
+                $selectedEnvironment = $this->selectedIntegrationOAuthEnvironment($integrationHandle);
+                $configurationFields = $integration->getConfigurationFields();
+                $configurationFieldNames = array_values(array_map(fn ($field) => $field->getName(), $configurationFields));
 
                 if (!$this->integrationEnabled($integrationHandle)) {
                     continue;
@@ -1126,7 +1134,13 @@ final class Framework extends FeatureProvider {
                         ->section($this->getIntegrationSettingsPageSlug($integration->getHandle()));
                 });
 
-                foreach ($integration->getConfigurationFields() as $configurationField) {
+                foreach ($configurationFields as $configurationField) {
+                    $fieldName = $configurationField->getName();
+
+                    if (!$this->shouldRenderIntegrationConfigurationField($integration, $fieldName, $configurationFieldNames, $selectedEnvironment)) {
+                        continue;
+                    }
+
                     $settings->add(function ($setting) use ($integration, $configurationField, $integrationPageSlug) {
                         $configurationField->applyTo(
                             $setting,
@@ -1434,6 +1448,8 @@ final class Framework extends FeatureProvider {
                                     ->first(fn ($registeredIntegration) => $registeredIntegration->getHandle() === $integrationHandle);
 
                                 if ($integration !== null) {
+                                    $selectedEnvironment = $this->selectedIntegrationOAuthEnvironment($integrationHandle);
+                                    $isOauthIntegration = $integration->getAuthType() === 'oauth';
                                     $backUrl = add_query_arg([
                                         'page' => 'meros-features',
                                         'tab'  => 'integrations',
@@ -1441,14 +1457,39 @@ final class Framework extends FeatureProvider {
 
                                     echo '<h2>' . esc_html($integration->getLabel()) . ' Configuration</h2>';
                                     echo '<p><a class="button button-secondary button-small" href="' . esc_url($backUrl) . '">Back to Integrations</a></p>';
+                                    echo '<p><strong>Active environment:</strong> ' . esc_html($this->oauthEnvironmentLabel($selectedEnvironment)) . '</p>';
 
-                                    if ($integration->getAuthType() === 'oauth') {
+                                    $layoutClass = $isOauthIntegration
+                                        ? 'meros-integration-settings-layout'
+                                        : 'meros-integration-settings-layout meros-integration-settings-layout--full';
+
+                                    echo '<div class="' . esc_attr($layoutClass) . '">';
+
+                                    if ($isOauthIntegration) {
+                                        echo '<aside class="meros-integration-settings-sidebar">';
                                         echo $this->getIntegrationOAuthSetupHTML($integration);
+                                        echo '</aside>';
+                                    }
+
+                                    echo '<section class="meros-integration-settings-main">';
+
+                                    if ($isOauthIntegration && $this->shouldShowOAuthConfigurationWarning($integrationHandle)) {
+                                        echo '<div class="notice notice-warning inline meros-oauth-config-warning-main"><p>Set OAuth Client ID, Authorize URL, and Token URL in integration settings, then save before connecting.</p></div>';
                                     }
 
                                     settings_fields('meros_framework_settings_container');
+                                    echo '<input type="hidden" name="_wp_http_referer" value="' . esc_attr(add_query_arg([
+                                        'page' => 'meros-features',
+                                        'tab' => 'integrations',
+                                        'integration' => $integrationHandle,
+                                        'oauth_environment' => $selectedEnvironment,
+                                    ], admin_url('options-general.php'))) . '">';
                                     do_settings_sections($this->getIntegrationSettingsPageSlug($integrationHandle));
                                     submit_button();
+
+                                    echo '</section>';
+
+                                    echo '</div>';
                                     return;
                                 }
                             }
@@ -1528,6 +1569,166 @@ final class Framework extends FeatureProvider {
     }
 
     /**
+     * Returns the currently selected OAuth environment for an integration settings page.
+     *
+     * @param string $integrationHandle
+     * @return string
+     */
+    private function selectedIntegrationOAuthEnvironment(string $integrationHandle): string {
+        $requested = sanitize_key($_GET['oauth_environment'] ?? '');
+
+        if ($requested !== '') {
+            return $this->normalizeOauthEnvironment($requested);
+        }
+
+        $default = (string) $this->getIntegrationSettingValue($integrationHandle, 'default_environment', 'production');
+
+        return $this->normalizeOauthEnvironment($default);
+    }
+
+    /**
+     * Returns a normalized OAuth environment identifier.
+     *
+     * @param string $environment
+     * @return string
+     */
+    private function normalizeOauthEnvironment(string $environment): string {
+        $value = sanitize_key($environment);
+
+        return match ($value) {
+            'prod' => 'production',
+            '' => 'production',
+            default => $value,
+        };
+    }
+
+    /**
+     * Returns a display label for an OAuth environment identifier.
+     *
+     * @param string $environment
+     * @return string
+     */
+    private function oauthEnvironmentLabel(string $environment): string {
+        return match ($this->normalizeOauthEnvironment($environment)) {
+            'production' => 'Production',
+            'sandbox' => 'Sandbox',
+            'test' => 'Test',
+            'live' => 'Live',
+            default => ucfirst($environment),
+        };
+    }
+
+    /**
+     * Returns an integration setting value from nested or flat settings structures.
+     *
+     * @param string $integrationHandle
+     * @param string $key
+     * @param mixed $default
+     * @return mixed
+     */
+    private function getIntegrationSettingValue(string $integrationHandle, string $key, mixed $default = null): mixed {
+        $settings = get_option('meros_framework_settings', []);
+        $integrationSettings = is_array($settings['integrations'] ?? null) ? $settings['integrations'] : [];
+        $nested = is_array($integrationSettings[$integrationHandle] ?? null) ? $integrationSettings[$integrationHandle] : [];
+        $prefixed = $integrationHandle . '_' . $key;
+
+        if (array_key_exists($prefixed, $nested)) {
+            return $nested[$prefixed];
+        }
+
+        if (array_key_exists($prefixed, $integrationSettings)) {
+            return $integrationSettings[$prefixed];
+        }
+
+        if (array_key_exists($key, $nested)) {
+            return $nested[$key];
+        }
+
+        if (array_key_exists($key, $integrationSettings)) {
+            return $integrationSettings[$key];
+        }
+
+        return $default;
+    }
+
+    /**
+     * Returns whether OAuth configuration warning should be shown for an integration.
+     *
+     * @param string $integrationHandle
+     * @return bool
+     */
+    private function shouldShowOAuthConfigurationWarning(string $integrationHandle): bool {
+        $clientId = trim((string) $this->getIntegrationSettingValue($integrationHandle, 'client_id', ''));
+
+        if ($clientId === '') {
+            return true;
+        }
+
+        if ($integrationHandle === 'salesforce') {
+            return false;
+        }
+
+        $selectedEnvironment = $this->selectedIntegrationOAuthEnvironment($integrationHandle);
+        $authorizeUrlEnvironment = trim((string) $this->getIntegrationSettingValue($integrationHandle, 'authorize_url_' . $selectedEnvironment, ''));
+        $tokenUrlEnvironment = trim((string) $this->getIntegrationSettingValue($integrationHandle, 'token_url_' . $selectedEnvironment, ''));
+        $authorizeUrl = $authorizeUrlEnvironment !== ''
+            ? $authorizeUrlEnvironment
+            : trim((string) $this->getIntegrationSettingValue($integrationHandle, 'authorize_url', ''));
+        $tokenUrl = $tokenUrlEnvironment !== ''
+            ? $tokenUrlEnvironment
+            : trim((string) $this->getIntegrationSettingValue($integrationHandle, 'token_url', ''));
+
+        return $authorizeUrl === '' || $tokenUrl === '';
+    }
+
+    /**
+     * Determines whether a configuration field should render for the selected OAuth environment.
+     *
+     * @param object $integration
+     * @param string $fieldName
+     * @param array $allFieldNames
+     * @param string $selectedEnvironment
+     * @return bool
+     */
+    private function shouldRenderIntegrationConfigurationField(object $integration, string $fieldName, array $allFieldNames, string $selectedEnvironment): bool {
+        if (!method_exists($integration, 'getAuthType') || $integration->getAuthType() !== 'oauth') {
+            return true;
+        }
+
+        $environmentAwareBases = ['authorize_url', 'token_url', 'base_uri', 'instance_url'];
+        $selected = $this->normalizeOauthEnvironment($selectedEnvironment);
+
+        foreach ($environmentAwareBases as $base) {
+            if (!str_starts_with($fieldName, $base)) {
+                continue;
+            }
+
+            $hasEnvironmentVariants = collect($allFieldNames)
+                ->contains(fn ($candidate) => preg_match('/^' . preg_quote($base, '/') . '_(production|prod|sandbox|test|live)$/', (string) $candidate) === 1);
+
+            if (!$hasEnvironmentVariants) {
+                return true;
+            }
+
+            if ($fieldName === $base) {
+                return $selected === 'production'
+                    && !in_array($base . '_production', $allFieldNames, true)
+                    && !in_array($base . '_prod', $allFieldNames, true);
+            }
+
+            if (preg_match('/^' . preg_quote($base, '/') . '_(production|prod|sandbox|test|live)$/', $fieldName, $matches) !== 1) {
+                return true;
+            }
+
+            $fieldEnvironment = $this->normalizeOauthEnvironment((string) ($matches[1] ?? 'production'));
+
+            return $fieldEnvironment === $selected;
+        }
+
+        return true;
+    }
+
+    /**
      * Builds an OAuth setup panel with an authorization link for OAuth-based integrations.
      *
      * @param object $integration
@@ -1538,43 +1739,168 @@ final class Framework extends FeatureProvider {
         $settings = get_option('meros_framework_settings', []);
         $integrationSettings = is_array($settings['integrations'] ?? null) ? $settings['integrations'] : [];
 
-        $prefixed = static function (string $key) use ($integrationSettings, $handle) {
+        $prefixedSetting = function (string $key, mixed $default = '') use ($integrationSettings, $handle) {
             $nested = $integrationSettings[$handle] ?? null;
 
             if (is_array($nested) && array_key_exists($handle . '_' . $key, $nested)) {
                 return $nested[$handle . '_' . $key];
             }
 
-            return $integrationSettings[$handle . '_' . $key] ?? '';
+            if (array_key_exists($handle . '_' . $key, $integrationSettings)) {
+                return $integrationSettings[$handle . '_' . $key];
+            }
+
+            if (is_array($nested) && array_key_exists($key, $nested)) {
+                return $nested[$key];
+            }
+
+            if (array_key_exists($key, $integrationSettings)) {
+                return $integrationSettings[$key];
+            }
+
+            return $default;
         };
 
-        $authorizeUrl = trim((string) $prefixed('authorize_url'));
-        $clientId = trim((string) $prefixed('client_id'));
-        $scopes = trim((string) $prefixed('scopes'));
-        $redirectUri = trim((string) $prefixed('redirect_uri'));
-
-        if ($redirectUri === '') {
-            $redirectUri = admin_url('options-general.php?page=meros-features&tab=integrations&integration=' . rawurlencode($handle));
-        }
-
-        if ($authorizeUrl === '' || $clientId === '') {
-            return '<div class="notice notice-warning inline"><p>Set the OAuth Authorize URL and Client ID, then save to generate an authorization link.</p></div>';
-        }
-
-        $query = [
-            'response_type' => 'code',
-            'client_id' => $clientId,
-            'redirect_uri' => $redirectUri,
-            'state' => wp_create_nonce('meros_integration_oauth_' . $handle),
+        $clientId = trim((string) $prefixedSetting('client_id', ''));
+        $tokenUrl = trim((string) $prefixedSetting('token_url', ''));
+        $authorizeUrl = trim((string) $prefixedSetting('authorize_url', ''));
+        $environments = [
+            'production' => 'Production',
+            'sandbox' => 'Sandbox',
+            'test' => 'Test',
+            'live' => 'Live',
         ];
 
-        if ($scopes !== '') {
-            $query['scope'] = trim(preg_replace('/\s*,\s*/', ' ', $scopes));
+        $selectedEnvironment = $this->selectedIntegrationOAuthEnvironment($handle);
+
+        if (!array_key_exists($selectedEnvironment, $environments)) {
+            $selectedEnvironment = 'production';
         }
 
-        $oauthHref = add_query_arg($query, $authorizeUrl);
+        $returnUrl = add_query_arg([
+            'page' => 'meros-features',
+            'tab' => 'integrations',
+            'integration' => $handle,
+        ], admin_url('options-general.php'));
+        $environmentSwitchUrl = add_query_arg([
+            'page' => 'meros-features',
+            'tab' => 'integrations',
+            'integration' => $handle,
+        ], admin_url('options-general.php'));
+        $environmentSelectId = 'meros-oauth-env-' . sanitize_html_class($handle);
 
-        return '<p><a class="button button-primary" href="' . esc_url($oauthHref) . '" target="_blank" rel="noopener noreferrer">Login & Authorize OAuth</a></p>';
+        $oauthStatus = sanitize_key($_GET['oauth_status'] ?? '');
+        $oauthMessage = sanitize_text_field($_GET['oauth_message'] ?? '');
+
+        $html = '';
+
+        if ($oauthStatus !== '') {
+            $noticeClass = $oauthStatus === 'success' ? 'notice-success' : 'notice-error';
+            $message = $oauthMessage !== '' ? $oauthMessage : ($oauthStatus === 'success' ? 'OAuth connection updated.' : 'OAuth operation failed.');
+            $html .= '<div class="notice ' . esc_attr($noticeClass) . ' inline"><p>' . esc_html($message) . '</p></div>';
+        }
+
+        $html .= '<div class="meros-integration-oauth-panel">';
+        $html .= '<h3>OAuth Connection</h3>';
+        $html .= '<p class="meros-oauth-intro">Connect, reconnect, or disconnect accounts for this integration. OAuth state is validated and tokens are stored encrypted.</p>';
+
+        $html .= '<div class="meros-oauth-env-row">';
+        $html .= '<label class="meros-oauth-field"><span>Environment</span><select id="' . esc_attr($environmentSelectId) . '" name="oauth_environment" onchange="(function(){var select=document.getElementById(\'' . esc_js($environmentSelectId) . '\');if(!select){return;}window.location.href=\'' . esc_js($environmentSwitchUrl) . '&oauth_environment=\'+encodeURIComponent(select.value);}())">';
+
+        foreach ($environments as $value => $label) {
+            $selected = $value === $selectedEnvironment ? ' selected' : '';
+            $html .= '<option value="' . esc_attr($value) . '"' . $selected . '>' . esc_html($label) . '</option>';
+        }
+
+        $html .= '</select></label>';
+        $html .= '</div>';
+
+        $startNonce = wp_create_nonce('meros_integration_oauth_start_' . $handle);
+
+        $html .= '<form class="meros-oauth-connect-form" method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+        $html .= '<input type="hidden" name="action" value="meros_integration_oauth_start">';
+        $html .= '<input type="hidden" name="integration_handle" value="' . esc_attr($handle) . '">';
+        $html .= '<input type="hidden" name="environment" value="' . esc_attr($selectedEnvironment) . '">';
+        $html .= '<input type="hidden" name="return_url" value="' . esc_attr($returnUrl) . '">';
+        $html .= '<input type="hidden" name="_wpnonce" value="' . esc_attr($startNonce) . '">';
+        $html .= '<label class="meros-oauth-field"><span>Account Label</span><input class="regular-text" type="text" name="account_label" value="default"></label>';
+        $html .= '<label class="meros-oauth-field"><span>Connection Label</span><input class="regular-text" type="text" name="connection_label" value="default"></label>';
+        $html .= '<label class="meros-oauth-checkbox"><input type="checkbox" name="pkce" value="1">Use PKCE</label>';
+        $html .= '<button class="button button-primary" type="submit">Connect</button>';
+        $html .= '</form>';
+
+        $accounts = IntegrationAccount::query()
+            ->where('integration_handle', $handle)
+            ->with('connections')
+            ->orderBy('environment')
+            ->orderBy('label')
+            ->get();
+
+        if ($accounts->isEmpty()) {
+            $html .= '<p><em>No saved OAuth accounts yet.</em></p>';
+        } else {
+            $html .= '<table class="widefat striped meros-oauth-table"><thead><tr>';
+            $html .= '<th>Account</th><th>Environment</th><th>Connection</th><th>Status</th><th>Expires</th><th>Actions</th>';
+            $html .= '</tr></thead><tbody>';
+
+            foreach ($accounts as $account) {
+                foreach ($account->connections as $connection) {
+                    $expiresAt = $connection->token_expires_at?->format('Y-m-d H:i:s') ?? 'n/a';
+                    $status = trim((string) ($connection->status ?? ($connection->is_active ? 'active' : 'inactive')));
+                    $status = $status !== '' ? $status : 'inactive';
+                    $errorSummary = trim((string) ($connection->last_error ?? ''));
+                    $statusClass = match ($status) {
+                        'active', 'connected', 'token_refreshed' => 'is-active',
+                        'error' => 'is-error',
+                        'disconnected' => 'is-disconnected',
+                        default => 'is-disconnected',
+                    };
+
+                    $html .= '<tr>';
+                    $html .= '<td>' . esc_html($account->label) . '</td>';
+                    $html .= '<td>' . esc_html($account->environment ?: 'production') . '</td>';
+                    $html .= '<td>' . esc_html($connection->label) . '</td>';
+                    $html .= '<td><span class="meros-oauth-status ' . esc_attr($statusClass) . '">' . esc_html($status) . '</span>' . ($errorSummary !== '' ? '<small class="meros-oauth-error-note">' . esc_html(Str::limit($errorSummary, 120)) . '</small>' : '') . '</td>';
+                    $html .= '<td>' . esc_html($expiresAt) . '</td>';
+                    $html .= '<td><div class="meros-oauth-actions">';
+
+                    $html .= '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+                    $html .= '<input type="hidden" name="action" value="meros_integration_oauth_start">';
+                    $html .= '<input type="hidden" name="integration_handle" value="' . esc_attr($handle) . '">';
+                    $html .= '<input type="hidden" name="environment" value="' . esc_attr($account->environment ?: 'production') . '">';
+                    $html .= '<input type="hidden" name="account_label" value="' . esc_attr($account->label) . '">';
+                    $html .= '<input type="hidden" name="connection_label" value="' . esc_attr($connection->label) . '">';
+                    $html .= '<input type="hidden" name="reconnect_connection_id" value="' . esc_attr((string) $connection->getKey()) . '">';
+                    $html .= '<input type="hidden" name="return_url" value="' . esc_attr($returnUrl) . '">';
+                    $html .= '<input type="hidden" name="_wpnonce" value="' . esc_attr($startNonce) . '">';
+                    $html .= '<button class="button button-small" type="submit">Reconnect</button>';
+                    $html .= '</form> ';
+
+                    $disconnectNonce = wp_create_nonce('meros_integration_oauth_disconnect_' . $connection->getKey());
+
+                    $html .= '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+                    $html .= '<input type="hidden" name="action" value="meros_integration_oauth_disconnect">';
+                    $html .= '<input type="hidden" name="connection_id" value="' . esc_attr((string) $connection->getKey()) . '">';
+                    $html .= '<input type="hidden" name="return_url" value="' . esc_attr($returnUrl) . '">';
+                    $html .= '<input type="hidden" name="_wpnonce" value="' . esc_attr($disconnectNonce) . '">';
+                    $html .= '<button class="button button-small" type="submit">Disconnect</button>';
+                    $html .= '</form>';
+
+                    $html .= '</div></td>';
+                    $html .= '</tr>';
+                }
+            }
+
+            $html .= '</tbody></table>';
+        }
+
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    private function oauthManager(): OAuthManager {
+        return app(OAuthManager::class);
     }
 
     /**
@@ -1931,6 +2257,161 @@ final class Framework extends FeatureProvider {
      * The following methods are used for AJAX calls from WP Admin
      * 
      ***************************************************************/
+
+    /**
+     * Registers admin-post handlers for integration OAuth actions.
+     *
+     * @return void
+     */
+    private function initIntegrationOAuthHandlers(): void {
+        add_action('admin_post_meros_integration_oauth_start', [$this, 'handleIntegrationOAuthStart']);
+        add_action('admin_post_meros_integration_oauth_callback', [$this, 'handleIntegrationOAuthCallback']);
+        add_action('admin_post_nopriv_meros_integration_oauth_callback', [$this, 'handleIntegrationOAuthCallback']);
+        add_action('admin_post_meros_integration_oauth_disconnect', [$this, 'handleIntegrationOAuthDisconnect']);
+    }
+
+    /**
+     * Starts an OAuth authorization redirect for an integration connection.
+     *
+     * @return void
+     */
+    public function handleIntegrationOAuthStart(): void {
+        if (!current_user_can('manage_options')) {
+            wp_die('You do not have permission to manage integrations.', 403);
+        }
+
+        $integrationHandle = sanitize_key($_REQUEST['integration_handle'] ?? '');
+
+        if ($integrationHandle === '') {
+            wp_die('Integration handle is required.', 400);
+        }
+
+        check_admin_referer('meros_integration_oauth_start_' . $integrationHandle);
+
+        $returnUrl = esc_url_raw((string) ($_REQUEST['return_url'] ?? ''));
+
+        try {
+            $redirect = $this->oauthManager()->buildAuthorizationRedirect($integrationHandle, [
+                'environment' => sanitize_key($_REQUEST['environment'] ?? ''),
+                'account_label' => sanitize_text_field($_REQUEST['account_label'] ?? ''),
+                'connection_label' => sanitize_text_field($_REQUEST['connection_label'] ?? ''),
+                'return_url' => $returnUrl,
+                'pkce' => !empty($_REQUEST['pkce']),
+                'reconnect_connection_id' => absint($_REQUEST['reconnect_connection_id'] ?? 0),
+            ]);
+
+            wp_safe_redirect($redirect['url']);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            $targetUrl = $returnUrl !== '' ? $returnUrl : add_query_arg([
+                'page' => 'meros-features',
+                'tab' => 'integrations',
+                'integration' => $integrationHandle,
+            ], admin_url('options-general.php'));
+
+            wp_safe_redirect(add_query_arg([
+                'oauth_status' => 'error',
+                'oauth_message' => 'Unable to start OAuth flow: ' . $exception->getMessage(),
+            ], $targetUrl));
+        }
+
+        exit;
+    }
+
+    /**
+     * Handles OAuth callback, token exchange, and connection persistence.
+     *
+     * @return void
+     */
+    public function handleIntegrationOAuthCallback(): void {
+        if (!is_user_logged_in() || !current_user_can('manage_options')) {
+            wp_die('You must be an administrator to complete this OAuth connection.', 403);
+        }
+
+        try {
+            $result = $this->oauthManager()->handleCallback($_GET);
+
+            $integrationHandle = sanitize_key($result['integration_handle'] ?? '');
+            $returnUrl = esc_url_raw((string) ($result['return_url'] ?? ''));
+
+            if ($returnUrl === '') {
+                $returnUrl = add_query_arg([
+                    'page' => 'meros-features',
+                    'tab' => 'integrations',
+                    'integration' => $integrationHandle,
+                ], admin_url('options-general.php'));
+            }
+
+            wp_safe_redirect(add_query_arg([
+                'oauth_status' => 'success',
+                'oauth_message' => 'OAuth connection established successfully.',
+            ], $returnUrl));
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            $integrationHandle = sanitize_key($_GET['integration'] ?? '');
+            $fallbackUrl = add_query_arg([
+                'page' => 'meros-features',
+                'tab' => 'integrations',
+                'integration' => $integrationHandle,
+            ], admin_url('options-general.php'));
+
+            wp_safe_redirect(add_query_arg([
+                'oauth_status' => 'error',
+                'oauth_message' => $exception->getMessage(),
+            ], $fallbackUrl));
+        }
+
+        exit;
+    }
+
+    /**
+     * Disconnects a saved OAuth connection.
+     *
+     * @return void
+     */
+    public function handleIntegrationOAuthDisconnect(): void {
+        if (!current_user_can('manage_options')) {
+            wp_die('You do not have permission to manage integrations.', 403);
+        }
+
+        $connectionId = absint($_REQUEST['connection_id'] ?? 0);
+
+        if ($connectionId <= 0) {
+            wp_die('Connection id is required.', 400);
+        }
+
+        check_admin_referer('meros_integration_oauth_disconnect_' . $connectionId);
+
+        $returnUrl = esc_url_raw((string) ($_REQUEST['return_url'] ?? ''));
+
+        if ($returnUrl === '') {
+            $returnUrl = add_query_arg([
+                'page' => 'meros-features',
+                'tab' => 'integrations',
+            ], admin_url('options-general.php'));
+        }
+
+        try {
+            $connection = IntegrationConnection::query()->with('account')->findOrFail($connectionId);
+            $this->oauthManager()->disconnectConnection($connection);
+
+            wp_safe_redirect(add_query_arg([
+                'oauth_status' => 'success',
+                'oauth_message' => 'Connection disconnected.',
+            ], $returnUrl));
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            wp_safe_redirect(add_query_arg([
+                'oauth_status' => 'error',
+                'oauth_message' => 'Disconnect failed: ' . $exception->getMessage(),
+            ], $returnUrl));
+        }
+
+        exit;
+    }
  
     /**
      * Initialises AJAX handlers registered by the framework.

@@ -12,6 +12,7 @@ use MM\Meros\Services\Contracts\Integration as IntegrationDefinition;
 use MM\Meros\Support\Integrations\HttpClient;
 use MM\Meros\Support\Integrations\IntegrationConnectionSecrets;
 use MM\Meros\Support\Integrations\AuthResolver;
+use MM\Meros\Support\Integrations\OAuthManager;
 
 abstract class ExternalModel {
     protected string $integrationHandle = '';
@@ -131,10 +132,44 @@ abstract class ExternalModel {
         $definition  = $this->resolveDefinition();
         $integration = $this->resolveIntegration();
         $connection  = $this->resolveConnection($integration);
+
+        // Refresh proactively when possible if the token is already expired.
+        if ($definition->getAuthType() === 'oauth' && $connection->secrets()->isExpired() && $connection->secrets()->hasRefreshToken()) {
+            app(OAuthManager::class)->refreshConnectionToken($connection);
+            $connection->refresh();
+        }
+
         $endpoint    = $this->resolveEndpoint($path);
         $request     = $this->buildRequest($definition, $connection, $endpoint, $method);
 
-        return $this->send($request);
+        $response = $this->send($request);
+
+        // Retry one time after refreshing when OAuth calls return unauthorized.
+        if (
+            $response->status() === 401
+            && $definition->getAuthType() === 'oauth'
+            && $connection->secrets()->hasRefreshToken()
+            && app(OAuthManager::class)->refreshConnectionToken($connection)
+        ) {
+            $connection->refresh();
+            $request = $this->buildRequest($definition, $connection, $endpoint, $method);
+            $response = $this->send($request);
+        }
+
+        if ($response->ok()) {
+            $connection->last_used_at = now();
+
+            if (property_exists($connection, 'status') || array_key_exists('status', $connection->getAttributes())) {
+                $connection->status = 'active';
+                $connection->status_reason = 'request_ok';
+                $connection->last_error = null;
+                $connection->last_error_at = null;
+            }
+
+            $connection->save();
+        }
+
+        return $response;
     }
 
     protected function resolveDefinition(): IntegrationDefinition {
@@ -236,7 +271,26 @@ abstract class ExternalModel {
     ): array {
         $secrets = new IntegrationConnectionSecrets($connection);
 
-        $url = rtrim($definition->getBaseUri(), '/');
+        $accountSettings = $connection->account?->settings;
+        $accountOauthSettings = is_array($accountSettings['oauth'] ?? null) ? $accountSettings['oauth'] : [];
+        $metadataBaseUri = (string) ($secrets->metadata('base_uri') ?? '');
+        $metadataInstanceUrl = (string) ($secrets->metadata('instance_url') ?? '');
+
+        $baseUri = trim($metadataBaseUri);
+
+        if ($baseUri === '' && trim($metadataInstanceUrl) !== '') {
+            $baseUri = rtrim($metadataInstanceUrl, '/') . '/services/data';
+        }
+
+        if ($baseUri === '' && trim((string) ($accountOauthSettings['base_uri'] ?? '')) !== '') {
+            $baseUri = trim((string) $accountOauthSettings['base_uri']);
+        }
+
+        if ($baseUri === '') {
+            $baseUri = $definition->getBaseUri();
+        }
+
+        $url = rtrim($baseUri, '/');
 
         if ($definition->getApiVersion() !== '') {
             $url .= '/' . trim($definition->getApiVersion(), '/');

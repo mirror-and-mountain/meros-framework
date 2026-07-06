@@ -1808,7 +1808,26 @@ class Builder extends Component {
 
         return $query
             ->whereHas('connections', function ($connectionQuery) {
-                $connectionQuery->where('is_active', true);
+                $connectionQuery
+                    ->where('is_active', true)
+                    ->where(function ($statusQuery) {
+                        $statusQuery
+                            ->whereNull('status')
+                            ->orWhere('status', 'active')
+                            ->orWhere('status', 'connected')
+                            ->orWhere('status', 'token_refreshed');
+                    })
+                    ->where(function ($tokenQuery) {
+                        $tokenQuery
+                            ->whereNotNull('access_token')
+                            ->orWhereNotNull('api_key');
+                    })
+                    ->where(function ($expiryQuery) {
+                        $expiryQuery
+                            ->whereNull('token_expires_at')
+                            ->orWhere('token_expires_at', '>', now())
+                            ->orWhereNotNull('refresh_token');
+                    });
             })
             ->exists();
     }
