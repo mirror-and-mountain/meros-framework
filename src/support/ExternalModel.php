@@ -496,10 +496,17 @@ abstract class ExternalModel {
         $accountOauthSettings = is_array($accountSettings['oauth'] ?? null) ? $accountSettings['oauth'] : [];
         $metadataBaseUri = (string) ($secrets->metadata('base_uri') ?? '');
         $metadataInstanceUrl = (string) ($secrets->metadata('instance_url') ?? '');
+        $integrationHandle = trim((string) ($connection->account?->integration_handle ?? $this->integrationHandle));
 
         $baseUri = trim($metadataBaseUri);
 
         if ($baseUri === '' && trim($metadataInstanceUrl) !== '') {
+            $baseUri = rtrim($metadataInstanceUrl, '/') . '/services/data';
+        }
+
+        // Salesforce OAuth APIs should use the instance URL returned by token exchange,
+        // not a static login/My Domain base URI from settings.
+        if ($integrationHandle === 'salesforce' && trim($metadataInstanceUrl) !== '') {
             $baseUri = rtrim($metadataInstanceUrl, '/') . '/services/data';
         }
 

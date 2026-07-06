@@ -636,16 +636,23 @@ final class OAuthManager {
         ));
 
         if ($integrationHandle === 'salesforce') {
-            $host = in_array($environment, ['sandbox', 'test'], true)
-                ? 'https://test.salesforce.com'
-                : 'https://login.salesforce.com';
+            $orgDomain = $this->normalizeSalesforceDomain((string) $this->setting($integrationHandle, 'org_domain', ''));
 
-            if ($environmentAuthorize === '') {
-                $authorizeUrl = $host . '/services/oauth2/authorize';
+            $host = $orgDomain !== ''
+                ? 'https://' . $orgDomain
+                : (in_array($environment, ['sandbox', 'test'], true)
+                    ? 'https://test.salesforce.com'
+                    : 'https://login.salesforce.com');
+
+            $authorizeUrl = $host . '/services/oauth2/authorize';
+            $tokenUrl = $host . '/services/oauth2/token';
+
+            if ($baseUri === '') {
+                $baseUri = $host . '/services/data';
             }
 
-            if ($environmentToken === '') {
-                $tokenUrl = $host . '/services/oauth2/token';
+            if ($instanceUrl === '') {
+                $instanceUrl = $host;
             }
         }
 
@@ -998,6 +1005,33 @@ final class OAuthManager {
         }
 
         return '/wp-admin/options-general.php?page=meros-features&tab=integrations&integration=' . rawurlencode($integrationHandle);
+    }
+
+    /**
+     * Normalizes a Salesforce org domain value to a host-only string.
+     *
+     * @param string $domain The raw org domain value from settings.
+     *
+     * @return string A normalized host value, or an empty string when invalid.
+     */
+    private function normalizeSalesforceDomain(string $domain): string {
+        $value = strtolower(trim($domain));
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (!str_starts_with($value, 'http://') && !str_starts_with($value, 'https://')) {
+            $value = 'https://' . $value;
+        }
+
+        $host = (string) parse_url($value, PHP_URL_HOST);
+
+        if ($host === '') {
+            return '';
+        }
+
+        return trim($host, '/');
     }
 
     /**

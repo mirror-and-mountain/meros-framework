@@ -80,6 +80,36 @@ final class OAuthStateStore {
     }
 
     /**
+     * Peeks at an OAuth state value without consuming it.
+     *
+     * @param string $state The state value to peek.
+     *
+     * @return array|null The associated payload if available and not expired; otherwise, null.
+     */
+    public function peek(string $state): ?array {
+        $key = $this->key($state);
+
+        if (function_exists('get_transient')) {
+            $payload = get_transient($key);
+            return is_array($payload) ? $payload : null;
+        }
+
+        $entry = self::$memory[$key] ?? null;
+
+        if (!is_array($entry)) {
+            return null;
+        }
+
+        if (($entry['expires_at'] ?? 0) < time()) {
+            return null;
+        }
+
+        $payload = $entry['payload'] ?? null;
+
+        return is_array($payload) ? $payload : null;
+    }
+
+    /**
      * Generates a unique key for storing the state value.
      *
      * @param string $state The state value.
