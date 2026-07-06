@@ -4,6 +4,9 @@ namespace MM\Meros\App\Integrations;
 
 use MM\Meros\Services\Contracts\Integration as IntegrationDefinition;
 
+/**
+ * Framework-provided integration definition for Stripe.
+ */
 final class Stripe extends IntegrationDefinition {
     public string $handle = 'stripe';
 

@@ -1733,9 +1733,9 @@ class Builder extends Component {
             ->removeRowText('Remove Action');
 
         $repeater->field('select', [
-            'id' => 'action',
-            'name' => 'action',
-            'label' => 'Action',
+            'id'      => 'action',
+            'name'    => 'action',
+            'label'   => 'Action',
             'options' => array_merge(['' => 'Select an action...'], $actionOptions),
         ]);
 
@@ -1831,7 +1831,6 @@ class Builder extends Component {
             })
             ->exists();
     }
-
 
     // =========================================================================
     // Saving

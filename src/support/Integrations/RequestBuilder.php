@@ -2,15 +2,31 @@
 
 namespace MM\Meros\Support\Integrations;
 
-use MM\Meros\App\Models\IntegrationAccount;
 use MM\Meros\App\Models\IntegrationConnection;
 
+/**
+ * Class RequestBuilder
+ *
+ * This class is responsible for constructing HTTP request parameters for integration endpoints.
+ * It builds the request URL, method, headers, payload, and format based on the provided integration,
+ * connection, and endpoint information.
+ */
 class RequestBuilder {
     public function __construct(
         protected AuthResolver $authResolver
     ) {
     }
 
+    /**
+     * Builds the HTTP request parameters for a given integration, connection, and endpoint.
+     *
+     * @param mixed $integration The integration instance or object.
+     * @param IntegrationConnection $connection The associated integration connection.
+     * @param mixed $endpoint The endpoint information, which may include method, URI, and format.
+     * @param array $payload Optional payload data to include in the request.
+     *
+     * @return array An associative array containing the request parameters: method, url, headers, payload, and format.
+     */
     public function build(
         mixed $integration,
         IntegrationConnection $connection,
@@ -28,6 +44,14 @@ class RequestBuilder {
         ];
     }
 
+    /**
+     * Builds the full URL for a given integration and endpoint.
+     *
+     * @param mixed $integration The integration instance or object.
+     * @param mixed $endpoint The endpoint information, which may include method, URI, and format.
+     *
+     * @return string The constructed URL.
+     */
     protected function buildUrl(mixed $integration, mixed $endpoint): string {
         $baseUri = '';
         $version = '';

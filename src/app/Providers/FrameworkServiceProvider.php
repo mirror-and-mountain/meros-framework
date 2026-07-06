@@ -13,6 +13,7 @@ use MM\Meros\App\Framework;
 use MM\Meros\App\Context;
 
 use MM\Meros\Support\ClassInfo;
+use MM\Meros\Services\Integrations\IntegrationsController;
 
 use MM\Meros\Services\Registers\Assets;
 use MM\Meros\Services\Registers\AssetGroups;
@@ -253,6 +254,11 @@ class FrameworkServiceProvider extends ServiceProvider {
         // Register the context class
         $this->app->singleton(Context::class, function () {
             return new Context();
+        });
+
+        // Register integrations controller
+        $this->app->singleton(IntegrationsController::class, function () {
+            return new IntegrationsController();
         });
 
         // Register the vite assets class

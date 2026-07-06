@@ -4,6 +4,9 @@ namespace MM\Meros\App\Integrations;
 
 use MM\Meros\Services\Contracts\Integration as IntegrationDefinition;
 
+/**
+ * Framework-provided integration definition for Microsoft Exchange Online.
+ */
 final class ExchangeOnline extends IntegrationDefinition {
     public string $handle = 'exchange_online';
 

@@ -2,6 +2,9 @@
 
 namespace MM\Meros\Support;
 
+/**
+ * Helper class for generating explicit-empty marker names for form field inputs.
+ */
 final class FormFieldName {
     /**
      * Returns the explicit-empty marker name for a field input name.

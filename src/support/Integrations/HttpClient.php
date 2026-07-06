@@ -5,7 +5,16 @@ namespace MM\Meros\Support\Integrations;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
+/**
+ * A simple HTTP client for sending requests to external services.
+ */
 class HttpClient {
+    /**
+     * Sends an HTTP request based on the provided request array.
+     *
+     * @param array $request The request details, including method, url, headers, payload, and format.
+     * @return Response The response from the HTTP request.
+     */
     public function send(array $request): Response {
         $client = Http::withHeaders($request['headers'] ?? []);
 

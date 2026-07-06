@@ -2,10 +2,25 @@
 
 namespace MM\Meros\Support\Integrations;
 
-use MM\Meros\App\Models\IntegrationAccount;
 use MM\Meros\App\Models\IntegrationConnection;
 
+/**
+ * Class AuthResolver
+ *
+ * This class is responsible for resolving the appropriate authentication headers
+ * for a given integration and its associated connection. It supports various
+ * authentication types, including OAuth, API Key, and Basic Authentication.
+ */
 class AuthResolver {
+
+    /**
+     * Resolves the authentication headers for a given integration and connection.
+     *
+     * @param mixed $integration The integration instance or object.
+     * @param IntegrationConnection $connection The associated integration connection.
+     *
+     * @return array<string, string> An associative array of HTTP headers for authentication.
+     */
     public function resolve(
         mixed $integration,
         IntegrationConnection $connection
@@ -52,6 +67,13 @@ class AuthResolver {
         return [];
     }
 
+    /**
+     * Determines the authentication type for a given integration.
+     *
+     * @param mixed $integration The integration instance or object.
+     *
+     * @return string The resolved authentication type (e.g., 'oauth', 'api_key', 'basic').
+     */
     protected function resolveAuthType(mixed $integration): string {
         if (is_object($integration)) {
             if (method_exists($integration, 'getAuthType')) {
