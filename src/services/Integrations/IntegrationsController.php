@@ -200,8 +200,29 @@ final class IntegrationsController {
                     });
                 }
 
+                if ($integrationHandle === 'salesforce') {
+                    $settings->add(function ($setting) use ($integration) {
+                        $setting->string($integration->getHandle() . '_default_environment')
+                            ->field('select', function ($field) {
+                                $field->label('Default OAuth Environment');
+                                $field->options([
+                                    'production' => 'Production',
+                                    'sandbox'    => 'Sandbox',
+                                    'test'       => 'Test',
+                                ]);
+                                $field->default('production');
+                                $field->helpText('Used when an environment is not explicitly selected in the OAuth connection panel.');
+                            })
+                            ->section($this->getIntegrationSettingsPageSlug($integration->getHandle()));
+                    });
+                }
+
                 foreach ($configurationFields as $configurationField) {
                     $fieldName = $configurationField->getName();
+
+                    if ($integrationHandle === 'salesforce' && $fieldName === 'default_environment') {
+                        continue;
+                    }
 
                     if (!$this->shouldRenderIntegrationConfigurationField($integration, $fieldName, $configurationFieldNames, $selectedEnvironment)) {
                         continue;
@@ -231,6 +252,10 @@ final class IntegrationsController {
         $integrationHandle = sanitize_key($_GET['integration'] ?? '');
         $oauthStatus = sanitize_key($_GET['oauth_status'] ?? '');
         $oauthMessage = sanitize_text_field(wp_unslash($_GET['oauth_message'] ?? ''));
+
+        if ($oauthStatus !== '') {
+            echo $this->oauthStatusNoticeHtml($oauthStatus, $oauthMessage);
+        }
 
         if ($integrationHandle !== '' && $this->integrationEnabled($integrationHandle)) {
             $integration = $this->resolvedIntegrations($framework)
@@ -263,7 +288,29 @@ final class IntegrationsController {
                 echo '<section class="meros-integration-settings-main">';
 
                 if ($isOauthIntegration && $this->shouldShowOAuthConfigurationWarning($integrationHandle)) {
-                    echo '<div class="notice notice-warning inline meros-oauth-config-warning-main"><p>Set OAuth Client ID, Authorize URL, and Token URL in integration settings, then save before connecting.</p></div>';
+                    echo '<div class="notice notice-warning inline meros-oauth-config-warning-main"><p>Set OAuth credentials for the selected environment, then save before connecting.</p></div>';
+                }
+
+                if ($integrationHandle === 'salesforce') {
+                    $callbackUrl = $this->integrationOAuthCallbackUrl();
+                    $derived = $this->salesforceDerivedEndpoints($selectedEnvironment);
+
+                    echo '<div class="meros-oauth-config-meta">';
+                    echo '<h3>OAuth App Setup</h3>';
+                    echo '<p>Copy this callback URI into your Salesforce External Client App configuration.</p>';
+                    echo '<label class="meros-oauth-meta-field"><span>Redirect URI</span><input type="text" readonly value="' . esc_attr($callbackUrl) . '" onclick="this.select();"/></label>';
+
+                    if ($derived !== null) {
+                        echo '<div class="meros-oauth-derived-grid">';
+                        echo '<label class="meros-oauth-meta-field"><span>Derived Authorize URL</span><input type="text" readonly value="' . esc_attr($derived['authorize_url']) . '" onclick="this.select();"/></label>';
+                        echo '<label class="meros-oauth-meta-field"><span>Derived Token URL</span><input type="text" readonly value="' . esc_attr($derived['token_url']) . '" onclick="this.select();"/></label>';
+                        echo '<label class="meros-oauth-meta-field"><span>Derived Base API URL</span><input type="text" readonly value="' . esc_attr($derived['base_uri']) . '" onclick="this.select();"/></label>';
+                        echo '</div>';
+                    } else {
+                        echo '<p class="description">Set Salesforce Org Domain for ' . esc_html($this->oauthEnvironmentLabel($selectedEnvironment)) . ' to preview derived OAuth endpoints.</p>';
+                    }
+
+                    echo '</div>';
                 }
 
                 settings_fields('meros_framework_settings_container');
@@ -281,11 +328,6 @@ final class IntegrationsController {
 
                 return;
             }
-        }
-
-        if ($oauthStatus !== '' && $oauthMessage !== '') {
-            $noticeClass = $oauthStatus === 'success' ? 'notice-success' : 'notice-error';
-            echo '<div class="notice ' . esc_attr($noticeClass) . ' inline"><p>' . esc_html($oauthMessage) . '</p></div>';
         }
 
         settings_fields('meros_framework_settings_container');
@@ -434,7 +476,7 @@ final class IntegrationsController {
         $value = sanitize_key($environment);
 
         return match ($value) {
-            'prod' => 'production',
+            'prod', 'live' => 'production',
             '' => 'production',
             default => $value,
         };
@@ -452,7 +494,6 @@ final class IntegrationsController {
             'production' => 'Production',
             'sandbox'    => 'Sandbox',
             'test'       => 'Test',
-            'live'       => 'Live',
             default      => ucfirst($environment),
         };
     }
@@ -499,17 +540,19 @@ final class IntegrationsController {
      * @return bool Whether to show the OAuth configuration warning.
      */
     private function shouldShowOAuthConfigurationWarning(string $integrationHandle): bool {
-        $clientId = trim((string) $this->getIntegrationSettingValue($integrationHandle, 'client_id', ''));
+        $selectedEnvironment = $this->selectedIntegrationOAuthEnvironment($integrationHandle);
+        $clientId = trim((string) $this->getIntegrationSettingValue($integrationHandle, 'client_id_' . $selectedEnvironment, ''));
+        $clientSecret = trim((string) $this->getIntegrationSettingValue($integrationHandle, 'client_secret_' . $selectedEnvironment, ''));
+        $orgDomain = trim((string) $this->getIntegrationSettingValue($integrationHandle, 'org_domain_' . $selectedEnvironment, ''));
 
         if ($clientId === '') {
             return true;
         }
 
         if ($integrationHandle === 'salesforce') {
-            return false;
+            return $clientSecret === '' || $orgDomain === '';
         }
 
-        $selectedEnvironment     = $this->selectedIntegrationOAuthEnvironment($integrationHandle);
         $authorizeUrlEnvironment = trim((string) $this->getIntegrationSettingValue($integrationHandle, 'authorize_url_' . $selectedEnvironment, ''));
         $tokenUrlEnvironment     = trim((string) $this->getIntegrationSettingValue($integrationHandle, 'token_url_' . $selectedEnvironment, ''));
 
@@ -539,7 +582,7 @@ final class IntegrationsController {
             return true;
         }
 
-        $environmentAwareBases = ['authorize_url', 'token_url', 'base_uri', 'instance_url'];
+        $environmentAwareBases = ['authorize_url', 'token_url', 'base_uri', 'instance_url', 'org_domain', 'client_id', 'client_secret'];
         $selected = $this->normalizeOauthEnvironment($selectedEnvironment);
 
         foreach ($environmentAwareBases as $base) {
@@ -610,7 +653,6 @@ final class IntegrationsController {
             'production' => 'Production',
             'sandbox' => 'Sandbox',
             'test' => 'Test',
-            'live' => 'Live',
         ];
 
         $selectedEnvironment = $this->selectedIntegrationOAuthEnvironment($handle);
@@ -623,16 +665,8 @@ final class IntegrationsController {
         $environmentSwitchUrl = $this->normalizedIntegrationsReturnUrl('', $handle);
 
         $environmentSelectId = 'meros-oauth-env-' . sanitize_html_class($handle);
-        $oauthStatus         = sanitize_key($_GET['oauth_status'] ?? '');
-        $oauthMessage        = sanitize_text_field($_GET['oauth_message'] ?? '');
 
         $html = '';
-
-        if ($oauthStatus !== '') {
-            $noticeClass = $oauthStatus === 'success' ? 'notice-success' : 'notice-error';
-            $message = $oauthMessage !== '' ? $oauthMessage : ($oauthStatus === 'success' ? 'OAuth connection updated.' : 'OAuth operation failed.');
-            $html .= '<div class="notice ' . esc_attr($noticeClass) . ' inline"><p>' . esc_html($message) . '</p></div>';
-        }
 
         $html .= '<div class="meros-integration-oauth-panel">';
         $html .= '<h3>OAuth Connection</h3>';
@@ -667,7 +701,9 @@ final class IntegrationsController {
         $html .= '<label class="meros-oauth-field"><span>Account Label</span><input id="' . esc_attr($accountLabelId) . '" class="regular-text" type="text" value="default"></label>';
         $html .= '<label class="meros-oauth-field"><span>Connection Label</span><input id="' . esc_attr($connectionLabelId) . '" class="regular-text" type="text" value="default"></label>';
         $html .= '<label class="meros-oauth-checkbox"><input id="' . esc_attr($pkceCheckboxId) . '" type="checkbox" value="1">Use PKCE</label>';
-        $html .= '<button id="' . esc_attr($connectButtonId) . '" class="button button-primary" type="button" data-start-url="' . esc_attr($startBaseUrl) . '">Connect</button>';
+        $html .= '<div class="meros-oauth-connect-actions">';
+        $html .= '<button id="' . esc_attr($connectButtonId) . '" class="button button-primary meros-oauth-connect-button" type="button" data-start-url="' . esc_attr($startBaseUrl) . '">Connect</button>';
+        $html .= '</div>';
         $html .= '</div>';
         $html .= '<script>(function(){var btn=document.getElementById("' . esc_js($connectButtonId) . '");if(!btn){return;}btn.addEventListener("click",function(){var account=document.getElementById("' . esc_js($accountLabelId) . '");var connection=document.getElementById("' . esc_js($connectionLabelId) . '");var pkce=document.getElementById("' . esc_js($pkceCheckboxId) . '");var base=btn.getAttribute("data-start-url")||"";if(base===""){return;}var query=[];query.push("account_label="+encodeURIComponent(account&&account.value!==""?account.value:"default"));query.push("connection_label="+encodeURIComponent(connection&&connection.value!==""?connection.value:"default"));if(pkce&&pkce.checked){query.push("pkce=1");}window.location.href=base+(base.indexOf("?")===-1?"?":"&")+query.join("&");});})();</script>';
 
@@ -1047,7 +1083,7 @@ final class IntegrationsController {
         foreach ($settings as $key => $value) {
             $keyString = sanitize_key((string) $key);
 
-            if (preg_match('/^([a-z0-9_]+)_(client_secret|api_key|secret)$/', $keyString, $matches) === 1) {
+            if (preg_match('/^([a-z0-9_]+)_(client_secret(?:_[a-z0-9_]+)?|api_key(?:_[a-z0-9_]+)?|secret(?:_[a-z0-9_]+)?)$/', $keyString, $matches) === 1) {
                 $handle = sanitize_key((string) ($matches[1] ?? ''));
                 $fieldName = sanitize_key((string) ($matches[2] ?? ''));
 
@@ -1069,7 +1105,11 @@ final class IntegrationsController {
 
                 $nestedKeyString = sanitize_key((string) $nestedKey);
 
-                if (!in_array($nestedKeyString, ['client_secret', 'api_key', 'secret'], true)) {
+                if (
+                    !str_starts_with($nestedKeyString, 'client_secret')
+                    && !str_starts_with($nestedKeyString, 'api_key')
+                    && !str_starts_with($nestedKeyString, 'secret')
+                ) {
                     continue;
                 }
 
@@ -1240,5 +1280,66 @@ final class IntegrationsController {
         }
 
         return add_query_arg($args, $baseUrl);
+    }
+
+    /**
+     * Builds a consistent OAuth status notice block for integrations pages.
+     *
+     * @param string $oauthStatus The OAuth status slug, for example success or error.
+     * @param string $oauthMessage Optional message to display.
+     *
+     * @return string
+     */
+    private function oauthStatusNoticeHtml(string $oauthStatus, string $oauthMessage = ''): string {
+        $noticeClass = $oauthStatus === 'success' ? 'notice-success' : 'notice-error';
+        $message = $oauthMessage !== ''
+            ? $oauthMessage
+            : ($oauthStatus === 'success' ? 'OAuth connection updated.' : 'OAuth operation failed.');
+
+        return '<div class="notice ' . esc_attr($noticeClass) . ' inline"><p>' . esc_html($message) . '</p></div>';
+    }
+
+    /**
+     * Returns the default OAuth callback URL used by integration OAuth handlers.
+     *
+     * @return string
+     */
+    private function integrationOAuthCallbackUrl(): string {
+        $base = admin_url('admin-post.php');
+        return add_query_arg(['action' => 'meros_integration_oauth_callback'], $base);
+    }
+
+    /**
+     * Builds derived Salesforce OAuth endpoints from the selected environment's org domain.
+     *
+     * @param string $environment The selected OAuth environment.
+     *
+     * @return array<string, string>|null
+     */
+    private function salesforceDerivedEndpoints(string $environment): ?array {
+        $env = $this->normalizeOauthEnvironment($environment);
+        $domain = trim((string) $this->getIntegrationSettingValue('salesforce', 'org_domain_' . $env, ''));
+
+        if ($domain === '') {
+            return null;
+        }
+
+        if (!str_starts_with($domain, 'http://') && !str_starts_with($domain, 'https://')) {
+            $domain = 'https://' . $domain;
+        }
+
+        $host = (string) parse_url($domain, PHP_URL_HOST);
+
+        if ($host === '') {
+            return null;
+        }
+
+        $base = 'https://' . trim($host, '/');
+
+        return [
+            'authorize_url' => $base . '/services/oauth2/authorize',
+            'token_url'     => $base . '/services/oauth2/token',
+            'base_uri'      => $base . '/services/data',
+        ];
     }
 }

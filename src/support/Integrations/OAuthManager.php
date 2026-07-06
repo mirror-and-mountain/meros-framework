@@ -42,8 +42,8 @@ final class OAuthManager {
         $environment = $this->normalizeEnvironment((string) ($options['environment'] ?? $this->setting($integrationHandle, 'default_environment', 'production')));
         $environmentConfig = $this->resolveEnvironmentConfig($integrationHandle, $provider, $environment, $integrationSettings);
 
-        $clientId     = trim((string) $this->setting($integrationHandle, 'client_id', ''));
-        $clientSecret = trim((string) $this->setting($integrationHandle, 'client_secret', ''));
+        $clientId     = trim((string) $this->oauthClientSetting($integrationHandle, $environment, 'client_id', ''));
+        $clientSecret = trim((string) $this->oauthClientSetting($integrationHandle, $environment, 'client_secret', ''));
         $redirectUri  = trim((string) ($options['redirect_uri'] ?? $this->setting($integrationHandle, 'redirect_uri', '')));
         $returnUrl    = trim((string) ($options['return_url'] ?? ''));
 
@@ -202,8 +202,8 @@ final class OAuthManager {
         $environment         = $this->normalizeEnvironment($account->preferredEnvironment() ?? 'production');
         $environmentConfig   = $this->resolveEnvironmentConfig($integrationHandle, (string) $account->provider, $environment, $integrationSettings);
 
-        $clientId     = trim((string) $this->setting($integrationHandle, 'client_id', ''));
-        $clientSecret = trim((string) $this->setting($integrationHandle, 'client_secret', ''));
+        $clientId     = trim((string) $this->oauthClientSetting($integrationHandle, $environment, 'client_id', ''));
+        $clientSecret = trim((string) $this->oauthClientSetting($integrationHandle, $environment, 'client_secret', ''));
         $tokenUrl     = trim((string) ($connection->secrets()->metadata('token_url') ?? $environmentConfig['token_url'] ?? ''));
 
         if ($clientId === '' || $tokenUrl === '') {
@@ -301,22 +301,17 @@ final class OAuthManager {
      * @return void
      */
     public function disconnectConnection(IntegrationConnection $connection): void {
-        $connection->fill([
-            'api_key'          => null,
-            'access_token'     => null,
-            'refresh_token'    => null,
-            'id_token'         => null,
-            'scopes'           => null,
-            'token_expires_at' => null,
-            'is_active'        => false,
-            'status'           => 'disconnected',
-            'status_reason'    => 'manual_disconnect',
-            'revoked_at'       => now(),
-            'last_error'       => null,
-            'last_error_at'    => null,
-        ]);
+        $connection->delete();
 
-        $connection->save();
+        $account = $connection->account;
+
+        if ($account instanceof IntegrationAccount) {
+            $remainingConnections = $account->connections()->count();
+
+            if ($remainingConnections === 0) {
+                $account->delete();
+            }
+        }
 
         $account = $connection->account;
 
@@ -636,22 +631,18 @@ final class OAuthManager {
         ));
 
         if ($integrationHandle === 'salesforce') {
-            $orgDomain = $this->normalizeSalesforceDomain((string) $this->setting($integrationHandle, 'org_domain', ''));
+            $orgDomain = $this->normalizeSalesforceDomain((string) $this->setting($integrationHandle, 'org_domain_' . $environment, ''));
 
-            $host = $orgDomain !== ''
-                ? 'https://' . $orgDomain
-                : (in_array($environment, ['sandbox', 'test'], true)
-                    ? 'https://test.salesforce.com'
-                    : 'https://login.salesforce.com');
+            $host = $orgDomain !== '' ? 'https://' . $orgDomain : '';
 
-            $authorizeUrl = $host . '/services/oauth2/authorize';
-            $tokenUrl = $host . '/services/oauth2/token';
+            $authorizeUrl = $host !== '' ? $host . '/services/oauth2/authorize' : '';
+            $tokenUrl = $host !== '' ? $host . '/services/oauth2/token' : '';
 
-            if ($baseUri === '') {
+            if ($baseUri === '' && $host !== '') {
                 $baseUri = $host . '/services/data';
             }
 
-            if ($instanceUrl === '') {
+            if ($instanceUrl === '' && $host !== '') {
                 $instanceUrl = $host;
             }
         }
@@ -1032,6 +1023,20 @@ final class OAuthManager {
         }
 
         return trim($host, '/');
+    }
+
+    /**
+     * Resolves an OAuth client setting scoped by selected environment.
+     *
+     * @param string $integrationHandle The integration handle.
+     * @param string $environment The selected OAuth environment.
+     * @param string $key The key stem, for example client_id.
+     * @param mixed $default Fallback default value.
+     *
+     * @return mixed The resolved setting value.
+     */
+    private function oauthClientSetting(string $integrationHandle, string $environment, string $key, mixed $default = null): mixed {
+        return $this->setting($integrationHandle, $key . '_' . $environment, $default);
     }
 
     /**

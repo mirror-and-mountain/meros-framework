@@ -250,6 +250,16 @@ tbody:has(.meros-provider-action-button) {
         padding-bottom: 8px;
         margin-bottom: 1rem;
     }
+
+    .meros-oauth-connect-actions {
+        width: 100%;
+        display: flex;
+        margin-top: -4px;
+    }
+
+    .meros-oauth-connect-button {
+        margin-left: 0;
+    }
 }
 
 .meros-integration-settings-layout {
@@ -271,6 +281,48 @@ tbody:has(.meros-provider-action-button) {
         margin-top: 14px;
         margin-bottom: 1rem;
     }
+}
+
+.meros-oauth-config-meta {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-top: 12px;
+    margin-bottom: 1rem;
+
+    h3 {
+        margin: 0 0 6px;
+        font-size: 15px;
+    }
+
+    p {
+        margin-top: 0;
+    }
+}
+
+.meros-oauth-meta-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+
+    > span {
+        font-weight: 600;
+        color: #1d2327;
+    }
+
+    input[type='text'] {
+        width: 100%;
+        font-family: Menlo, Consolas, Monaco, monospace;
+        font-size: 12px;
+    }
+}
+
+.meros-oauth-derived-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
 }
 
 .meros-integration-settings-layout--full {
