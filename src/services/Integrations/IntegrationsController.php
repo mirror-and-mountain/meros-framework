@@ -311,6 +311,13 @@ final class IntegrationsController {
                     }
 
                     echo '</div>';
+
+                    echo '<div class="meros-oauth-settings-guide">';
+                    echo '<h4>Global Salesforce Settings</h4>';
+                    echo '<p class="description">Default OAuth Environment and Scopes apply across all environments.</p>';
+                    echo '<h4>Environment-Specific Credentials</h4>';
+                    echo '<p class="description">Org Domain, Client ID, and Client Secret are scoped to the active environment shown above.</p>';
+                    echo '</div>';
                 }
 
                 settings_fields('meros_framework_settings_container');
@@ -671,6 +678,10 @@ final class IntegrationsController {
         $html .= '<div class="meros-integration-oauth-panel">';
         $html .= '<h3>OAuth Connection</h3>';
         $html .= '<p class="meros-oauth-intro">Connect, reconnect, or disconnect accounts for this integration. OAuth state is validated and tokens are stored encrypted.</p>';
+
+        if ($handle === 'salesforce') {
+            $html .= '<p class="meros-oauth-readonly-note"><strong>PKCE:</strong> selected per connection using the Use PKCE toggle when connecting. Reconnect defaults to PKCE on for Salesforce.</p>';
+        }
 
         $html .= '<div class="meros-oauth-env-row">';
         $html .= '<label class="meros-oauth-field"><span>Environment</span><select id="' . esc_attr($environmentSelectId) . '" name="oauth_environment" onchange="(function(){var select=document.getElementById(\'' . esc_js($environmentSelectId) . '\');if(!select){return;}window.location.href=\'' . esc_js($environmentSwitchUrl) . '&oauth_environment=\'+encodeURIComponent(select.value);}())">';

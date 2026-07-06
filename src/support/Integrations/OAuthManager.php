@@ -542,6 +542,10 @@ final class OAuthManager {
             return (bool) $options['pkce'];
         }
 
+        if ($integrationHandle === 'salesforce') {
+            return true;
+        }
+
         return (bool) $this->setting($integrationHandle, 'oauth_use_pkce', false);
     }
 

@@ -215,6 +215,12 @@ tbody:has(.meros-provider-action-button) {
         color: #50575e;
     }
 
+    .meros-oauth-readonly-note {
+        margin: 0 0 12px;
+        font-size: 12px;
+        color: #50575e;
+    }
+
     .meros-oauth-env-row,
     .meros-oauth-connect-form {
         display: flex;
@@ -323,6 +329,21 @@ tbody:has(.meros-provider-action-button) {
     display: grid;
     grid-template-columns: 1fr;
     gap: 6px;
+}
+
+.meros-oauth-settings-guide {
+    margin: 10px 0 12px;
+
+    h4 {
+        margin: 0 0 4px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #1d2327;
+    }
+
+    p {
+        margin: 0 0 10px;
+    }
 }
 
 .meros-integration-settings-layout--full {
