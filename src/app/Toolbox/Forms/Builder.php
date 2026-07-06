@@ -23,6 +23,7 @@ use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\FormActions;
 
 use MM\Meros\App\Models\Form;
+use MM\Meros\App\Models\IntegrationAccount;
 use MM\Meros\App\Models\PostMeta as FormMeta;
 
 use MM\Meros\Services\Contracts\Forms\FormAction;
@@ -1677,6 +1678,7 @@ class Builder extends Component {
      */
     public function getActionsRepeaterField(): Field {
         $actions = $this->schema['actions'] ?? [];
+        $configuredActionHandles = $this->getConfiguredActionHandles(is_array($actions) ? $actions : []);
 
         $formFields = $this->getFields(true, true, ['name', 'label']);
         $formFieldOptions = [];
@@ -1702,8 +1704,16 @@ class Builder extends Component {
                 continue;
             }
 
+            $isAvailable = $this->isFormActionAvailable($handle);
+
+            if (!$isAvailable && !in_array($handle, $configuredActionHandles, true)) {
+                continue;
+            }
+
             $resolvedActions[$handle] = $action;
-            $actionOptions[$handle] = $action->getLabel();
+            $actionOptions[$handle] = $isAvailable
+                ? $action->getLabel()
+                : $action->getLabel() . ' (Unavailable: configure an active integration connection first)';
         }
 
         $repeater = Fields::checkout(Framework::get())->makeFrom('repeater', [
@@ -1738,6 +1748,69 @@ class Builder extends Component {
         $repeater->default(is_array($actions) ? $actions : []);
 
         return $repeater;
+    }
+
+    /**
+     * Returns action handles currently present in the schema so unavailable actions can remain visible without data loss.
+     *
+     * @param array $actions
+     * @return array
+     */
+    private function getConfiguredActionHandles(array $actions): array {
+        $handles = [];
+
+        foreach ($actions as $actionRow) {
+            if (!is_array($actionRow)) {
+                continue;
+            }
+
+            $handle = trim((string) ($actionRow['action'] ?? ''));
+
+            if ($handle !== '') {
+                $handles[] = $handle;
+            }
+        }
+
+        return array_values(array_unique($handles));
+    }
+
+    /**
+     * Determines whether a form action should be available in the action picker.
+     *
+     * @param string $handle
+     * @return bool
+     */
+    private function isFormActionAvailable(string $handle): bool {
+        return match ($handle) {
+            'create_salesforce_contact' => $this->hasActiveIntegrationConnection('salesforce', null),
+            'run_crm_sync_jobs' => $this->hasActiveIntegrationConnection(null, 'crm'),
+            default => true,
+        };
+    }
+
+    /**
+     * Checks whether at least one active integration account exists with an active connection.
+     *
+     * @param string|null $integrationHandle
+     * @param string|null $category
+     * @return bool
+     */
+    private function hasActiveIntegrationConnection(?string $integrationHandle = null, ?string $category = null): bool {
+        $query = IntegrationAccount::query()->where('is_active', true);
+
+        if (is_string($integrationHandle) && $integrationHandle !== '') {
+            $query->where('integration_handle', $integrationHandle);
+        }
+
+        if (is_string($category) && $category !== '') {
+            $query->where('category', $category);
+        }
+
+        return $query
+            ->whereHas('connections', function ($connectionQuery) {
+                $connectionQuery->where('is_active', true);
+            })
+            ->exists();
     }
 
 

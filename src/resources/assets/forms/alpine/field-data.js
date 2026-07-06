@@ -1270,6 +1270,7 @@ document.addEventListener('alpine:init', () => {
 
                                     setFieldValue(field, currentConfig[name]);
                                 });
+
                             });
                         }, this.openDelayMs);
 
@@ -1571,7 +1572,6 @@ document.addEventListener('alpine:init', () => {
                 } else {
                     this.__restoreRowDialogFields();
                 }
-
                 this.rowDialogOpen = false;
                 this.isOpeningRowDialog = false;
                 this.activeDialogRowEl = null;

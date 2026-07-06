@@ -312,11 +312,11 @@
         @if($allowsAdd)
             <button
                 type="button"
-                @click.stop="addRow((typeof isEditor !== 'undefined') ? isEditor : false)"
+                @click.stop="addRow(((typeof isEditor !== 'undefined') ? isEditor : false) || !!$el.closest('.meros-repeater-config-dialog__body'))"
                 class="meros-repeater-button meros-repeater-button--neutral meros-repeater-button--add"
                 title="{{ $addRowText }}"
-                :disabled="!canAddRows && !(typeof isRepeaterEditorOpen !== 'undefined' ? isRepeaterEditorOpen : false) === true"
-                :aria-disabled="!canAddRows && !(typeof isRepeaterEditorOpen !== 'undefined' ? isRepeaterEditorOpen : false) === true"
+                :disabled="!canAddRows && !$el.closest('.meros-repeater-config-dialog__body')"
+                :aria-disabled="!canAddRows && !$el.closest('.meros-repeater-config-dialog__body')"
             >
                 {{ $addRowText }}
             </button>

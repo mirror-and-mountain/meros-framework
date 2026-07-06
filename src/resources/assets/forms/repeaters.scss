@@ -336,7 +336,7 @@ body.meros-repeater-dialog-open {
 .meros-repeater-config-dialog__shell {
 	display: flex;
 	flex-direction: column;
-	width: min(48rem, 100%);
+	width: min(82rem, 100%);
 	max-width: 100%;
 	height: auto;
 	max-height: calc(100dvh - 2rem);
@@ -374,6 +374,7 @@ body.meros-repeater-dialog-open {
 	gap: 1rem;
 	padding: 1.25rem;
 	overflow-y: auto;
+	overflow-x: clip;
 	-webkit-overflow-scrolling: touch;
 	background-color: #f9fafb;
 }
