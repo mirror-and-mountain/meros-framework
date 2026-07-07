@@ -86,7 +86,7 @@ function showInstallerModal({ button, provider, providerType, providerLabel, sub
     const actionLabel = subAction.charAt(0).toUpperCase() + subAction.slice(1);
 
     title.textContent = `${actionLabel} ${providerLabel} Tables`;
-    description.textContent = `You are about to ${subAction} tables for ${providerLabel}. Please review the exact changes before proceeding.`;
+    description.textContent = `You are about to ${subAction} tables for ${providerLabel}. Back up your site and database before proceeding. This action cannot be undone.`;
     planList.innerHTML = '';
 
     if (!Array.isArray(plan) || plan.length === 0) {

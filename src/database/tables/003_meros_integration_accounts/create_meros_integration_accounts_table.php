@@ -16,11 +16,12 @@ return new class extends Migration {
             $table->string('label');
             $table->string('category')->index();
             $table->string('auth_type')->index();
+            $table->string('environment')->default('production')->index();
             $table->boolean('is_active')->default(false)->index();
             $table->json('settings')->nullable();
             $table->timestamps();
 
-            $table->unique(['provider', 'integration_handle', 'label'], 'meros_integration_accounts_unique');
+            $table->unique(['provider', 'integration_handle', 'environment', 'label'], 'meros_integration_accounts_unique');
         });
     }
 

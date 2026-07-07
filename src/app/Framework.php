@@ -58,6 +58,7 @@ use MM\Meros\Services\Integrations\IntegrationsController;
 
 use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Blocks as BlocksAccessor;
+use MM\Meros\Facades\Packages as PackagesAccessor;
 use MM\Meros\Facades\AssetGroups as AssetGroupsAccessor;
 
 final class Framework extends FeatureProvider {
@@ -371,8 +372,12 @@ final class Framework extends FeatureProvider {
             ->where('tableName', 'meros_integration_connections')
             ->first();
 
-        if ($accountsTable === null || $connectionsTable === null) {
-            throw new \RuntimeException('Meros Framework requires the meros_integration_accounts and meros_integration_connections tables to manage integrations. One or both of these tables were not found.');
+        $environmentsTable = $tables
+            ->where('tableName', 'meros_integration_environments')
+            ->first();
+
+        if ($accountsTable === null || $connectionsTable === null || $environmentsTable === null) {
+            throw new \RuntimeException('Meros Framework requires the meros_integration_accounts, meros_integration_connections, and meros_integration_environments tables to manage integrations. One or more of these tables were not found.');
         }
 
         $batchID = Str::ulid();
@@ -383,6 +388,10 @@ final class Framework extends FeatureProvider {
 
         if (!$connectionsTable->isInstalled()) {
             $connectionsTable->install($batchID);
+        }
+
+        if (!$environmentsTable->isInstalled()) {
+            $environmentsTable->install($batchID);
         }
     }
 
@@ -910,12 +919,6 @@ final class Framework extends FeatureProvider {
                         ->section('meros-features-packages');
 
                 $titleHTML = $this->getPackageSettingHTML($package);
-                $hasTables = $package->hasTables();
-                
-                if ($hasTables) {
-                    $titleHTML .= $this->installerController()->renderInstallerHTML($package);
-                }
-
                 $enabledSetting->titleHTML($titleHTML);
             }
         }, 10, 2);
@@ -1122,7 +1125,11 @@ final class Framework extends FeatureProvider {
                             $theme = ThemeAccessor::get();
                             $hasThemeTables = $theme->hasTables();
                             $hasFrameworkTables = $this->hasTables();
-                            $hasInstallerTables = $hasThemeTables || $hasFrameworkTables;
+                            $packageInstallers = PackagesAccessor::all()->filter(function ($package) {
+                                return $package->hasTables();
+                            });
+                            $hasPackageTables = $packageInstallers->isNotEmpty();
+                            $hasInstallerTables = $hasThemeTables || $hasFrameworkTables || $hasPackageTables;
                             $isManagingTables = $this->isManagingTablesView();
                             $manageTablesUrl = $this->getThemeTablesManagerUrl();
                             $themeTabUrl = $this->getThemeTabUrl();
@@ -1130,10 +1137,19 @@ final class Framework extends FeatureProvider {
                             if ($hasInstallerTables) {
                                 $frameworkPlan = $this->installerController()->getInstallerPlanData($this);
                                 $themePlan = $this->installerController()->getInstallerPlanData($theme);
+                                $packagePlans = $packageInstallers->mapWithKeys(function ($package) {
+                                    return [$package->getHandle() => $this->installerController()->getInstallerPlanData($package)];
+                                });
                                 $frameworkUpdateCount = collect($frameworkPlan['update'])->where('change', 'update')->count();
                                 $themeUpdateCount = collect($themePlan['update'])->where('change', 'update')->count();
-                                $installCount = count($frameworkPlan['install']) + count($themePlan['install']);
-                                $updateCount = $frameworkUpdateCount + $themeUpdateCount;
+                                $packageInstallCount = $packagePlans->sum(function ($plan) {
+                                    return count($plan['install'] ?? []);
+                                });
+                                $packageUpdateCount = $packagePlans->sum(function ($plan) {
+                                    return collect($plan['update'] ?? [])->where('change', 'update')->count();
+                                });
+                                $installCount = count($frameworkPlan['install']) + count($themePlan['install']) + $packageInstallCount;
+                                $updateCount = $frameworkUpdateCount + $themeUpdateCount + $packageUpdateCount;
                                 $hasAttention = $installCount > 0 || $updateCount > 0;
 
                                 $operation = sanitize_text_field($_GET['operation'] ?? '');
@@ -1143,7 +1159,7 @@ final class Framework extends FeatureProvider {
                                 if ($operation !== '') {
                                     $providerLabel = $providerType === 'framework'
                                         ? 'Framework'
-                                        : ($providerType === 'theme' ? 'Theme' : 'Provider');
+                                        : ($providerType === 'theme' ? 'Theme' : ($providerType === 'package' ? 'Package' : 'Provider'));
 
                                     if ($providerType === 'theme' && $providerHandle !== '' && $providerHandle !== $theme->getHandle()) {
                                         $providerLabel = 'Provider';
@@ -1151,6 +1167,14 @@ final class Framework extends FeatureProvider {
 
                                     if ($providerType === 'framework' && $providerHandle !== '' && $providerHandle !== $this->getHandle()) {
                                         $providerLabel = 'Provider';
+                                    }
+
+                                    if ($providerType === 'package' && $providerHandle !== '') {
+                                        $package = $packageInstallers->first(fn ($item) => $item->getHandle() === $providerHandle);
+
+                                        if ($package !== null) {
+                                            $providerLabel = $package->getName();
+                                        }
                                     }
 
                                     $operationLabel = match($operation) {
@@ -1168,8 +1192,8 @@ final class Framework extends FeatureProvider {
 
                                 if ($isManagingTables) {
                                     echo '<div class="meros-installer-manager-header">';
-                                    echo '<h2 style="margin-top: 2em;">Manage Framework & Theme Tables</h2>';
-                                    echo '<p class="description">Review and run installer actions for framework and theme tables from one place.</p>';
+                                    echo '<h2 style="margin-top: 2em;">Manage Framework, Theme & Package Tables</h2>';
+                                    echo '<p class="description">Review and run installer actions for framework, theme and package tables from one place.</p>';
                                     echo '<p><a class="button button-secondary button-small" href="' . esc_url($themeTabUrl) . '">Back to Theme Settings</a></p>';
                                     echo '</div>';
 
@@ -1188,6 +1212,21 @@ final class Framework extends FeatureProvider {
                                         echo '<h2 style="margin-top: 2em;">Theme Installer</h2>';
                                         echo '<p class="description">These are tables provided by your active theme.</p>';
                                         echo $this->installerController()->renderInstallerHTML($theme, 'theme');
+                                        echo '</section>';
+                                    }
+
+                                    if ($hasPackageTables) {
+                                        echo '<section class="meros-installer-group meros-installer-group-packages">';
+                                        echo '<h2 style="margin-top: 2em;">Package Installers</h2>';
+                                        echo '<p class="description">These are tables provided by enabled or installed packages.</p>';
+
+                                        foreach ($packageInstallers as $package) {
+                                            echo '<div class="meros-installer-package">';
+                                            echo '<h3>' . esc_html($package->getName()) . '</h3>';
+                                            echo $this->installerController()->renderInstallerHTML($package, 'package');
+                                            echo '</div>';
+                                        }
+
                                         echo '</section>';
                                     }
 
@@ -1211,7 +1250,7 @@ final class Framework extends FeatureProvider {
                                     echo '<div class="meros-theme-installer-callout' . ($hasAttention ? ' has-attention' : '') . '">';
                                     echo '<div>';
                                     echo '<h3>Table Management</h3>';
-                                    echo '<p>Manage database tables provided by the framework and your active theme.</p>';
+                                    echo '<p>Manage database tables provided by the framework, your active theme and installed packages.</p>';
                                     echo '<p>' . esc_html(implode(' · ', $summary)) . '</p>';
                                     echo '</div>';
                                     echo '<a class="button button-small" href="' . esc_url($manageTablesUrl) . '">Manage Tables</a>';

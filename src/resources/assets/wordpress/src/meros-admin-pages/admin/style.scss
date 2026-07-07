@@ -13,6 +13,9 @@
 
     .meros-provider-action-button {
         transition: opacity 0.3s ease;
+        min-height: 28px;
+        line-height: 26px;
+        padding: 0 10px;
     }
 
     .meros-provider-action-button.meros-working {
@@ -60,6 +63,16 @@
 
 .meros-installer-group-theme {
     border-left: 4px solid #00844a;
+}
+
+.meros-installer-group-packages {
+    border-left: 4px solid #3858e9;
+}
+
+.meros-installer-group-packages .meros-installer-package + .meros-installer-package {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid #dcdcde;
 }
 
 .meros-installer-manager-header {

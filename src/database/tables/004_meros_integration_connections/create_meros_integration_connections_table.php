@@ -21,7 +21,14 @@ return new class extends Migration {
             $table->json('metadata')->nullable();
             $table->timestamp('token_expires_at')->nullable();
             $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('connected_at')->nullable();
+            $table->timestamp('revoked_at')->nullable();
+            $table->timestamp('last_refreshed_at')->nullable();
             $table->boolean('is_active')->default(true)->index();
+            $table->string('status')->default('inactive')->index();
+            $table->string('status_reason')->nullable();
+            $table->text('last_error')->nullable();
+            $table->timestamp('last_error_at')->nullable();
             $table->timestamps();
         });
     }

@@ -47,7 +47,7 @@ class InstallerController {
 
         if (!$enabled && !$isThemeProvider && $installed) {
             $html .= '<p class="meros-installer-info">Installed: ' . esc_html($installedAt) . '</p>';
-            $html .= '<a href="#" class="meros-provider-action-button meros-provider-uninstaller-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Uninstall</a>';
+            $html .= '<a href="#" class="meros-provider-action-button meros-provider-uninstaller-button button button-primary" ' . $dataAttrs . ' style="margin-top:4px;">Uninstall</a>';
             $html .= '</div>';
             
             return $html;
@@ -73,22 +73,22 @@ class InstallerController {
             $html .= '<div class="meros-provider-action-buttons">';
 
             if ($isThemeProvider || $resolvedProviderType === 'framework') {
-                $html .= '<a href="#" class="meros-provider-action-button meros-provider-uninstaller-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Uninstall</a>';
+                $html .= '<a href="#" class="meros-provider-action-button meros-provider-uninstaller-button button button-primary" ' . $dataAttrs . ' style="margin-top:4px;">Uninstall</a>';
             }
              
             if ($hasUpdates) {
-                $html .= '<a href="#" class="meros-provider-action-button meros-provider-update-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Update</a>';
+                $html .= '<a href="#" class="meros-provider-action-button meros-provider-update-button button button-primary" ' . $dataAttrs . ' style="margin-top:4px;">Update</a>';
             }
 
             if ($canRollback) {
-                $html .= '<a href="#" class="meros-provider-action-button meros-provider-rollback-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Rollback</a>';
+                $html .= '<a href="#" class="meros-provider-action-button meros-provider-rollback-button button button-primary" ' . $dataAttrs . ' style="margin-top:4px;">Rollback</a>';
             }
 
             $html .= '</div>';
 
         } else {
             $html .= '<p class="meros-installer-info">This ' . esc_html($resolvedProviderType) . ' has features that may need to be installed for it to function properly.</p>';
-            $html .= '<a href="#" class="meros-provider-action-button meros-provider-installer-button button button-primary" ' . $dataAttrs . ' style="margin-top:8px;">Install</a>';
+            $html .= '<a href="#" class="meros-provider-action-button meros-provider-installer-button button button-primary" ' . $dataAttrs . ' style="margin-top:4px;">Install</a>';
         }
 
         $html .= '</div>';
