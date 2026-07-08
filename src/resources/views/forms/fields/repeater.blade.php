@@ -59,14 +59,13 @@
                 <template x-if="!isUsingCustomConfigurationDialog">
                     <div class="meros-repeater-config-dialog__body" x-ref="rowConfigDialogBody">
                         @foreach($fieldNames as $fieldIndex => $fieldName)
-                            @php
-                                $templateSubField = $templateRow[$fieldName] ?? null;
-                                $isHiddenInTable = $templateSubField && $templateSubField->isHiddenInRepeaterTable();
-                            @endphp
+                            @if($fieldName === '__configuration')
+                                @continue
+                            @endif
 
                             <section class="meros-repeater-config-dialog__field" data-field-name="{{ $fieldName }}">
                                 <h3 class="meros-repeater-config-dialog__field-label">
-                                    {{ $fieldLabels[$fieldIndex] ?? $fieldName }}@if($isHiddenInTable) (This field is hidden in the table)@endif
+                                    {{ $fieldLabels[$fieldIndex] ?? $fieldName }}
                                 </h3>
                                 <div class="meros-repeater-config-dialog__field-input" data-field-name="{{ $fieldName }}"></div>
                             </section>

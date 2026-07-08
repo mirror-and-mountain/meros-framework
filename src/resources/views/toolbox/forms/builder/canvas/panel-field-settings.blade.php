@@ -90,7 +90,11 @@
             </div>
 
             {{-- Default Value --}}
-            <div class="nice-form-group" x-show="supportsProperty('dynamicDefault')" x-cloak>
+            <div
+                class="nice-form-group"
+                x-show="supportsProperty('dynamicDefault') && !(activeFieldProps?.useDynamicOptions ?? false)"
+                x-cloak
+            >
                 <label for="field-use-dynamic-default" class="form-label">Use Dynamic Default</label>
                 <small class="whitespace-normal">Whether to use a dynamic default value for the field</small>
                 <input
@@ -98,11 +102,33 @@
                     type="checkbox"
                     class="switch"
                     :checked="activeFieldProps?.useDynamicDefault ?? false"
-                    @change="updateActiveFieldProperty('useDynamicDefault', $event.target.checked);"
+                    @change="
+                        const nextUseDynamicDefault = $event.target.checked;
+                        updateActiveFieldProperty('useDynamicDefault', nextUseDynamicDefault);
+
+                        if (nextUseDynamicDefault && supportsProperty('dynamicOptions')) {
+                            updateActiveFieldProperty('useDynamicOptions', false);
+                            activeFieldProps.useDynamicOptions = false;
+                        }
+                    "
                 />
             </div>
 
-            @if ($this->activeField !== null && $this->activeField->useDynamicDefault === true)
+            @php
+                $enforceDynamicQueryDefaults = $this->activeField !== null
+                    && method_exists($this->activeField, 'usesDynamicOptions')
+                    && $this->activeField->usesDynamicOptions();
+            @endphp
+
+            @if ($enforceDynamicQueryDefaults)
+                <div class="nice-form-group">
+                    <small class="whitespace-normal">
+                        Default values for this field are selected from the configured dynamic options source.
+                    </small>
+                </div>
+            @endif
+
+            @if ($this->activeField !== null && $this->activeField->useDynamicDefault === true && !$enforceDynamicQueryDefaults)
                 <div
                     x-data="{
                         control: null,
@@ -136,6 +162,11 @@
             @endif
 
             {{-- Field Options --}}
+            @php
+                $dynamicChoiceSourceList = is_array($dynamicChoiceSources ?? null) ? $dynamicChoiceSources : [];
+                $defaultDynamicChoiceSource = $dynamicChoiceSourceList[0]['source'] ?? 'posts';
+            @endphp
+
             <div class="nice-form-group" x-show="supportsProperty('dynamicOptions')" x-cloak>
                 <label for="field-use-dynamic-options" class="form-label">Use Dynamic Options</label>
                 <small class="whitespace-normal">Load option choices from a live query instead of a fixed list.</small>
@@ -144,7 +175,15 @@
                     type="checkbox"
                     class="switch"
                     :checked="activeFieldProps?.useDynamicOptions ?? false"
-                    @change="updateActiveFieldProperty('useDynamicOptions', $event.target.checked);"
+                    @change="
+                        const nextUseDynamicOptions = $event.target.checked;
+                        updateActiveFieldProperty('useDynamicOptions', nextUseDynamicOptions);
+
+                        if (nextUseDynamicOptions && supportsProperty('dynamicDefault')) {
+                            updateActiveFieldProperty('useDynamicDefault', false);
+                            activeFieldProps.useDynamicDefault = false;
+                        }
+                    "
                 />
             </div>
 
@@ -155,78 +194,116 @@
                     id="field-dynamic-options-source"
                     @change="updateActiveFieldProperty('dynamicOptionsSource', $event.target.value);"
                 >
-                    <option value="posts" :selected="(activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'posts'">Posts</option>
-                    <option value="users" :selected="(activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'users'">Users</option>
+                    @foreach ($dynamicChoiceSourceList as $source)
+                        <option
+                            value="{{ $source['source'] }}"
+                            :selected="(activeFieldProps?.dynamicOptionsSource ?? '{{ $defaultDynamicChoiceSource }}') === '{{ $source['source'] }}'"
+                        >
+                            {{ $source['label'] ?? $source['source'] }}
+                        </option>
+                    @endforeach
                 </select>
             </div>
 
-            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false) && (activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'posts'" x-cloak>
-                <label for="field-dynamic-options-post-type" class="form-label">Queried Post Type</label>
-                <small class="whitespace-normal">The post type to query for option values.</small>
-                <input
-                    id="field-dynamic-options-post-type"
-                    type="text"
-                    :value="activeFieldProps?.dynamicOptionsPostType ?? 'post'"
-                    @change="updateActiveFieldProperty('dynamicOptionsPostType', $event.target.value);"
-                />
-            </div>
+            @foreach ($dynamicChoiceSourceList as $source)
+                @php
+                    $sourceKey = $source['source'] ?? '';
+                    $sourceFields = is_array($source['configFields'] ?? null) ? $source['configFields'] : [];
+                @endphp
 
-            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false) && (activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'posts'" x-cloak>
-                <label for="field-dynamic-options-post-status" class="form-label">Queried Post Status</label>
-                <small class="whitespace-normal">The post status to query for option values.</small>
-                <input
-                    id="field-dynamic-options-post-status"
-                    type="text"
-                    :value="activeFieldProps?.dynamicOptionsPostStatus ?? 'publish'"
-                    @change="updateActiveFieldProperty('dynamicOptionsPostStatus', $event.target.value);"
-                />
-            </div>
+                @foreach ($sourceFields as $field)
+                    @php
+                        $fieldKey = (string) ($field['key'] ?? '');
+                        $fieldType = (string) ($field['type'] ?? 'text');
+                        $fieldLabel = (string) ($field['label'] ?? $fieldKey);
+                        $fieldHelpText = (string) ($field['helpText'] ?? '');
+                        $fieldDefault = $field['default'] ?? '';
+                        $fieldMin = $field['min'] ?? null;
+                        $fieldStep = $field['step'] ?? null;
+                        $fieldOptions = is_array($field['options'] ?? null) ? $field['options'] : [];
+                    @endphp
 
-            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false)" x-cloak>
-                <label for="field-dynamic-options-limit" class="form-label">Dynamic Options Limit</label>
-                <small class="whitespace-normal">The maximum number of option results to load per request.</small>
-                <input
-                    id="field-dynamic-options-limit"
-                    type="number"
-                    min="1"
-                    step="1"
-                    :value="activeFieldProps?.dynamicOptionsLimit ?? 20"
-                    @change="updateActiveFieldProperty('dynamicOptionsLimit', Math.max(1, parseInt($event.target.value || '20', 10) || 20));"
-                />
-            </div>
+                    @if ($fieldKey !== '')
+                        <div
+                            class="nice-form-group"
+                            x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false) && (activeFieldProps?.dynamicOptionsSource ?? '{{ $defaultDynamicChoiceSource }}') === '{{ $sourceKey }}'"
+                            x-cloak
+                        >
+                            <label for="field-dynamic-options-config-{{ $sourceKey }}-{{ $fieldKey }}" class="form-label">{{ $fieldLabel }}</label>
 
-            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false) && (activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'posts'" x-cloak>
-                <label for="field-dynamic-options-taxonomy" class="form-label">Filter Taxonomy</label>
-                <small class="whitespace-normal">Optional taxonomy slug used to filter the queried posts.</small>
-                <input
-                    id="field-dynamic-options-taxonomy"
-                    type="text"
-                    :value="activeFieldProps?.dynamicOptionsTaxonomy ?? ''"
-                    @change="updateActiveFieldProperty('dynamicOptionsTaxonomy', $event.target.value);"
-                />
-            </div>
+                            @if ($fieldHelpText !== '')
+                                <small class="whitespace-normal">{{ $fieldHelpText }}</small>
+                            @endif
 
-            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false) && (activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'posts'" x-cloak>
-                <label for="field-dynamic-options-terms" class="form-label">Filter Terms</label>
-                <small class="whitespace-normal">Comma-separated term IDs or slugs used with the taxonomy filter.</small>
-                <input
-                    id="field-dynamic-options-terms"
-                    type="text"
-                    :value="activeFieldProps?.dynamicOptionsTerms ?? ''"
-                    @change="updateActiveFieldProperty('dynamicOptionsTerms', $event.target.value);"
-                />
-            </div>
-
-            <div class="nice-form-group" x-show="supportsProperty('dynamicOptions') && (activeFieldProps?.useDynamicOptions ?? false) && (activeFieldProps?.dynamicOptionsSource ?? 'posts') === 'users'" x-cloak>
-                <label for="field-dynamic-options-user-role" class="form-label">Filter User Role</label>
-                <small class="whitespace-normal">Optional role slug used to filter queried users.</small>
-                <input
-                    id="field-dynamic-options-user-role"
-                    type="text"
-                    :value="activeFieldProps?.dynamicOptionsUserRole ?? ''"
-                    @change="updateActiveFieldProperty('dynamicOptionsUserRole', $event.target.value);"
-                />
-            </div>
+                            @if ($fieldType === 'select')
+                                <select
+                                    id="field-dynamic-options-config-{{ $sourceKey }}-{{ $fieldKey }}"
+                                    @change="
+                                        const nextConfig = { ...(activeFieldProps?.dynamicOptionsConfig || {}) };
+                                        nextConfig['{{ $fieldKey }}'] = $event.target.value;
+                                        updateActiveFieldProperty('dynamicOptionsConfig', nextConfig);
+                                        activeFieldProps.dynamicOptionsConfig = nextConfig;
+                                    "
+                                >
+                                    @foreach ($fieldOptions as $optionValue => $optionLabel)
+                                        <option
+                                            value="{{ $optionValue }}"
+                                            :selected="((activeFieldProps?.dynamicOptionsConfig || {})['{{ $fieldKey }}'] ?? '{{ is_scalar($fieldDefault) ? (string) $fieldDefault : '' }}') == '{{ (string) $optionValue }}'"
+                                        >
+                                            {{ $optionLabel }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            @elseif ($fieldType === 'number')
+                                <input
+                                    id="field-dynamic-options-config-{{ $sourceKey }}-{{ $fieldKey }}"
+                                    type="number"
+                                    @if ($fieldMin !== null)
+                                        min="{{ $fieldMin }}"
+                                    @endif
+                                    @if ($fieldStep !== null)
+                                        step="{{ $fieldStep }}"
+                                    @else
+                                        step="1"
+                                    @endif
+                                    :value="(activeFieldProps?.dynamicOptionsConfig || {})['{{ $fieldKey }}'] ?? '{{ is_scalar($fieldDefault) ? (string) $fieldDefault : '' }}'"
+                                    @change="
+                                        const nextConfig = { ...(activeFieldProps?.dynamicOptionsConfig || {}) };
+                                        nextConfig['{{ $fieldKey }}'] = Math.max(1, parseInt($event.target.value || '{{ is_numeric($fieldDefault) ? (int) $fieldDefault : 1 }}', 10) || {{ is_numeric($fieldDefault) ? (int) $fieldDefault : 1 }});
+                                        updateActiveFieldProperty('dynamicOptionsConfig', nextConfig);
+                                        activeFieldProps.dynamicOptionsConfig = nextConfig;
+                                    "
+                                />
+                            @elseif ($fieldType === 'textarea')
+                                <textarea
+                                    id="field-dynamic-options-config-{{ $sourceKey }}-{{ $fieldKey }}"
+                                    rows="6"
+                                    class="font-mono"
+                                    :value="(activeFieldProps?.dynamicOptionsConfig || {})['{{ $fieldKey }}'] ?? '{{ is_scalar($fieldDefault) ? (string) $fieldDefault : '' }}'"
+                                    @change="
+                                        const nextConfig = { ...(activeFieldProps?.dynamicOptionsConfig || {}) };
+                                        nextConfig['{{ $fieldKey }}'] = $event.target.value;
+                                        updateActiveFieldProperty('dynamicOptionsConfig', nextConfig);
+                                        activeFieldProps.dynamicOptionsConfig = nextConfig;
+                                    "
+                                ></textarea>
+                            @else
+                                <input
+                                    id="field-dynamic-options-config-{{ $sourceKey }}-{{ $fieldKey }}"
+                                    type="text"
+                                    :value="(activeFieldProps?.dynamicOptionsConfig || {})['{{ $fieldKey }}'] ?? '{{ is_scalar($fieldDefault) ? (string) $fieldDefault : '' }}'"
+                                    @change="
+                                        const nextConfig = { ...(activeFieldProps?.dynamicOptionsConfig || {}) };
+                                        nextConfig['{{ $fieldKey }}'] = $event.target.value;
+                                        updateActiveFieldProperty('dynamicOptionsConfig', nextConfig);
+                                        activeFieldProps.dynamicOptionsConfig = nextConfig;
+                                    "
+                                />
+                            @endif
+                        </div>
+                    @endif
+                @endforeach
+            @endforeach
 
             <button
                 x-show="supportsProperty('options') && !(activeFieldProps?.useDynamicOptions ?? false)"

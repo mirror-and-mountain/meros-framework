@@ -13,11 +13,14 @@ use MM\Meros\App\Framework;
 use MM\Meros\App\Context;
 
 use MM\Meros\Support\ClassInfo;
-use MM\Meros\Services\Integrations\IntegrationsController;
+use MM\Meros\Services\Controllers\InstallerController;
+use MM\Meros\Services\Controllers\IntegrationsController;
+use MM\Meros\Services\Controllers\RestController;
 
 use MM\Meros\Services\Registers\Assets;
 use MM\Meros\Services\Registers\AssetGroups;
 use MM\Meros\Services\Registers\Blocks;
+use MM\Meros\Services\Registers\DynamicChoiceSources;
 use MM\Meros\Services\Registers\Integrations;
 
 use MM\Meros\Services\Registers\Forms;
@@ -154,6 +157,10 @@ class FrameworkServiceProvider extends ServiceProvider {
             return new Blocks();
         });
 
+        $this->app->singleton(DynamicChoiceSources::class, function () {
+            return new DynamicChoiceSources();
+        });
+
         $this->app->singleton(Integrations::class, function () {
             return new Integrations();
         });
@@ -225,6 +232,7 @@ class FrameworkServiceProvider extends ServiceProvider {
         $this->app->alias(AssetGroups::class, 'meros.registers.asset_groups');
         $this->app->alias(Assets::class, 'meros.registers.assets');
         $this->app->alias(Blocks::class, 'meros.registers.blocks');
+        $this->app->alias(DynamicChoiceSources::class, 'meros.registers.dynamic_choice_sources');
         $this->app->alias(Integrations::class, 'meros.registers.integrations');
         $this->app->alias(Forms::class, 'meros.registers.forms');
         $this->app->alias(FormRows::class, 'meros.registers.form_rows');
@@ -259,6 +267,16 @@ class FrameworkServiceProvider extends ServiceProvider {
         // Register integrations controller
         $this->app->singleton(IntegrationsController::class, function () {
             return new IntegrationsController();
+        });
+
+        // Register installer controller
+        $this->app->singleton(InstallerController::class, function () {
+            return new InstallerController();
+        });
+
+        // Register REST controller
+        $this->app->singleton(RestController::class, function () {
+            return new RestController();
         });
 
         // Register the vite assets class

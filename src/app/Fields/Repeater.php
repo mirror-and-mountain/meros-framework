@@ -73,14 +73,14 @@ class Repeater extends Field {
     public array $fields = [];
 
     /**
-     * Custom configuration dialogs for repeater rows, each with an optional rule for when to show the dialog.
+     * Custom configuration dialogs keyed by optional row matching conditions.
      *
-     * @var array
+     * @var array<int, array<string, mixed>>
      */
     protected array $customConfigurationDialogs = [];
 
     /**
-     * A hidden field used to store the configuration for a repeater row when using a custom configuration dialog.
+     * Hidden row configuration payload field.
      *
      * @var Field|null
      */
@@ -277,6 +277,251 @@ class Repeater extends Field {
         return $parsedProps;
     }
 
+    // =========================================================================
+    // Configuration Dialogs
+    // =========================================================================
+
+    /**
+     * Defines a repeater row configuration dialog from a callback or pre-rendered HTML.
+     *
+     * Supported options:
+     * - when: either ['mode' => 'and|or', 'rules' => [[field,operator,value], ...]] or legacy [field,operator,value]
+     * - default: default payload for the hidden __configuration field
+        * - renderMode: 'static' or 'dynamic'
+        * - rerenderOn: ['row' => ['field_name'], 'dialog' => ['field_name'], 'debounceMs' => 120]
+     *
+     * @param Closure|string $dialog
+     * @param array<string, mixed> $options
+     * @return self
+     */
+    public function configurationDialog(Closure|string $dialog, array $options = []): self {
+        $html = '';
+
+        if ($dialog instanceof Closure) {
+            $group = FieldGroupsRegister::checkout($this->provider)->make();
+            $dialog($group);
+
+            $html = $group->html(['class' => 'meros-form-group--no-style']);
+        } elseif (is_string($dialog)) {
+            $html = $dialog;
+        }
+
+        if (trim($html) === '') {
+            return $this;
+        }
+
+        $when = $this->normaliseDialogWhen($options['when'] ?? null);
+        $default = is_array($options['default'] ?? null) ? $options['default'] : [];
+        $runtime = $this->normaliseDialogRuntime($options);
+
+        $this->customConfigurationDialogs[] = [
+            'when' => $when,
+            'runtime' => $runtime,
+            'html' => $html,
+        ];
+
+        $this->ensureHiddenConfigurationField($default);
+
+        return $this;
+    }
+
+    /**
+     * Backward-compatible wrapper using legacy rule tuple input.
+     *
+     * @param Closure $callback
+     * @param array<int, mixed> $rule
+     * @param array<string, mixed> $default
+     * @return self
+     */
+    public function customConfigurationDialog(Closure $callback, array $rule = [], array $default = []): self {
+        return $this->configurationDialog($callback, [
+            'when' => $rule,
+            'default' => $default,
+        ]);
+    }
+
+    /**
+     * Backward-compatible wrapper for pre-rendered HTML dialogs.
+     *
+     * @param string $html
+     * @param array<int, mixed> $rule
+     * @param array<string, mixed> $default
+     * @return self
+     */
+    public function customConfigurationDialogHtml(string $html, array $rule = [], array $default = []): self {
+        return $this->configurationDialog($html, [
+            'when' => $rule,
+            'default' => $default,
+        ]);
+    }
+
+    /**
+     * Defines a dynamic configuration dialog that can be re-rendered from row and/or dialog dependencies.
+     *
+     * @param Closure|string $dialog
+     * @param array<string, mixed> $options
+     * @return self
+     */
+    public function dynamicConfigurationDialog(Closure|string $dialog, array $options = []): self {
+        $options['renderMode'] = 'dynamic';
+
+        return $this->configurationDialog($dialog, $options);
+    }
+
+    /**
+     * Convenience helper for row-based re-render dependencies.
+     *
+     * @param array<int, string> $rowFieldNames
+     * @param int $debounceMs
+     * @return self
+     */
+    public function configurationDialogRerenderOnRow(array $rowFieldNames, int $debounceMs = 120): self {
+        $dialogIndex = count($this->customConfigurationDialogs) - 1;
+
+        if ($dialogIndex < 0) {
+            return $this;
+        }
+
+        $runtime = is_array($this->customConfigurationDialogs[$dialogIndex]['runtime'] ?? null)
+            ? $this->customConfigurationDialogs[$dialogIndex]['runtime']
+            : $this->normaliseDialogRuntime([]);
+
+        $runtime['renderMode'] = 'dynamic';
+        $runtime['rerenderOn']['row'] = $this->normaliseDialogFieldNameList($rowFieldNames);
+        $runtime['rerenderOn']['debounceMs'] = max(0, $debounceMs);
+
+        $this->customConfigurationDialogs[$dialogIndex]['runtime'] = $runtime;
+
+        return $this;
+    }
+
+    /**
+     * Convenience helper for dialog-field-based re-render dependencies.
+     *
+     * @param array<int, string> $dialogFieldNames
+     * @param int $debounceMs
+     * @return self
+     */
+    public function configurationDialogRerenderOnDialog(array $dialogFieldNames, int $debounceMs = 120): self {
+        $dialogIndex = count($this->customConfigurationDialogs) - 1;
+
+        if ($dialogIndex < 0) {
+            return $this;
+        }
+
+        $runtime = is_array($this->customConfigurationDialogs[$dialogIndex]['runtime'] ?? null)
+            ? $this->customConfigurationDialogs[$dialogIndex]['runtime']
+            : $this->normaliseDialogRuntime([]);
+
+        $runtime['renderMode'] = 'dynamic';
+        $runtime['rerenderOn']['dialog'] = $this->normaliseDialogFieldNameList($dialogFieldNames);
+        $runtime['rerenderOn']['debounceMs'] = max(0, $debounceMs);
+
+        $this->customConfigurationDialogs[$dialogIndex]['runtime'] = $runtime;
+
+        return $this;
+    }
+
+    /**
+     * @param mixed $when
+     * @return array{mode:string,rules:array<int, array<int, mixed>>}
+     */
+    private function normaliseDialogWhen(mixed $when): array {
+        if (is_array($when) && isset($when['rules']) && is_array($when['rules'])) {
+            $mode = (string) ($when['mode'] ?? 'and');
+            $mode = strtolower($mode) === 'or' ? 'or' : 'and';
+
+            $rules = array_values(array_filter($when['rules'], function ($rule) {
+                return is_array($rule) && isset($rule[0], $rule[1], $rule[2]);
+            }));
+
+            return [
+                'mode' => $mode,
+                'rules' => $rules,
+            ];
+        }
+
+        if (is_array($when) && isset($when[0], $when[1], $when[2])) {
+            return [
+                'mode' => 'and',
+                'rules' => [[$when[0], $when[1], $when[2]]],
+            ];
+        }
+
+        return [
+            'mode' => 'and',
+            'rules' => [],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>
+     */
+    private function normaliseDialogRuntime(array $options): array {
+        $renderMode = (string) ($options['renderMode'] ?? 'static');
+        $renderMode = strtolower($renderMode) === 'dynamic' ? 'dynamic' : 'static';
+
+        $rerenderOn = is_array($options['rerenderOn'] ?? null) ? $options['rerenderOn'] : [];
+
+        return [
+            'renderMode' => $renderMode,
+            'rerenderOn' => [
+                'row' => $this->normaliseDialogFieldNameList($rerenderOn['row'] ?? []),
+                'dialog' => $this->normaliseDialogFieldNameList($rerenderOn['dialog'] ?? []),
+                'debounceMs' => max(0, (int) ($rerenderOn['debounceMs'] ?? 120)),
+            ],
+        ];
+    }
+
+    /**
+     * @param mixed $fieldNames
+     * @return array<int, string>
+     */
+    private function normaliseDialogFieldNameList(mixed $fieldNames): array {
+        if (!is_array($fieldNames)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            fn($fieldName) => trim((string) $fieldName),
+            $fieldNames
+        ), fn($fieldName) => $fieldName !== '')));
+    }
+
+    /**
+     * Ensures the hidden configuration field exists and merges any provided defaults.
+     *
+     * @param array<string, mixed> $default
+     * @return void
+     */
+    private function ensureHiddenConfigurationField(array $default = []): void {
+        if ($this->hiddenConfigurationField === null) {
+            $this->hiddenConfigurationField = FieldsRegister::checkout($this->provider)
+                ->makeFrom('hidden', function (Field $field) use ($default) {
+                    $field->name('__configuration')
+                        ->hideInRepeaterTable()
+                        ->attribute('data-repeater-configuration-field', true)
+                        ->attribute('value-as-json', 'true')
+                        ->default(json_encode($default));
+                });
+
+            $this->field($this->hiddenConfigurationField);
+            return;
+        }
+
+        if ($default === []) {
+            return;
+        }
+
+        $existing = $this->hiddenConfigurationField->getDefault();
+        $decoded = is_string($existing) ? json_decode($existing, true) : [];
+        $decoded = is_array($decoded) ? $decoded : [];
+        $merged = array_replace($decoded, $default);
+
+        $this->hiddenConfigurationField->default(json_encode($merged));
+    }
+
     /**
      * Renders the default value control for the repeater field in the field settings panel.
      * Repeaters do not have a default value control, so this method is intentionally left blank.
@@ -327,95 +572,6 @@ class Repeater extends Field {
         $rowToken = $this->resolveRowToken([], 0);
 
         return $this->buildRowFields([], $rowToken, true);
-    }
-
-    // =========================================================================
-    // Configuration Dialogs
-    // =========================================================================
-
-    /**
-     * Defines a custom configuration dialog for repeater rows with an optional rule for when to show the dialog. 
-     * The callback receives a FieldGroup instance to which fields can be added for the dialog. 
-     * 
-     * The rule is an array in the format [fieldName, operator, value] that determines when to 
-     * show the dialog based on the values of the row's fields.
-     *
-     * @param Closure $callback
-     * @param array   $rule
-     *
-     * @return self
-     */
-    public function customConfigurationDialog(Closure $callback, array $rule = [], array $default = []): self {
-        $dialog = FieldGroupsRegister::checkout($this->provider)->make();
-
-        $callback($dialog);
-
-        $this->customConfigurationDialogs[] = [
-            'rule'  => $rule,
-            'html'  => $dialog->html(['class' => 'meros-form-group--no-style']),
-        ];
-
-        $this->ensureHiddenConfigurationField($default);
-
-        return $this;
-    }
-
-    /**
-     * Defines a custom configuration dialog from pre-rendered HTML.
-     *
-     * @param string $html
-     * @param array $rule
-     * @param array $default
-     *
-     * @return self
-     */
-    public function customConfigurationDialogHtml(string $html, array $rule = [], array $default = []): self {
-        if (trim($html) === '') {
-            return $this;
-        }
-
-        $this->customConfigurationDialogs[] = [
-            'rule' => $rule,
-            'html' => $html,
-        ];
-
-        $this->ensureHiddenConfigurationField($default);
-
-        return $this;
-    }
-
-    /**
-     * Ensures the repeater has a hidden JSON field to store row dialog configuration.
-     *
-     * @param array $default
-     * @return void
-     */
-    private function ensureHiddenConfigurationField(array $default = []): void {
-        if ($this->hiddenConfigurationField !== null) {
-            return;
-        }
-
-        $this->hiddenConfigurationField = FieldsRegister::checkout($this->provider)
-            ->makeFrom('hidden', function (Field $field) use ($default) {
-                $field->name('__configuration')
-                    ->hideInRepeaterTable()
-                    ->attribute('data-repeater-configuration-field', true)
-                    ->attribute('value-as-json', 'true')
-                    ->default(json_encode($default));
-            });
-
-        $this->field($this->hiddenConfigurationField);
-    }
-
-    /**
-     * Gets the custom configuration dialogs for repeater rows, including their rules and rendered HTML.
-     *
-     * @return array
-     */
-    private function getCustomConfigurationDialogs(): array {
-        return collect($this->customConfigurationDialogs)
-            ->map(fn($dialog) => $dialog ?? [])
-            ->toArray();
     }
 
     // =========================================================================

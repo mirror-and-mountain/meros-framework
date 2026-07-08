@@ -799,9 +799,8 @@ document.addEventListener('alpine:init', () => {
 
                 if (element && element.getAttribute('data-conditions-field-select') !== null) {
                     const formField = this.formFields[value] ?? null;
-                    
+
                     if (formField && context) {
-                        console.log('found field', formField);
                         this.__getRuleParams('show', context.repeater.row);
                     }
                 }
@@ -816,7 +815,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         getConditions() {
-            console.log({
+            return {
                 show: {
                     'logic': this.showLogicField ? mforms.getFieldValue(this.showLogicField) : null,
                     'rules': this.showField ? mforms.getFieldValue(this.showField) : null
@@ -841,12 +840,11 @@ document.addEventListener('alpine:init', () => {
                     'logic': this.enableLogicField ? mforms.getFieldValue(this.enableLogicField) : null,
                     'rules': this.enableField ? mforms.getFieldValue(this.enableField) : null
                 }
-            });
+            };
         },
 
         __initialiseFields() {
             this.showField     = mforms.getField('field-conditions-editor-show');
-            console.log('showField', this.showField);
             this.hideField     = document.getElementById('field-conditions-editor-hide');
             this.requireField  = document.getElementById('field-conditions-editor-require');
             this.optionalField = document.getElementById('field-conditions-editor-optional');
@@ -863,12 +861,12 @@ document.addEventListener('alpine:init', () => {
 
         __getRuleParams(ruleType, index) {
             const ruleField = this[`${ruleType}Field`];
-            console.log('ruleField', ruleField, index);
 
             if (ruleField) {
-                const rule = ruleField.getRowValue(index);
-                console.log(rule);
+                return ruleField.getRowValue(index);
             }
+
+            return null;
         }
     }));
 
@@ -953,9 +951,4 @@ document.addEventListener('alpine:init', () => {
             }
         }
     }));
-});
-
-
-window.addEventListener('mforms:field-updated', ({ detail }) => {
-    console.log('Field updated:', detail);
 });

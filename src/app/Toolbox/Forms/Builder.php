@@ -19,6 +19,7 @@ use MM\Meros\App\Fields\Repeater;
 
 use MM\Meros\Facades\Fields;
 use MM\Meros\Facades\FieldGroups;
+use MM\Meros\Facades\DynamicChoiceSources as DynamicChoiceSourcesAccessor;
 use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\FormActions;
 
@@ -204,6 +205,7 @@ class Builder extends Component {
             'formDescription' => $this->formSettings['description'] ?? '',
             'formSlug'        => $this->formSettings['slug'] ?? '',
             'formStatus'      => $this->formSettings['status'] ?? '',
+            'dynamicChoiceSources' => $this->getDynamicChoiceSourcesForBuilder(),
         ])
             ->layout('meros::toolbox.layout');
     }
@@ -1913,5 +1915,22 @@ class Builder extends Component {
         }
 
         $this->redirect(route('meros.toolbox.form-builder.edit', ['formID' => $newFormId]));
+    }
+
+    /**
+     * Returns dynamic choice source definitions available to the builder settings panel.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function getDynamicChoiceSourcesForBuilder(): array {
+        $register = DynamicChoiceSourcesAccessor::checkout(Framework::get());
+        $sources = $register->allResolved();
+
+        return $sources
+            ->filter(fn ($source) => method_exists($source, 'isAvailable') ? (bool) $source->isAvailable() : true)
+            ->map(fn ($source) => $source->toBuilderDefinition())
+            ->filter(fn ($source) => is_array($source) && !empty($source['source']))
+            ->values()
+            ->toArray();
     }
 }

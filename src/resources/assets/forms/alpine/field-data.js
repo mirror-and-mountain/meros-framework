@@ -26,7 +26,19 @@ document.addEventListener('alpine:init', () => {
                     }
                 }
 
-                this.element = document.getElementById(this.id);
+                // Prefer resolving inside this Alpine root first so duplicate IDs
+                // (for example row fields + custom dialog fields) bind correctly.
+                if (this.$el instanceof HTMLElement) {
+                    if (this.$el.id === this.id) {
+                        this.element = this.$el;
+                    } else {
+                        this.element = this.$el.querySelector(`[id="${this.id}"]`);
+                    }
+                }
+
+                if (!this.element) {
+                    this.element = document.getElementById(this.id);
+                }
             }
 
             if (this.element) {
@@ -45,15 +57,18 @@ document.addEventListener('alpine:init', () => {
             return this.value;
         },
 
-        setValue(value) {
+        setValue(value, options = {}) {
             if (!this.element) return;
 
             this.previousValue = snapshotValue(this.getValue());
 
-            setFieldValue(this.element, value);
+            setFieldValue(this.element, value, true, options);
 
             this.value = snapshotValue(this.getValue());
-            this.__dispatchUpdate();
+
+            if (!options?.silent) {
+                this.__dispatchUpdate();
+            }
         },
 
         getValidationRule(rule, returnValue = 'value') {    
@@ -308,18 +323,36 @@ document.addEventListener('alpine:init', () => {
                 return this.element.value;
             },
 
-            setValue(value) {
+            setValue(value, options = {}) {
                 if (!this.element) return;
                 this.previousValue = snapshotValue(this.getValue());
 
                 if (this.type === 'checkbox') {
-                    this.element.checked = !!value;
+                    if (Array.isArray(value)) {
+                        this.element.checked = value.length > 0;
+                    } else if (typeof value === 'string') {
+                        const normalised = value.trim().toLowerCase();
+                        this.element.checked = !(
+                            normalised === ''
+                            || normalised === '0'
+                            || normalised === 'false'
+                            || normalised === 'off'
+                            || normalised === 'no'
+                            || normalised === 'null'
+                            || normalised === 'undefined'
+                        );
+                    } else {
+                        this.element.checked = !!value;
+                    }
                 } else {
                     this.element.value = value;
                 }
 
                 this.value = snapshotValue(this.getValue());
-                this.__dispatchUpdate();
+
+                if (!options?.silent) {
+                    this.__dispatchUpdate();
+                }
             },
 
             destroy() {
@@ -407,7 +440,7 @@ document.addEventListener('alpine:init', () => {
                     .map((input) => input.value);
             },
 
-            setValue(value) {
+            setValue(value, options = {}) {
                 if (!this.element) return;
 
                 this.previousValue = snapshotValue(this.getValue());
@@ -437,7 +470,10 @@ document.addEventListener('alpine:init', () => {
                 }
 
                 this.value = snapshotValue(this.getValue());
-                this.__dispatchUpdate();
+
+                if (!options?.silent) {
+                    this.__dispatchUpdate();
+                }
             },
 
             onChange() {
@@ -506,7 +542,13 @@ document.addEventListener('alpine:init', () => {
                 if (!this.element) return null;
 
                 if (this.element.tomselect) {
-                    return this.element.tomselect.getValue();
+                    const value = this.element.tomselect.getValue();
+
+                    if (this.element.hasAttribute('multiple')) {
+                        return this.__normaliseMultiValue(value);
+                    }
+
+                    return value;
                 }
 
                 if (this.element.hasAttribute('multiple')) {
@@ -516,12 +558,54 @@ document.addEventListener('alpine:init', () => {
                 return this.element.value;
             },
 
-            setValue(value) {
-                if (!this.element || !this.element.tomselect) return;
+            __normaliseMultiValue(value) {
+                const values = Array.isArray(value)
+                    ? value
+                    : (typeof value === 'string' && value !== '' ? value.split(',') : []);
 
-                // Use silent=true to suppress onChange so we don't double-dispatch.
-                this.element.tomselect.setValue(value, true);
-                this.__dispatchUpdate();
+                const normalised = values
+                    .map((item) => String(item).trim())
+                    .filter((item) => item !== '');
+
+                return Array.from(new Set(normalised));
+            },
+
+            setValue(value, options = {}) {
+                if (!this.element) return;
+
+                this.previousValue = snapshotValue(this.getValue());
+
+                const isMultiple = this.element.hasAttribute('multiple');
+                const normalisedValue = isMultiple
+                    ? this.__normaliseMultiValue(value)
+                    : (value === null || value === undefined ? '' : String(value));
+
+                // During dialog hydration this can be called before TomSelect is instantiated.
+                // Seed the native select first, then instantiate/apply so hydration is reliable.
+                if (!this.element.tomselect) {
+                    if (isMultiple) {
+                        const selectedValues = Array.isArray(normalisedValue) ? normalisedValue : [];
+
+                        Array.from(this.element.options).forEach((option) => {
+                            option.selected = selectedValues.includes(option.value);
+                        });
+                    } else {
+                        this.element.value = normalisedValue;
+                    }
+
+                    this.__instantiate();
+                }
+
+                if (this.element.tomselect) {
+                    // Use silent=true to suppress onChange so we don't double-dispatch.
+                    this.element.tomselect.setValue(normalisedValue, true);
+                }
+
+                this.value = snapshotValue(this.getValue());
+
+                if (!options?.silent) {
+                    this.__dispatchUpdate();
+                }
             },
 
             destroy() {
@@ -547,16 +631,163 @@ document.addEventListener('alpine:init', () => {
                     return null;
                 }
 
+                let params = {};
+
+                try {
+                    const rawConfig = this.element.dataset.dynamicOptionsConfig || '{}';
+                    const parsed = JSON.parse(rawConfig);
+
+                    if (parsed && Object.prototype.toString.call(parsed) === '[object Object]') {
+                        params = parsed;
+                    }
+                } catch (error) {
+                    params = {};
+                }
+
+                if (params.postType === undefined) {
+                    params.postType = this.element.dataset.dynamicOptionsPostType || 'post';
+                }
+
+                if (params.postStatus === undefined) {
+                    params.postStatus = this.element.dataset.dynamicOptionsPostStatus || 'publish';
+                }
+
+                if (params.taxonomy === undefined) {
+                    params.taxonomy = this.element.dataset.dynamicOptionsTaxonomy || '';
+                }
+
+                if (params.terms === undefined) {
+                    params.terms = this.element.dataset.dynamicOptionsTerms || '';
+                }
+
+                if (params.userRole === undefined) {
+                    params.userRole = this.element.dataset.dynamicOptionsUserRole || '';
+                }
+
+                const limit = parseInt(
+                    (params.limit ?? this.element.dataset.dynamicOptionsLimit ?? '20'),
+                    10
+                ) || 20;
+
+                params = this.__resolveDynamicOptionsParams(params);
+                params.limit = limit;
+
                 return {
                     endpoint: this.element.dataset.dynamicOptionsEndpoint || '',
                     source: this.element.dataset.dynamicOptionsSource || '',
-                    postType: this.element.dataset.dynamicOptionsPostType || 'post',
-                    postStatus: this.element.dataset.dynamicOptionsPostStatus || 'publish',
-                    taxonomy: this.element.dataset.dynamicOptionsTaxonomy || '',
-                    terms: this.element.dataset.dynamicOptionsTerms || '',
-                    userRole: this.element.dataset.dynamicOptionsUserRole || '',
-                    limit: parseInt(this.element.dataset.dynamicOptionsLimit || '20', 10) || 20,
+                    limit,
+                    params,
                 };
+            },
+
+            __resolveDynamicOptionsParams(params) {
+                if (!params || Object.prototype.toString.call(params) !== '[object Object]') {
+                    return params;
+                }
+
+                const context = this.__getDynamicOptionsContext();
+                const resolve = (value) => {
+                    if (Array.isArray(value)) {
+                        return value.map(resolve);
+                    }
+
+                    if (value && Object.prototype.toString.call(value) === '[object Object]') {
+                        const next = {};
+
+                        Object.entries(value).forEach(([key, nestedValue]) => {
+                            next[key] = resolve(nestedValue);
+                        });
+
+                        return next;
+                    }
+
+                    if (typeof value === 'string') {
+                        return value.replace(/\{\{\s*([A-Za-z0-9_\.]+)\s*\}\}/g, (match, path) => {
+                            const resolved = this.__resolveContextPath(context, String(path || ''));
+
+                            if (resolved === null || resolved === undefined) {
+                                return '';
+                            }
+
+                            if (Array.isArray(resolved)) {
+                                return resolved.join(',');
+                            }
+
+                            return String(resolved);
+                        });
+                    }
+
+                    return value;
+                };
+
+                return resolve(params);
+            },
+
+            __getDynamicOptionsContext() {
+                const context = {
+                    row: {},
+                    dialog: {},
+                };
+
+                const dialogBody = this.element
+                    ? this.element.closest('#meros-repeater-config-dialog-custom-body, .meros-repeater-config-dialog__body')
+                    : null;
+
+                if (!dialogBody) {
+                    return context;
+                }
+
+                const inputs = dialogBody.querySelectorAll('[data-field-type]');
+
+                inputs.forEach((input) => {
+                    if (!(input instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const fieldName = (input.dataset.fieldName || input.name || '').trim();
+
+                    if (!fieldName) {
+                        return;
+                    }
+
+                    context.dialog[fieldName] = getFieldValue(input);
+                });
+
+                return context;
+            },
+
+            __resolveContextPath(context, path) {
+                if (!path || !context) {
+                    return null;
+                }
+
+                const segments = path.split('.').filter(Boolean);
+
+                if (segments.length < 2) {
+                    return null;
+                }
+
+                const root = segments.shift();
+
+                if (!root || !(root in context)) {
+                    return null;
+                }
+
+                let current = context[root];
+
+                for (const segment of segments) {
+                    if (!current || Object.prototype.toString.call(current) !== '[object Object]') {
+                        return null;
+                    }
+
+                    if (!(segment in current)) {
+                        return null;
+                    }
+
+                    current = current[segment];
+                }
+
+                return current;
             },
 
             async __requestDynamicOptions(config, { search = '', selected = [] } = {}) {
@@ -566,21 +797,31 @@ document.addEventListener('alpine:init', () => {
 
                 const url = new URL(config.endpoint, window.location.origin);
                 url.searchParams.set('source', config.source);
-                url.searchParams.set('postType', config.postType);
-                url.searchParams.set('postStatus', config.postStatus);
                 url.searchParams.set('limit', String(config.limit));
 
-                if (config.taxonomy) {
-                    url.searchParams.set('taxonomy', config.taxonomy);
-                }
+                const params = config.params && Object.prototype.toString.call(config.params) === '[object Object]'
+                    ? config.params
+                    : {};
 
-                if (config.terms) {
-                    url.searchParams.set('terms', config.terms);
-                }
+                Object.entries(params).forEach(([key, value]) => {
+                    if (key === 'source' || key === 'limit' || key === 'search' || key === 'selected') {
+                        return;
+                    }
 
-                if (config.userRole) {
-                    url.searchParams.set('userRole', config.userRole);
-                }
+                    if (value === null || value === undefined || value === '') {
+                        return;
+                    }
+
+                    if (Array.isArray(value)) {
+                        if (value.length > 0) {
+                            url.searchParams.set(key, value.join(','));
+                        }
+
+                        return;
+                    }
+
+                    url.searchParams.set(key, String(value));
+                });
 
                 if (search !== '') {
                     url.searchParams.set('search', search);
@@ -603,6 +844,7 @@ document.addEventListener('alpine:init', () => {
                 }
 
                 const payload = await response.json();
+
                 return Array.isArray(payload?.options) ? payload.options : [];
             },
 
@@ -637,15 +879,52 @@ document.addEventListener('alpine:init', () => {
                     );
                     this.element.tomselect.refreshOptions(false);
                 } catch (error) {
-                    console.error(error);
+                    // Ignore dynamic option hydration errors.
                 }
             },
 
             __loadDynamicOptions(config, query, callback) {
                 this.__requestDynamicOptions(config, { search: query })
-                    .then((options) => callback(options))
+                    .then((options) => {
+                        if (this.element?.tomselect && typeof this.element.tomselect.clearOptions === 'function') {
+                            const selectedItems = Array.isArray(this.element.tomselect.items)
+                                ? [...this.element.tomselect.items]
+                                : [];
+
+                            const selectedOptions = selectedItems
+                                .map((itemValue) => this.element.tomselect.options[itemValue])
+                                .filter((option) => option && option.value !== undefined)
+                                .map((option) => ({ ...option }));
+
+                            this.element.tomselect.clearOptions();
+
+                            selectedOptions.forEach((option) => {
+                                this.element.tomselect.addOption(option);
+                            });
+
+                            const incoming = Array.isArray(options) ? options : [];
+                            const merged = [...selectedOptions, ...incoming];
+                            const uniqueByValue = [];
+                            const seen = new Set();
+
+                            merged.forEach((option) => {
+                                const value = option && option.value !== undefined ? String(option.value) : '';
+
+                                if (value === '' || seen.has(value)) {
+                                    return;
+                                }
+
+                                seen.add(value);
+                                uniqueByValue.push(option);
+                            });
+
+                            callback(uniqueByValue);
+                            return;
+                        }
+
+                        callback(options);
+                    })
                     .catch((error) => {
-                        console.error(error);
                         callback([]);
                     });
             },
@@ -677,6 +956,7 @@ document.addEventListener('alpine:init', () => {
                         valueField: 'value',
                         labelField: 'text',
                         searchField: ['text'],
+                        score: () => () => 1,
                         preload: true,
                         shouldLoad: () => true,
                         load: (query, callback) => this.__loadDynamicOptions(dynamicOptions, query, callback),
@@ -817,7 +1097,7 @@ document.addEventListener('alpine:init', () => {
                 return this.element ? (this.element.innerHTML || '') : '';
             },
 
-            setValue(value) {
+            setValue(value, options = {}) {
                 this.previousValue = snapshotValue(this.value);
                 const htmlValue = typeof value === 'string' ? value : '';
 
@@ -837,7 +1117,10 @@ document.addEventListener('alpine:init', () => {
 
                 this.__setEditorHtml(this.element.__quill, htmlValue);
                 this.__syncHiddenInput(htmlValue);
-                this.__dispatchUpdate();
+
+                if (!options?.silent) {
+                    this.__dispatchUpdate();
+                }
             },
 
             destroy() {
@@ -1050,6 +1333,9 @@ document.addEventListener('alpine:init', () => {
             rowDialogOpen: false,
             isUsingCustomConfigurationDialog: false,
             customConfigurationDialogHtml: '',
+            activeCustomConfigurationDialog: null,
+            activeCustomDialogs: [],
+            isSwitchingCustomDialog: false,
 
             isOpeningRowDialog: false,
             isUpdatingRowDialog: false,
@@ -1058,6 +1344,7 @@ document.addEventListener('alpine:init', () => {
             activeDialogRowEl: null,
             activeDialogFieldMounts: [],
             bodyScrollLockClass: 'meros-repeater-dialog-open',
+            onFieldUpdated: null,
 
             init() {
                 this.onRefresh = () => {
@@ -1073,11 +1360,22 @@ document.addEventListener('alpine:init', () => {
                 this.__initialise();
 
                 window.addEventListener('mforms:form-canvas-updated', this.onRefresh);
+
+                this.onFieldUpdated = (event) => {
+                    this.__handleRowFieldUpdate(event);
+                    this.__handleDialogFieldUpdate(event);
+                };
+
+                window.addEventListener('mforms:field-updated', this.onFieldUpdated);
             },
 
             destroy() {
                 if (this.onRefresh) {
                     window.removeEventListener('mforms:form-canvas-updated', this.onRefresh);
+                }
+
+                if (this.onFieldUpdated) {
+                    window.removeEventListener('mforms:field-updated', this.onFieldUpdated);
                 }
 
                 this.__finalizeRowDialogClose();
@@ -1192,94 +1490,45 @@ document.addEventListener('alpine:init', () => {
                 }
 
                 const rowIndex = Number.parseInt(row.dataset.repeaterRowIndex || '-1', 10);
-                const rowData = this.getRowValue(rowIndex) || {};
+                const rowData = this.__readRowData(row, rowIndex) || {};
+                this.activeCustomDialogs = Array.isArray(customDialogs) ? customDialogs : [];
 
-                if (Array.isArray(customDialogs) && customDialogs.length > 0) {
-                    for (const entry of customDialogs) {
-                        const { rule, html } = entry || {};
+                const currentConfig = this.__readRowConfiguration(row);
 
-                        if (!Array.isArray(rule) || rule.length < 3 || typeof html !== 'string' || html.trim() === '') {
-                            continue;
-                        }
+                const matchedDialog = this.__resolveMatchingCustomDialog(this.activeCustomDialogs, rowData, currentConfig, false);
 
-                        const [field, operator, value] = rule;
-                        const fieldValue = rowData[field];
-                        let isMatch = false;
+                if (matchedDialog) {
+                    this.isUsingCustomConfigurationDialog = true;
+                    this.customConfigurationDialogHtml = matchedDialog.html;
+                    this.activeCustomConfigurationDialog = matchedDialog;
+                    this.isOpeningRowDialog = true;
+                    this.pendingDialogRowIndex = rowIndex;
 
-                        switch (operator) {
-                            case '=':
-                                isMatch = fieldValue == value;
-                                break;
-                            case '!=':
-                                isMatch = fieldValue != value;
-                                break;
-                            case '>':
-                                isMatch = fieldValue > value;
-                                break;
-                            case '<':
-                                isMatch = fieldValue < value;
-                                break;
-                            case '>=':
-                                isMatch = fieldValue >= value;
-                                break;
-                            case '<=':
-                                isMatch = fieldValue <= value;
-                                break;
-                        }
+                    window.setTimeout(() => {
+                        this.activeDialogRowEl = row;
+                        this.activeDialogRowIndex = rowIndex;
+                        this.rowDialogOpen = true;
+                        this.isOpeningRowDialog = false;
+                        this.pendingDialogRowIndex = null;
+                        document.body.classList.add(this.bodyScrollLockClass);
 
-                        if (!isMatch) {
-                            continue;
-                        }
+                        this.$nextTick(() => {
+                            const dialogBody = document.getElementById('meros-repeater-config-dialog-custom-body');
 
-                        let currentConfig = null;
-                        const configurationField = row.querySelector('.meros-repeater-data-cell[data-field-name="__configuration"] [data-field-type="hidden"]');
+                            if (dialogBody && window.Alpine && typeof window.Alpine.initTree === 'function') {
+                                window.Alpine.initTree(dialogBody);
+                            }
 
-                        if (configurationField) {
-                            currentConfig = configurationField.value ? JSON.parse(configurationField.value) : {};
-                        }
+                            this.__applyCustomDialogHydration(dialogBody, row, rowIndex, currentConfig);
+                        });
+                    }, this.openDelayMs);
 
-                        this.isUsingCustomConfigurationDialog = true;
-                        this.customConfigurationDialogHtml = html;
-                        this.isOpeningRowDialog = true;
-                        this.pendingDialogRowIndex = rowIndex;
-
-                        window.setTimeout(() => {
-                            this.activeDialogRowEl = row;
-                            this.activeDialogRowIndex = rowIndex;
-                            this.rowDialogOpen = true;
-                            this.isOpeningRowDialog = false;
-                            this.pendingDialogRowIndex = null;
-                            document.body.classList.add(this.bodyScrollLockClass);
-
-                            this.$nextTick(() => {
-                                const dialogBody = document.getElementById('meros-repeater-config-dialog-custom-body');
-
-                                if (dialogBody && window.Alpine && typeof window.Alpine.initTree === 'function') {
-                                    window.Alpine.initTree(dialogBody);
-                                }
-
-                                if (!currentConfig) return;
-
-                                const fields = dialogBody ? dialogBody.querySelectorAll('[data-field-type]') : [];
-
-                                fields.forEach((field) => {
-                                    const name = field.dataset.fieldName;
-
-                                    if (!name) return;
-                                    if (!currentConfig[name]) return;
-
-                                    setFieldValue(field, currentConfig[name]);
-                                });
-
-                            });
-                        }, this.openDelayMs);
-
-                        return;
-                    }
+                    return;
                 }
 
                 this.isUsingCustomConfigurationDialog = false;
                 this.customConfigurationDialogHtml = '';
+                this.activeCustomConfigurationDialog = null;
 
                 this.isOpeningRowDialog = true;
                 this.pendingDialogRowIndex = rowIndex;
@@ -1294,6 +1543,961 @@ document.addEventListener('alpine:init', () => {
                     document.body.classList.add(this.bodyScrollLockClass);
                 }, this.openDelayMs);
             },
+
+            __readRowConfiguration(row) {
+                if (!row) {
+                    return {};
+                }
+
+                const configurationField = row.querySelector('.meros-repeater-data-cell[data-field-name="__configuration"] [data-field-type="hidden"]');
+
+                if (!configurationField) {
+                    return {};
+                }
+
+                try {
+                    const raw = configurationField.value || '{}';
+                    const parsed = JSON.parse(raw);
+                    const safeParsed = parsed && Object.prototype.toString.call(parsed) === '[object Object]'
+                        ? { ...parsed }
+                        : {};
+
+                    if (Object.prototype.hasOwnProperty.call(safeParsed, '__configuration')) {
+                        delete safeParsed.__configuration;
+                    }
+
+                    return safeParsed;
+                } catch (e) {
+                    return {};
+                }
+            },
+
+            __writeRowConfiguration(row, configuration = {}) {
+                if (!row) {
+                    return;
+                }
+
+                const configurationField = row.querySelector('.meros-repeater-data-cell[data-field-name="__configuration"] [data-field-type="hidden"]');
+
+                if (!configurationField) {
+                    return;
+                }
+
+                const safeConfiguration = configuration && Object.prototype.toString.call(configuration) === '[object Object]'
+                    ? configuration
+                    : {};
+                const cleanedConfiguration = { ...safeConfiguration };
+
+                if (Object.prototype.hasOwnProperty.call(cleanedConfiguration, '__configuration')) {
+                    delete cleanedConfiguration.__configuration;
+                }
+
+                const configurationJson = JSON.stringify(cleanedConfiguration);
+                const component = getFieldComponent(configurationField);
+
+                // Silent write: avoid emitting a secondary mforms:field-updated event
+                // from the hidden __configuration field on every dialog change.
+                configurationField.value = configurationJson;
+
+                // Keep component snapshots in sync when present.
+                if (component && Object.prototype.toString.call(component) === '[object Object]') {
+                    if ('previousValue' in component) {
+                        component.previousValue = snapshotValue(configurationJson);
+                    }
+
+                    if ('value' in component) {
+                        component.value = snapshotValue(configurationJson);
+                    }
+                }
+            },
+
+            __syncConfigurationFieldValue(row, fieldName, value) {
+                if (!row || !fieldName || fieldName === '__configuration') {
+                    return;
+                }
+
+                let nextValue = value;
+                const resolvedFieldName = this.__resolveRowFieldName(row, fieldName);
+
+                if (resolvedFieldName) {
+                    const rowCell = row.querySelector(`.meros-repeater-data-cell[data-field-name="${resolvedFieldName}"]`);
+                    const rowInput = rowCell
+                        ? rowCell.querySelector([
+                            'input[type="checkbox"][name]',
+                            'input[type="radio"][name]',
+                            'select[name]',
+                            'textarea[name]',
+                            'input[name]:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])',
+                        ].join(', ')) || this.__resolveDialogControlElement(rowCell.querySelector('[data-field-type]'))
+                        : null;
+
+                    if (rowInput) {
+                        nextValue = this.__readControlValue(rowInput);
+                    }
+                }
+
+                const currentConfig = this.__readRowConfiguration(row);
+                const targetFieldName = resolvedFieldName || fieldName;
+                currentConfig[targetFieldName] = nextValue;
+                this.__writeRowConfiguration(row, currentConfig);
+            },
+
+            __resolveMatchingCustomDialog(customDialogs, rowData, dialogData = {}, preferDialog = false) {
+                if (!Array.isArray(customDialogs) || customDialogs.length === 0) {
+                    return null;
+                }
+
+                const safeRowData = rowData && Object.prototype.toString.call(rowData) === '[object Object]'
+                    ? rowData
+                    : {};
+                const safeDialogData = dialogData && Object.prototype.toString.call(dialogData) === '[object Object]'
+                    ? dialogData
+                    : {};
+                const context = preferDialog
+                    ? { ...safeRowData, ...safeDialogData }
+                    : { ...safeDialogData, ...safeRowData };
+
+                for (const entry of customDialogs) {
+                    const html = typeof entry?.html === 'string' ? entry.html : '';
+
+                    if (html.trim() === '') {
+                        continue;
+                    }
+
+                    const when = entry?.when ?? entry?.rule ?? null;
+
+                    if (this.__matchesDialogWhen(context, when)) {
+                        return entry;
+                    }
+                }
+
+                return null;
+            },
+
+            __matchesDialogWhen(context, when) {
+                if (Array.isArray(when)) {
+                    if (when.length < 3) {
+                        return true;
+                    }
+
+                    return this.__matchesSingleDialogRule(context, when);
+                }
+
+                if (!when || Object.prototype.toString.call(when) !== '[object Object]') {
+                    return true;
+                }
+
+                const mode = String(when.mode || 'and').toLowerCase() === 'or' ? 'or' : 'and';
+                const rules = Array.isArray(when.rules) ? when.rules : [];
+
+                if (rules.length === 0) {
+                    return true;
+                }
+
+                if (mode === 'or') {
+                    return rules.some((rule) => this.__matchesSingleDialogRule(context, rule));
+                }
+
+                return rules.every((rule) => this.__matchesSingleDialogRule(context, rule));
+            },
+
+            __matchesSingleDialogRule(context, rule) {
+                if (!Array.isArray(rule) || rule.length < 3) {
+                    return false;
+                }
+
+                const [field, operator, value] = rule;
+                const fieldValue = context ? context[field] : null;
+
+                switch (operator) {
+                    case '=':
+                        return fieldValue == value;
+                    case '!=':
+                        return fieldValue != value;
+                    case '>':
+                        return fieldValue > value;
+                    case '<':
+                        return fieldValue < value;
+                    case '>=':
+                        return fieldValue >= value;
+                    case '<=':
+                        return fieldValue <= value;
+                    case 'contains': {
+                        const haystack = Array.isArray(fieldValue) ? fieldValue.map((item) => String(item)) : String(fieldValue ?? '');
+
+                        if (Array.isArray(haystack)) {
+                            return haystack.includes(String(value));
+                        }
+
+                        return haystack.includes(String(value));
+                    }
+                    default:
+                        return false;
+                }
+            },
+
+            __resolveFieldName(element) {
+                if (!element || !(element instanceof HTMLElement)) {
+                    return '';
+                }
+
+                const resolveFromElement = (candidate) => {
+                    if (!candidate || !(candidate instanceof HTMLElement)) {
+                        return '';
+                    }
+
+                    const baseFieldName = (candidate.dataset?.baseFieldName || '').trim();
+
+                    if (baseFieldName !== '') {
+                        return baseFieldName;
+                    }
+
+                    const datasetFieldName = (candidate.dataset?.fieldName || '').trim();
+
+                    if (datasetFieldName !== '') {
+                        return datasetFieldName;
+                    }
+
+                    const elementName = typeof candidate.name === 'string' ? candidate.name.trim() : '';
+
+                    if (elementName === '') {
+                        return '';
+                    }
+
+                    const match = elementName.match(/\[([^\[\]]+)\](?:\[\])?$/);
+                    if (match && match[1]) {
+                        return match[1];
+                    }
+
+                    return elementName;
+                };
+
+                const ownName = resolveFromElement(element);
+
+                if (ownName !== '') {
+                    return ownName;
+                }
+
+                const component = getFieldComponent(element);
+                const componentElement = component && component.element instanceof HTMLElement
+                    ? component.element
+                    : null;
+                const componentName = resolveFromElement(componentElement);
+
+                if (componentName !== '') {
+                    return componentName;
+                }
+
+                const descendant = element.querySelector('[data-base-field-name], [data-field-name], [name]');
+                const descendantName = resolveFromElement(descendant);
+
+                if (descendantName !== '') {
+                    return descendantName;
+                }
+
+                return '';
+            },
+
+            __resolveFieldNameFromInputName(inputName) {
+                const name = typeof inputName === 'string' ? inputName.trim() : '';
+
+                if (name === '') {
+                    return '';
+                }
+
+                const match = name.match(/\[([^\[\]]+)\](?:\[\])?$/);
+
+                if (match && match[1]) {
+                    return match[1];
+                }
+
+                return name;
+            },
+
+            __isMeaningfulDialogValue(value) {
+                return (
+                    value !== null
+                    && value !== undefined
+                    && !(typeof value === 'string' && value.trim() === '')
+                );
+            },
+
+            __resolveDialogControlElement(element) {
+                if (!element || !(element instanceof HTMLElement)) {
+                    return null;
+                }
+
+                if (element.matches('select, textarea, input:not([type="hidden"])')) {
+                    return element;
+                }
+
+                if (element.hasAttribute('data-field-type')) {
+                    const descendant = element.querySelector('select[name], textarea[name], input[name]:not([type="hidden"])');
+
+                    if (descendant) {
+                        return descendant;
+                    }
+
+                    return element;
+                }
+
+                return element.querySelector('[data-field-type], select, textarea, input:not([type="hidden"])');
+            },
+
+            __getDialogControls(dialogBody) {
+                if (!dialogBody) {
+                    return [];
+                }
+
+                const controls = Array.from(dialogBody.querySelectorAll([
+                    '[data-field-type]',
+                    'select[name]',
+                    'textarea[name]',
+                    'input[type="checkbox"][name]',
+                    'input[type="radio"][name]',
+                    'input[name]:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])',
+                ].join(', '))).filter((el) => el instanceof HTMLElement);
+
+                const resolvedControls = controls
+                    .map((el) => this.__resolveDialogControlElement(el))
+                    .filter((el) => el instanceof HTMLElement && el.matches('select, textarea, input:not([type="hidden"]), [data-field-type]'));
+
+                return Array.from(new Set(resolvedControls));
+            },
+
+            __setControlValueSilently(control, value) {
+                if (!control || !(control instanceof HTMLElement)) {
+                    return;
+                }
+
+                if (control.tagName === 'SELECT') {
+                    control.value = value === null || value === undefined ? '' : String(value);
+                    return;
+                }
+
+                if (control.tagName === 'INPUT') {
+                    if (control.type === 'checkbox') {
+                        control.checked = this.__coerceCheckboxValue(value);
+                        return;
+                    }
+
+                    if (control.type === 'radio') {
+                        const radioValue = value === null || value === undefined ? '' : String(value);
+                        const root = control.closest('[x-data]') || control.parentElement || document;
+                        const radios = root.querySelectorAll(`input[type="radio"][name="${control.name}"]`);
+
+                        radios.forEach((radio) => {
+                            radio.checked = radio.value === radioValue;
+                        });
+
+                        return;
+                    }
+
+                    control.value = value === null || value === undefined ? '' : value;
+                    return;
+                }
+
+                setFieldValue(control, value, true, { silent: true });
+            },
+
+            __readControlValue(control) {
+                if (!control || !(control instanceof HTMLElement)) {
+                    return null;
+                }
+
+                if (control.tagName === 'SELECT') {
+                    if (control.multiple) {
+                        return Array.from(control.selectedOptions).map((option) => option.value);
+                    }
+
+                    return control.value;
+                }
+
+                if (control.tagName === 'TEXTAREA') {
+                    return control.value;
+                }
+
+                if (control.tagName === 'INPUT') {
+                    if (control.type === 'checkbox') {
+                        return control.checked;
+                    }
+
+                    if (control.type === 'radio') {
+                        const root = control.closest('.meros-repeater-data-cell, #meros-repeater-config-dialog-custom-body, .meros-repeater-config-dialog') || document;
+                        const checkedRadio = root.querySelector(`input[type="radio"][name="${control.name}"]:checked`)
+                            || document.querySelector(`input[type="radio"][name="${control.name}"]:checked`);
+                        return checkedRadio ? checkedRadio.value : null;
+                    }
+
+                    return control.value;
+                }
+
+                if (control.hasAttribute('data-field-type')) {
+                    const descendant = this.__resolveDialogControlElement(control);
+
+                    if (descendant && descendant !== control) {
+                        return this.__readControlValue(descendant);
+                    }
+                }
+
+                return control.value ?? null;
+            },
+
+            __coerceCheckboxValue(value) {
+                if (typeof value === 'boolean') {
+                    return value;
+                }
+
+                if (typeof value === 'number') {
+                    return value !== 0;
+                }
+
+                if (typeof value === 'string') {
+                    const normalised = value.trim().toLowerCase();
+
+                    if (
+                        normalised === ''
+                        || normalised === '0'
+                        || normalised === 'false'
+                        || normalised === 'off'
+                        || normalised === 'no'
+                        || normalised === 'null'
+                        || normalised === 'undefined'
+                    ) {
+                        return false;
+                    }
+
+                    return true;
+                }
+
+                return !!value;
+            },
+
+            __readRowFieldValue(row, rowIndex, fieldName, sourceElement = null) {
+                if (!row || !fieldName) {
+                    return {
+                        found: false,
+                        value: undefined,
+                    };
+                }
+
+                const resolvedFieldName = this.__resolveRowFieldName(row, fieldName, sourceElement);
+
+                if (!resolvedFieldName) {
+                    return {
+                        found: false,
+                        value: undefined,
+                    };
+                }
+
+                const cell = row.querySelector(`.meros-repeater-data-cell[data-field-name="${resolvedFieldName}"]`);
+
+                if (!cell) {
+                    return {
+                        found: false,
+                        value: undefined,
+                    };
+                }
+
+                return {
+                    found: true,
+                    value: this.__readCellData(row, cell, rowIndex, resolvedFieldName),
+                };
+            },
+
+            __normaliseFieldKey(value) {
+                return String(value || '')
+                    .trim()
+                    .toLowerCase()
+                    .replace(/\[\]/g, '')
+                    .replace(/[^a-z0-9]/g, '');
+            },
+
+            __extractFieldNameCandidates(fieldName, sourceElement = null) {
+                const candidates = new Set();
+                const add = (value) => {
+                    const next = String(value || '').trim();
+
+                    if (next !== '') {
+                        candidates.add(next);
+                    }
+                };
+
+                add(fieldName);
+
+                if (sourceElement && sourceElement instanceof HTMLElement) {
+                    add(sourceElement.dataset?.baseFieldName);
+                    add(sourceElement.dataset?.fieldName);
+                    add(sourceElement.getAttribute('name'));
+                    add(sourceElement.id);
+                }
+
+                Array.from(candidates).forEach((candidate) => {
+                    add(candidate.replace(/\[\]$/, ''));
+
+                    const bracketMatches = candidate.match(/\[([^\[\]]+)\](?:\[\])?$/);
+                    if (bracketMatches && bracketMatches[1]) {
+                        add(bracketMatches[1]);
+                    }
+
+                    const dotParts = candidate.split('.').filter(Boolean);
+                    if (dotParts.length > 1) {
+                        add(dotParts[dotParts.length - 1]);
+                    }
+
+                    const underscoreParts = candidate.split('_').filter(Boolean);
+                    if (underscoreParts.length > 1) {
+                        add(underscoreParts[underscoreParts.length - 1]);
+                    }
+                });
+
+                return Array.from(candidates);
+            },
+
+            __resolveRowFieldName(row, fieldName, sourceElement = null) {
+                if (!row) {
+                    return '';
+                }
+
+                const rowFieldNames = Array.from(
+                    row.querySelectorAll('.meros-repeater-data-cell[data-field-name]')
+                )
+                    .map((cell) => String(cell.dataset.fieldName || '').trim())
+                    .filter((name) => name !== '');
+
+                if (rowFieldNames.length === 0) {
+                    return '';
+                }
+
+                const candidates = this.__extractFieldNameCandidates(fieldName, sourceElement);
+
+                for (const candidate of candidates) {
+                    if (rowFieldNames.includes(candidate)) {
+                        return candidate;
+                    }
+                }
+
+                const normalisedMap = rowFieldNames.reduce((map, name) => {
+                    const key = this.__normaliseFieldKey(name);
+
+                    if (!map[key]) {
+                        map[key] = [];
+                    }
+
+                    map[key].push(name);
+                    return map;
+                }, {});
+
+                for (const candidate of candidates) {
+                    const normalisedCandidate = this.__normaliseFieldKey(candidate);
+                    const matches = normalisedMap[normalisedCandidate] || [];
+
+                    if (matches.length === 1) {
+                        return matches[0];
+                    }
+                }
+
+                return '';
+            },
+
+            __applyCustomDialogHydration(dialogBody, row, rowIndex, config = {}, preferred = {}) {
+                const safeConfig = config && Object.prototype.toString.call(config) === '[object Object]'
+                    ? config
+                    : {};
+                const safePreferred = preferred && Object.prototype.toString.call(preferred) === '[object Object]'
+                    ? preferred
+                    : {};
+                const nextConfig = { ...safeConfig };
+
+                const fields = this.__getDialogControls(dialogBody);
+
+                fields.forEach((field) => {
+                    const control = this.__resolveDialogControlElement(field);
+                    const name = this.__resolveFieldName(control || field);
+
+                    if (!name) {
+                        return;
+                    }
+
+                    if (Object.prototype.hasOwnProperty.call(safePreferred, name)) {
+                        const value = safePreferred[name];
+                        this.__setControlValueSilently(control || field, value);
+                        nextConfig[name] = value;
+                        return;
+                    }
+
+                    if (Object.prototype.hasOwnProperty.call(nextConfig, name)) {
+                        this.__setControlValueSilently(control || field, nextConfig[name]);
+                        return;
+                    }
+
+                    const rowValueResult = this.__readRowFieldValue(row, rowIndex, name, control || field);
+
+                    if (rowValueResult.found && this.__isMeaningfulDialogValue(rowValueResult.value)) {
+                        this.__setControlValueSilently(control || field, rowValueResult.value);
+                        nextConfig[name] = rowValueResult.value;
+                        return;
+                    }
+
+                    if (Object.prototype.hasOwnProperty.call(safeConfig, name)) {
+                        this.__setControlValueSilently(control || field, safeConfig[name]);
+                    }
+                });
+
+                this.__writeRowConfiguration(row, nextConfig);
+            },
+
+            __writeRowFieldValue(row, rowIndex, fieldName, value, sourceElement = null) {
+                if (!row || !fieldName || fieldName === '__configuration') {
+                    return;
+                }
+
+                const resolvedFieldName = this.__resolveRowFieldName(row, fieldName, sourceElement);
+
+                if (!resolvedFieldName) {
+                    return;
+                }
+
+                const cell = row.querySelector(`.meros-repeater-data-cell[data-field-name="${resolvedFieldName}"]`);
+
+                if (!cell) {
+                    return;
+                }
+
+                const input = cell.querySelector('[data-field-type]');
+
+                if (!input) {
+                    return;
+                }
+
+                // Keep row data in sync with dialog edits without emitting another
+                // field-updated event that can re-enter dialog switching logic.
+                if (input.tagName === 'SELECT') {
+                    input.value = value === null || value === undefined ? '' : String(value);
+                    return;
+                }
+
+                if (input.tagName === 'INPUT') {
+                    if (input.type === 'checkbox') {
+                        input.checked = this.__coerceCheckboxValue(value);
+                        return;
+                    }
+
+                    if (input.type === 'radio') {
+                        const radioValue = value === null || value === undefined ? '' : String(value);
+                        const radios = cell.querySelectorAll('input[type="radio"]');
+
+                        radios.forEach((radio) => {
+                            radio.checked = radio.value === radioValue;
+                        });
+
+                        return;
+                    }
+
+                    input.value = value === null || value === undefined ? '' : value;
+                    return;
+                }
+
+                // Fallback for complex controls that need component-aware assignment.
+                setFieldValue(input, value, true, { silent: true });
+            },
+
+            __normaliseDialogRuntime(dialogEntry) {
+                const runtime = dialogEntry && Object.prototype.toString.call(dialogEntry.runtime) === '[object Object]'
+                    ? dialogEntry.runtime
+                    : {};
+
+                const renderMode = String(runtime.renderMode || 'static').toLowerCase() === 'dynamic'
+                    ? 'dynamic'
+                    : 'static';
+
+                const rerenderOn = runtime && Object.prototype.toString.call(runtime.rerenderOn) === '[object Object]'
+                    ? runtime.rerenderOn
+                    : {};
+
+                const normaliseNames = (value) => {
+                    if (!Array.isArray(value)) {
+                        return [];
+                    }
+
+                    return Array.from(new Set(value
+                        .map((name) => String(name).trim())
+                        .filter((name) => name !== '')));
+                };
+
+                return {
+                    renderMode,
+                    rerenderOn: {
+                        row: normaliseNames(rerenderOn.row),
+                        dialog: normaliseNames(rerenderOn.dialog),
+                        debounceMs: Math.max(0, Number.parseInt(String(rerenderOn.debounceMs ?? 120), 10) || 120),
+                    },
+                };
+            },
+
+            __collectCustomDialogValues() {
+                const dialogBody = document.getElementById('meros-repeater-config-dialog-custom-body');
+
+                if (!dialogBody) {
+                    return {};
+                }
+
+                const values = {};
+                const inputs = this.__getDialogControls(dialogBody);
+
+                inputs.forEach((input) => {
+                    const control = this.__resolveDialogControlElement(input);
+                    const fieldName = this.__resolveFieldName(control || input);
+
+                    if (!fieldName) {
+                        return;
+                    }
+
+                    values[fieldName] = this.__readControlValue(control || input);
+                });
+
+                return values;
+            },
+
+            __applyPreferredDialogValues(preferredValues = {}) {
+                const dialogBody = document.getElementById('meros-repeater-config-dialog-custom-body');
+
+                if (!dialogBody) {
+                    return;
+                }
+
+                const safePreferred = preferredValues && Object.prototype.toString.call(preferredValues) === '[object Object]'
+                    ? preferredValues
+                    : {};
+                const controls = this.__getDialogControls(dialogBody);
+
+                controls.forEach((controlEl) => {
+                    const control = this.__resolveDialogControlElement(controlEl);
+                    const fieldName = this.__resolveFieldName(control || controlEl);
+
+                    if (!fieldName || !Object.prototype.hasOwnProperty.call(safePreferred, fieldName)) {
+                        return;
+                    }
+
+                    this.__setControlValueSilently(control || controlEl, safePreferred[fieldName]);
+                });
+            },
+
+            __switchActiveDialogIfNeeded(preferredValues = {}) {
+                if (!this.rowDialogOpen || !this.activeDialogRowEl || this.activeDialogRowIndex === null || this.activeDialogRowIndex === undefined) {
+                    return;
+                }
+
+                const safePreferred = preferredValues && Object.prototype.toString.call(preferredValues) === '[object Object]'
+                    ? preferredValues
+                    : {};
+                const rowData = this.__readRowData(this.activeDialogRowEl, this.activeDialogRowIndex) || {};
+                const nextDialog = this.__resolveMatchingCustomDialog(this.activeCustomDialogs, rowData, safePreferred, true);
+
+                if (!nextDialog) {
+                    if (!this.isUsingCustomConfigurationDialog) {
+                        return;
+                    }
+
+                    this.isSwitchingCustomDialog = true;
+                    this.__saveCustomConfigurationDialogValues();
+                    this.isUsingCustomConfigurationDialog = false;
+                    this.customConfigurationDialogHtml = '';
+                    this.activeCustomConfigurationDialog = null;
+
+                    this.$nextTick(() => {
+                        this.__mountRowDialogFields();
+                        this.isSwitchingCustomDialog = false;
+                    });
+
+                    return;
+                }
+
+                const nextHtml = typeof nextDialog.html === 'string' ? nextDialog.html : '';
+
+                if (nextHtml.trim() === '') {
+                    return;
+                }
+
+                const isAlreadySameCustomDialog = this.isUsingCustomConfigurationDialog
+                    && this.activeCustomConfigurationDialog === nextDialog
+                    && this.customConfigurationDialogHtml === nextHtml;
+
+                if (isAlreadySameCustomDialog) {
+                    return;
+                }
+
+                this.isSwitchingCustomDialog = true;
+
+                if (!this.isUsingCustomConfigurationDialog) {
+                    this.__restoreRowDialogFields();
+                    this.isUsingCustomConfigurationDialog = true;
+                }
+
+                this.customConfigurationDialogHtml = nextHtml;
+                this.activeCustomConfigurationDialog = nextDialog;
+
+                this.$nextTick(() => {
+                    const dialogBody = document.getElementById('meros-repeater-config-dialog-custom-body');
+
+                    if (dialogBody && window.Alpine && typeof window.Alpine.initTree === 'function') {
+                        window.Alpine.initTree(dialogBody);
+                    }
+
+                    this.__applyCustomDialogHydration(
+                        dialogBody,
+                        this.activeDialogRowEl,
+                        this.activeDialogRowIndex,
+                        this.__readRowConfiguration(this.activeDialogRowEl),
+                        safePreferred
+                    );
+
+                    this.isSwitchingCustomDialog = false;
+                });
+            },
+
+            __handleRowFieldUpdate(event) {
+                const updatedElement = event?.detail?.element;
+
+                if (!updatedElement || !(updatedElement instanceof HTMLElement)) {
+                    return;
+                }
+
+                const rowEl = updatedElement.closest('tr.meros-repeater-row');
+
+                if (!rowEl || !this.element || !this.element.contains(rowEl)) {
+                    return;
+                }
+
+                const detailName = typeof event?.detail?.name === 'string'
+                    ? event.detail.name
+                    : '';
+                const updatedFieldName = this.__resolveFieldNameFromInputName(detailName)
+                    || this.__resolveFieldName(updatedElement);
+
+                if (!updatedFieldName || updatedFieldName === '__configuration') {
+                    return;
+                }
+
+                const detailValue = event?.detail?.value;
+                const updatedValue = detailValue !== undefined
+                    ? detailValue
+                    : this.__readControlValue(updatedElement);
+
+                this.__syncConfigurationFieldValue(rowEl, updatedFieldName, updatedValue);
+            },
+
+            __handleDialogFieldUpdate(event) {
+                if (
+                    !this.rowDialogOpen
+                    || !this.activeDialogRowEl
+                    || this.isOpeningRowDialog
+                    || this.isUpdatingRowDialog
+                    || this.isSwitchingCustomDialog
+                ) {
+                    return;
+                }
+
+                const updatedElement = event?.detail?.element;
+
+                if (!updatedElement || !(updatedElement instanceof HTMLElement)) {
+                    return;
+                }
+
+                const rowEl = updatedElement.closest('tr.meros-repeater-row');
+                const isRowField = rowEl && rowEl === this.activeDialogRowEl;
+                const dialogBody = document.getElementById('meros-repeater-config-dialog-custom-body');
+                const isDialogField = dialogBody ? dialogBody.contains(updatedElement) : false;
+                const defaultDialogBody = this.$refs?.rowConfigDialogBody || null;
+                const isDefaultDialogField = defaultDialogBody ? defaultDialogBody.contains(updatedElement) : false;
+
+                if (!isRowField && !isDialogField && !isDefaultDialogField) {
+                    return;
+                }
+
+                const detailName = typeof event?.detail?.name === 'string'
+                    ? event.detail.name
+                    : '';
+                const updatedFieldName = this.__resolveFieldNameFromInputName(detailName)
+                    || this.__resolveFieldName(updatedElement);
+
+                if (updatedFieldName === '') {
+                    return;
+                }
+
+                // Internal hidden state payload updates should never trigger dynamic rerenders.
+                if (updatedFieldName === '__configuration') {
+                    return;
+                }
+
+                let shouldRerenderFromRow = false;
+                let shouldRerenderFromDialog = false;
+                const detailValue = event?.detail?.value;
+                const updatedValue = detailValue !== undefined
+                    ? detailValue
+                    : this.__readControlValue(updatedElement);
+
+                if (this.isUsingCustomConfigurationDialog) {
+                    const runtime = this.__normaliseDialogRuntime(this.activeCustomConfigurationDialog);
+
+                    if (runtime.renderMode === 'dynamic') {
+                        shouldRerenderFromRow = isRowField && runtime.rerenderOn.row.includes(updatedFieldName);
+                        shouldRerenderFromDialog = isDialogField && runtime.rerenderOn.dialog.includes(updatedFieldName);
+                    }
+                } else {
+                    const dynamicDialogs = Array.isArray(this.activeCustomDialogs)
+                        ? this.activeCustomDialogs.filter((entry) => this.__normaliseDialogRuntime(entry).renderMode === 'dynamic')
+                        : [];
+
+                    shouldRerenderFromRow = isRowField && dynamicDialogs.some((entry) => {
+                        const runtime = this.__normaliseDialogRuntime(entry);
+                        return runtime.rerenderOn.row.includes(updatedFieldName);
+                    });
+
+                    shouldRerenderFromDialog = (isDialogField || isDefaultDialogField) && dynamicDialogs.some((entry) => {
+                        const runtime = this.__normaliseDialogRuntime(entry);
+                        return runtime.rerenderOn.dialog.includes(updatedFieldName);
+                    });
+                }
+
+                if (!shouldRerenderFromRow && !shouldRerenderFromDialog) {
+                    if (isDialogField || isDefaultDialogField || isRowField) {
+                        this.__syncConfigurationFieldValue(this.activeDialogRowEl, updatedFieldName, updatedValue);
+                    }
+
+                    if (isDialogField) {
+                        const preferredValues = this.__collectCustomDialogValues();
+                        preferredValues[updatedFieldName] = updatedValue;
+
+                        window.requestAnimationFrame(() => {
+                            this.__applyPreferredDialogValues(preferredValues);
+                        });
+                    }
+
+                    return;
+                }
+
+                if (isDialogField) {
+                    this.__writeRowFieldValue(this.activeDialogRowEl, this.activeDialogRowIndex, updatedFieldName, updatedValue, updatedElement);
+                }
+
+                if (isDialogField || isDefaultDialogField || isRowField) {
+                    this.__syncConfigurationFieldValue(this.activeDialogRowEl, updatedFieldName, updatedValue);
+                }
+
+                const preferredValues = this.isUsingCustomConfigurationDialog
+                    ? this.__collectCustomDialogValues()
+                    : {};
+
+                if (isDialogField || isDefaultDialogField) {
+                    // Preserve the most recent changed value even if the collector
+                    // still sees stale DOM during the same change tick.
+                    preferredValues[updatedFieldName] = updatedValue;
+                }
+
+                this.__switchActiveDialogIfNeeded(preferredValues);
+            },
+
 
             closeRowDialog() {
                 this.updateRowDialog();
@@ -1488,7 +2692,7 @@ document.addEventListener('alpine:init', () => {
                 const input = cell.querySelector('[data-field-type]');
 
                 if (!input) return null;
-                const component = getFieldComponent(input.id);
+                const component = getFieldComponent(input);
 
                 if (
                     component
@@ -1496,7 +2700,11 @@ document.addEventListener('alpine:init', () => {
                     && !(component.element && component.element === this.element)
                     && typeof component.getValue === 'function'
                 ) {
-                    return component.getValue();
+                    const componentValue = component.getValue();
+
+                    if (componentValue !== undefined) {
+                        return componentValue;
+                    }
                 }
 
                 if (input.tagName === 'SELECT') {
@@ -1579,6 +2787,9 @@ document.addEventListener('alpine:init', () => {
                 this.pendingDialogRowIndex = null;
                 this.isUsingCustomConfigurationDialog = false;
                 this.customConfigurationDialogHtml = '';
+                this.activeCustomConfigurationDialog = null;
+                this.activeCustomDialogs = [];
+                this.isSwitchingCustomDialog = false;
                 document.body.classList.remove(this.bodyScrollLockClass);
             },
 
@@ -1728,27 +2939,21 @@ document.addEventListener('alpine:init', () => {
                 const dialogBody = document.getElementById('meros-repeater-config-dialog-custom-body');
                 if (!dialogBody) return;
 
-                const configurationField = this.activeDialogRowEl.querySelector('.meros-repeater-data-cell[data-field-name="__configuration"] [data-field-type="hidden"]');
-                if (!configurationField) return;
-
-                const configuration = {};
-                const inputs = dialogBody.querySelectorAll('[data-field-type]');
+                const configuration = this.__readRowConfiguration(this.activeDialogRowEl);
+                const inputs = this.__getDialogControls(dialogBody);
 
                 inputs.forEach((input) => {
-                    const fieldName = input.name || input.dataset.fieldName;
+                    const control = this.__resolveDialogControlElement(input);
+                    const fieldName = this.__resolveFieldName(control || input);
 
-                    if (!fieldName) return;
-                    configuration[fieldName] = getFieldValue(input);
+                    if (!fieldName || fieldName === '__configuration') return;
+
+                    const value = this.__readControlValue(control || input);
+                    configuration[fieldName] = value;
+
+                    this.__writeRowFieldValue(this.activeDialogRowEl, this.activeDialogRowIndex, fieldName, value, control || input);
                 });
-
-                const configurationJson = JSON.stringify(configuration);
-                const component = getFieldComponent(configurationField.id);
-
-                if (component && typeof component.setValue === 'function') {
-                    component.setValue(configurationJson);
-                } else {
-                    configurationField.value = configurationJson;
-                }
+                this.__writeRowConfiguration(this.activeDialogRowEl, configuration);
             }
         };
     });

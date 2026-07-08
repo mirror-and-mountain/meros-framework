@@ -1,6 +1,6 @@
 <?php
 
-namespace MM\Meros\Services\Database;
+namespace MM\Meros\Services\Controllers;
 
 use MM\Meros\App\Framework;
 use MM\Meros\App\Package;

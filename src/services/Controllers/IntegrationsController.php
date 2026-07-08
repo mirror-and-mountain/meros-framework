@@ -1,6 +1,6 @@
 <?php
 
-namespace MM\Meros\Services\Integrations;
+namespace MM\Meros\Services\Controllers;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -8,17 +8,19 @@ use Illuminate\Support\Str;
 use MM\Meros\App\Framework;
 use MM\Meros\App\Models\IntegrationAccount;
 use MM\Meros\App\Models\IntegrationConnection;
+use MM\Meros\App\Models\IntegrationEnvironment;
 use MM\Meros\Services\Contracts\Admin\Setting;
 use MM\Meros\Services\Contracts\FeatureProvider;
 use MM\Meros\Services\Contracts\Table;
 use MM\Meros\Services\Registers\Integrations as IntegrationsRegister;
 use MM\Meros\Support\Integrations\OAuthManager;
 use MM\Meros\Support\Integrations\OAuthStateStore;
+use MM\Meros\Support\Integrations\ExternalModelCache;
 
 use MM\Meros\Facades\Theme as ThemeAccessor;
 use MM\Meros\Facades\Packages as PackagesAccessor;
 
-final class IntegrationsController {
+class IntegrationsController {
     /**
      * Prefix used to identify encrypted integration settings in framework options.
      */
@@ -37,8 +39,45 @@ final class IntegrationsController {
      * @return void
      */
     public function initIntegrationSettingsProtection(): void {
+        add_filter('pre_update_option_meros_framework_settings', [$this, 'cleanupDisabledIntegrationRecords'], 9, 3);
         add_filter('pre_update_option_meros_framework_settings', [$this, 'encryptSensitiveIntegrationSettings'], 10, 3);
         add_filter('option_meros_framework_settings', [$this, 'decryptSensitiveIntegrationSettings']);
+    }
+
+    /**
+     * Clears persisted integration OAuth/account records when integrations are disabled.
+     *
+     * @param mixed  $value    The new value being saved.
+     * @param mixed  $oldValue The old value being replaced.
+     * @param string $option   The name of the option being saved.
+     *
+     * @return mixed The unmodified value.
+     */
+    public function cleanupDisabledIntegrationRecords(mixed $value, mixed $oldValue, string $option): mixed {
+        if ($option !== 'meros_framework_settings' || !is_array($value) || !is_array($oldValue)) {
+            return $value;
+        }
+
+        $nextIntegrations = is_array($value['integrations'] ?? null) ? $value['integrations'] : [];
+        $previousIntegrations = is_array($oldValue['integrations'] ?? null) ? $oldValue['integrations'] : [];
+
+        if ($nextIntegrations === [] || $previousIntegrations === []) {
+            return $value;
+        }
+
+        try {
+            $disabledHandles = $this->integrationHandlesDisabledInTransition($previousIntegrations, $nextIntegrations);
+
+            if ($disabledHandles === []) {
+                return $value;
+            }
+
+            $this->purgeIntegrationRecords($disabledHandles);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        return $value;
     }
 
     /**
@@ -201,20 +240,9 @@ final class IntegrationsController {
                 }
 
                 if ($integrationHandle === 'salesforce') {
-                    $settings->add(function ($setting) use ($integration) {
-                        $setting->string($integration->getHandle() . '_default_environment')
-                            ->field('select', function ($field) {
-                                $field->label('Default OAuth Environment');
-                                $field->options([
-                                    'production' => 'Production',
-                                    'sandbox'    => 'Sandbox',
-                                    'test'       => 'Test',
-                                ]);
-                                $field->default('production');
-                                $field->helpText('Used when an environment is not explicitly selected in the OAuth connection panel.');
-                            })
-                            ->section($this->getIntegrationSettingsPageSlug($integration->getHandle()));
-                    });
+                    // Register this as a first-class settings key so the custom top-level selector persists.
+                    $settings->add()->string('salesforce_default_environment')
+                        ->default('production');
                 }
 
                 foreach ($configurationFields as $configurationField) {
@@ -272,6 +300,31 @@ final class IntegrationsController {
                 echo '<h2>' . esc_html($integration->getLabel()) . ' Configuration</h2>';
                 echo '<p><a class="button button-secondary button-small" href="' . esc_url($backUrl) . '">Back to Integrations</a></p>';
                 echo '<p><strong>Active environment:</strong> ' . esc_html($this->oauthEnvironmentLabel($selectedEnvironment)) . '</p>';
+
+                if ($integrationHandle === 'salesforce') {
+                    $defaultEnvironment = $this->normalizeOauthEnvironment((string) $this->getIntegrationSettingValue('salesforce', 'default_environment', 'production'));
+                    $defaultEnvironmentOptions = [
+                        'production' => 'Production',
+                        'sandbox'    => 'Sandbox',
+                        'test'       => 'Test',
+                    ];
+
+                    if (!array_key_exists($defaultEnvironment, $defaultEnvironmentOptions)) {
+                        $defaultEnvironment = 'production';
+                    }
+
+                    echo '<div class="meros-oauth-global-default-environment">';
+                    echo '<label class="meros-oauth-field"><span>Default OAuth Environment</span><select style="margin-left: 0.5rem;" name="meros_framework_settings[integrations][salesforce_default_environment]">';
+
+                    foreach ($defaultEnvironmentOptions as $value => $label) {
+                        $selected = $value === $defaultEnvironment ? ' selected' : '';
+                        echo '<option value="' . esc_attr($value) . '"' . $selected . '>' . esc_html($label) . '</option>';
+                    }
+
+                    echo '</select></label>';
+                    echo '<p class="description">Global default used when no environment is explicitly selected in the OAuth connection panel.</p>';
+                    echo '</div>';
+                }
 
                 $layoutClass = $isOauthIntegration
                     ? 'meros-integration-settings-layout'
@@ -703,20 +756,26 @@ final class IntegrationsController {
             '_wpnonce'           => $startNonce,
         ], admin_url('admin-post.php'));
 
-        $accountLabelId = 'meros-oauth-account-label-' . sanitize_html_class($handle);
-        $connectionLabelId = 'meros-oauth-connection-label-' . sanitize_html_class($handle);
         $pkceCheckboxId = 'meros-oauth-pkce-' . sanitize_html_class($handle);
         $connectButtonId = 'meros-oauth-connect-' . sanitize_html_class($handle);
+        $defaultAccountLabel = $selectedEnvironment;
+        $currentUser = wp_get_current_user();
+        $defaultConnectionLabel = $currentUser instanceof \WP_User
+            ? sanitize_user((string) $currentUser->user_login, true)
+            : '';
+
+        if ($defaultConnectionLabel === '') {
+            $defaultConnectionLabel = 'default';
+        }
 
         $html .= '<div class="meros-oauth-connect-form">';
-        $html .= '<label class="meros-oauth-field"><span>Account Label</span><input id="' . esc_attr($accountLabelId) . '" class="regular-text" type="text" value="default"></label>';
-        $html .= '<label class="meros-oauth-field"><span>Connection Label</span><input id="' . esc_attr($connectionLabelId) . '" class="regular-text" type="text" value="default"></label>';
+        $html .= '<p class="description">New OAuth connections will use account label <strong>' . esc_html($defaultAccountLabel) . '</strong> and connection label <strong>' . esc_html($defaultConnectionLabel) . '</strong>.</p>';
         $html .= '<label class="meros-oauth-checkbox"><input id="' . esc_attr($pkceCheckboxId) . '" type="checkbox" value="1">Use PKCE</label>';
         $html .= '<div class="meros-oauth-connect-actions">';
         $html .= '<button id="' . esc_attr($connectButtonId) . '" class="button button-primary meros-oauth-connect-button" type="button" data-start-url="' . esc_attr($startBaseUrl) . '">Connect</button>';
         $html .= '</div>';
         $html .= '</div>';
-        $html .= '<script>(function(){var btn=document.getElementById("' . esc_js($connectButtonId) . '");if(!btn){return;}btn.addEventListener("click",function(){var account=document.getElementById("' . esc_js($accountLabelId) . '");var connection=document.getElementById("' . esc_js($connectionLabelId) . '");var pkce=document.getElementById("' . esc_js($pkceCheckboxId) . '");var base=btn.getAttribute("data-start-url")||"";if(base===""){return;}var query=[];query.push("account_label="+encodeURIComponent(account&&account.value!==""?account.value:"default"));query.push("connection_label="+encodeURIComponent(connection&&connection.value!==""?connection.value:"default"));if(pkce&&pkce.checked){query.push("pkce=1");}window.location.href=base+(base.indexOf("?")===-1?"?":"&")+query.join("&");});})();</script>';
+        $html .= '<script>(function(){var btn=document.getElementById("' . esc_js($connectButtonId) . '");if(!btn){return;}btn.addEventListener("click",function(){var pkce=document.getElementById("' . esc_js($pkceCheckboxId) . '");var base=btn.getAttribute("data-start-url")||"";if(base===""){return;}var query=[];query.push("account_label="+encodeURIComponent("' . esc_js($defaultAccountLabel) . '"));query.push("connection_label="+encodeURIComponent("' . esc_js($defaultConnectionLabel) . '"));if(pkce&&pkce.checked){query.push("pkce=1");}window.location.href=base+(base.indexOf("?")===-1?"?":"&")+query.join("&");});})();</script>';
 
         $accounts = IntegrationAccount::query()
             ->where('integration_handle', $handle)
@@ -811,12 +870,33 @@ final class IntegrationsController {
         check_admin_referer('meros_integration_oauth_start_' . $integrationHandle);
 
         $returnUrl = esc_url_raw((string) ($_REQUEST['return_url'] ?? ''));
+        $environment = $this->normalizeOauthEnvironment(sanitize_key($_REQUEST['environment'] ?? 'production'));
+        $accountLabel = sanitize_text_field($_REQUEST['account_label'] ?? '');
+
+        if ($accountLabel === '') {
+            $accountLabel = $environment;
+        }
+
+        $currentUser = wp_get_current_user();
+        $defaultConnectionLabel = $currentUser instanceof \WP_User
+            ? sanitize_user((string) $currentUser->user_login, true)
+            : '';
+
+        if ($defaultConnectionLabel === '') {
+            $defaultConnectionLabel = 'default';
+        }
+
+        $connectionLabel = sanitize_text_field($_REQUEST['connection_label'] ?? '');
+
+        if ($connectionLabel === '') {
+            $connectionLabel = $defaultConnectionLabel;
+        }
 
         try {
             $redirect = $this->oauthManager()->buildAuthorizationRedirect($integrationHandle, [
-                'environment'             => sanitize_key($_REQUEST['environment'] ?? ''),
-                'account_label'           => sanitize_text_field($_REQUEST['account_label'] ?? ''),
-                'connection_label'        => sanitize_text_field($_REQUEST['connection_label'] ?? ''),
+                'environment'             => $environment,
+                'account_label'           => $accountLabel,
+                'connection_label'        => $connectionLabel,
                 'return_url'              => $returnUrl,
                 'pkce'                    => !empty($_REQUEST['pkce']),
                 'reconnect_connection_id' => absint($_REQUEST['reconnect_connection_id'] ?? 0),
@@ -917,6 +997,16 @@ final class IntegrationsController {
             $connection = IntegrationConnection::query()->with('account')->findOrFail($connectionId);
             $this->oauthManager()->disconnectConnection($connection);
 
+            $integrationHandle = sanitize_key((string) ($connection->account?->integration_handle ?? ''));
+
+            if ($integrationHandle !== '') {
+                $this->clearIntegrationTransients([$integrationHandle]);
+                ExternalModelCache::clearByIntegration([$integrationHandle]);
+            } else {
+                $this->clearIntegrationTransients();
+                ExternalModelCache::clearByIntegration();
+            }
+
             wp_safe_redirect(add_query_arg([
                 'oauth_status'  => 'success',
                 'oauth_message' => 'Connection disconnected.',
@@ -956,6 +1046,177 @@ final class IntegrationsController {
         $value['integrations'] = $this->transformSensitiveValues($integrations, true);
 
         return $value;
+    }
+
+    /**
+     * Returns integration handles that transitioned from enabled to disabled.
+     *
+     * @param array $previousIntegrations The previously persisted integrations settings.
+     * @param array $nextIntegrations The new integrations settings payload.
+     *
+     * @return array<int, string> Disabled integration handles.
+     */
+    private function integrationHandlesDisabledInTransition(array $previousIntegrations, array $nextIntegrations): array {
+        $previousMap = $this->integrationEnableMap($previousIntegrations);
+        $nextMap = $this->integrationEnableMap($nextIntegrations);
+
+        $previousGlobalEnabled = (bool) ($previousIntegrations['enable_integrations'] ?? false);
+        $nextGlobalEnabled = (bool) ($nextIntegrations['enable_integrations'] ?? false);
+
+        if ($previousGlobalEnabled && !$nextGlobalEnabled) {
+            return array_keys(array_filter($previousMap, static fn (bool $enabled): bool => $enabled));
+        }
+
+        $disabled = [];
+
+        foreach ($previousMap as $handle => $wasEnabled) {
+            if (!$wasEnabled) {
+                continue;
+            }
+
+            if (($nextMap[$handle] ?? false) === false) {
+                $disabled[] = $handle;
+            }
+        }
+
+        return array_values(array_unique($disabled));
+    }
+
+    /**
+     * Builds an integration enabled map from flattened and nested settings payloads.
+     *
+     * @param array $integrationSettings The integrations settings payload.
+     *
+     * @return array<string, bool> Map of handle => enabled.
+     */
+    private function integrationEnableMap(array $integrationSettings): array {
+        $map = [];
+
+        foreach ($integrationSettings as $key => $value) {
+            if (!is_string($key) || $key === 'enable_integrations') {
+                continue;
+            }
+
+            if (is_array($value)) {
+                $handle = sanitize_key($key);
+                $toggleKey = $handle . '_enable';
+
+                if (array_key_exists($toggleKey, $value)) {
+                    $map[$handle] = (bool) $value[$toggleKey];
+                }
+
+                continue;
+            }
+
+            if (!str_ends_with($key, '_enable')) {
+                continue;
+            }
+
+            $handle = sanitize_key((string) substr($key, 0, -strlen('_enable')));
+
+            if ($handle === '') {
+                continue;
+            }
+
+            $map[$handle] = (bool) $value;
+        }
+
+        return $map;
+    }
+
+    /**
+     * Purges integration records in integration tables for provided handles.
+     *
+     * @param array<int, string> $integrationHandles Integration handles to purge.
+     *
+     * @return void
+     */
+    private function purgeIntegrationRecords(array $integrationHandles): void {
+        $handles = array_values(array_unique(array_filter(array_map(
+            static fn (mixed $handle): string => sanitize_key((string) $handle),
+            $integrationHandles
+        ))));
+
+        if ($handles === []) {
+            return;
+        }
+
+        if ($this->integrationTablesAvailable()) {
+            app('db')->transaction(static function () use ($handles): void {
+                IntegrationConnection::query()
+                    ->whereHas('account', static fn ($query) => $query->whereIn('integration_handle', $handles))
+                    ->delete();
+
+                IntegrationAccount::query()
+                    ->whereIn('integration_handle', $handles)
+                    ->delete();
+
+                IntegrationEnvironment::query()
+                    ->whereIn('integration_handle', $handles)
+                    ->delete();
+            });
+        }
+
+        $this->clearIntegrationTransients($handles);
+        ExternalModelCache::clearByIntegration($handles);
+    }
+
+    /**
+     * Clears integration-related transients from WordPress options storage.
+     *
+     * @param array<int, string> $integrationHandles Optional integration handles to scope prefix cleanup.
+     *
+     * @return void
+     */
+    private function clearIntegrationTransients(array $integrationHandles = []): void {
+        global $wpdb;
+
+        if (!isset($wpdb) || !is_object($wpdb) || !isset($wpdb->options)) {
+            return;
+        }
+
+        $patterns = [
+            '_transient_meros_integration_oauth_state_%',
+            '_transient_timeout_meros_integration_oauth_state_%',
+        ];
+
+        foreach ($integrationHandles as $handle) {
+            $normalizedHandle = sanitize_key((string) $handle);
+
+            if ($normalizedHandle === '') {
+                continue;
+            }
+
+            $patterns[] = '_transient_meros_integration_' . $normalizedHandle . '_%';
+            $patterns[] = '_transient_timeout_meros_integration_' . $normalizedHandle . '_%';
+        }
+
+        $patterns = array_values(array_unique($patterns));
+
+        if ($patterns === []) {
+            return;
+        }
+
+        $clauses = array_fill(0, count($patterns), 'option_name LIKE %s');
+        $query = 'DELETE FROM ' . $wpdb->options . ' WHERE ' . implode(' OR ', $clauses);
+        $prepared = $wpdb->prepare($query, ...$patterns);
+
+        if (is_string($prepared) && $prepared !== '') {
+            $wpdb->query($prepared);
+        }
+    }
+
+    /**
+     * Returns true when integration tables exist and can be queried safely.
+     *
+     * @return bool
+     */
+    private function integrationTablesAvailable(): bool {
+        $schema = app('db')->getSchemaBuilder();
+
+        return $schema->hasTable('meros_integration_accounts')
+            && $schema->hasTable('meros_integration_connections')
+            && $schema->hasTable('meros_integration_environments');
     }
 
     /**

@@ -127,6 +127,32 @@ abstract class ExternalModel {
     }
 
     /**
+     * Creates a new model instance with an optional connection label.
+     */
+    public static function init(string $connectionLabel = ''): static {
+        $instance = new static();
+
+        if ($connectionLabel !== '') {
+            $instance->using($connectionLabel);
+        }
+
+        return $instance;
+    }
+    
+    /**
+     * Allows Laravel-like static calls on external models.
+     */
+    public static function __callStatic(string $method, array $arguments): mixed {
+        $instance = new static();
+
+        if (!method_exists($instance, $method)) {
+            throw new \BadMethodCallException('Method ' . static::class . '::' . $method . ' does not exist.');
+        }
+
+        return $instance->{$method}(...$arguments);
+    }
+
+    /**
      * Sets the integration handle for the request.
      *
      * @param string $handle The integration handle.
@@ -149,7 +175,13 @@ abstract class ExternalModel {
      * @return static
      */
     public function using(string $connectionLabel): static {
-        $this->connectionLabel = $connectionLabel;
+        $normalised = trim($connectionLabel);
+
+        if (in_array(strtolower($normalised), ['default', 'active', 'current'], true)) {
+            $normalised = '';
+        }
+
+        $this->connectionLabel = $normalised;
         $this->connection = null;
 
         return $this;
@@ -247,11 +279,13 @@ abstract class ExternalModel {
     /**
      * Sets the HTTP method to GET for the request.
      *
+     * Subclasses may override this to provide model-style semantics.
+     *
      * @param string $path
      *
-     * @return Response
+     * @return mixed
      */
-    public function get(string $path = ''): Response {
+    public function get(string $path = ''): mixed {
         return $this->request('GET', $path);
     }
 
@@ -291,11 +325,13 @@ abstract class ExternalModel {
     /**
      * Sets the HTTP method to DELETE for the request.
      *
+     * Subclasses may override this to provide model-style semantics.
+     *
      * @param string $path
      *
-     * @return Response
+     * @return mixed
      */
-    public function delete(string $path = ''): Response {
+    public function delete(string $path = ''): mixed {
         return $this->request('DELETE', $path);
     }
 
@@ -431,13 +467,24 @@ abstract class ExternalModel {
             return $this->connection;
         }
 
-        $query = $integration->connections()->where('is_active', true);
+        $baseQuery = $integration->connections()->where('is_active', true);
+
+        $connection = null;
 
         if ($this->connectionLabel !== '') {
-            $query->where('label', $this->connectionLabel);
+            $connection = (clone $baseQuery)
+                ->where('label', $this->connectionLabel)
+                ->first();
         }
 
-        $connection = $query->first();
+        // Global fallback: if a specific label is unavailable, use the most recent active connection.
+        if (!$connection instanceof IntegrationConnection) {
+            $connection = (clone $baseQuery)
+                ->orderByDesc('last_used_at')
+                ->orderByDesc('connected_at')
+                ->orderByDesc('id')
+                ->first();
+        }
 
         if (!$connection instanceof IntegrationConnection) {
             throw new \RuntimeException('No active connection was found for integration handle: ' . $integration->integration_handle);
@@ -560,6 +607,39 @@ abstract class ExternalModel {
      */
     protected function send(array $request): Response {
         return $this->httpClient->send($request);
+    }
+
+    /**
+     * Throws a RuntimeException if the HTTP response indicates a failure.
+     *
+     * @param Response $response
+     * @param string $action
+     *
+     * @return void
+     */
+    protected function throwIfFailed(Response $response, string $action): void {
+        if ($response->failed()) {
+            throw new \RuntimeException('Failed to ' . $action . ': ' . $response->body());
+        }
+    }
+
+    /**
+     * Executes a callback against a temporary path and restores the prior path afterward.
+     *
+     * @param string $path
+     * @param callable $callback
+     *
+     * @return mixed
+     */
+    protected function withPath(string $path, callable $callback): mixed {
+        $originalPath = $this->path;
+        $this->path($path);
+
+        try {
+            return $callback();
+        } finally {
+            $this->path($originalPath);
+        }
     }
 
     /**

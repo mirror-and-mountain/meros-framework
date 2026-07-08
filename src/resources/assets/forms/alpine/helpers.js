@@ -25,6 +25,44 @@ function resolveField(fieldIdentifier) {
     return field;
 }
 
+function coerceCheckboxLike(value) {
+    if (Array.isArray(value)) {
+        return value.length > 0;
+    }
+
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (typeof value === 'number') {
+        return value !== 0;
+    }
+
+    if (typeof value === 'string') {
+        const normalised = value.trim().toLowerCase();
+
+        if (
+            normalised === ''
+            || normalised === '0'
+            || normalised === 'false'
+            || normalised === 'off'
+            || normalised === 'no'
+            || normalised === 'null'
+            || normalised === 'undefined'
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    return !!value;
+}
+
+// Prevent recursive component.setValue -> setFieldValue -> component.setValue loops
+// when components delegate their setters back to this helper.
+const activeSetFieldOps = new WeakSet();
+
 /**
  * Retrieves the Alpine component instance associated with a given field ID
  * if available.
@@ -135,18 +173,24 @@ export function getFieldValue(fieldIdentifier) {
  * @param {boolean} validate Whether to validate the field after setting its value.
  * @returns 
  */
-export function setFieldValue(fieldIdentifier, value, validate = true) {
+export function setFieldValue(fieldIdentifier, value, validate = true, options = {}) {
     const field = resolveField(fieldIdentifier);
 
     if (!field) return;
     const component = getFieldComponent(field);
 
-    if (component && typeof component.setValue === 'function') {
+    if (!activeSetFieldOps.has(field) && component && typeof component.setValue === 'function') {
         const hasElementProperty = Object.prototype.hasOwnProperty.call(component, 'element');
         const isUninitialized = hasElementProperty && !component.element;
 
         if (!isUninitialized) {
-            component.setValue(value);
+            activeSetFieldOps.add(field);
+
+            try {
+                component.setValue(value, options);
+            } finally {
+                activeSetFieldOps.delete(field);
+            }
 
             if (validate) {
                 validateFieldValue(field, value);
@@ -158,7 +202,7 @@ export function setFieldValue(fieldIdentifier, value, validate = true) {
 
     if (field.tagName === 'INPUT') {
         if (field.type === 'checkbox') {
-            field.checked = value ? true : false;
+            field.checked = coerceCheckboxLike(value);
         }
 
         else if (field.type === 'radio') {

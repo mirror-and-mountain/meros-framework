@@ -73,6 +73,13 @@ abstract class Choice extends Field {
      */
     protected ?int $dynamicOptionsLimit = null;
 
+    /**
+     * Generic source-specific dynamic option parameters.
+     *
+     * @var array<string, mixed>
+     */
+    protected array $dynamicOptionsConfig = [];
+
     // =========================================================================
     // Initialisation
     // =========================================================================
@@ -127,9 +134,12 @@ abstract class Choice extends Field {
         $parsedProps['options'] = isset($props['options']) && is_array($props['options']) ? $props['options'] : $this->options;
 
         if ($this->supports('dynamicOptions') && $this->useDynamicOptions && $this->dynamicOptionsSource !== null) {
+            $dynamicConfig = $this->resolveDynamicOptionsConfig();
+
             $parsedProps['attributes']['data-dynamic-options-enabled'] = 'true';
             $parsedProps['attributes']['data-dynamic-options-source'] = $this->dynamicOptionsSource;
             $parsedProps['attributes']['data-dynamic-options-endpoint'] = rest_url('meros/v1/dynamic-choice-options');
+            $parsedProps['attributes']['data-dynamic-options-config'] = json_encode($dynamicConfig);
 
             if ($this->dynamicOptionsPostType !== null) {
                 $parsedProps['attributes']['data-dynamic-options-post-type'] = $this->dynamicOptionsPostType;
@@ -208,12 +218,49 @@ abstract class Choice extends Field {
         if ($this->supports('dynamicOptions')) {
             $this->useDynamicOptions = $useDynamicOptions;
 
+            if ($useDynamicOptions && $this->supports('dynamicDefault')) {
+                $this->useDynamicDefault = false;
+                $this->dynamicDefaultType = null;
+            }
+
             if ($useDynamicOptions) {
                 $this->dynamicOptionsSource ??= 'posts';
                 $this->dynamicOptionsPostType ??= 'post';
                 $this->dynamicOptionsPostStatus ??= 'publish';
                 $this->dynamicOptionsLimit ??= 20;
+
+                if (!array_key_exists('postType', $this->dynamicOptionsConfig)) {
+                    $this->dynamicOptionsConfig['postType'] = $this->dynamicOptionsPostType;
+                }
+
+                if (!array_key_exists('postStatus', $this->dynamicOptionsConfig)) {
+                    $this->dynamicOptionsConfig['postStatus'] = $this->dynamicOptionsPostStatus;
+                }
+
+                if (!array_key_exists('limit', $this->dynamicOptionsConfig)) {
+                    $this->dynamicOptionsConfig['limit'] = $this->dynamicOptionsLimit;
+                }
             }
+        }
+
+        return $this;
+    }
+
+    public function useDynamicDefault(bool $useDynamicDefault = true): self {
+        parent::useDynamicDefault($useDynamicDefault);
+
+        if ($useDynamicDefault && $this->supports('dynamicOptions')) {
+            $this->useDynamicOptions = false;
+        }
+
+        return $this;
+    }
+
+    public function dynamicDefault(string $dynamicDefault): self {
+        parent::dynamicDefault($dynamicDefault);
+
+        if ($this->supports('dynamicOptions')) {
+            $this->useDynamicOptions = false;
         }
 
         return $this;
@@ -229,6 +276,22 @@ abstract class Choice extends Field {
         if ($this->supports('dynamicOptions')) {
             $this->dynamicOptionsSource = trim($source) !== '' ? trim($source) : null;
             $this->useDynamicOptions = $this->dynamicOptionsSource !== null;
+
+            if ($this->useDynamicOptions && $this->supports('dynamicDefault')) {
+                $this->useDynamicDefault = false;
+                $this->dynamicDefaultType = null;
+            }
+
+            if ($this->dynamicOptionsSource === 'posts') {
+                $this->dynamicOptionsConfig['postType'] ??= $this->dynamicOptionsPostType ?? 'post';
+                $this->dynamicOptionsConfig['postStatus'] ??= $this->dynamicOptionsPostStatus ?? 'publish';
+                $this->dynamicOptionsConfig['limit'] ??= $this->dynamicOptionsLimit ?? 20;
+            }
+
+            if ($this->dynamicOptionsSource === 'users') {
+                $this->dynamicOptionsConfig['userRole'] ??= $this->dynamicOptionsUserRole ?? '';
+                $this->dynamicOptionsConfig['limit'] ??= $this->dynamicOptionsLimit ?? 20;
+            }
         }
 
         return $this;
@@ -243,6 +306,10 @@ abstract class Choice extends Field {
     public function dynamicOptionsPostType(string $postType): self {
         if ($this->supports('dynamicOptions')) {
             $this->dynamicOptionsPostType = trim($postType) !== '' ? trim($postType) : null;
+
+            if ($this->dynamicOptionsPostType !== null) {
+                $this->dynamicOptionsConfig['postType'] = $this->dynamicOptionsPostType;
+            }
         }
 
         return $this;
@@ -257,6 +324,10 @@ abstract class Choice extends Field {
     public function dynamicOptionsPostStatus(string $postStatus): self {
         if ($this->supports('dynamicOptions')) {
             $this->dynamicOptionsPostStatus = trim($postStatus) !== '' ? trim($postStatus) : null;
+
+            if ($this->dynamicOptionsPostStatus !== null) {
+                $this->dynamicOptionsConfig['postStatus'] = $this->dynamicOptionsPostStatus;
+            }
         }
 
         return $this;
@@ -271,6 +342,10 @@ abstract class Choice extends Field {
     public function dynamicOptionsTaxonomy(string $taxonomy): self {
         if ($this->supports('dynamicOptions')) {
             $this->dynamicOptionsTaxonomy = trim($taxonomy) !== '' ? trim($taxonomy) : null;
+
+            if ($this->dynamicOptionsTaxonomy !== null) {
+                $this->dynamicOptionsConfig['taxonomy'] = $this->dynamicOptionsTaxonomy;
+            }
         }
 
         return $this;
@@ -285,6 +360,10 @@ abstract class Choice extends Field {
     public function dynamicOptionsTerms(string $terms): self {
         if ($this->supports('dynamicOptions')) {
             $this->dynamicOptionsTerms = trim($terms) !== '' ? trim($terms) : null;
+
+            if ($this->dynamicOptionsTerms !== null) {
+                $this->dynamicOptionsConfig['terms'] = $this->dynamicOptionsTerms;
+            }
         }
 
         return $this;
@@ -299,6 +378,10 @@ abstract class Choice extends Field {
     public function dynamicOptionsUserRole(string $role): self {
         if ($this->supports('dynamicOptions')) {
             $this->dynamicOptionsUserRole = trim($role) !== '' ? trim($role) : null;
+
+            if ($this->dynamicOptionsUserRole !== null) {
+                $this->dynamicOptionsConfig['userRole'] = $this->dynamicOptionsUserRole;
+            }
         }
 
         return $this;
@@ -313,6 +396,68 @@ abstract class Choice extends Field {
     public function dynamicOptionsLimit(int $limit): self {
         if ($this->supports('dynamicOptions')) {
             $this->dynamicOptionsLimit = $limit > 0 ? $limit : null;
+
+            if ($this->dynamicOptionsLimit !== null) {
+                $this->dynamicOptionsConfig['limit'] = $this->dynamicOptionsLimit;
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Sets generic source configuration values for dynamic options.
+     *
+     * @param array<string, mixed>|string $config
+     * @return self
+     */
+    public function dynamicOptionsConfig(array|string $config): self {
+        if (!$this->supports('dynamicOptions')) {
+            return $this;
+        }
+
+        if (is_string($config)) {
+            $decoded = json_decode($config, true);
+            $config = is_array($decoded) ? $decoded : [];
+        }
+
+        $clean = [];
+
+        foreach ($config as $key => $value) {
+            $configKey = trim((string) $key);
+
+            if ($configKey === '') {
+                continue;
+            }
+
+            $clean[$configKey] = $value;
+        }
+
+        $this->dynamicOptionsConfig = $clean;
+
+        if (array_key_exists('postType', $clean)) {
+            $this->dynamicOptionsPostType = trim((string) $clean['postType']) !== '' ? trim((string) $clean['postType']) : null;
+        }
+
+        if (array_key_exists('postStatus', $clean)) {
+            $this->dynamicOptionsPostStatus = trim((string) $clean['postStatus']) !== '' ? trim((string) $clean['postStatus']) : null;
+        }
+
+        if (array_key_exists('taxonomy', $clean)) {
+            $this->dynamicOptionsTaxonomy = trim((string) $clean['taxonomy']) !== '' ? trim((string) $clean['taxonomy']) : null;
+        }
+
+        if (array_key_exists('terms', $clean)) {
+            $this->dynamicOptionsTerms = trim((string) $clean['terms']) !== '' ? trim((string) $clean['terms']) : null;
+        }
+
+        if (array_key_exists('userRole', $clean)) {
+            $this->dynamicOptionsUserRole = trim((string) $clean['userRole']) !== '' ? trim((string) $clean['userRole']) : null;
+        }
+
+        if (array_key_exists('limit', $clean)) {
+            $parsedLimit = (int) $clean['limit'];
+            $this->dynamicOptionsLimit = $parsedLimit > 0 ? $parsedLimit : null;
         }
 
         return $this;
@@ -329,6 +474,23 @@ abstract class Choice extends Field {
         $isDynamic = is_string($default) && 
             Str::startsWith($default, '{{') && 
             Str::endsWith($default, '}}');
+
+        if (!$isDynamic && $this->supports('dynamicOptions') && $this->useDynamicOptions) {
+            if (is_array($default) && ($this->attributes['multiple'] ?? false)) {
+                $this->default = array_values(array_filter(
+                    array_map(fn ($value) => trim((string) $value), $default),
+                    fn ($value) => $value !== ''
+                ));
+
+                return $this;
+            }
+
+            if (is_scalar($default)) {
+                $this->default = (string) $default;
+
+                return $this;
+            }
+        }
 
         if ($isDynamic && $this->supports('dynamicDefault')) {
             $this->default = $default;
@@ -396,6 +558,7 @@ abstract class Choice extends Field {
         $json['properties']['dynamicOptionsTerms'] = $this->dynamicOptionsTerms;
         $json['properties']['dynamicOptionsUserRole'] = $this->dynamicOptionsUserRole;
         $json['properties']['dynamicOptionsLimit'] = $this->dynamicOptionsLimit;
+        $json['properties']['dynamicOptionsConfig'] = $this->resolveDynamicOptionsConfig();
 
         if ($asString) {
             return json_encode($json, ...$flags);
@@ -429,6 +592,50 @@ abstract class Choice extends Field {
      */
     public function usesDynamicOptions(): bool {
         return $this->useDynamicOptions;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getDynamicOptionsConfig(): array {
+        return $this->resolveDynamicOptionsConfig();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function resolveDynamicOptionsConfig(): array {
+        $config = $this->dynamicOptionsConfig;
+
+        if ($this->dynamicOptionsPostType !== null && !array_key_exists('postType', $config)) {
+            $config['postType'] = $this->dynamicOptionsPostType;
+        }
+
+        if ($this->dynamicOptionsPostStatus !== null && !array_key_exists('postStatus', $config)) {
+            $config['postStatus'] = $this->dynamicOptionsPostStatus;
+        }
+
+        if ($this->dynamicOptionsTaxonomy !== null && !array_key_exists('taxonomy', $config)) {
+            $config['taxonomy'] = $this->dynamicOptionsTaxonomy;
+        }
+
+        if ($this->dynamicOptionsTerms !== null && !array_key_exists('terms', $config)) {
+            $config['terms'] = $this->dynamicOptionsTerms;
+        }
+
+        if ($this->dynamicOptionsUserRole !== null && !array_key_exists('userRole', $config)) {
+            $config['userRole'] = $this->dynamicOptionsUserRole;
+        }
+
+        if ($this->dynamicOptionsLimit !== null && !array_key_exists('limit', $config)) {
+            $config['limit'] = $this->dynamicOptionsLimit;
+        }
+
+        if (!array_key_exists('limit', $config)) {
+            $config['limit'] = 20;
+        }
+
+        return $config;
     }
 
     private function buildRenderableOptions(array $options, mixed $value): array {

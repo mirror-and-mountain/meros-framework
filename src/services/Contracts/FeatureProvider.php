@@ -6,6 +6,7 @@ use MM\Meros\App\Framework;
 
 use MM\Meros\Services\Concerns\HasAssets;
 use MM\Meros\Services\Concerns\HasBlocks;
+use MM\Meros\Services\Concerns\HasDynamicChoiceSources;
 use MM\Meros\Services\Concerns\HasFields;
 use MM\Meros\Services\Concerns\HasInstallers;
 use MM\Meros\Services\Concerns\HasIntegrations;
@@ -35,6 +36,7 @@ abstract class FeatureProvider {
         HasAssets,
         HasBlocks,
         HasFields,
+        HasDynamicChoiceSources,
         HasIntegrations,
         HasInstallers;
 
