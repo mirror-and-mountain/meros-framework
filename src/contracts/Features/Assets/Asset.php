@@ -373,7 +373,10 @@ abstract class Asset extends Feature implements Registrable, Makeable {
      * @throws \InvalidArgumentException if the resolved path does not point to a valid file, or if the file is not a valid JS or CSS file.
      */
     private function resolveAssetPath(string $path): string {
-        if ($this->pathLooksAbsolute($path) && $this->pathIsFile($path)) {
+        if ($this->pathLooksAbsolute($path) && 
+            $this->pathIsFile($path) &&
+            $this->fileHasExtensions($path, ['js', 'css'], true)
+        ) {
             return $path;
         }
 
@@ -385,10 +388,8 @@ abstract class Asset extends Feature implements Registrable, Makeable {
             throw new \InvalidArgumentException("The provided path '{$path}' does not point to a valid file.");
         }
 
-        $extension = File::extension($path);
-        if (!in_array($extension, ['js', 'css'])) {
-            throw new \InvalidArgumentException("The provided path '{$path}' does not point to a valid JS or CSS file.");
-        }
+        // Validate the file extension (throws error on failure)
+        $this->fileHasExtensions($path, ['js', 'css'], true);
 
         return $path;
     }

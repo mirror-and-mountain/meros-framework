@@ -31,8 +31,10 @@ use MM\Meros\Registers\Components\Fields;
 use MM\Meros\Registers\Components\FieldGroups;
 
 use MM\Meros\Registers\Content\PostTypes;
+
 use MM\Meros\Registers\Data\PostMetaContainers;
 use MM\Meros\Registers\Data\PostMetaDefinitions;
+use MM\Meros\Registers\Data\Tables;
 
 use MM\Meros\Registers\Assets\AssetGroups;
 use MM\Meros\Registers\Assets\Scripts;
@@ -71,12 +73,17 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         Settings::class,
         SettingsSections::class,
         SettingsContainers::class,
+
         Forms::class,
         Fields::class,
         FieldGroups::class,
+
         PostTypes::class,
+
         PostMetaContainers::class,
         PostMetaDefinitions::class,
+        Tables::class,
+
         AssetGroups::class,
         Scripts::class,
         Styles::class,

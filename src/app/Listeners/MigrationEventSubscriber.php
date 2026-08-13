@@ -11,10 +11,9 @@ use MM\Meros\App\Events\Migrations\TableUpdated;
 use MM\Meros\App\Events\Migrations\TableDropped;
 
 use MM\Meros\App\Models\Migration;
-use MM\Meros\Services\Contracts\Table;
 
-use MM\Meros\Facades\Theme;
-use MM\Meros\Facades\Tables;
+use MM\Meros\Facades\Data\Tables;
+use MM\Meros\Contracts\Features\Data\Table;
 
 class MigrationEventSubscriber {
     /**
@@ -121,7 +120,7 @@ class MigrationEventSubscriber {
 
         $recordHandle = $installer->getHandle();
         $recordLabel  = $installer->getLabel();
-        $recordPath   = $installer->getPath();
+        $recordPath   = $installer->getMigrationPath();
 
         if ($type === 'update') {
             $updates = $installer->getUpdates();
@@ -142,7 +141,7 @@ class MigrationEventSubscriber {
             'handle'        => $recordHandle,
             'related_table' => $table,
             'path'          => $trimmedPath,
-            'batch_id'      => $installer->getBatchID()
+            'batch_id'      => $installer->getBatchId()
         ]);
     }
 

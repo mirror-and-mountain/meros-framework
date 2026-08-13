@@ -7,5 +7,6 @@ trait IsNonFrameworkProvider {
     use ProvidesAssets,
         ProvidesAdminFeatures,
         ProvidesContent,
-        ProvidesComponents;
+        ProvidesComponents,
+        ProvidesTables;
 }

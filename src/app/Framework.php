@@ -70,6 +70,7 @@ final class Framework extends Provider {
         $this->registerSettings();
         $this->registerPostTypes();
         $this->registerAssets();
+        $this->registerTables();
     }
 
     // =========================================================================
@@ -290,6 +291,14 @@ final class Framework extends Provider {
      */
     private function registerAssets(): void {
         $this->assetGroups()->register(MerosAdminAssets::class, 'meros_admin_assets', true);
+    }
+
+    // =========================================================================
+    // Tables & Migrations
+    // =========================================================================
+
+    private function registerTables(): void {
+        $test = $this->tables()->makeFromPath('001_meros_migrations');
     }
 
     // =========================================================================

@@ -4,10 +4,11 @@ namespace MM\Meros\Database\Migrations;
 
 use Illuminate\Database\Schema\Blueprint;
 
-use MM\Meros\Support\Migration;
 use MM\Meros\Support\SchemaManager;
+use MM\Meros\Contracts\Features\Data\Migration;
 
 return new class extends Migration {
+    public string $description = 'Creates the meros_migrations table to track migrations run by the Meros framework.';
 
     public function up(string $installer): void {
         SchemaManager::create('meros_migrations', $installer, function (Blueprint $table) {

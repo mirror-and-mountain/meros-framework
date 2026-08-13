@@ -112,6 +112,80 @@ trait ResolvesPaths {
     }
 
     /**
+     * Checks whether the given file path has one of the specified extensions.
+     *
+     * @param string $path
+     * @param array  $extensions
+     * @param bool   $throwError Whether to throw an exception if the file does not have a valid extension.
+     *
+     * @return bool
+     */
+    final protected function fileHasExtensions(string $path, array $extensions, bool $throwError = false): bool {
+        if (!$this->pathIsFile($path)) {
+            if ($throwError) {
+                throw new \InvalidArgumentException("The provided path '{$path}' is not a valid file.");
+            }
+            
+            return false;
+        }
+    
+        $extension = File::extension($path);
+        $hasExtension = in_array($extension, $extensions);
+
+        if (!$hasExtension && $throwError) {
+            throw new \InvalidArgumentException("The provided path '{$path}' does not have a valid extension.");
+        }
+
+        return $hasExtension;
+    }
+
+    /**
+     * Checks if the given directory contains at least one file with one of the specified extensions.
+     *
+     * @param string $directory
+     * @param array  $extensions
+     *
+     * @return boolean
+     */
+    final protected function directoryHasFileWithExtensions(string $directory, array $extensions): bool {
+        if (!$this->pathIsDirectory($directory)) {
+            return false;
+        }
+
+        $files = File::files($directory);
+        foreach ($files as $file) {
+            if (in_array($file->getExtension(), $extensions)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Retrieves the first file in the given directory that has one of the specified extensions.
+     *
+     * @param string $directory
+     * @param array  $extensions
+     *
+     * @return string|null The path of the first matching file, or null if none found.
+     */
+    final protected function getFirstFileInDirectoryWithExtensions(string $directory, array $extensions): ?string {
+        if (!$this->pathIsDirectory($directory)) {
+            return null;
+        }
+
+        $files = File::files($directory);
+        foreach ($files as $file) {
+            if (in_array($file->getExtension(), $extensions)) {
+                return $file->getPathname();
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Converts a given file path to a URI based on the provider's base path and URI.
      *
      * @param string $path The file path to convert.
