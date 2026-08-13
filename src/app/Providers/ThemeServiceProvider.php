@@ -2,47 +2,64 @@
 
 namespace MM\Meros\App\Providers;
 
-use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Config;
+use MM\Meros\Contracts\MerosServiceProvider;
 
-use MM\Meros\App\BaseTheme as MerosTheme;
-;
+use MM\Meros\App\BaseTheme;
+
 use MM\Meros\Support\ClassInfo;
 
-use MM\Meros\Facades\Theme;
+class ThemeServiceProvider extends MerosServiceProvider {
 
-class ThemeServiceProvider extends ServiceProvider {
+    /**
+     * The instance of the theme being registered.
+     *
+     * @var BaseTheme
+     */
+    private BaseTheme $instance;
 
-    use Concerns\HasViews, Concerns\HasRoutes, Concerns\HasLivewire;
+    // =========================================================================
+    // Registration
+    // =========================================================================
 
+    /**
+     * Registers the theme's services.
+     *
+     * @return void
+     */
     final public function register(): void {
         $themeClass = Config::get('theme.theme_class');
         $themeClass = ClassInfo::get($themeClass);
 
-        if ($themeClass->extends(MerosTheme::class)) {
-            $this->app->singleton(MerosTheme::class, function () use ($themeClass) {
+        if ($themeClass->extends(BaseTheme::class)) {
+            $this->app->singleton(BaseTheme::class, function () use ($themeClass) {
                 return new $themeClass->name();
             });
             
-            $this->app->alias(MerosTheme::class, 'meros.theme');
+            $this->app->alias(BaseTheme::class, 'meros.theme');
 
             // Instantiate the theme to trigger the constructor and set up the theme
-            $this->app->make(MerosTheme::class);
+            $this->instance = $this->app->make(BaseTheme::class)->get();
         }
 
         defined('MEROS') || define('MEROS', true);
     }
 
-    protected function beforeBoot(): void {
-        // This method can be overridden by child classes to perform actions before the boot process
-    }
-
+    // =========================================================================
+    // Booting
+    // =========================================================================
+    
+    /**
+     * Boots the theme's services.
+     *
+     * @return void
+     */
     final public function boot(): void {
+        // Run the beforeBoot method
         $this->beforeBoot();
 
-        $theme = Theme::get(); // Get the theme instance
-
-        $theme->initialiseStyleSheet(); // Ensure the theme's stylesheet is enqueued
+        // Initialise the theme
+        $theme = $this->instance;
         
         // Register Livewire components
         $this->registerLivewireComponents($theme, 'theme');
@@ -53,9 +70,27 @@ class ThemeServiceProvider extends ServiceProvider {
         // Load routes from the theme's routes directory
         $this->registerRoutes($theme);
 
+        // Call the theme's configure method
+        $theme->configure();
+
+        // Run the afterBoot method
         $this->afterBoot();
     }
 
+    /**
+     * This method can be overridden by child classes to perform actions before the boot process.
+     *
+     * @return void
+     */
+    protected function beforeBoot(): void {
+        // This method can be overridden by child classes to perform actions before the boot process
+    }
+
+    /**
+     * This method can be overridden by child classes to perform actions after the boot process.
+     *
+     * @return void
+     */
     protected function afterBoot(): void {
         // This method can be overridden by child classes to perform actions after the boot process
     }

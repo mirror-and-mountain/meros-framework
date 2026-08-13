@@ -11,8 +11,6 @@ use MM\Meros\Support\SchemaManager;
 
 use MM\Meros\Services\Contracts\FeatureDefinition;
 
-use MM\Meros\App\Theme;
-
 use MM\Meros\App\Models\Migration as MigrationModel;
 
 final class Table extends FeatureDefinition {
@@ -36,6 +34,13 @@ final class Table extends FeatureDefinition {
      * @var string
      */
     protected string $label = '';
+
+    /**
+     * The description of the table.
+     *
+     * @var string
+     */
+    protected string $description = '';
 
     /**
      * The migration file for the table.
@@ -92,19 +97,21 @@ final class Table extends FeatureDefinition {
 
         $migrationData = $this->instantiateMigration($migrationPath);
 
-        $this->migration = $migrationData['migration'];
-        $this->handle    = $migrationData['handle'];
-        $this->label     = $migrationData['label'];
-        $this->path      = $migrationData['path'];
+        $this->migration   = $migrationData['migration'];
+        $this->handle      = $migrationData['handle'];
+        $this->label       = $migrationData['label'];
+        $this->description = $migrationData['description'];
+        $this->path        = $migrationData['path'];
 
         foreach ($updates as $update) {
             $updateData = $this->instantiateMigration($update);
 
             $this->updates[$updateData['handle']] = [
-                'migration' => $updateData['migration'],
-                'handle'    => $updateData['handle'],
-                'label'     => $updateData['label'],
-                'path'      => $updateData['path'],
+                'migration'   => $updateData['migration'],
+                'handle'      => $updateData['handle'],
+                'label'       => $updateData['label'],
+                'description' => $updateData['description'],
+                'path'        => $updateData['path'],
             ];
         }
 
@@ -344,9 +351,11 @@ final class Table extends FeatureDefinition {
     public function getInfo(): array {
         if (!$this->isInstalled()) {
             return [
-                'provider'  => $this->provider->getHandle(),
-                'name'      => $this->tableName,
-                'installed' => false,
+                'provider'    => $this->provider->getHandle(),
+                'name'        => $this->tableName,
+                'description' => $this->description,
+                'label'       => $this->label,
+                'installed'   => false,
             ];
         }
 
@@ -356,6 +365,8 @@ final class Table extends FeatureDefinition {
         return [
             'provider'     => $this->provider->getHandle(),
             'name'         => $this->tableName,
+            'description'  => $this->description,
+            'label'        => $this->label,
             'installed'    => true,
             'installed_at' => $installedAt,
             'last_updated' => $lastUpdated,
@@ -410,6 +421,10 @@ final class Table extends FeatureDefinition {
         return $this->label;
     }
 
+    public function getDescription(): string {
+        return $this->description;
+    }
+
     public function getPath(): string {
         return $this->path;
     }
@@ -452,10 +467,11 @@ final class Table extends FeatureDefinition {
         $handleWithoutTimeStamp = preg_replace('/^(?:\d{4}_\d{2}_\d{2}_\d{6}_|\d+_)/', '', $handle);
 
         return [
-            'migration' => $migration,
-            'handle'    => $handle,
-            'label'     => Str::title(Str::replace('_', ' ', $handleWithoutTimeStamp)),
-            'path'      => $path,
+            'migration'   => $migration,
+            'handle'      => $handle,
+            'description' => $migration->description ?? '',
+            'label'       => Str::title(Str::replace('_', ' ', $handleWithoutTimeStamp)),
+            'path'        => $path,
         ];
     }
 

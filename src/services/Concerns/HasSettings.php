@@ -4,22 +4,27 @@ namespace MM\Meros\Services\Concerns;
 
 use Closure;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 
 use MM\Meros\Services\Contracts\Admin\Setting;
 use MM\Meros\Services\Contracts\Admin\MenuPage;
 use MM\Meros\Services\Contracts\Admin\SettingsSection;
 use MM\Meros\Services\Contracts\Admin\MenuPageTemplate;
+use MM\Meros\Services\Contracts\FeatureSet;
 
 use MM\Meros\Facades\Settings;
 use MM\Meros\Facades\MenuPages;
 use MM\Meros\Facades\SettingsSections;
 use MM\Meros\Facades\MenuPageTemplates;
+use MM\Meros\Facades\FeatureSets;
 
 use MM\Meros\Services\Registers\MenuPages as MenuPagesRegister;
 use MM\Meros\Services\Registers\SettingsSections as SettingsSectionsRegister;
 use MM\Meros\Services\Registers\MenuPageTemplates as MenuPageTemplatesRegister;
 
-use MM\Meros\App\Theme;
+use MM\Meros\App\BaseTheme;
+use MM\Meros\App\Package;
+use MM\Meros\App\Framework;
 
 trait HasSettings {
     /**
@@ -38,6 +43,20 @@ trait HasSettings {
     protected string $currentSettingsContainer = '';
 
     /**
+     * The current values of all settings registered by the feature provider.
+     *
+     * @var array
+     */
+    protected array $settingsValues;
+
+    /**
+     * Indicates whether this feature provider has any settings registered.
+     *
+     * @var boolean
+     */
+    protected bool $hasSettings;
+
+    /**
      * Retrieves the current settings container for this feature provider, or a specific sub-setting 
      * inside the current container if a name is provided. 
      * 
@@ -53,12 +72,17 @@ trait HasSettings {
             : null;
 
         if ($container === null) {
+            $container = $this->getDefaultSettingsContainer();
+            $this->currentSettingsContainer = 'default';
+        }
+
+        if ($container === null) {
             return null;
         }
 
         if (!empty($name)) {
             return collect($container->getSubItems())->firstWhere('name', $name);
-        } 
+        }
         
         else {
             return $container;
@@ -75,11 +99,11 @@ trait HasSettings {
      */
     protected function menuPages(string $slug = '', ?Closure $callback = null): MenuPage|MenuPagesRegister|null {
         if (empty($slug)) {
-            return MenuPages::checkout($this); // return register instance
+            return MenuPages::checkout($this->resolveAuthority()); // return register instance
         }
 
         else {
-            return MenuPages::checkout($this)->get($slug, $callback); // return specific menu page
+            return MenuPages::get($slug, $this->resolveAuthority(), $callback); // return specific menu page
         }
     }
 
@@ -93,11 +117,11 @@ trait HasSettings {
      */
     protected function menuPageTemplates(string $handle = '', ?Closure $callback = null): MenuPageTemplate|MenuPageTemplatesRegister|null {
         if (empty($handle)) {
-            return MenuPageTemplates::checkout($this); // return register instance
+            return MenuPageTemplates::checkout($this->resolveAuthority()); // return register instance
         }
 
         else {
-            return MenuPageTemplates::checkout($this)->get($handle, $callback); // return specific menu page template
+            return MenuPageTemplates::get($handle, $this->resolveAuthority(), $callback); // return specific menu page template
         }
     }
 
@@ -137,11 +161,11 @@ trait HasSettings {
      */
     protected function settingsSections(string $id = '', ?Closure $callback = null): SettingsSection|SettingsSectionsRegister|null {
         if (empty($id)) {
-            return SettingsSections::checkout($this); // return register instance
+            return SettingsSections::checkout($this->resolveAuthority()); // return register instance
         }
 
         else {
-            return SettingsSections::checkout($this)->get($id, $callback); // return specific settings section
+            return SettingsSections::get($id, $this->resolveAuthority(), $callback); // return specific settings section
         }
     }
 
@@ -179,7 +203,7 @@ trait HasSettings {
 
         else {
             // Create new settings container with provided name
-            $container = Settings::checkout($this)->make([
+            $container = Settings::checkout($this->resolveAuthority())->make([
                 'group' => Str::snake($name) . '_container',
                 'name'  => Str::snake($name),
             ])
@@ -215,21 +239,37 @@ trait HasSettings {
             return $this->settingsContainers['default'];
         }
 
-        $name = $this->getHandle() . '_settings';
+        $authority = $this->resolveAuthority();
+        $name      = $authority->getHandle() . '_settings';
+        $container = null;
 
-        $label = $this instanceof Theme
-            ? 'Theme Settings'
-            : $this->getName() . ' Settings';
+        if ($authority instanceof BaseTheme) {
+            $container = Settings::get('meros_theme_settings')->setProvider($authority);
+        }
 
-        $setting = Settings::checkout($this)->make([
-            'group' => $name . '_container',
-            'name'  => $name,
-        ])
-            ->type('object')
-            ->label($label);
+        else if ($authority instanceof Package) {
+            $container = Settings::get('meros_package_settings')
+                ->add()
+                ->setProvider($authority)
+                ->object($name)
+                ->label($authority->getName() . ' Settings');
+        }
 
-        $this->settingsContainers['default'] = $setting;
-        return $setting;
+        else if ($authority instanceof Framework) {
+            $container = Settings::checkout($authority)->make([
+                'group' => 'meros_framework_settings',
+                'name'  => 'meros_framework_settings',
+            ])
+                ->type('object')
+                ->label('Meros Framework Settings');
+        }
+
+        if ($container === null) {
+            throw new \BadMethodCallException("The default settings container for the feature provider '{$authority->getHandle()}' has not been created.");
+        }
+
+        $this->settingsContainers['default'] = $container;
+        return $container;
     }
 
     /**
@@ -238,6 +278,88 @@ trait HasSettings {
      * @return boolean
      */
     final public function hasSettings(): bool {
-        return $this->settings()->hasSubItems();
+        if (isset($this->hasSettings)) {
+            return $this->hasSettings;
+        }
+
+        $hasSettings = false;
+
+        foreach ($this->settingsContainers as $container) {
+            if ($container instanceof Setting && !empty($container->getSubItems())) {
+                $hasSettings = true;
+                break;
+            }
+        }
+        
+        $this->hasSettings = $hasSettings;
+        return $this->hasSettings;
+    }
+
+    /**
+     * Returns the slug of the settings page for this item.
+     *
+     * @return string
+     */
+    final public function getSettingsPageSlug(): string {
+        return $this instanceof BaseTheme
+            ? 'meros-theme-settings' 
+            : 'meros-packages-' . $this->getHandle();
+    }
+
+    /**
+     * Retrieves the current values of all settings registered by the feature provider.
+     * 
+     * @param string|bool $container The name of the settings container to retrieve values from, or a boolean indicating whether to refresh the cached values.
+     * @param bool        $refresh   Whether to refresh the cached values of the settings.
+     *
+     * @return array
+     */
+    public function getSettings(string|bool $container = '', bool $refresh = false): array {
+        if (is_bool($container)) {
+            $refresh = $container;
+            $container = '';
+        }
+
+        if (!isset($this->settingsValues) || $refresh) {
+            $value = [];
+            foreach ($this->settingsContainers as $settingContainer) {
+                if ($settingContainer instanceof Setting) {
+                    $value[$settingContainer->name] = $settingContainer->getValue();
+                }
+            }
+
+            if ($this instanceof FeatureSet === false) {
+                $featureSets = FeatureSets::all($this->resolveAuthority());
+
+                if ($featureSets instanceof Collection) {
+                    foreach ($featureSets as $featureSet) {
+                        if ($featureSet instanceof FeatureSet) {
+                            $value[$featureSet->handle] = $featureSet->getSettings($refresh);
+                        }
+                    }
+                }
+            }
+
+            $this->settingsValues = $value;
+        }
+
+        if (!empty($container) && $this->settingsContainers[$container] ?? null instanceof Setting) {
+            return $this->settingsValues[$container] ?? [];
+        }
+
+        return $this->settingsValues;
+    }
+
+    /**
+     * Retrieves the current values of all settings registered by the feature provider.
+     * Alias of getSettings() for users who prefer snake_case method names.
+     *
+     * @param string|bool $container The name of the settings container to retrieve values from, or a boolean indicating whether to refresh the cached values.
+     * @param bool        $refresh   Whether to refresh the cached values of the settings.
+     *
+     * @return array
+     */
+    public function get_settings(string $container = '', bool $refresh = false): array {
+        return $this->getSettings($container, $refresh);
     }
 }

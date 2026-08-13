@@ -9,28 +9,22 @@ use MM\Meros\Services\Contracts\Forms\DynamicChoiceSource;
 
 class DynamicChoiceSources extends Register {
     protected string $identifier = 'source';
-
     protected string $definition = DynamicChoiceSource::class;
-
-    protected array $supports = [
-        'register',
-        'make',
-        'makeFrom',
-        'public',
-        'multiple',
-    ];
 
     protected function parseProperties(array $props): array {
         return [
-            'source' => $props['source'] ?? '',
-            'label' => $props['label'] ?? '',
-            'description' => $props['description'] ?? '',
-            'resolver' => $props['resolver'] ?? null,
+            'source'       => $props['source'] ?? '',
+            'label'        => $props['label'] ?? '',
+            'description'  => $props['description'] ?? '',
+            'resolver'     => $props['resolver'] ?? null,
             'configFields' => $props['configFields'] ?? $props['config_fields'] ?? [],
         ];
     }
 
     /**
+     * Returns all resolved dynamic choice source instances, including those 
+     * registered in the current provider and any previously registered sources.
+     * 
      * @return Collection<int, DynamicChoiceSource>
      */
     public function allResolved(?FeatureProvider $provider = null): Collection {

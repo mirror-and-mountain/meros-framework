@@ -3,12 +3,12 @@
 namespace MM\Meros\Services\Registers;
 
 use MM\Meros\Services\Contracts\Register;
-use MM\Meros\Services\Contracts\AssetGroup;
+use MM\Meros\Services\Components\AssetGroup;
 
 class AssetGroups extends Register {
     protected string $identifier = 'name';
     protected string $definition = AssetGroup::class;
-    protected array  $rejects    = ['makeFromCallback'];
+    protected array  $rejects    = ['register', 'makeFrom', 'makeFromCallback'];
 
     /**
      * Parses properties for the asset group's constructor.
@@ -22,8 +22,7 @@ class AssetGroups extends Register {
             'name'          => $props['name'] ?? '',
             'label'         => $props['label'] ?? '',
             'description'   => $props['description'] ?? '',
-            'isSwitchable'  => $props['switchable'] ?? null,
-            'wasDiscovered' => $props['discovered'] ?? false,
+            'isSwitchable'  => $props['switchable'] ?? null
         ];
     }
 }

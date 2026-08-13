@@ -54,7 +54,6 @@ abstract class Register {
         'make',
         'makeFrom',
         'makeFromCallback',
-        'public',
         'multiple'
     ];
 
@@ -82,6 +81,7 @@ abstract class Register {
 
     /**
      * Checks out the register to a specific feature provider.
+     * 
      *
      * @param FeatureProvider $provider The provider to check out the register to.
      * 
@@ -93,19 +93,12 @@ abstract class Register {
     }
 
     /**
-     * Determines if the register is currently checked out to a provider.
-     * 
-     * @param FeatureProvider|null $provider Optional provider to check against. If null, checks if the register is checked out to any provider.
+     * Throws an error if the register is not currently checked out to a provider.
      * 
      * @return void
      * @throws \LogicException If the register is not currently checked out to a provider.
      */
-    protected function ensureCheckedOut(?FeatureProvider $provider = null): void {
-        if ($provider !== null && $this->provider === null) {
-            $this->checkout($provider);
-            return;
-        }
-
+    protected function ensureCheckedOut(): void {
         if ($this->provider === null) {
             throw new \LogicException("The register (" . static::class . ") is not currently checked out to a provider.");
         }
@@ -140,13 +133,12 @@ abstract class Register {
      *
      * @param string               $id                     The identifier for the feature class or a callback to create the feature when required.
      * @param string|array|Closure $featureClassOrCallback The fully qualified class name of the feature or a callback to create it.
-     * @param FeatureProvider|null $provider               Optional provider to check out the register to for this operation.
      *
-     * @return void
+     * @return self
      * @throws \BadMethodCallException If the register does not support registering feature classes.
      * @throws \InvalidArgumentException If the provided class does not extend the expected definition class or if it already exists in the register.
      */
-    public function register(string $id, string|array|Closure $featureClassOrCallback, ?FeatureProvider $provider = null): void {
+    public function register(string $id, string|array|Closure $featureClassOrCallback): self {
         if (!$this->supports('register')) {
             throw new \BadMethodCallException("This register (" . static::class . ") does not support registering feature classes.");
         }
@@ -165,8 +157,6 @@ abstract class Register {
             throw new \InvalidArgumentException("The class {$featureClassOrCallback} is already registered in this register (" . static::class . ").");
         }
 
-        $this->ensureCheckedOut($provider);
-
         if (!is_callable($featureClassOrCallback)) {
             $class = ClassInfo::get($featureClassOrCallback);
 
@@ -176,7 +166,7 @@ abstract class Register {
         }
 
         $this->registered[$id] = $featureClassOrCallback;
-        $this->checkin();
+        return $this;
     }
 
     /**
@@ -197,17 +187,16 @@ abstract class Register {
      *
      * @param Closure|array|null   $callback Optional callback to configure the feature.
      * @param array                $props Optional arguments for the feature's constructor.
-     * @param FeatureProvider|null $provider Optional provider to check out the register to for this operation.
      *
      * @return FeatureDefinition The newly created feature instance.
      * @throws \BadMethodCallException If the register does not support making features.
      */
-    public function make(Closure|array|null $callback = null, array $props = [], ?FeatureProvider $provider = null): FeatureDefinition {
+    public function make(Closure|array|null $callback = null, array $props = []): FeatureDefinition {
         if (!$this->supports('make')) {
             throw new \BadMethodCallException("This register (" . static::class . ") does not support making features.");
         }
 
-        $this->ensureCheckedOut($provider);
+        $this->ensureCheckedOut();
 
         $params = func_num_args();
 
@@ -238,19 +227,17 @@ abstract class Register {
      * @param string               $id        The identifier of the registered feature to instantiate.
      * @param Closure|array|null   $callback  Optional callback to configure the feature.
      * @param array                $props     Optional arguments for the feature's constructor.
-     * @param FeatureProvider|null $provider  Optional provider to check out the register to for this operation.
      *
      * @return FeatureDefinition The newly created feature instance.
      * @throws \BadMethodCallException If the register does not support making features from registered classes or callbacks, or if the specified ID is not registered.
      * @throws \InvalidArgumentException If the registered class does not extend the expected definition class or if the callback does not return a valid feature instance.
      */
-    public function makeFrom(string $id, Closure|array|null $callback = null, array $props = [], ?FeatureProvider $provider = null): FeatureDefinition {
+    public function makeFrom(string $id, Closure|array|null $callback = null, array $props = []): FeatureDefinition {
         if (!$this->supports('makeFrom') && !$this->supports('makeFromCallback')) {
             throw new \BadMethodCallException("This register (" . static::class . ") does not support making features from registered classes or callbacks.");
         }
 
-        $this->ensureCheckedOut($provider);
-        $provider = $this->provider;
+        $this->ensureCheckedOut();
 
         $params = func_num_args();
 
@@ -290,12 +277,11 @@ abstract class Register {
             throw new \BadMethodCallException("Could not create an instance of the item with ID {$id} in this register (" . static::class . ").");
         }
 
-        $this->checkout($provider); // Re-checkout to ensure the provider is set after making the item
-
         if ($callback && $callback instanceof Closure) {
             $callback($item);
         }
 
+        $this->checkin();
         return $item;
     }
 
@@ -326,81 +312,32 @@ abstract class Register {
      *
      * @param string               $id       Optional identifier to retrieve a specific feature.
      * @param Closure|null         $callback Optional callback to filter or modify the retrieved feature(s).
-     * @param FeatureProvider|null $provider Optional provider to check out the register to for this operation.
      * 
      * @return FeatureDefinition|Collection|null The requested feature, all the provider's features, or null if not found.
      */
-    public function get(string $id = '', ?Closure $callback = null, ?FeatureProvider $provider = null): FeatureDefinition|Collection|null {
-        // If the register supports public retrieval, search all instances regardless of provider
-        if ($this->supports('public')) {
-            // If no ID is provided, return all instances (optionally filtered by the callback)
-            if ($id === '') {
-                $items = $this->instances;
-
-                if ($callback) {
-                    $items->each($callback);
-                }
-
-                return $items;
-            }
-
-            // Search for the item by the identifier or nickname across all instances
-            $item = $this->instances->firstWhere($this->identifier, $id);
-
-            // If not found by identifier, try searching by nickname
-            if ($item === null) {
-                $item = $this->instances->firstWhere('nickname', $id);
-            }
-
-            // Check if the item is registered but not currently instantiated
-            if ($item === null) {
-                $registered = $this->registered[$id] ?? null;
-
-                if ($registered) {
-                    $item = $this->makeFrom($id);
-                    $item->{$this->identifier} = $id; // Ensure the identifier is set on the item
-                }
-            }
-
-            // If a callback is provided, execute it with the found item
-            if ($item && $callback) {
-                $callback($item);
-            }
-
-            return $item;
+    public function get(string $id = '', FeatureProvider|Closure|null $provider = null, ?Closure $callback = null): FeatureDefinition|Collection|null {
+        if ($provider instanceof Closure) {
+            $callback = $provider;
+            $provider = null;
         }
-
-        // If public retrieval is not supported, search instances from the current provider
-        $this->ensureCheckedOut($provider);
-        $provider = $this->provider;
-
-        // If no ID is provided, return all instances for the current provider (optionally filtered by the callback)
+    
+        // If no ID is provided, return all instances (optionally filtered by the callback)
         if ($id === '') {
-            $items = $this->instances->where('provider', $this->provider);
+            $items = $provider ? $this->instances->where('provider', $provider) : $this->instances;
 
             if ($callback) {
                 $items->each($callback);
             }
 
-            $this->checkin();
             return $items;
         }
 
-        // Search for the item by the identifier field or nickname among instances from the current provider
-        $item = $this->instances->where('provider', $this->provider)->firstWhere($this->identifier, $id);
-        
-        if ($item === null) {
-            $item = $this->instances->where('provider', $this->provider)->firstWhere('nickname', $id);
-        }
+        // Search for the item by the identifier or nickname across all instances
+        $item = $this->instances->firstWhere($this->identifier, $id);
 
+        // If not found by identifier, try searching by nickname
         if ($item === null) {
-            $registered = $this->registered[$id] ?? null;
-
-            if ($registered) {
-                $item = $this->makeFrom($id);
-                $item->{$this->identifier} = $id; // Ensure the identifier is set on the item
-                $this->checkout($provider); // Re-checkout to ensure the provider is set after making the item
-            }
+            $item = $this->instances->firstWhere('nickname', $id);
         }
 
         // If a callback is provided, execute it with the found item
@@ -408,7 +345,6 @@ abstract class Register {
             $callback($item);
         }
 
-        $this->checkin();
         return $item;
     }
 
@@ -420,16 +356,11 @@ abstract class Register {
      * @return Collection A collection of all features in the register.
      */
     public function all(?FeatureProvider $provider = null): Collection {
-        if ($this->supports('public')) {
+        if ($provider === null) {
             return $this->instances;
         }
 
-        $this->ensureCheckedOut($provider);
-        
-        $items = $this->instances->where('provider', $this->provider);
-        $this->checkin();
-
-        return $items;
+        return $this->instances->where('provider', $provider);
     }
 
     /**
@@ -460,5 +391,14 @@ abstract class Register {
         }
 
         return false;
+    }
+
+    /**
+     * Returns the current instance of the register.
+     *
+     * @return self The current register instance.
+     */
+    final public function getInstance(): self {
+        return $this;
     }
 }

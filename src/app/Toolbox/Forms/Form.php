@@ -19,6 +19,7 @@ use MM\Meros\Services\Contracts\Forms\FormAction as FormActionContract;
 
 use MM\Meros\Facades\FormActions;
 use MM\Meros\Facades\Framework;
+use MM\Meros\Support\Forms\ConditionEvaluator;
 
 class Form extends Component {
     /**
@@ -112,6 +113,20 @@ class Form extends Component {
      */
     public array $fieldState = [];
 
+    /**
+     * Baseline field attributes used when re-applying runtime conditions.
+     *
+     * @var array<string, array{required: bool|null, disabled: bool|null}>
+     */
+    public array $fieldConditionBaselines = [];
+
+    /**
+     * Runtime visibility state for fields keyed by field ID.
+     *
+     * @var array<string, bool>
+     */
+    public array $fieldConditionVisibility = [];
+
     public function mount(string|int $formID, bool $showTitle = false, bool $showDescription = true, bool $isPagedView = false) {
         $this->formID          = $formID;
         $this->showTitle       = $showTitle;
@@ -136,6 +151,7 @@ class Form extends Component {
     }
 
     public function render() {
+        $this->applyRuntimeFieldConditions();
         $this->recalculateGroupPages();
 
         return view('meros::forms.form', [
@@ -263,6 +279,7 @@ class Form extends Component {
     public function submitForm(array $data): void {
         $this->resetErrorBag();
         $this->syncFormState($data);
+        $this->applyRuntimeFieldConditions();
 
         [$sanitisedData, $validationErrors] = $this->validateAndSanitiseSubmission($this->fieldState);
 
@@ -415,6 +432,10 @@ class Form extends Component {
                 'label' => $field->getLabel(),
                 'value' => $value,
             ];
+
+            if (!$this->shouldValidateField($field)) {
+                continue;
+            }
 
             $fieldErrors = $this->validateFieldValue($field, $value);
 
@@ -577,6 +598,261 @@ class Form extends Component {
         }
 
         return false;
+    }
+
+    /**
+     * Shared condition evaluation helper intended for upcoming non-repeater condition handling.
+     *
+     * @param array<int, array<string, mixed>> $rules
+     * @param array<string, mixed> $context
+     * @param string $logic
+     * @return bool
+     */
+    private function evaluateConditionRules(array $rules, array $context, string $logic = 'and'): bool {
+        if (empty($rules)) {
+            return true;
+        }
+
+        $results = [];
+
+        foreach ($rules as $rule) {
+            if (!is_array($rule)) {
+                continue;
+            }
+
+            $field = (string) ($rule['field'] ?? '');
+            $operator = (string) ($rule['operator'] ?? 'equals');
+            $expected = $rule['value'] ?? null;
+            $actual = $field !== '' && array_key_exists($field, $context)
+                ? $context[$field]
+                : null;
+
+            $results[] = ConditionEvaluator::evaluateRule($actual, $operator, $expected);
+        }
+
+        if (empty($results)) {
+            return true;
+        }
+
+        return strtolower($logic) === 'or'
+            ? in_array(true, $results, true)
+            : !in_array(false, $results, true);
+    }
+
+    /**
+     * Returns whether a field should currently render based on evaluated conditions.
+     *
+     * @param Field $field
+     * @return bool
+     */
+    public function shouldRenderField(mixed $field): bool {
+        if (!($field instanceof Field)) {
+            return false;
+        }
+
+        return $this->isFieldVisible($field->id);
+    }
+
+    /**
+     * Applies runtime field conditions using current form state as evaluation context.
+     *
+     * @return void
+     */
+    private function applyRuntimeFieldConditions(): void {
+        $fields = $this->getFields(true);
+
+        $this->captureFieldConditionBaselines($fields);
+
+        $context = $this->buildConditionContext($fields);
+        $visibility = [];
+
+        foreach ($fields as $field) {
+            $fieldId = (string) $field->id;
+            $baseline = $this->fieldConditionBaselines[$fieldId] ?? [
+                'required' => $field->isRequired(),
+                'disabled' => $field->isDisabled(),
+            ];
+
+            if ($field->isRequired() !== null) {
+                $field->required((bool) ($baseline['required'] ?? false));
+            }
+
+            if ($field->isDisabled() !== null) {
+                $field->disabled((bool) ($baseline['disabled'] ?? false));
+            }
+
+            $conditions = $field->getConditions();
+
+            $showMatch = $this->evaluateConditionType($conditions, 'show', $context);
+            $hideMatch = $this->evaluateConditionType($conditions, 'hide', $context);
+            $requireMatch = $this->evaluateConditionType($conditions, 'require', $context);
+            $optionalMatch = $this->evaluateConditionType($conditions, 'optional', $context);
+            $enableMatch = $this->evaluateConditionType($conditions, 'enable', $context);
+            $disableMatch = $this->evaluateConditionType($conditions, 'disable', $context);
+
+            $isVisible = true;
+
+            if ($this->conditionTypeHasRules($conditions, 'show')) {
+                $isVisible = $showMatch;
+            }
+
+            if ($hideMatch) {
+                $isVisible = false;
+            }
+
+            if ($field->isRequired() !== null) {
+                if ($requireMatch) {
+                    $field->required(true);
+                }
+
+                if ($optionalMatch) {
+                    $field->required(false);
+                }
+            }
+
+            if ($field->isDisabled() !== null) {
+                if ($enableMatch) {
+                    $field->disabled(false);
+                }
+
+                if ($disableMatch) {
+                    $field->disabled(true);
+                }
+            }
+
+            $visibility[$fieldId] = $isVisible;
+        }
+
+        $this->fieldConditionVisibility = $visibility;
+    }
+
+    /**
+     * Stores baseline required/disabled values for all current fields.
+     *
+     * @param Collection|null $fields
+     * @return void
+     */
+    private function captureFieldConditionBaselines(?Collection $fields = null): void {
+        $targetFields = $fields ?? $this->getFields(true);
+
+        foreach ($targetFields as $field) {
+            $fieldId = (string) $field->id;
+
+            if ($fieldId === '' || array_key_exists($fieldId, $this->fieldConditionBaselines)) {
+                continue;
+            }
+
+            $this->fieldConditionBaselines[$fieldId] = [
+                'required' => $field->isRequired(),
+                'disabled' => $field->isDisabled(),
+            ];
+        }
+    }
+
+    /**
+     * Builds a condition context map keyed by field ID and field name.
+     *
+     * @param Collection $fields
+     * @return array<string, mixed>
+     */
+    private function buildConditionContext(Collection $fields): array {
+        $context = [];
+
+        foreach ($fields as $field) {
+            $fieldId = (string) $field->id;
+
+            if ($fieldId === '') {
+                continue;
+            }
+
+            $persisted = $this->fieldState[$fieldId]['value'] ?? null;
+            $value = array_key_exists('value', $this->fieldState[$fieldId] ?? [])
+                ? $persisted
+                : $field->getValue();
+
+            $context[$fieldId] = $value;
+
+            $fieldName = trim((string) $field->getName());
+
+            if ($fieldName !== '') {
+                $context[$fieldName] = $value;
+            }
+        }
+
+        return $context;
+    }
+
+    /**
+     * Returns whether a condition type has one or more valid rules.
+     *
+     * @param array $conditions
+     * @param string $type
+     * @return bool
+     */
+    private function conditionTypeHasRules(array $conditions, string $type): bool {
+        $config = is_array($conditions[$type] ?? null)
+            ? $conditions[$type]
+            : [];
+
+        $rules = is_array($config['rules'] ?? null)
+            ? $config['rules']
+            : [];
+
+        return !empty($rules);
+    }
+
+    /**
+     * Evaluates a specific condition type against the current context.
+     *
+     * @param array $conditions
+     * @param string $type
+     * @param array<string, mixed> $context
+     * @return bool
+     */
+    private function evaluateConditionType(array $conditions, string $type, array $context): bool {
+        $config = is_array($conditions[$type] ?? null)
+            ? $conditions[$type]
+            : [];
+
+        $rules = is_array($config['rules'] ?? null)
+            ? $config['rules']
+            : [];
+
+        if (empty($rules)) {
+            return false;
+        }
+
+        $logic = (string) ($config['logic'] ?? 'and');
+
+        return $this->evaluateConditionRules($rules, $context, $logic);
+    }
+
+    /**
+     * Determines whether a field should be considered visible in the current runtime state.
+     *
+     * @param string|null $fieldId
+     * @return bool
+     */
+    private function isFieldVisible(?string $fieldId): bool {
+        if (!is_string($fieldId) || $fieldId === '') {
+            return true;
+        }
+
+        return $this->fieldConditionVisibility[$fieldId] ?? true;
+    }
+
+    /**
+     * Determines whether a field should be validated in the current runtime state.
+     *
+     * @param Field $field
+     * @return bool
+     */
+    private function shouldValidateField(Field $field): bool {
+        if (!$this->isFieldVisible($field->id)) {
+            return false;
+        }
+
+        return $field->isDisabled() !== true;
     }
 
     /**

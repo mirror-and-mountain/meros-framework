@@ -43,6 +43,29 @@
 	font-size: 0.875rem;
 }
 
+/* Neutralize wp-admin table defaults (for example .form-table/.wp-list-table th,td rules). */
+.meros-repeater-table th.meros-repeater-head-cell,
+.meros-repeater-table td.meros-repeater-data-cell,
+.meros-repeater-table td.meros-repeater-move-cell,
+.meros-repeater-table td.meros-repeater-actions-cell {
+	float: none;
+	margin: 0;
+	vertical-align: top;
+	box-sizing: border-box;
+}
+
+.meros-repeater-table th.meros-repeater-data-header,
+.meros-repeater-table td.meros-repeater-data-cell {
+	width: auto;
+	max-width: none;
+}
+
+.meros-repeater-table thead th,
+.meros-repeater-table thead td {
+	padding: 1rem;
+	width: auto;
+}
+
 .meros-repeater-table .meros-repeater-data-header,
 .meros-repeater-table .meros-repeater-data-cell {
 	min-width: 16rem;
@@ -301,221 +324,53 @@
 
 .meros-repeater-config-dialog {
 	position: fixed;
-	inset: 0;
-	z-index: 100000;
-	width: auto;
-	max-width: none;
-	height: 100dvh;
-	max-height: 100dvh;
+	top: 0;
+	left: 0;
+	z-index: 9999;
+	width: 100%;
+	height: 100%;
 	display: none;
 	align-items: center;
 	justify-content: center;
-	box-sizing: border-box;
-	padding: 1rem;
+	background-color: rgba(0, 0, 0, 0.5);
+	padding: 0;
 	margin: 0;
 	border: 0;
-	border-radius: 0;
-	background: transparent;
-	box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
-	overflow: hidden;
 }
 
 .meros-repeater-config-dialog[open] {
 	display: flex;
 }
 
-body.meros-repeater-dialog-open {
+body.meros-repeater-row-dialog-open {
 	overflow: hidden;
 }
 
 .meros-repeater-config-dialog::backdrop {
-	background: rgba(17, 24, 39, 0.52);
-	backdrop-filter: blur(2px);
+	background-color: rgba(0, 0, 0, 0.5);
 }
 
 .meros-repeater-config-dialog__shell {
+	width: 900px;
+	max-width: 90%;
+	max-height: 60%;
+	padding: 2rem;
+	border-radius: 5px;
+	background-color: #ffffff;
+	overflow: auto;
+}
+
+.meros-repeater-row-dialog-content .meros-field {
 	display: flex;
 	flex-direction: column;
-	width: min(82rem, 100%);
-	max-width: 100%;
-	height: auto;
-	max-height: calc(100dvh - 2rem);
-	min-height: 0;
-	border-radius: 0.75rem;
-	overflow: hidden;
-	box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
-	background: #ffffff;
-	color: #111827;
-}
-
-
-.meros-repeater-config-dialog__header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 1rem;
-	padding: 1rem 1.25rem;
-	border-bottom: 1px solid #e5e7eb;
-	background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
-}
-
-.meros-repeater-config-dialog__title {
-	margin: 0;
-	font-size: 1rem;
-	font-weight: 600;
-	line-height: 1.5rem;
-	color: #111827;
-}
-
-
-.meros-repeater-config-dialog__body {
-	flex: 1 1 auto;
-	display: grid;
-	gap: 1rem;
-	padding: 1.25rem;
-	overflow-y: auto;
-	overflow-x: clip;
-	-webkit-overflow-scrolling: touch;
-	background-color: #f9fafb;
+	margin-top: 1rem;
 }
 
 .meros-repeater-config-dialog__footer {
 	display: flex;
 	justify-content: flex-end;
-	padding: 0.875rem 1.25rem 1.25rem;
-	border-top: 1px solid #e5e7eb;
-	background: #ffffff;
-}
-
-.meros-repeater-config-dialog__field {
-	padding: 1rem;
-	border: 1px solid #e5e7eb;
-	border-radius: 0.75rem;
-	background-color: #ffffff;
-	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-.meros-repeater-config-dialog__field-label {
-	margin: 0 0 0.75rem;
-	font-size: 0.8125rem;
-	font-weight: 600;
-	line-height: 1.25rem;
-	letter-spacing: 0.01em;
-	color: #374151;
-}
-
-.meros-repeater-config-dialog__field-input {
-	display: grid;
-	gap: 0.75rem;
-	min-width: 0;
-	padding-top: 0.125rem;
-	overflow: visible;
-}
-
-.meros-repeater-config-dialog__field-input .meros-field,
-.meros-repeater-config-dialog__field-input .meros-field input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='color']),
-.meros-repeater-config-dialog__field-input .meros-field select,
-.meros-repeater-config-dialog__field-input .meros-field textarea {
-	min-width: 100%;
-	width: 100%;
-	max-width: 100%;
-	box-sizing: border-box;
-}
-
-.meros-repeater-config-dialog__field-input .meros-site-field label,
-.meros-repeater-config-dialog__field-input .nice-form-group label {
-	display: inline-flex;
-	align-items: center;
 	gap: 0.5rem;
-}
-
-@media (max-width: 640px) {
-	.meros-repeater {
-		border-radius: 0.375rem;
-	}
-
-	.meros-repeater-scroll {
-		padding-bottom: 0.25rem;
-		margin-bottom: -0.25rem;
-	}
-
-	.meros-repeater-table {
-		min-width: max-content;
-	}
-
-	.meros-repeater-table .meros-repeater-data-header,
-	.meros-repeater-table .meros-repeater-data-cell {
-		min-width: 12.5rem;
-	}
-
-	.meros-repeater-move-cell,
-	.meros-repeater-head-cell--move {
-		width: 2.25rem;
-	}
-
-	.meros-repeater-actions-cell,
-	.meros-repeater-head-cell--actions {
-		width: 7.5rem;
-	}
-
-	.meros-repeater-move-cell,
-	.meros-repeater-data-cell,
-	.meros-repeater-actions-cell {
-		padding: 0.625rem;
-	}
-
-	.meros-repeater-head-cell {
-		padding: 0.5rem 0.625rem;
-	}
-
-	.meros-repeater-config-dialog {
-		padding: 0.5rem;
-	}
-
-	.meros-repeater-config-dialog__shell {
-		width: 100%;
-		max-height: calc(100dvh - 1rem);
-	}
-
-	.meros-repeater-config-dialog__header,
-	.meros-repeater-config-dialog__body,
-	.meros-repeater-config-dialog__footer {
-		padding-inline: 0.875rem;
-	}
-
-	.meros-repeater-config-dialog__header {
-		align-items: flex-start;
-		flex-direction: column;
-		gap: 0.75rem;
-		padding-top: 0.875rem;
-		padding-bottom: 0.875rem;
-	}
-
-	.meros-repeater-config-dialog__header .button {
-		width: 100%;
-		justify-content: center;
-	}
-
-	.meros-repeater-config-dialog__body {
-		gap: 0.75rem;
-		padding-top: 0.875rem;
-		padding-bottom: 1rem;
-	}
-
-	.meros-repeater-config-dialog__footer {
-		padding-top: 0.75rem;
-		padding-bottom: 0.875rem;
-	}
-
-	.meros-repeater-config-dialog__footer .button {
-		width: 100%;
-		justify-content: center;
-	}
-
-	.meros-repeater-config-dialog__field {
-		padding: 0.75rem;
-		border-radius: 0.625rem;
-	}
+	margin-top: 1rem;
 }
 
 .meros-repeater-table input[type='text'],

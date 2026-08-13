@@ -2,49 +2,67 @@
 
 namespace MM\Meros\App;
 
-use MM\Meros\Services\Contracts\FeatureProvider;
+use Illuminate\Support\Str;
 
-abstract class Package extends FeatureProvider {
-    /**
-     * Indicates whether the package is enabled.
-     *
-     * @var boolean
-     */
-    private bool $enabled = false;
+use MM\Meros\Contracts\Provider;
 
-    final public function __construct(
-        string $name = '',
-        string $path = '',
-        string $uri  = ''
-    ) {
-        $enabled = get_option('meros_framework_settings')['packages'][$this->getHandle() . '_enable'] ?? false;
-        $this->enabled = (bool) $enabled;
+use MM\Meros\Registers\Admin\SettingsContainers;
+use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 
-        if ($this->enabled) {
-            parent::__construct($name, $path, $uri);
-        }
+use MM\Meros\Contracts\Providers\Concerns\IsNonFrameworkProvider;
 
-        else {
-            $this->setIdentity($name, $path, $uri);
-            $this->settingsContainer('default');
-        }
+use MM\Meros\Support\ClassInfo;
+
+abstract class Package extends Provider {
+    use IsNonFrameworkProvider;
+    
+    // =========================================================================
+    // Initialisation
+    // =========================================================================
+
+    final protected function afterInit(): void {
+        $info = ClassInfo::get(static::class);
+
+        $this->setName(Str::headline($info->shortName));
+        $this->setPath($info->path);
+        $this->setUri($info->uri);
     }
 
     /**
-     * Gets the instance of the package.
+     * Sets the package's handle.
      *
-     * @return Package
+     * @param string $handle
+     *
+     * @return void
      */
-    final public function get(): Package {
-        return $this;
+    final protected function setHandle(string $handle): void {
+        $handle = Str::snake($handle);
+        $author = $this->getAuthor();
+
+        parent::setHandle(
+            Str::startsWith($handle, 'meros_') 
+                ? $handle 
+                : ($author !== '' ? $author . '_' . $handle : $handle)
+        );
     }
 
+    // =========================================================================
+    // Settings Management
+    // =========================================================================
+
     /**
-     * Returns whether the package is enabled.
+     * Resolves the settings container for the package.
      *
-     * @return bool
+     * @param SettingsContainers $register The SettingsContainers register.
+     *
+     * @return SettingsContainer The settings container for the package.
      */
-    final public function isEnabled(): bool {
-        return $this->enabled;
+    final public function resolveSettingsContainer(SettingsContainers $register): SettingsContainer {
+        $containerName = $this->getHandle() . '_settings';
+
+        return $register->get($containerName, $this) ?? 
+               $register
+                ->checkout($this)
+                ->makeFrom($containerName);
     }
 }

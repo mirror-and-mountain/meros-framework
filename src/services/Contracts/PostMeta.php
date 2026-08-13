@@ -21,7 +21,6 @@ use MM\Meros\Facades\FieldGroups;
 use MM\Meros\Facades\PostMetaDefinitions;
 
 class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRegistrant {
-
     /**
      * The post type that this meta belongs to.
      *
@@ -46,6 +45,10 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
     use IsDataRegistrant {
         IsDataRegistrant::field as protected makeField;
     }
+
+    // =========================================================================
+    // Initialisation
+    // =========================================================================
 
     final public function __construct(
         FeatureProvider $provider,
@@ -181,9 +184,10 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         }
     }
 
-    /***************************
-     * Default Callbacks
-     ***************************/
+    // =========================================================================
+    // Default callbacks
+    // =========================================================================
+
     /**
      * The default authentication callback for the post meta, which checks if the current user has permission to edit posts.
      *
@@ -273,9 +277,9 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         update_post_meta($postId, $this->name, $existingData);
     }
 
-    /***************************
-     * Public Chainable methods
-     ***************************/
+    // =========================================================================
+    // Attribute Setters
+    // =========================================================================
 
     /**
      * Sets the key for the post meta. This is required for the post meta to be registered.
@@ -330,6 +334,10 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         return $this->single(!$multiple);
     }
 
+    // =========================================================================
+    // Field Management
+    // =========================================================================
+
     /**
      * Overrides field() method from IsAdminFieldRegistrant to ensure the field is attached to the correct field group.
      *
@@ -365,101 +373,6 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
 
         return $this->field;
     }
-
-    /***************************
-     * Getters
-     ***************************/
-
-    /**
-     * Retrieves the value of the post meta for a given post ID. If no post ID is provided, it will attempt to use the global $post.
-     *
-     * @param int|null $postId Optional post ID to retrieve the meta for. If not provided, uses the global $post.
-     *
-     * @return mixed The value of the post meta, or null if not found or if required properties are missing.
-     */
-    final public function getValue(?int $postId = null): mixed {
-        // If required properties are missing, return null
-        if (empty($this->name)) {
-            return null;
-        }
-
-        if ($this->isRoot() && empty($this->postType)) {
-            return null;
-        }
-
-        $postType = $this->getPostType();
-        $post     = get_post($postId);
-
-        // If no post ID is provided, attempt to use the global $post
-        if ($post === null) {
-            $post = get_post();
-            $postId = $post->ID ?? null;
-        }
-
-        // If we still don't have a post ID, return null
-        if (is_null($postId)) {
-            return null;
-        }
-
-        // If the post type doesn't match, return null
-        if ($post->post_type !== $postType) {
-            return null;
-        }
-
-        // Traverse up to the root of the post meta structure
-        $root = $this;
-        while ($root->parent !== null) {
-            $root = $root->parent;
-        }
-
-        // Retrieve the post meta value using get_post_meta
-        $value = get_post_meta($postId, $root->getName(), $this->args['single']);
-
-        if ($this->isRoot()) {
-            // Merge with default values from sub-items 
-            if (!empty($this->subItems)) {
-                $value = is_array($value) ? $value : [];
-
-                foreach ($root->getSubItems() as $subItem) {
-                    if (!isset($value[$subItem->name])) {
-                        $value[$subItem->name] = $subItem->getValue($postId);
-                    }
-                }
-
-                return $value;
-            }
-
-            return $value;
-        }
-
-        return $value[$this->name] ?? ($this->args['default'] ?? null);
-    }
-
-    /**
-     * Retrieves the default value of the post meta.
-     *
-     * @return mixed
-     */
-    public function getDefault(): mixed {
-        return $this->args['default'] ?? null;
-    }
-
-    /**
-     * Retrieves the post type that this meta belongs to. If this is a nested meta, it will traverse up to the root to get the post type.
-     *
-     * @return string|null The post type this meta belongs to, or null if not set.
-     */
-    public function getPostType(): ?string {
-        if ($this->isRoot()) {
-            return $this->postType;
-        }
-
-        return $this->parent->getPostType();
-    }
-
-    /***************************
-     * Helpers
-     ***************************/
 
     /**
      * Retrieves the root field group for this post meta, creating it if it doesn't exist.
@@ -694,5 +607,96 @@ class PostMeta extends FeatureDefinition implements DataRegistrant, AdminFieldRe
         if (!empty($this->args['description'])) {
             $this->field->helpText((string) $this->args['description']);
         }
+    }
+
+    // =========================================================================
+    // Getters
+    // =========================================================================
+
+    /**
+     * Retrieves the value of the post meta for a given post ID. If no post ID is provided, it will attempt to use the global $post.
+     *
+     * @param int|null $postId Optional post ID to retrieve the meta for. If not provided, uses the global $post.
+     *
+     * @return mixed The value of the post meta, or null if not found or if required properties are missing.
+     */
+    final public function getValue(?int $postId = null): mixed {
+        // If required properties are missing, return null
+        if (empty($this->name)) {
+            return null;
+        }
+
+        if ($this->isRoot() && empty($this->postType)) {
+            return null;
+        }
+
+        $postType = $this->getPostType();
+        $post     = get_post($postId);
+
+        // If no post ID is provided, attempt to use the global $post
+        if ($post === null) {
+            $post = get_post();
+            $postId = $post->ID ?? null;
+        }
+
+        // If we still don't have a post ID, return null
+        if (is_null($postId)) {
+            return null;
+        }
+
+        // If the post type doesn't match, return null
+        if ($post->post_type !== $postType) {
+            return null;
+        }
+
+        // Traverse up to the root of the post meta structure
+        $root = $this;
+        while ($root->parent !== null) {
+            $root = $root->parent;
+        }
+
+        // Retrieve the post meta value using get_post_meta
+        $value = get_post_meta($postId, $root->getName(), $this->args['single']);
+
+        if ($this->isRoot()) {
+            // Merge with default values from sub-items 
+            if (!empty($this->subItems)) {
+                $value = is_array($value) ? $value : [];
+
+                foreach ($root->getSubItems() as $subItem) {
+                    if (!isset($value[$subItem->name])) {
+                        $value[$subItem->name] = $subItem->getValue($postId);
+                    }
+                }
+
+                return $value;
+            }
+
+            return $value;
+        }
+
+        return $value[$this->name] ?? ($this->args['default'] ?? null);
+    }
+
+    /**
+     * Retrieves the default value of the post meta.
+     *
+     * @return mixed
+     */
+    public function getDefault(): mixed {
+        return $this->args['default'] ?? null;
+    }
+
+    /**
+     * Retrieves the post type that this meta belongs to. If this is a nested meta, it will traverse up to the root to get the post type.
+     *
+     * @return string|null The post type this meta belongs to, or null if not set.
+     */
+    public function getPostType(): ?string {
+        if ($this->isRoot()) {
+            return $this->postType;
+        }
+
+        return $this->parent->getPostType();
     }
 }

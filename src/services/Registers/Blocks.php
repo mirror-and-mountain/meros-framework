@@ -4,14 +4,14 @@ namespace MM\Meros\Services\Registers;
 
 use Illuminate\Support\Facades\File;
 
-use MM\Meros\Services\Contracts\Block;
 use MM\Meros\Services\Contracts\Register;
+use MM\Meros\Services\Components\Block;
 use MM\Meros\Services\Registers\Interfaces\Discovery;
 
 class Blocks extends Register implements Discovery {
     protected string $identifier = 'name';
     protected string $definition = Block::class;
-    protected array  $rejects    = ['makeFromCallback'];
+    protected array  $rejects    = ['register', 'makeFrom', 'makeFromCallback'];
 
     use Concerns\Discovers;
 
@@ -41,7 +41,6 @@ class Blocks extends Register implements Discovery {
             'name'          => $props['name'] ?? '',
             'path'          => $props['path'] ?? '',
             'isSwitchable'  => $props['switchable'] ?? false,
-            'wasDiscovered' => $props['discovered'] ?? false,
             'args'          => $props['args'] ?? [],
         ];
     }

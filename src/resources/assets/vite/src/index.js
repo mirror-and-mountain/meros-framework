@@ -1,4 +1,4 @@
-import { setFieldValue, getFieldValue } from '../../forms/alpine/helpers.js';
+import '../../forms/alpine/api.js';
 import '../../forms/alpine/field-data.js';
 import './style.css';
 
@@ -546,6 +546,7 @@ document.addEventListener('alpine:init', () => {
         getActiveFieldCallback, 
         removeActiveFieldCallback
     ) => ({
+        mforms: window.mforms || null,
         open: false,
         initialised: false,
         activeFieldId: null,
@@ -765,31 +766,17 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            setFieldValue(fieldId, value);
+            mforms.setFieldValue(fieldId, value);
         },
     }));
 
-    Alpine.data('fieldConditions', (formFields) => ({
-        formFields: formFields,
-
-        showField: null,
-        hideField: null,
-        requireField: null,
-        optionalField: null,
-        disableField: null,
-        enableField: null,
-
-        showLogicField: null,
-        hideLogicField: null,
-        requireLogicField: null,
-        optionalLogicField: null,
-        disableLogicField: null,
-        enableLogicField: null,
-
+    Alpine.data('fieldConditions', (formFields, conditionTypes = {}) => ({
+        mforms: window.mforms || null,
+        formFields: formFields || {},
+        conditionTypes: (conditionTypes && typeof conditionTypes === 'object') ? conditionTypes : {},
+        conditionFields: {},
+        conditionLogicFields: {},
         onRuleChange: null,
-        onRuleLogicChange: null,
-        onRuleFieldChange: null,
-        onRuleOperatorChange: null,
 
         init() {
             this.__initialiseFields();
@@ -797,14 +784,17 @@ document.addEventListener('alpine:init', () => {
             this.onRuleChange = (event) => {
                 const { element, value, context } = event.detail ?? {};
 
-                if (element && element.getAttribute('data-conditions-field-select') !== null) {
-                    const formField = this.formFields[value] ?? null;
-
-                    if (formField && context) {
-                        this.__getRuleParams('show', context.repeater.row);
-                    }
+                if (!element || element.getAttribute('data-conditions-field-select') === null) {
+                    return;
                 }
-            }
+
+                const formField = this.formFields[value] ?? null;
+                const conditionType = this.__resolveConditionTypeFromElement(element);
+
+                if (formField && conditionType && context?.repeater?.row !== undefined) {
+                    this.__getRuleParams(conditionType, context.repeater.row);
+                }
+            };
 
             window.addEventListener('mforms:field-updated', this.onRuleChange);
         },
@@ -815,54 +805,53 @@ document.addEventListener('alpine:init', () => {
         },
 
         getConditions() {
-            return {
-                show: {
-                    'logic': this.showLogicField ? mforms.getFieldValue(this.showLogicField) : null,
-                    'rules': this.showField ? mforms.getFieldValue(this.showField) : null
-                },
-                hide: {
-                    'logic': this.hideLogicField ? mforms.getFieldValue(this.hideLogicField) : null,
-                    'rules': this.hideField ? mforms.getFieldValue(this.hideField) : null
-                },
-                require: {
-                    'logic': this.requireLogicField ? mforms.getFieldValue(this.requireLogicField) : null,
-                    'rules': this.requireField ? mforms.getFieldValue(this.requireField) : null
-                },
-                optional: {
-                    'logic': this.optionalLogicField ? mforms.getFieldValue(this.optionalLogicField) : null,
-                    'rules': this.optionalField ? mforms.getFieldValue(this.optionalField) : null
-                },
-                disable: {
-                    'logic': this.disableLogicField ? mforms.getFieldValue(this.disableLogicField) : null,
-                    'rules': this.disableField ? mforms.getFieldValue(this.disableField) : null
-                },
-                enable: {
-                    'logic': this.enableLogicField ? mforms.getFieldValue(this.enableLogicField) : null,
-                    'rules': this.enableField ? mforms.getFieldValue(this.enableField) : null
-                }
-            };
+            const conditions = {};
+
+            Object.keys(this.conditionTypes).forEach((type) => {
+                const logicField = this.conditionLogicFields[type] || null;
+                const rulesField = this.conditionFields[type] || null;
+
+                conditions[type] = {
+                    logic: logicField ? mforms.getFieldValue(logicField) : 'and',
+                    rules: rulesField ? (mforms.getFieldValue(rulesField) || []) : [],
+                };
+            });
+
+            return conditions;
         },
 
         __initialiseFields() {
-            this.showField     = mforms.getField('field-conditions-editor-show');
-            this.hideField     = document.getElementById('field-conditions-editor-hide');
-            this.requireField  = document.getElementById('field-conditions-editor-require');
-            this.optionalField = document.getElementById('field-conditions-editor-optional');
-            this.disableField  = document.getElementById('field-conditions-editor-disable');
-            this.enableField   = document.getElementById('field-conditions-editor-enable');
+            this.conditionFields = {};
+            this.conditionLogicFields = {};
 
-            this.showLogicField     = document.getElementById('field-conditions-logic-show');
-            this.hideLogicField     = document.getElementById('field-conditions-logic-hide');
-            this.requireLogicField  = document.getElementById('field-conditions-logic-require');
-            this.optionalLogicField = document.getElementById('field-conditions-logic-optional');
-            this.disableLogicField  = document.getElementById('field-conditions-logic-disable');
-            this.enableLogicField   = document.getElementById('field-conditions-logic-enable');
+            Object.keys(this.conditionTypes).forEach((type) => {
+                this.conditionFields[type] = mforms.getField(`field-conditions-editor-${type}`)
+                    || document.getElementById(`field-conditions-editor-${type}`)
+                    || null;
+
+                this.conditionLogicFields[type] = document.getElementById(`field-conditions-logic-${type}`) || null;
+            });
         },
 
-        __getRuleParams(ruleType, index) {
-            const ruleField = this[`${ruleType}Field`];
+        __resolveConditionTypeFromElement(element) {
+            if (!(element instanceof HTMLElement)) {
+                return null;
+            }
 
-            if (ruleField) {
+            const repeater = element.closest('.meros-repeater-field, [id^="field-conditions-editor-"]');
+            const sourceId = repeater?.id || '';
+
+            if (!sourceId.startsWith('field-conditions-editor-')) {
+                return null;
+            }
+
+            return sourceId.replace('field-conditions-editor-', '');
+        },
+
+        __getRuleParams(type, index) {
+            const ruleField = this.conditionFields[type] || null;
+
+            if (ruleField && typeof ruleField.getRowValue === 'function') {
                 return ruleField.getRowValue(index);
             }
 

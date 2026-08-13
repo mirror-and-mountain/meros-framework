@@ -8,7 +8,7 @@ use MM\Meros\Services\Contracts\Forms\FieldGroup;
 class FieldGroups extends Register {
     protected string $identifier = 'handle';
     protected string $definition = FieldGroup::class;
-    protected array  $rejects    = ['makeFrom'];
+    protected array  $rejects    = ['register', 'makeFrom'];
 
     /**
      * Parses properties for the field group's constructor.

@@ -8,7 +8,7 @@ use MM\Meros\Services\Contracts\PostType;
 class PostTypes extends Register {
     protected string $identifier = 'handle';
     protected string $definition = PostType::class;
-    protected array  $rejects    = ['multiple', 'makeFrom', 'makeFromCallback'];
+    protected array  $rejects    = ['register', 'multiple', 'makeFrom', 'makeFromCallback'];
 
     /**
      * Parses properties for the post type's constructor.
@@ -18,14 +18,6 @@ class PostTypes extends Register {
      * @return array
      */
     protected function parseProperties(array $props): array {
-        $args = $props['args'] ?? [];
-        $meta = is_array($props['meta'] ?? null) ? $props['meta'] : ($props['meta'] ?? []);
-
-        return [
-            'handle'        => $props['handle'] ?? '',
-            'singularLabel' => $props['singular'] ?? '',
-            'pluralLabel'   => $props['plural'] ?? '',
-            'args'          => $args,
-        ];
+        return $props; // No additional parsing needed for post type properties; they are passed directly to the constructor.
     }
 }

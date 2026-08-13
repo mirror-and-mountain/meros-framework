@@ -23,6 +23,12 @@ class HttpClient {
         $payload = $request['payload'] ?? [];
         $format  = $request['format'] ?? null;
 
+        if ($method === 'GET') {
+            return $client->send($method, $url, [
+                'query' => $payload,
+            ]);
+        }
+
         if ($format === 'json') {
             $client = $client->asJson();
 

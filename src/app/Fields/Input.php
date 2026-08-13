@@ -18,6 +18,7 @@ abstract class Input extends Field {
         $this->addSupports([
             'required',
             'disabled',
+            'readonly',
             'placeholder',
             'helpText',
             'dynamicDefault'

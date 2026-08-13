@@ -8,7 +8,7 @@ use MM\Meros\Services\Contracts\PostMeta;
 class PostMetaDefinitions extends Register {
     protected string $identifier = 'name';
     protected string $definition = PostMeta::class;
-    protected array  $rejects    = ['multiple', 'makeFrom', 'makeFromCallback'];
+    protected array  $rejects    = ['register', 'multiple', 'makeFrom', 'makeFromCallback'];
 
     /**
      * Parses properties for the post meta's constructor.
@@ -18,23 +18,6 @@ class PostMetaDefinitions extends Register {
      * @return array
      */
     protected function parseProperties(array $props): array {
-        $args = $props['args'] ?? [];
-
-        return [
-            'name'      => $props['name'] ?? '',
-            'postType'  => $props['post_type'] ?? '',
-            'autoQueue' => $props['auto_queue'] ?? false,
-            'type'      => $props['type'] ?? '',
-            'args'      => [
-                'type'              => $args['type'] ?? 'string',
-                'default'           => $args['default'] ?? null,
-                'label'             => $args['label'] ?? '',
-                'description'       => $args['description'] ?? '',
-                'show_in_rest'      => $args['show_in_rest'] ?? false,
-                'sanitize_callback' => $args['sanitize_callback'] ?? null,
-                'auth_callback'     => $args['auth_callback'] ?? null,
-                'single'            => $args['single'] ?? true,
-            ],
-        ];
+        return $props; // No additional parsing needed for post meta properties; they are passed directly to the constructor.
     }
 }

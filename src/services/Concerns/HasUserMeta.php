@@ -31,10 +31,10 @@ trait HasUserMeta {
      */
     protected function userMeta(string $key = '', ?Closure $callback = null): UserMeta|UserMetaRegister|null {
         if (empty($key)) {
-            return UserMetaDefinitions::checkout($this);
+            return UserMetaDefinitions::checkout($this->resolveAuthority()); // return register instance
         }
 
-        return UserMetaDefinitions::checkout($this)->get($key, $callback);
+        return UserMetaDefinitions::get($key, $this->resolveAuthority(), $callback);
     }
 
     /**
@@ -67,7 +67,7 @@ trait HasUserMeta {
             ? '_' . Str::replace('-', '_', $this->getHandle()) . '_user_meta'
             : '_' . Str::replace('-', '_', $this->getHandle()) . '_' . $key . '_user_meta';
 
-        $container = UserMetaDefinitions::checkout($this)->make([
+        $container = UserMetaDefinitions::checkout($this->resolveAuthority())->make([
             'name' => $containerName,
             'type' => 'object',
             'auto_queue' => true,
@@ -99,7 +99,7 @@ trait HasUserMeta {
      */
     protected function userMetaFields(FieldGroup|string $fieldGroup, string $container = 'default'): static {
         if (is_string($fieldGroup)) {
-            $fieldGroup = FieldGroups::checkout($this)->get($fieldGroup);
+            $fieldGroup = FieldGroups::get($fieldGroup, $this->resolveAuthority());
         }
 
         if (!$fieldGroup instanceof FieldGroup) {

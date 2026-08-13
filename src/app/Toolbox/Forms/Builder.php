@@ -19,7 +19,7 @@ use MM\Meros\App\Fields\Repeater;
 
 use MM\Meros\Facades\Fields;
 use MM\Meros\Facades\FieldGroups;
-use MM\Meros\Facades\DynamicChoiceSources as DynamicChoiceSourcesAccessor;
+use MM\Meros\Facades\DynamicChoiceSources;
 use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\FormActions;
 
@@ -27,6 +27,7 @@ use MM\Meros\App\Models\Form;
 use MM\Meros\App\Models\IntegrationAccount;
 use MM\Meros\App\Models\PostMeta as FormMeta;
 
+use MM\Meros\Services\Contracts\Forms\DynamicChoiceSource;
 use MM\Meros\Services\Contracts\Forms\FormAction;
 
 class Builder extends Component {
@@ -205,7 +206,7 @@ class Builder extends Component {
             'formDescription' => $this->formSettings['description'] ?? '',
             'formSlug'        => $this->formSettings['slug'] ?? '',
             'formStatus'      => $this->formSettings['status'] ?? '',
-            'dynamicChoiceSources' => $this->getDynamicChoiceSourcesForBuilder(),
+            // 'dynamicChoiceSources' => $this->getDynamicChoiceSourcesForBuilder(),
         ])
             ->layout('meros::toolbox.layout');
     }
@@ -744,7 +745,16 @@ class Builder extends Component {
             return;
         }
 
+        // Handle dynamic options config properties for fields that support them.
         if (!property_exists($canonicalField, $property) && !method_exists($canonicalField, $property)) {
+            if (Str::startsWith($property, 'dynamicOptions_config_')) {
+                $configKey = Str::snake(substr($property, 22));
+                $canonicalField->dynamicOptionsConfig($configKey, $value);
+
+                $this->activeField = $canonicalField;
+                $this->syncRepeaterEditorAfterActiveFieldUpdate();
+                $this->dispatchFieldSettingsUpdated();
+            }
             return;
         }
 
@@ -760,6 +770,11 @@ class Builder extends Component {
         $this->dispatchFieldSettingsUpdated();
     }
 
+    /**
+     * Retrieves a dynamic default control for the currently active field, if applicable.
+     *
+     * @return Field|null
+     */
     public function getDynamicDefaultControl(): ?Field {
         if ($this->activeField === null) {
             return null;
@@ -1319,6 +1334,83 @@ class Builder extends Component {
     }
 
     /**
+     * Returns dynamic choice source definitions available to the builder settings panel.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getDynamicChoiceSources(): array {
+        if ($this->activeField === null) {
+            return [];
+        }
+
+        $sources = DynamicChoiceSources::getRegistered();
+
+        $options = [];
+
+        foreach ($sources as $key => $__definition) {
+            $instance = DynamicChoiceSources::checkout(Framework::get())->makeFrom($key);
+
+            if ($instance instanceof DynamicChoiceSource === false) {
+                continue;
+            }
+
+            $label = $instance->getLabel();
+            $options[ $key ] = $label;
+        }
+
+        return $options;
+    }
+
+    public function getDynamicChoiceSourceConfigFields(string $source = ''): string {
+        if ($this->activeField === null) {
+            return '';
+        }
+
+        $source = empty($source) ? $this->activeField->getDynamicOptionsSource() : $source;
+ 
+        $source = DynamicChoiceSources::get($source);
+
+        if ($source === null) {
+            return '';
+        }
+
+        $fields = $source->getConfigFields();
+
+        if (!is_array($fields) || empty($fields)) {
+            return '';
+        }
+
+        $html = '';
+
+        foreach ($fields as $field) {
+            $key      = $field['key'] ?? null;
+            $label    = $field['label'] ?? null;
+            $type     = $field['type'] ?? null;
+            $default  = $field['default'] ?? null;
+            $helpText = $field['helpText'] ?? null;
+
+            if ($key === null || $label === null || $type === null) {
+                continue;
+            }
+
+            $field = Fields::checkout(Framework::get())->makeFrom($type, [
+                'id'          => $key,
+                'name'        => $key,
+                'label'       => $label,
+                'default'     => $default,
+                'helpText'    => $helpText,
+            ]);
+
+            $field->default($this->activeField->getDynamicOptionsConfig($key) ?? $default);
+            $field->attribute('wire:change', "updateActiveFieldProperty('dynamicOptions_config_{$key}', \$event.target.value)");
+
+            $html .= $field->html();
+        }
+
+        return $html;
+    }
+
+    /**
      * Closes the options editor screen.
      *
      * @return void
@@ -1558,20 +1650,49 @@ class Builder extends Component {
             return '';
         }
 
-        $formFields = $this->getFields()
-            ->filter(fn($field) => $field->getId() !== $activeField->getId() && $field->isInRepeater() === false);
+        $formFields = $this->getFields(true);
 
-        $currentConditions = $activeField->getConditions();
+        $currentConditions  = $activeField->getConditions();
+        $conditionTypes     = $activeField::getConditionTypes();
+        $conditionOperators = $activeField::getConditionOperators();
+        $fieldOptions       = $formFields
+            ->mapWithKeys(fn($field) => [$field->getId() => $field->getLabel()])
+            ->toArray();
 
         $html = '';
-        foreach ($currentConditions as $type => $configuration) {
+        foreach ($conditionTypes as $type => $typeLabel) {
+            $configuration = is_array($currentConditions[$type] ?? null)
+                ? $currentConditions[$type]
+                : [
+                    'logic' => 'and',
+                    'rules' => [],
+                ];
+
+            $rules = is_array($configuration['rules'] ?? null)
+                ? $configuration['rules']
+                : [];
+
+            $defaultRows = array_map(static function ($rule) {
+                $value = $rule['value'] ?? '';
+
+                if (is_array($value) || is_object($value)) {
+                    $value = json_encode($value);
+                }
+
+                return [
+                    'condition_field' => (string) ($rule['field'] ?? ''),
+                    'condition_rule' => (string) ($rule['operator'] ?? 'equals'),
+                    'condition_value' => (string) $value,
+                ];
+            }, $rules);
+
             $html .= 
                 '<fieldset 
                     class="nice-form-group" 
                     style="margin-bottom:1rem;padding:1rem;border:1px solid #ccc;border-radius:10px;background-color:#ffffff;box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"
                 >
-                    <legend>' . Str::title(str_replace('_', ' ', $type)) . '</legend>
-                    <small class="description" style="margin-bottom:1.5rem;">Test test test</small>';
+                    <legend>' . $typeLabel . '</legend>
+                    <small class="description" style="margin-bottom:1.5rem;">Define conditional rules for this behavior.</small>';
                     
 
             $logic = Fields::checkout(Framework::get())->makeFrom('select', [
@@ -1604,7 +1725,7 @@ class Builder extends Component {
                 'attributes' => [
                     'data-conditions-field-select' => 'true'
                 ],
-                'options' => $formFields->mapWithKeys(fn($field) => [$field->getId() => $field->getLabel()])->toArray(),
+                'options' => $fieldOptions,
             ]);
 
             $repeater->field('select', [
@@ -1614,23 +1735,142 @@ class Builder extends Component {
                 'attributes' => [
                     'data-conditions-rule-select' => 'true'
                 ],
-                'options' => [
-                    'equals'           => 'Equals',
-                    'not_equals'       => 'Does Not Equal',
-                    'contains'         => 'Contains',
-                    'not_contains'     => 'Does Not Contain',
-                    'greater_or_equal' => 'Greater Than or Equal To',
-                    'greater_than'     => 'Greater Than',
-                    'less_or_equal'    => 'Less Than or Equal To',
-                    'less_than'        => 'Less Than'
-                ],
+                'options' => $conditionOperators,
             ]);
+
+            $repeater->field('text', [
+                'id'    => 'condition_value',
+                'name'  => 'condition_value',
+                'label' => 'Value',
+                'helpText' => 'For object/array values, provide JSON.',
+            ]);
+
+            $repeater->default($defaultRows);
 
             $html .= $repeater->html();
             $html .= '</fieldset>';
         }
 
         return $html;
+    }
+
+    /**
+     * Updates the conditions for the currently active field.
+     *
+     * @param array $conditions
+     * @return void
+     */
+    public function updateFieldConditions(array $conditions): void {
+        $activeField = $this->resolveActiveField();
+
+        if ($activeField === null) {
+            return;
+        }
+
+        $validTypes = array_keys($activeField::getConditionTypes());
+        $validOperators = array_keys($activeField::getConditionOperators());
+        $normalisedConditions = [];
+
+        foreach ($validTypes as $type) {
+            $config = is_array($conditions[$type] ?? null)
+                ? $conditions[$type]
+                : [];
+
+            $logic = strtolower((string) ($config['logic'] ?? 'and'));
+            $logic = in_array($logic, ['and', 'or'], true) ? $logic : 'and';
+
+            $rules = is_array($config['rules'] ?? null)
+                ? $config['rules']
+                : [];
+
+            $normalisedRules = [];
+
+            foreach ($rules as $rule) {
+                if (!is_array($rule)) {
+                    continue;
+                }
+
+                $field = trim((string) ($rule['condition_field'] ?? ''));
+                $operator = trim((string) ($rule['condition_rule'] ?? 'equals'));
+
+                if ($field === '' || !in_array($operator, $validOperators, true)) {
+                    continue;
+                }
+
+                $normalisedRules[] = [
+                    'field' => $field,
+                    'operator' => $operator,
+                    'value' => $this->normaliseConditionRuleValue($rule['condition_value'] ?? null),
+                ];
+            }
+
+            if (empty($normalisedRules)) {
+                continue;
+            }
+
+            $normalisedConditions[$type] = [
+                'logic' => $logic,
+                'rules' => $normalisedRules,
+            ];
+        }
+
+        $activeField->conditions($normalisedConditions);
+        $this->activeField = $activeField;
+        $this->syncRepeaterEditorAfterActiveFieldUpdate();
+        $this->dispatchFieldSettingsUpdated();
+        $this->closeConditionsEditor();
+    }
+
+    /**
+     * Normalises a condition-rule value, decoding JSON values when provided.
+     *
+     * @param mixed $value
+     * @return mixed
+     */
+    private function normaliseConditionRuleValue(mixed $value): mixed {
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        $trimmed = trim($value);
+
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $looksLikeJson = str_starts_with($trimmed, '{')
+            || str_starts_with($trimmed, '[')
+            || in_array(strtolower($trimmed), ['true', 'false', 'null'], true)
+            || is_numeric($trimmed);
+
+        if (!$looksLikeJson) {
+            return $value;
+        }
+
+        $decoded = json_decode($trimmed, true);
+
+        return json_last_error() === JSON_ERROR_NONE
+            ? $decoded
+            : $value;
+    }
+
+    /**
+     * Closes the conditions editor screen.
+     *
+     * @return void
+     */
+    private function closeConditionsEditor(): void {
+        $returnScreen = $this->resolveReturnScreen('canvas-conditions-editor', 'canvas-main');
+
+        if ($returnScreen === 'canvas-repeater-editor' && $this->activeRepeaterId) {
+            $this->changeScreen('canvas-repeater-editor');
+            $this->resolveEditingRepeater();
+            $this->dispatchRepeaterEditorUpdated();
+        } else {
+            $this->changeScreen('canvas-main');
+        }
+
+        $this->dispatch('mforms:unhide-field-settings');
     }
 
     // =========================================================================
@@ -1740,12 +1980,6 @@ class Builder extends Component {
             'label'   => 'Action',
             'options' => array_merge(['' => 'Select an action...'], $actionOptions),
         ]);
-
-        foreach ($resolvedActions as $handle => $action) {
-            $html = $action->renderConfigurationDialog($formFieldOptions, []);
-
-            $repeater->customConfigurationDialogHtml($html, ['action', '=', $handle]);
-        }
 
         $repeater->default(is_array($actions) ? $actions : []);
 
@@ -1915,22 +2149,5 @@ class Builder extends Component {
         }
 
         $this->redirect(route('meros.toolbox.form-builder.edit', ['formID' => $newFormId]));
-    }
-
-    /**
-     * Returns dynamic choice source definitions available to the builder settings panel.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function getDynamicChoiceSourcesForBuilder(): array {
-        $register = DynamicChoiceSourcesAccessor::checkout(Framework::get());
-        $sources = $register->allResolved();
-
-        return $sources
-            ->filter(fn ($source) => method_exists($source, 'isAvailable') ? (bool) $source->isAvailable() : true)
-            ->map(fn ($source) => $source->toBuilderDefinition())
-            ->filter(fn ($source) => is_array($source) && !empty($source['source']))
-            ->values()
-            ->toArray();
     }
 }

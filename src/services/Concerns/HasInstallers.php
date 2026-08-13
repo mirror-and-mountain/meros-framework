@@ -29,11 +29,11 @@ trait HasInstallers {
      */
     protected function tables(string $handle = '', ?Closure $callback = null): Table|TableRegister|null {
         if (empty($handle)) {
-            return Tables::checkout($this); // return register instance
+            return Tables::checkout($this->resolveAuthority()); // return register instance
         }
 
         else {
-            return Tables::checkout($this)->get($handle, $callback);
+            return Tables::get($handle, $this->resolveAuthority(), $callback);
         }
     }
 
@@ -45,7 +45,7 @@ trait HasInstallers {
     private function providerTables(): Collection {
         return $this->tables()
             ->discover()
-            ->checkout($this)
+            ->checkout($this->resolveAuthority())
             ->all()
             ->filter(fn (Table $table) => $table->provider() === $this && $this->shouldIncludeInstallerTable($table))
             ->values();
@@ -189,11 +189,13 @@ trait HasInstallers {
 
     /**
      * Checks if the provider is installed by verifying if at least one associated table is installed.
+     * 
+     * @param Collection|null $tables Optional collection of tables to check. If not provided, it will use the provider's tables.
      *
      * @return bool
      */
-    final public function isInstalled(): bool {
-        $tables = $this->providerTables();
+    final public function isInstalled(?Collection $tables = null): bool {
+        $tables = $tables ?? $this->providerTables();
     
         if ($tables->count() === 0) {
             return true; // If there are no tables, consider it installed
@@ -215,11 +217,13 @@ trait HasInstallers {
 
     /**
      * Checks if the provider has updates by verifying if any associated table is not installed or has updates available.
+     * 
+     * @param Collection|null $tables Optional collection of tables to check. If not provided, it will use the provider's tables.
      *
      * @return bool
      */
-    final public function hasUpdates(): bool {
-        $tables = $this->providerTables();
+    final public function hasUpdates(?Collection $tables = null): bool {
+        $tables = $tables ?? $this->providerTables();
 
         if ($tables->count() === 0) {
             return false; // If there are no tables, there can't be updates

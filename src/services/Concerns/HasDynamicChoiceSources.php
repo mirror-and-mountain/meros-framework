@@ -14,10 +14,10 @@ trait HasDynamicChoiceSources {
      */
     protected function dynamicChoiceSources(string $source = '', ?Closure $callback = null): DynamicChoiceSource|DynamicChoiceSourcesRegister|Collection|null {
         if (empty($source)) {
-            return DynamicChoiceSources::checkout($this);
+            return DynamicChoiceSources::checkout($this->resolveAuthority());
         }
 
-        $item = DynamicChoiceSources::checkout($this)->get($source, $callback);
+        $item = DynamicChoiceSources::get($source, $this->resolveAuthority(), $callback);
 
         return $item instanceof DynamicChoiceSource ? $item : null;
     }

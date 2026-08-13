@@ -23,11 +23,11 @@ trait HasAssets {
      */
     protected function assets(string $handle = '', ?Closure $callback = null): Asset|AssetsRegister|null {
         if (empty($handle)) {
-            return Assets::checkout($this); // return register instance
+            return Assets::checkout($this->resolveAuthority()); // return register instance
         }
 
         else {
-            return Assets::checkout($this)->get($handle, $callback);
+            return Assets::get($handle, $this->resolveAuthority(), $callback);
         }
     }
 
@@ -40,11 +40,11 @@ trait HasAssets {
      */
     protected function assetGroups(string $handle = '', ?Closure $callback = null): AssetGroup|AssetGroupsRegister|null {
         if (empty($handle)) {
-            return AssetGroups::checkout($this); // return register instance
+            return AssetGroups::checkout($this->resolveAuthority()); // return register instance
         }
 
         else {
-            return AssetGroups::checkout($this)->get($handle, $callback);
+            return AssetGroups::get($handle, $this->resolveAuthority(), $callback);
         }
     } 
 }

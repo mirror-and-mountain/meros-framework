@@ -8,7 +8,7 @@ use MM\Meros\Services\Contracts\Forms\FormRow;
 class FormRows extends Register {
     protected string $identifier = 'handle';
     protected string $definition = FormRow::class;
-    protected array $rejects     = ['makeFrom', 'makeFromCallback'];
+    protected array $rejects     = ['register', 'makeFrom', 'makeFromCallback'];
 
     /**
      * Parses properties for the form row's constructor.

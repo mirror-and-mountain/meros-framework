@@ -21,6 +21,20 @@ class TabbedSettingsPage extends MenuPageTemplate {
     protected string $view = 'meros::admin.templates.tabbed-page';
 
     /**
+     * Indicates whether the page title should be displayed on the tabbed page.
+     *
+     * @var boolean
+     */
+    protected bool $showTitle = true;
+
+    /**
+     * Indicates whether the page introduction should be displayed on the tabbed page.
+     *
+     * @var boolean
+     */
+    protected bool $showIntro = true;
+
+    /**
      * Renders the content of the tabbed page.
      *
      * @return void
@@ -31,10 +45,31 @@ class TabbedSettingsPage extends MenuPageTemplate {
         }
 
         echo view($this->view, [
+            'showTitle'  => $this->showTitle,
+            'showIntro'  => $this->showIntro,
             'title'      => $this->pageTitle,
+            'pageIntro'  => $this->pageIntro,
             'pageSlug'   => $this->pageSlug,
             'tabs'       => $this->tabs
         ]);
+    }
+
+    /**
+     * Hides the page title on the tabbed page.
+     *
+     * @return void
+     */
+    public function hideTitle(): void {
+        $this->showTitle = false;
+    }
+
+    /**
+     * Hides the page introduction on the tabbed page.
+     *
+     * @return void
+     */
+    public function hideIntro(): void {
+        $this->showIntro = false;
     }
 
     /**

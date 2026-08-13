@@ -8,7 +8,7 @@ use MM\Meros\Services\Contracts\Admin\SettingsSection;
 class SettingsSections extends Register {
     protected string $identifier = 'id';
     protected string $definition = SettingsSection::class;
-    protected array  $rejects    = ['multiple', 'public'];
+    protected array  $rejects    = ['multiple'];
 
     /**
      * Parses properties for the settings section's constructor.

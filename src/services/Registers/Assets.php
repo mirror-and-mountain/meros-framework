@@ -5,7 +5,7 @@ namespace MM\Meros\Services\Registers;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
-use MM\Meros\Services\Contracts\Asset;
+use MM\Meros\Services\Components\Asset;
 use MM\Meros\Services\Contracts\Register;
 use MM\Meros\Services\Registers\Interfaces\Discovery;
 
@@ -14,7 +14,7 @@ use MM\Meros\Facades\AssetGroups;
 class Assets extends Register implements Discovery {
     protected string $identifier = 'handle';
     protected string $definition = Asset::class;
-    protected array  $rejects    = ['public', 'makeFromCallback'];
+    protected array  $rejects    = ['register', 'makeFrom', 'makeFromCallback'];
 
     use Concerns\Discovers;
 
@@ -148,7 +148,7 @@ class Assets extends Register implements Discovery {
 
             // Setup an asset group if groupConfig is available
             $groupInstance = null;
-            $baseName      = Str::slug($this->provider->getName()) . '-';
+            $baseName      = Str::snake($this->provider->getName()) . '_';
 
             if ($location !== 'admin' && $groupLabel !== '') {
                 $groupName     = $baseName . $group;
@@ -161,7 +161,6 @@ class Assets extends Register implements Discovery {
                             'label'         => $groupLabel,
                             'description'   => $groupDesc,
                             'switchable'    => $switchable,
-                            'wasDiscovered' => true,
                         ]);
                 }
             }

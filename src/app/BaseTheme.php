@@ -2,29 +2,41 @@
 
 namespace MM\Meros\App;
 
-use MM\Meros\Services\Contracts\FeatureProvider;
+use MM\Meros\Contracts\Provider;
 
-abstract class BaseTheme extends FeatureProvider {
-    /**
-     * Adds a Wordpress theme support.
-     * 
-     * @param  string $support
-     * @param  mixed  ...$args
-     * 
-     * @return void
-     */
-    protected function addThemeSupport(string $support, mixed ...$args): void {
-        add_theme_support($support, $args);
+use MM\Meros\Registers\Admin\SettingsContainers;
+use MM\Meros\Contracts\Features\Admin\SettingsContainer;
+
+use MM\Meros\Contracts\Providers\Concerns\IsNonFrameworkProvider;
+
+abstract class BaseTheme extends Provider {
+    use IsNonFrameworkProvider;
+
+    // =========================================================================
+    // Initialisation
+    // =========================================================================
+
+    final protected function init(): void {
+        $themeInfo = \wp_get_theme();
+
+        $this->setName($themeInfo->get('Name'));
+        $this->setDescription($themeInfo->get('Description'));
+        $this->setAuthor($themeInfo->get('Author'));
+        $this->setAuthorUrl($themeInfo->get('AuthorURI'));
+        $this->setPath(\get_stylesheet_directory());
+        $this->setUri(\get_stylesheet_directory_uri());
+
+        $this->enqueueStyleSheet();
     }
 
     /**
-     * Initialises the theme stylesheet
+     * Enqueues the theme's stylesheet
      * 
      * @return void
      */
-    public function initialiseStyleSheet(): void {
-        $handle = $this->handle . '_style'; // e.g. meros_style.
-        $uri = get_stylesheet_uri();
+    private function enqueueStyleSheet(): void {
+        $handle  = $this->getHandle() . '_style'; // e.g. meros_style.
+        $uri     = get_stylesheet_uri();
         $version = filemtime(trailingslashit(get_stylesheet_directory()) . 'style.css');
 
         add_action('wp_enqueue_scripts', function () use ($handle, $uri, $version) {
@@ -46,12 +58,37 @@ abstract class BaseTheme extends FeatureProvider {
         });
     }
 
+    // =========================================================================
+    // Settings Management
+    // =========================================================================
+
     /**
-     * Gets the instance of the theme.
+     * Resolves the settings container for the theme.
      *
-     * @return BaseTheme
+     * @param SettingsContainers $register The SettingsContainers register.
+     *
+     * @return SettingsContainer The settings container for the theme.
      */
-    final public function get(): BaseTheme {
-        return $this;
+    final public function resolveSettingsContainer(SettingsContainers $register): SettingsContainer {
+        return $register->get('meros_theme_settings', $this) ?? 
+               $register
+                ->checkout($this)
+                ->makeFrom('meros_theme_settings');
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    /**
+     * Adds a Wordpress theme support.
+     * 
+     * @param  string $support
+     * @param  mixed  ...$args
+     * 
+     * @return void
+     */
+    final protected function addThemeSupport(string $support, mixed ...$args): void {
+        add_theme_support($support, $args);
     }
 }

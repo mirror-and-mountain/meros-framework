@@ -6,205 +6,59 @@
         font-weight: 400 !important;
     }
 
-    .meros-provider-action-buttons {
-        display: flex;
-        gap: 8px;
-    }
-
-    .meros-provider-action-button {
-        transition: opacity 0.3s ease;
-        min-height: 28px;
-        line-height: 26px;
-        padding: 0 10px;
-    }
-
-    .meros-provider-action-button.meros-working {
-        position: relative;
-        overflow: hidden;
-        pointer-events: none;
-    }
-
-    .meros-provider-action-button.meros-working::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        transform: translateX(-100%);
-        background: linear-gradient(
-            90deg,
-            transparent,
-            rgba(255,255,255,0.25),
-            transparent
-        );
-        animation: meros-shimmer 1.2s infinite;
-    }
-
-    @keyframes meros-shimmer {
-        100% {
-            transform: translateX(100%);
-        }
-    }
-}
-
-.meros-installer-groups {
-    display: grid;
-    gap: 1rem;
-}
-
-.meros-installer-group {
-    border: 1px solid #dcdcde;
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
-    background: #fff;
-}
-
-.meros-installer-group-framework {
-    border-left: 4px solid #2271b1;
-}
-
-.meros-installer-group-theme {
-    border-left: 4px solid #00844a;
-}
-
-.meros-installer-group-packages {
-    border-left: 4px solid #3858e9;
-}
-
-.meros-installer-group-packages .meros-installer-package + .meros-installer-package {
-    margin-top: 1.25rem;
-    padding-top: 1rem;
-    border-top: 1px solid #dcdcde;
-}
-
-.meros-installer-manager-header {
-    margin-top: 0.5rem;
-}
-
-.meros-theme-installer-callout {
-    margin-top: 1.25rem;
-    border: 1px solid #dcdcde;
-    border-radius: 8px;
-    background: #fff;
-    padding: 0.75rem 1rem;
+.meros-provider-action-buttons {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
+    gap: 8px;
+}
 }
 
-.meros-theme-installer-callout.has-attention {
-    border-left: 4px solid #dba617;
-    background: #fffbef;
+.meros-provider-action-button {
+    transition: opacity 0.3s ease;
+    min-height: 28px;
+    line-height: 26px;
+    padding: 0 10px;
 }
 
-.meros-theme-installer-callout h3 {
-    margin: 0 0 0.25rem;
-    font-size: 14px;
+.meros-provider-action-button.meros-working {
+    position: relative;
+    overflow: hidden;
+    pointer-events: none;
 }
 
-.meros-theme-installer-callout p {
-    margin: 0;
-    color: #50575e;
-}
-
-.meros-installer-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 100000;
-    display: grid;
-    place-items: center;
-}
-
-.meros-installer-modal[hidden] {
-    display: none !important;
-}
-
-.meros-installer-modal-backdrop {
+.meros-provider-action-button.meros-working::before {
+    content: "";
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
+    transform: translateX(-100%);
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,0.25),
+        transparent
+    );
+    animation: meros-shimmer 1.2s infinite;
 }
 
-.meros-installer-modal-dialog {
-    position: relative;
-    width: min(640px, 92vw);
-    max-height: 80vh;
-    overflow: auto;
-    background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
-    padding: 1.25rem;
-}
-
-.meros-installer-modal-plan {
-    margin-top: 0.75rem;
-    padding: 0.75rem;
-    background: #f6f7f7;
-    border: 1px solid #dcdcde;
-    border-radius: 8px;
-}
-
-.meros-installer-modal-plan ul {
-    margin: 0;
-}
-
-.meros-installer-plan-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.4rem;
-}
-
-.meros-installer-plan-row:last-child {
-    margin-bottom: 0;
-}
-
-.meros-installer-plan-badge {
-    display: inline-flex;
-    min-width: 74px;
-    justify-content: center;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    padding: 0.2rem 0.5rem;
-    border: 1px solid transparent;
-}
-
-.meros-installer-plan-badge-add {
-    background: #edfaef;
-    color: #0f5f2f;
-    border-color: #92c8a7;
-}
-
-.meros-installer-plan-badge-update,
-.meros-installer-plan-badge-rollback {
-    background: #eef5ff;
-    color: #174f7c;
-    border-color: #9fc2e4;
-}
-
-.meros-installer-plan-badge-remove {
-    background: #fff1f0;
-    color: #8f1d14;
-    border-color: #f0b5b0;
-}
-
-.meros-installer-modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    margin-top: 1rem;
+@keyframes meros-shimmer {
+    100% {
+        transform: translateX(100%);
+    }
 }
 
 /* Widen the label column for settings and align action buttons to the top of their cells */
-tbody:has(.meros-settings-label) {
+tbody:has(.meros-settings-label:not(.meros-settings-label--wide)) {
+    th[scope="row"]:has(.meros-settings-label) {
+        width: 300px;
+    }
+}
+
+tbody:has(.meros-settings-label.meros-settings-label--wide) {
     th[scope="row"]:has(.meros-settings-label) {
         width: 400px;
     }
 }
 
-tbody:has(.meros-provider-tasks),
-tbody:has(.meros-provider-action-button) {
+tbody:has(.meros-settings-label--wide) {
     td:has(.meros-settings-field) {
         vertical-align: top !important;
         padding-top: 2.5rem !important;

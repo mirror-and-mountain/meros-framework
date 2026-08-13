@@ -13,6 +13,12 @@
         @endphp
     @endif
     <div class="wrap">
+        @if($showTitle)
+            <h1>{{ $title }}</h1>
+        @endif
+        @if($showIntro && !empty($pageIntro))
+            <p>{{ $pageIntro }}</p>
+        @endif
         <form method="post" action="options.php">
             <nav class="nav-tab-wrapper">
                 @foreach($tabs as $slug => $tab)
@@ -23,7 +29,7 @@
             </nav>
             <div class="tab-content" style="margin-top: 20px;">
                 @php
-                    call_user_func($tabs[$activeTab]['callback']);
+                    call_user_func($tabs[$activeTab]['callback'], \MM\Meros\Facades\Context::params());
                 @endphp
             </div>
         </form>

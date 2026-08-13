@@ -509,6 +509,16 @@
 	margin-bottom: 0.25rem;
 }
 
+.meros-field input[readonly] {
+	background-color: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+.meros-field.meros-password-field {
+	position: relative;
+	display: inline-block;
+	width: 100%;
+}
+
 .meros-field label .required-indicator,
 .meros-field legend .required-indicator {
 	color: #dc2626;

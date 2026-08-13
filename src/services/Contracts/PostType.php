@@ -52,7 +52,7 @@ class PostType extends FeatureDefinition {
     /**
      * Meta containers associated with this post type.
      *
-     * @var array<PostMeta>
+     * @var array<string|PostMeta>
      */
     protected array $metaContainers = [];
 
@@ -87,6 +87,10 @@ class PostType extends FeatureDefinition {
      * @var Post|null
      */
     protected ?Post $model = null;
+
+    // =========================================================================
+    // Initialisation
+    // =========================================================================
 
     final public function __construct(
         FeatureProvider $provider,
@@ -153,118 +157,26 @@ class PostType extends FeatureDefinition {
         }
     }
 
-    /***************************
-     * Public Chainable methods
-     ***************************/
-
     /**
-     * Sets the post type handle.
+     * Instantiates post meta containers from their class names if provided.
      *
-     * @param string $handle
-     *
-     * @return self
+     * @return void
      */
-    public function handle(string $handle): self {
-        $this->handle = Str::slug($handle);
-
-        $this->queue();
-        return $this;
-    }
-
-    /**
-     * Alias of handle(). Sets the post type handle.
-     *
-     * @param string $handle
-     *
-     * @return self
-     */
-    public function name(string $handle): self {
-        return $this->handle($handle);
-    }
-
-    /**
-     * Marks the post type as a WP 'core' post type, which prevents it from being registered 
-     * through the register_post_type function and allows it to be used for extending existing 
-     * core post types like 'post' and 'page'.
-     *
-     * @param boolean $isCore
-     *
-     * @return self
-     */
-    public function isCore(bool $isCore = true): self {
-        $this->isCore = $isCore;
-
-        return $this;
-    }
-
-    /**
-     * Adds a column to the admin list table for this post type.
-     * 
-     * @param string $slug  The slug for the column, used for referencing in callbacks.
-     * @param string $label The label for the column header.
-     * @param Closure       $callback
-     *
-     * @return self
-     */
-    public function column(string $slug, string $label, Closure $callback): self {
-        $this->columns[$slug] = $label;
-
-        add_action(
-            'manage_' . $this->handle . '_posts_custom_column', 
-            function(string $column, int $postId) use ($slug, $callback) {
-                if ($column !== $slug) {
-                    return;
-                }
-
-                $meta = null;
-
-                if (!empty($this->metaContainers)) {
-                    $meta = collect($this->metaContainers)->mapWithKeys(function($container) use ($postId) {
-                        return [$container->name => $container->getValue($postId)];
-                    })->toArray();
-                }
-
-                $callback($column, $postId, $meta);
-        }, 10, 2);
-
-        return $this;
-    }
-
-    /**
-     * Sets a custom edit link for this post type in the admin list table.
-     *
-     * @param string|Closure $link A string URL or a Closure that returns a URL to be used as the edit link for this post type.
-     *
-     * @return self
-     */
-    public function editLink(string|Closure $link): self {
-        $callback = null;
-
-        if (is_string($link)) {
-            $this->editPostLink = $link;
+    protected function instantiatePostMetaContainers(): void {
+        if (empty($this->metaContainers)) {
+            return;
         }
 
-        else {
-            $callback = $link;
+        foreach ($this->metaContainers as $index => $meta) {
+            if (is_string($meta) && !empty($meta)) {
+                $this->metaContainers[$index] = PostMetaFacade::checkout($this->provider)->makeFrom($meta);
+            }
         }
-
-        add_filter('get_edit_post_link', function($link, $postId) use ($callback) {
-            $postType = get_post_type($postId);
-
-            if ($postType !== $this->handle) {
-                return $link;
-            }
-
-            if ($callback !== null) {
-                $this->editPostLink = $callback($postId);
-                return $this->editPostLink;
-            }
-
-            return $this->editPostLink;
-        }, 10, 2);
-
-        return $this;
     }
+
+    // =========================================================================
+    // Meta and Fields Management
+    // =========================================================================
 
     /**
      * Adds a field group to the post type's meta containers.
@@ -422,6 +334,119 @@ class PostType extends FeatureDefinition {
                 $args['priority'] ?? 'default'
             );
         });
+        return $this;
+    }
+
+    // =========================================================================
+    // Attribute Setters
+    // =========================================================================
+
+    /**
+     * Sets the post type handle.
+     *
+     * @param string $handle
+     *
+     * @return self
+     */
+    public function handle(string $handle): self {
+        $this->handle = Str::slug($handle);
+
+        $this->queue();
+        return $this;
+    }
+
+    /**
+     * Alias of handle(). Sets the post type handle.
+     *
+     * @param string $handle
+     *
+     * @return self
+     */
+    public function name(string $handle): self {
+        return $this->handle($handle);
+    }
+
+    /**
+     * Marks the post type as a WP 'core' post type, which prevents it from being registered 
+     * through the register_post_type function and allows it to be used for extending existing 
+     * core post types like 'post' and 'page'.
+     *
+     * @param boolean $isCore
+     *
+     * @return self
+     */
+    public function isCore(bool $isCore = true): self {
+        $this->isCore = $isCore;
+
+        return $this;
+    }
+
+    /**
+     * Adds a column to the admin list table for this post type.
+     * 
+     * @param string $slug  The slug for the column, used for referencing in callbacks.
+     * @param string $label The label for the column header.
+     * @param Closure       $callback
+     *
+     * @return self
+     */
+    public function column(string $slug, string $label, Closure $callback): self {
+        $this->columns[$slug] = $label;
+
+        add_action(
+            'manage_' . $this->handle . '_posts_custom_column', 
+            function(string $column, int $postId) use ($slug, $callback) {
+                if ($column !== $slug) {
+                    return;
+                }
+
+                $meta = null;
+
+                if (!empty($this->metaContainers)) {
+                    $meta = collect($this->metaContainers)->mapWithKeys(function($container) use ($postId) {
+                        return [$container->name => $container->getValue($postId)];
+                    })->toArray();
+                }
+
+                $callback($column, $postId, $meta);
+        }, 10, 2);
+
+        return $this;
+    }
+
+    /**
+     * Sets a custom edit link for this post type in the admin list table.
+     *
+     * @param string|Closure $link A string URL or a Closure that returns a URL to be used as the edit link for this post type.
+     *
+     * @return self
+     */
+    public function editLink(string|Closure $link): self {
+        $callback = null;
+
+        if (is_string($link)) {
+            $this->editPostLink = $link;
+        }
+
+        else {
+            $callback = $link;
+        }
+
+        add_filter('get_edit_post_link', function($link, $postId) use ($callback) {
+            $postType = get_post_type($postId);
+
+            if ($postType !== $this->handle) {
+                return $link;
+            }
+
+            if ($callback !== null) {
+                $this->editPostLink = $callback($postId);
+                return $this->editPostLink;
+            }
+
+            return $this->editPostLink;
+        }, 10, 2);
+
         return $this;
     }
 
@@ -919,9 +944,9 @@ class PostType extends FeatureDefinition {
         return $this;
     }
 
-    /***************************
-     * Getters
-     ***************************/
+    // =========================================================================
+    // Getters
+    // =========================================================================
 
     /**
      * Retrieves the post type's arguments.
@@ -947,28 +972,6 @@ class PostType extends FeatureDefinition {
         else {
             $this->model = Post::where('ID', $postId)->where('post_type', $this->handle)->first();
             return $this->model;
-        }
-    }
-
-
-    /***************************
-     * Helpers
-     ***************************/
-
-    /**
-     * Instantiates post meta containers from their class names if provided.
-     *
-     * @return void
-     */
-    protected function instantiatePostMetaContainers(): void {
-        if (empty($this->metaContainers)) {
-            return;
-        }
-
-        foreach ($this->metaContainers as $index => $meta) {
-            if (is_string($meta) && !empty($meta)) {
-                $this->metaContainers[$index] = PostMetaFacade::checkout($this->provider)->makeFrom($meta);
-            }
         }
     }
 }

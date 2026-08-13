@@ -127,6 +127,26 @@ trait HasSanitizer {
                     data_set($sanitizedRow, $childName, $sanitized);
                 }
 
+                if (array_key_exists('__row_nonce', $sanitizedRow)) {
+                    unset($sanitizedRow['__row_nonce']);
+                }
+
+                if (array_key_exists('__row_data', $sanitizedRow)) {
+                    $decoded = is_string($sanitizedRow['__row_data'])
+                        ? json_decode($sanitizedRow['__row_data'], true)
+                        : null;
+
+                    foreach ($decoded ?? [] as $key => $value) {
+                        if (array_key_exists($key, $sanitizedRow)) {
+                            data_set($sanitizedRow, $key, $value);
+                        }
+
+                        $decoded[$key] = $this->sanitizeValue($value, gettype($value));
+                    }
+
+                    $sanitizedRow['__row_data'] = json_encode($decoded);
+                }
+                
                 $sanitizedItems[] = $sanitizedRow;
             }
 
@@ -142,13 +162,25 @@ trait HasSanitizer {
         }
 
         // Simple array
+        $items = $this->sanitizeSimpleArray($items);
+        $this->cachedExisting = null;
+
+        return $items;
+    }
+
+    /**
+     * Recursively sanitizes each value in a simple array using the generic sanitize helper.
+     *
+     * @param array $items The array of values to sanitize.
+     *
+     * @return array The sanitized array.
+     */
+    protected function sanitizeSimpleArray(array $items): array {
         foreach ($items as $key => $value) {
             $items[$key] = is_array($value)
-                ? $this->sanitizeArray($value)
-                : $this->sanitizeValue($value, $this->itemType);
+                ? $this->sanitizeSimpleArray($value)
+                : $this->sanitizeValue($value, gettype($value));
         }
-
-        $this->cachedExisting = null;
 
         return $items;
     }
@@ -261,6 +293,10 @@ trait HasSanitizer {
             case 'boolean':
             case 'checkbox':
                 $value = (bool) $value;
+                break;
+
+            case 'array':
+                $value = $this->sanitizeSimpleArray(is_array($value) ? $value : []);
                 break;
         }
 

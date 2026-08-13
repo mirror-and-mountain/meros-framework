@@ -3,6 +3,7 @@
 namespace MM\Meros\App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Model {
     protected $table = 'users';
@@ -22,5 +23,9 @@ class User extends Model {
 
     public function meta() {
         return $this->hasMany(UserMeta::class, 'user_id');
+    }
+
+    public function externalConnections(): HasMany {
+        return $this->hasMany(ExternalConnection::class, 'user_id');
     }
 }

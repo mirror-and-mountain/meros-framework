@@ -8,22 +8,7 @@ use MM\Meros\Services\Contracts\Admin\MenuPage;
 class MenuPages extends Register {
     protected string $identifier = 'slug';
     protected string $definition = MenuPage::class;
-    protected array  $rejects    = ['multiple', 'public', 'makeFromCallback'];
-    
-
-    /**
-     * List of supported operations for this register.
-     *
-     * @var array
-     */
-    protected array $supports = [
-        'register',
-        'make',
-        'makeFrom',
-        'get',
-        'all',
-        'attach'
-    ];
+    protected array  $rejects    = ['multiple', 'makeFromCallback'];
 
     /**
      * Parses properties for the menu page's constructor.
@@ -36,6 +21,7 @@ class MenuPages extends Register {
         return [
             'slug'        => $props['slug'] ?? '',
             'title'       => $props['title'] ?? '',
+            'intro'       => $props['intro'] ?? '',
             'menu_title'  => $props['menu_title'] ?? '',
             'capability'  => $props['capability'] ?? 'manage_options',
             'icon'        => $props['icon'] ?? 'dashicons-admin-generic',

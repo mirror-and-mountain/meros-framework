@@ -23,11 +23,11 @@ trait HasPostTypes {
      */
     protected function postTypes(string $handle = '', ?Closure $callback = null): PostType|PostTypesRegister|null {
         if (empty($handle)) {
-            return PostTypes::checkout($this); // return register instance
+            return PostTypes::checkout($this->resolveAuthority()); // return register instance
         }
 
         else {
-            return PostTypes::checkout($this)->get($handle, $callback); // return specific post type
+            return PostTypes::get($handle, $this->resolveAuthority(), $callback); // return specific post type
         }
     }
 
@@ -54,11 +54,11 @@ trait HasPostTypes {
       */
     protected function postMeta(string $key = '', ?Closure $callback = null): PostMeta|PostMetaRegister|null {
         if (empty($key)) {
-            return PostMetaDefinitions::checkout($this); // return register instance
+            return PostMetaDefinitions::checkout($this->resolveAuthority()); // return register instance
         }
 
         else {
-            return PostMetaDefinitions::checkout($this)->get($key, $callback); // return specific post meta definition
+            return PostMetaDefinitions::get($key, $this->resolveAuthority(), $callback); // return specific post meta definition
         }
     }
 

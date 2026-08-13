@@ -36,11 +36,11 @@ trait HasFields {
      */
     protected function forms(string $id = '', ?Closure $callback = null): Form|FormsRegister|null {
         if (empty($id)) {
-            return Forms::checkout($this);
+            return Forms::checkout($this->resolveAuthority());
         }
 
         else {
-            return Forms::checkout($this)->get($id, $callback);
+            return Forms::get($id, $this->resolveAuthority(), $callback);
         }
     }
 
@@ -54,11 +54,11 @@ trait HasFields {
      */
     protected function fields(string $handle = '', ?Closure $callback = null): Field|FieldsRegister|null {
         if (empty($handle)) {
-            return Fields::checkout($this);
+            return Fields::checkout($this->resolveAuthority());
         }
 
         else {
-            return Fields::checkout($this)->get($handle, $callback);
+            return Fields::get($handle, $this->resolveAuthority(), $callback);
         }
     }
 
@@ -72,11 +72,11 @@ trait HasFields {
      */
     protected function fieldGroups(string $handle = '', ?Closure $callback = null): FieldGroup|FieldGroupsRegister|null {
         if (empty($handle)) {
-            return FieldGroups::checkout($this);
+            return FieldGroups::checkout($this->resolveAuthority());
         }
 
         else {
-            return FieldGroups::checkout($this)->get($handle, $callback);
+            return FieldGroups::get($handle, $this->resolveAuthority(), $callback);
         }
     }
 
@@ -90,11 +90,11 @@ trait HasFields {
      */
     protected function fieldWrappers(string $handle = '', ?Closure $callback = null): FieldWrapper|FieldWrappersRegister|null {
         if (empty($handle)) {
-            return FieldWrappers::checkout($this);
+            return FieldWrappers::checkout($this->resolveAuthority());
         }
 
         else {
-            return FieldWrappers::checkout($this)->get($handle, $callback);
+            return FieldWrappers::get($handle, $this->resolveAuthority(), $callback);
         }
     }
 
@@ -108,11 +108,11 @@ trait HasFields {
      */
     protected function formActions(string $handle = '', ?Closure $callback = null): FormAction|FormActionsRegister|null {
         if (empty($handle)) {
-            return FormActions::checkout($this);
+            return FormActions::checkout($this->resolveAuthority());
         }
 
         else {
-            return FormActions::checkout($this)->get($handle, $callback);
+            return FormActions::get($handle, $this->resolveAuthority(), $callback);
         }
     }
 

@@ -20,11 +20,11 @@ trait HasBlocks {
      */
     protected function blocks(string $name = '', ?Closure $callback = null): Block|BlocksRegister|null {
         if (empty($name)) {
-            return Blocks::checkout($this); // return register instance
+            return Blocks::checkout($this->resolveAuthority()); // return register instance
         }
 
         else {
-            return Blocks::checkout($this)->get($name, $callback);
+            return Blocks::get($name, $this->resolveAuthority(), $callback);
         }
     }
 }

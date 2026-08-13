@@ -9,9 +9,7 @@ use Illuminate\Support\Collection;
 use MM\Meros\Services\Contracts\FeatureProvider;
 
 use MM\Meros\Services\Contracts\Forms\Field;
-
 use MM\Meros\Facades\Fields as FieldsRegister;
-use MM\Meros\Facades\FieldGroups as FieldGroupsRegister;
 
 use MM\Meros\Facades\Context;
 
@@ -66,25 +64,32 @@ class Repeater extends Field {
     protected ?bool $allowConfigure = null;
 
     /**
-     * The fields that belong to this repeater.
+     * The fields that belong to this repeater and are shown in the repeater's table view.
      *
      * @var array<Field|array>
      */
-    public array $fields = [];
+    public array $rowFields = [];
 
     /**
-     * Custom configuration dialogs keyed by optional row matching conditions.
+     * Fields associated with this repeater that are only rendered in the repeater's configuration dialog.
      *
-     * @var array<int, array<string, mixed>>
+     * @var array<Field|array>
      */
-    protected array $customConfigurationDialogs = [];
+    public array $formFields = [];
 
     /**
-     * Hidden row configuration payload field.
+     * Indicates that the repeater has a hidden form data field.
      *
-     * @var Field|null
+     * @var bool
      */
-    protected ?Field $hiddenConfigurationField = null;
+    protected bool $hasHiddenFormDataField = false;
+
+    /**
+     * Indicates that the repeater has a hidden nonce field for row configuration.
+     *
+     * @var bool
+     */
+    protected bool $hasHiddenNonceField = false;
 
     /**
      * The text to show in the button for adding new rows to the repeater.
@@ -108,6 +113,36 @@ class Repeater extends Field {
     protected string $removeRowText = '';
 
     /**
+     * A JavaScript callback function to call when a new row is added to the repeater.
+     *
+     * @var string
+     */
+    protected string $onAddRow = '';
+
+    /**
+     * A JavaScript callback function to call when a row is removed from the repeater.
+     *
+     * @var string
+     */
+    protected string $onRemoveRow = '';
+
+    /**
+     * A callback to call when the configure button is clicked for a row.
+     * If a Closure is provided, it will be executed server-side via an Ajax request. 
+     * If a string is provided, it will be treated as a JavaScript function name and called client-side.
+     *
+     * @var Closure|string
+     */
+    protected Closure|string $onConfigureRow = 'ajax';
+
+    /**
+     * The URL to send Ajax requests to when the configure button is clicked for a row.
+     *
+     * @var string
+     */
+    protected string $ajaxUrl = '';
+
+    /**
      * An optional list of field names that must have a non-empty value before the
      * configure button is enabled for a row. Only applies when a custom onConfigureRow
      * callback is set.
@@ -124,13 +159,13 @@ class Repeater extends Field {
         FeatureProvider $provider,
         array           $props = []
     ) {
+        $this->ajaxUrl = admin_url('admin-ajax.php');
+
         parent::__construct($provider, $props);
 
         if (isset($props['attributes']['placeholder'])) {
             $this->placeholder((string) $props['attributes']['placeholder']);
         }
-
-        $this->instantiateFields();
     }
 
     /**
@@ -162,20 +197,28 @@ class Repeater extends Field {
      * @return void
      */
     public function render(bool $wrapped = true, array $props = []): void {
+        $this->ensureNonceField();
         $props = $this->getRenderProps($props);
-
-        $allowsActions = $props['allowsConfigure'] || $props['allowsRemove'];
-        $props['columnCount']   = count($this->fields) + ($props['allowsReorder'] ? 1 : 0) + ($allowsActions ? 1 : 0);
 
         if ($wrapped) {
             $wrapper = $this->resolveFieldWrapper();
-
             echo view($wrapper, $props);
         }
 
         else {
-            echo view($parsedConfig['component'] ?? $this->getFieldComponent(), $props);
+            echo view($props['component'] ?? $this->getFieldComponent(), $props);
         }
+    }
+
+    /**
+     * Public alias for getRenderProps(). Retrieves the rendering properties for the field, applying defaults where necessary.
+     *
+     * @param array $props An array of properties that may include 'id', 'label', 'helpText', 'excludeAttributes', and 'component'.
+     *
+     * @return array An array containing the parsed properties with defaults applied.
+     */
+    public function getRefreshedRenderProps(array $props = []): array {
+        return $this->getRenderProps($props);
     }
 
     /**
@@ -189,38 +232,41 @@ class Repeater extends Field {
         $parsedProps = $this->parseRenderProps($props);
 
         return [
-            'view'                       => $parsedProps['component'] ?? $this->getFieldComponent(),
-            'field'                      => $this,
-            'id'                         => $parsedProps['id'],
-            'name'                       => $parsedProps['name'],
-            'label'                      => $parsedProps['label'] ?? $this->getLabel(),
-            'helpText'                   => $parsedProps['helpText'] ?? $this->getHelpText(),
-            'value'                      => $this->getValue(),
-            'columnCount'                => count($this->fields) + ($parsedProps['allowsReorder'] ? 1 : 0) + (($parsedProps['allowsConfigure'] || $parsedProps['allowsRemove']) ? 1 : 0),
-            'fieldCount'                 => count($this->fields),
-            'rows'                       => $this->buildRows(),
-            'templateRow'                => $this->buildTemplateRow(),
-            'fieldNames'                 => $this->getFieldNames(),
-            'fieldLabels'                => $this->getFieldLabels(),
-            'attributes'                 => $this->attributes($parsedProps['attributes'] ?? [], $parsedProps['excludeAttributes'] ?? []),
-            'placeholder'                => $parsedProps['placeholder'],
-            'allowsAdd'                  => $parsedProps['allowsAdd'],
-            'allowsRemove'               => $parsedProps['allowsRemove'],
-            'allowsConfigure'            => $parsedProps['allowsConfigure'],
-            'showsActionsColumn'         => $parsedProps['allowsConfigure'] || $parsedProps['allowsRemove'],
-            'allowsReorder'              => $parsedProps['allowsReorder'],
-            'addRowText'                 => $parsedProps['addRowText'],
-            'configureRowText'           => $parsedProps['configureRowText'],
-            'removeRowText'              => $parsedProps['removeRowText'],
-            'hasRules'                   => $this->hasRules(),
-            'rules'                      => $parsedProps['rules'],
-            'serialisedRules'            => json_encode($parsedProps['rules']),
-            'maxRows'                    => $this->getRuleValue('max-items'),
-            'minRows'                    => $this->getRuleValue('min-items'),
-            'showMinHint'                => $parsedProps['showMinHint'],
-            'showMaxHint'                => $parsedProps['showMaxHint'],
-            'configureRequiredFields'    => $parsedProps['configureRequiredFields'],
-            'customConfigurationDialogs' => $parsedProps['customConfigurationDialogs']
+            'view'                          => $parsedProps['component'] ?? $this->getFieldComponent(),
+            'field'                         => $this,
+            'id'                            => $parsedProps['id'],
+            'name'                          => $parsedProps['name'],
+            'label'                         => $parsedProps['label'] ?? $this->getLabel(),
+            'helpText'                      => $parsedProps['helpText'] ?? $this->getHelpText(),
+            'value'                         => $this->getValue(),
+            'columnCount'                   => count($this->rowFields) + ($parsedProps['allowsReorder'] ? 1 : 0) + (($parsedProps['allowsConfigure'] || $parsedProps['allowsRemove']) ? 1 : 0),
+            'fieldCount'                    => count($this->rowFields),
+            'rows'                          => $this->buildRows(),
+            'templateRow'                   => $this->buildTemplateRow(),
+            'fieldNames'                    => $this->getRowFieldNames(),
+            'fieldLabels'                   => $this->getRowFieldLabels(),
+            'attributes'                    => $this->attributes($parsedProps['attributes'] ?? [], $parsedProps['excludeAttributes'] ?? []),
+            'placeholder'                   => $parsedProps['placeholder'],
+            'allowsAdd'                     => $parsedProps['allowsAdd'],
+            'allowsRemove'                  => $parsedProps['allowsRemove'],
+            'allowsConfigure'               => $parsedProps['allowsConfigure'],
+            'showsActionsColumn'            => $parsedProps['allowsConfigure'] || $parsedProps['allowsRemove'],
+            'allowsReorder'                 => $parsedProps['allowsReorder'],
+            'addRowText'                    => $parsedProps['addRowText'],
+            'configureRowText'              => $parsedProps['configureRowText'],
+            'removeRowText'                 => $parsedProps['removeRowText'],
+            'onAddRow'                      => $parsedProps['onAddRow'],
+            'onRemoveRow'                   => $parsedProps['onRemoveRow'],
+            'onConfigureRow'                => $parsedProps['onConfigureRow'],
+            'hasRules'                      => $this->hasRules(),
+            'rules'                         => $parsedProps['rules'],
+            'serialisedRules'               => json_encode($parsedProps['rules']),
+            'maxRows'                       => $this->getRuleValue('max-items'),
+            'minRows'                       => $this->getRuleValue('min-items'),
+            'showMinHint'                   => $parsedProps['showMinHint'],
+            'showMaxHint'                   => $parsedProps['showMaxHint'],
+            'configureRequiredFields'       => $parsedProps['configureRequiredFields'],
+            'ajaxUrl'                       => $this->ajaxUrl,
         ];
     }
 
@@ -270,256 +316,19 @@ class Repeater extends Field {
             ? $props['configureRequiredFields']
             : $this->configureRequiredFields;
 
-        $parsedProps['customConfigurationDialogs'] = is_array($props['customConfigurationDialogs'] ?? null)
-            ? $props['customConfigurationDialogs']
-            : $this->customConfigurationDialogs;
+        $parsedProps['onAddRow'] = is_string($props['onAddRow'] ?? null)
+            ? $props['onAddRow']
+            : $this->onAddRow;
+
+        $parsedProps['onRemoveRow'] = is_string($props['onRemoveRow'] ?? null)
+            ? $props['onRemoveRow']
+            : $this->onRemoveRow;
+
+        $parsedProps['onConfigureRow'] = is_string($props['onConfigureRow'] ?? null)
+            ? $props['onConfigureRow']
+            : $this->getConfigureRowCallback();
 
         return $parsedProps;
-    }
-
-    // =========================================================================
-    // Configuration Dialogs
-    // =========================================================================
-
-    /**
-     * Defines a repeater row configuration dialog from a callback or pre-rendered HTML.
-     *
-     * Supported options:
-     * - when: either ['mode' => 'and|or', 'rules' => [[field,operator,value], ...]] or legacy [field,operator,value]
-     * - default: default payload for the hidden __configuration field
-        * - renderMode: 'static' or 'dynamic'
-        * - rerenderOn: ['row' => ['field_name'], 'dialog' => ['field_name'], 'debounceMs' => 120]
-     *
-     * @param Closure|string $dialog
-     * @param array<string, mixed> $options
-     * @return self
-     */
-    public function configurationDialog(Closure|string $dialog, array $options = []): self {
-        $html = '';
-
-        if ($dialog instanceof Closure) {
-            $group = FieldGroupsRegister::checkout($this->provider)->make();
-            $dialog($group);
-
-            $html = $group->html(['class' => 'meros-form-group--no-style']);
-        } elseif (is_string($dialog)) {
-            $html = $dialog;
-        }
-
-        if (trim($html) === '') {
-            return $this;
-        }
-
-        $when = $this->normaliseDialogWhen($options['when'] ?? null);
-        $default = is_array($options['default'] ?? null) ? $options['default'] : [];
-        $runtime = $this->normaliseDialogRuntime($options);
-
-        $this->customConfigurationDialogs[] = [
-            'when' => $when,
-            'runtime' => $runtime,
-            'html' => $html,
-        ];
-
-        $this->ensureHiddenConfigurationField($default);
-
-        return $this;
-    }
-
-    /**
-     * Backward-compatible wrapper using legacy rule tuple input.
-     *
-     * @param Closure $callback
-     * @param array<int, mixed> $rule
-     * @param array<string, mixed> $default
-     * @return self
-     */
-    public function customConfigurationDialog(Closure $callback, array $rule = [], array $default = []): self {
-        return $this->configurationDialog($callback, [
-            'when' => $rule,
-            'default' => $default,
-        ]);
-    }
-
-    /**
-     * Backward-compatible wrapper for pre-rendered HTML dialogs.
-     *
-     * @param string $html
-     * @param array<int, mixed> $rule
-     * @param array<string, mixed> $default
-     * @return self
-     */
-    public function customConfigurationDialogHtml(string $html, array $rule = [], array $default = []): self {
-        return $this->configurationDialog($html, [
-            'when' => $rule,
-            'default' => $default,
-        ]);
-    }
-
-    /**
-     * Defines a dynamic configuration dialog that can be re-rendered from row and/or dialog dependencies.
-     *
-     * @param Closure|string $dialog
-     * @param array<string, mixed> $options
-     * @return self
-     */
-    public function dynamicConfigurationDialog(Closure|string $dialog, array $options = []): self {
-        $options['renderMode'] = 'dynamic';
-
-        return $this->configurationDialog($dialog, $options);
-    }
-
-    /**
-     * Convenience helper for row-based re-render dependencies.
-     *
-     * @param array<int, string> $rowFieldNames
-     * @param int $debounceMs
-     * @return self
-     */
-    public function configurationDialogRerenderOnRow(array $rowFieldNames, int $debounceMs = 120): self {
-        $dialogIndex = count($this->customConfigurationDialogs) - 1;
-
-        if ($dialogIndex < 0) {
-            return $this;
-        }
-
-        $runtime = is_array($this->customConfigurationDialogs[$dialogIndex]['runtime'] ?? null)
-            ? $this->customConfigurationDialogs[$dialogIndex]['runtime']
-            : $this->normaliseDialogRuntime([]);
-
-        $runtime['renderMode'] = 'dynamic';
-        $runtime['rerenderOn']['row'] = $this->normaliseDialogFieldNameList($rowFieldNames);
-        $runtime['rerenderOn']['debounceMs'] = max(0, $debounceMs);
-
-        $this->customConfigurationDialogs[$dialogIndex]['runtime'] = $runtime;
-
-        return $this;
-    }
-
-    /**
-     * Convenience helper for dialog-field-based re-render dependencies.
-     *
-     * @param array<int, string> $dialogFieldNames
-     * @param int $debounceMs
-     * @return self
-     */
-    public function configurationDialogRerenderOnDialog(array $dialogFieldNames, int $debounceMs = 120): self {
-        $dialogIndex = count($this->customConfigurationDialogs) - 1;
-
-        if ($dialogIndex < 0) {
-            return $this;
-        }
-
-        $runtime = is_array($this->customConfigurationDialogs[$dialogIndex]['runtime'] ?? null)
-            ? $this->customConfigurationDialogs[$dialogIndex]['runtime']
-            : $this->normaliseDialogRuntime([]);
-
-        $runtime['renderMode'] = 'dynamic';
-        $runtime['rerenderOn']['dialog'] = $this->normaliseDialogFieldNameList($dialogFieldNames);
-        $runtime['rerenderOn']['debounceMs'] = max(0, $debounceMs);
-
-        $this->customConfigurationDialogs[$dialogIndex]['runtime'] = $runtime;
-
-        return $this;
-    }
-
-    /**
-     * @param mixed $when
-     * @return array{mode:string,rules:array<int, array<int, mixed>>}
-     */
-    private function normaliseDialogWhen(mixed $when): array {
-        if (is_array($when) && isset($when['rules']) && is_array($when['rules'])) {
-            $mode = (string) ($when['mode'] ?? 'and');
-            $mode = strtolower($mode) === 'or' ? 'or' : 'and';
-
-            $rules = array_values(array_filter($when['rules'], function ($rule) {
-                return is_array($rule) && isset($rule[0], $rule[1], $rule[2]);
-            }));
-
-            return [
-                'mode' => $mode,
-                'rules' => $rules,
-            ];
-        }
-
-        if (is_array($when) && isset($when[0], $when[1], $when[2])) {
-            return [
-                'mode' => 'and',
-                'rules' => [[$when[0], $when[1], $when[2]]],
-            ];
-        }
-
-        return [
-            'mode' => 'and',
-            'rules' => [],
-        ];
-    }
-
-    /**
-     * @param array<string, mixed> $options
-     * @return array<string, mixed>
-     */
-    private function normaliseDialogRuntime(array $options): array {
-        $renderMode = (string) ($options['renderMode'] ?? 'static');
-        $renderMode = strtolower($renderMode) === 'dynamic' ? 'dynamic' : 'static';
-
-        $rerenderOn = is_array($options['rerenderOn'] ?? null) ? $options['rerenderOn'] : [];
-
-        return [
-            'renderMode' => $renderMode,
-            'rerenderOn' => [
-                'row' => $this->normaliseDialogFieldNameList($rerenderOn['row'] ?? []),
-                'dialog' => $this->normaliseDialogFieldNameList($rerenderOn['dialog'] ?? []),
-                'debounceMs' => max(0, (int) ($rerenderOn['debounceMs'] ?? 120)),
-            ],
-        ];
-    }
-
-    /**
-     * @param mixed $fieldNames
-     * @return array<int, string>
-     */
-    private function normaliseDialogFieldNameList(mixed $fieldNames): array {
-        if (!is_array($fieldNames)) {
-            return [];
-        }
-
-        return array_values(array_unique(array_filter(array_map(
-            fn($fieldName) => trim((string) $fieldName),
-            $fieldNames
-        ), fn($fieldName) => $fieldName !== '')));
-    }
-
-    /**
-     * Ensures the hidden configuration field exists and merges any provided defaults.
-     *
-     * @param array<string, mixed> $default
-     * @return void
-     */
-    private function ensureHiddenConfigurationField(array $default = []): void {
-        if ($this->hiddenConfigurationField === null) {
-            $this->hiddenConfigurationField = FieldsRegister::checkout($this->provider)
-                ->makeFrom('hidden', function (Field $field) use ($default) {
-                    $field->name('__configuration')
-                        ->hideInRepeaterTable()
-                        ->attribute('data-repeater-configuration-field', true)
-                        ->attribute('value-as-json', 'true')
-                        ->default(json_encode($default));
-                });
-
-            $this->field($this->hiddenConfigurationField);
-            return;
-        }
-
-        if ($default === []) {
-            return;
-        }
-
-        $existing = $this->hiddenConfigurationField->getDefault();
-        $decoded = is_string($existing) ? json_decode($existing, true) : [];
-        $decoded = is_array($decoded) ? $decoded : [];
-        $merged = array_replace($decoded, $default);
-
-        $this->hiddenConfigurationField->default(json_encode($merged));
     }
 
     /**
@@ -538,7 +347,7 @@ class Repeater extends Field {
      * @return string
      */
     public function getFieldComponent(): string {
-        return 'meros::forms.fields.repeater';
+        return 'meros::forms.fields.repeater-lw';
     }
 
     /**
@@ -572,6 +381,28 @@ class Repeater extends Field {
         $rowToken = $this->resolveRowToken([], 0);
 
         return $this->buildRowFields([], $rowToken, true);
+    }
+
+    /**
+     * Builds the configuration form fields html for the repeater's configuration dialog.
+     *
+     * @return string
+     */
+    public function buildConfigurationFormFields(array $rowData, string $rowToken): string {
+        $fields = array_merge(
+            collect($this->rowFields)->where('isShownInRepeaterForm', true)->toArray(),
+            $this->formFields
+        );
+
+        $html = '';
+
+        foreach ($fields as $field) {
+            if ($field instanceof Field) {
+                $html .= $field->html();
+            }
+        }
+
+        return $html;
     }
 
     // =========================================================================
@@ -657,6 +488,24 @@ class Repeater extends Field {
      */
     public function allowConfigure(bool $allowConfigure = true): static {
         $this->allowConfigure = $allowConfigure;
+
+        if ($allowConfigure) {
+            $this->ensureNonceField();
+            $this->ensureFormDataField();
+        } else {
+            $this->detach(collect($this->rowFields)->where('name', '__row_nonce')->first());
+            $this->detach(collect($this->rowFields)->where('name', '__row_data')->first());
+
+            foreach ($this->formFields as $formField) {
+                if ($formField instanceof Field) {
+                    $this->detach($formField);
+                }
+            }
+
+            $this->hasHiddenNonceField = false;
+            $this->hasHiddenFormDataField = false;
+        }
+
         return $this;
     }
 
@@ -696,6 +545,83 @@ class Repeater extends Field {
         return $this;
     }
 
+    /**
+     * Sets a JavaScript callback function to call when a new row is added to the repeater.
+     *
+     * @param string $jsCallback
+     *
+     * @return static
+     */
+    public function onAddRow(string $jsCallback): static {
+        $this->onAddRow = $jsCallback;
+        return $this;
+    }
+
+    /**
+     * Sets a JavaScript callback function to call when a row is removed from the repeater.
+     *
+     * @param string $jsCallback
+     *
+     * @return static
+     */
+    public function onRemoveRow(string $jsCallback): static {
+        $this->onRemoveRow = $jsCallback;
+        return $this;
+    }
+
+    /**
+     * Sets a callback function to call when the configure button is clicked for a row.
+     *
+     * @param Closure|string $callback
+     *
+     * @return static
+     */
+    public function onConfigureRow(Closure|string $callback): static {
+        $this->onConfigureRow = $callback;
+
+        return $this->allowConfigure(true);
+    }
+
+    /**
+     * Ensures that the hidden nonce field is created and attached to the repeater's fields if it doesn't already exist.
+     *
+     * @return void
+     */
+    private function ensureNonceField(): void {
+        if ($this->hasHiddenNonceField === true) {
+            return;
+        }
+
+        $this->rowField('hidden', function ($field) {
+            $field->name('__row_nonce');
+            $field->hideInRepeaterTable();
+            $field->hideInRepeaterForm();
+            $field->default(wp_create_nonce('meros_repeater_row_action_' . $this->getName()));
+        });
+
+        $this->hasHiddenNonceField = true;
+    }
+
+    /**
+     * Ensures that the hidden form data field is created and attached to the repeater's fields if it doesn't already exist.
+     *
+     * @return void
+     */
+    private function ensureFormDataField(): void {
+        if ($this->hasHiddenFormDataField === true) {
+            return;
+        }
+
+        $this->rowField('hidden', function ($field) {
+            $field->name('__row_data');
+            $field->attribute('data-has-json', 'true');
+            $field->hideInRepeaterTable();
+            $field->hideInRepeaterForm();
+        });
+
+        $this->hasHiddenFormDataField = true;
+    }
+
     // =========================================================================
     // Field Setters
     // =========================================================================
@@ -719,7 +645,7 @@ class Repeater extends Field {
     /**
      * Creates a new field instance, adds it to the repeater's fields array, and returns it for chaining.
      *
-     * @param Field|string       $field The field handle or instance to add as a sub-field.
+     * @param Field|string       $field The field handle, class name, or existing Field instance to add as a sub-field.
      * @param Closure|array|null $callback An optional callback function or array of properties to apply to the field instance after creation.
      * @param array              $props Additional configuration options for the field instance.
      *
@@ -731,20 +657,21 @@ class Repeater extends Field {
         if ($params === 2 && is_array($callback)) {
             $props    = $callback;
             $callback = null;
+        };
+
+        $valid = (is_string($field) && $field !== 'repeater') || ($field instanceof Repeater === false);
+
+        if (!$valid) {
+            throw new \InvalidArgumentException('Invalid field type. Only string handles or Field instances are allowed, and Repeater fields cannot be nested.');
         }
 
-        if (is_string($field)) {
-            $field = FieldsRegister::checkout($this->provider)->makeFrom($field, $callback, $props);
-        } else {
-            FieldsRegister::checkout($this->provider)->attach($field);
-        }
-
+        $field    = FieldsRegister::checkout($this->provider)->makeFrom($field, $callback, $props);
         $position = $props['position'] ?? -1;
 
-        if ($position === -1 || $position >= count($this->fields)) {
-            $this->fields[] = $field;
+        if ($position === -1 || $position >= count($this->rowFields)) {
+            $this->rowFields[] = $field;
         } else {
-            array_splice($this->fields, $position, 0, [$field]);
+            array_splice($this->rowFields, $position, 0, [$field]);
         }
 
         $field->repeater($this);
@@ -764,6 +691,58 @@ class Repeater extends Field {
      */
     public function subField(string $fieldIdOrClass, Closure|array|null $callback = null, array $props = []): Field {
         return $this->field($fieldIdOrClass, $callback, $props);
+    }
+
+    /**
+     * Creates a new field instance, adds it to the repeater's fields array, and returns it for chaining.
+     * Alias for field() method.
+     *
+     * @param string             $fieldIdOrClass The class name of the field to instantiate.
+     * @param Closure|array|null $callback An optional callback function or array of properties to apply to the field instance after creation.
+     * @param array              $props Additional configuration options for the field instance.
+     *
+     * @return Field The created field instance.
+     */
+    public function rowField(string $fieldIdOrClass, Closure|array|null $callback = null, array $props = []): Field {
+        return $this->field($fieldIdOrClass, $callback, $props);
+    }
+
+    /**
+     * Creates a new field instance, adds it to the repeater's form-only fields array, and returns it for chaining.
+     *
+     * @param string             $fieldIdOrClass The field handle or class name of the field to instantiate.
+     * @param Closure|array|null $callback       An optional callback function or array of properties to apply to the field instance after creation.
+     * @param array              $props          Additional configuration options for the field instance.
+     *
+     * @return Field The created field instance.
+     */
+    public function formField(string $fieldIdOrClass, Closure|array|null $callback = null, array $props = []): Field {
+        $params = func_num_args();
+    
+        if ($params === 2 && is_array($callback)) {
+            $props    = $callback;
+            $callback = null;
+        }
+
+        $field    = FieldsRegister::checkout($this->provider)->makeFrom($fieldIdOrClass, $callback, $props);
+        $position = $props['position'] ?? -1;
+
+        if ($position === -1 || $position >= count($this->formFields)) {
+            $this->formFields[] = $field;
+        } else {
+            array_splice($this->formFields, $position, 0, [$field]);
+        }
+
+        $field->repeater($this);
+
+        $this->rowFields = array_filter($this->rowFields, fn($f) => $f !== $field);
+        $this->allowConfigure(true); // Ensure that the repeater allows configuration if form fields are added
+
+        if ($fieldIdOrClass === 'repeater') {
+            $field->allowConfigure(false); // Prevent nested repeaters from allowing configuration
+        }
+
+        return $field;
     }
 
     /**
@@ -790,17 +769,6 @@ class Repeater extends Field {
     }
 
     /**
-     * Refreshes the repeater's fields with a new array of field instances.
-     *
-     * @param array $fields<Field>
-     *
-     * @return void
-     */
-    public function refreshFields(array $fields): void {
-        $this->fields = $fields;
-    }
-
-    /**
      * Moves a field to a new position within the repeater's fields array.
      *
      * @param string  $fieldId
@@ -809,27 +777,27 @@ class Repeater extends Field {
      * @return void
      */
     public function moveField(string $fieldId, int $newPosition): void {
-        $field = collect($this->fields)->firstWhere('id', $fieldId);
+        $field = collect($this->rowFields)->firstWhere('id', $fieldId);
 
         if ($field === null) {
             return; // Field not found in the repeater
         }
 
-        $currentIndex = array_search($field, $this->fields, true);
+        $currentIndex = array_search($field, $this->rowFields, true);
 
         if ($currentIndex === false) {
             return; // Field not found in the repeater
         }
 
-        array_splice($this->fields, $currentIndex, 1); // Remove the field from its current position
+        array_splice($this->rowFields, $currentIndex, 1); // Remove the field from its current position
 
-        if ($newPosition >= count($this->fields)) {
-            $this->fields[] = $field; // Add to the end if new position is out of bounds
+        if ($newPosition >= count($this->rowFields)) {
+            $this->rowFields[] = $field; // Add to the end if new position is out of bounds
         } else {
-            array_splice($this->fields, $newPosition, 0, [$field]); // Insert at the new position
+            array_splice($this->rowFields, $newPosition, 0, [$field]); // Insert at the new position
         }
 
-        $this->fields = array_values($this->fields); // Reindex the array
+        $this->rowFields = array_values($this->rowFields); // Reindex the array
     }
 
     /**
@@ -840,8 +808,13 @@ class Repeater extends Field {
      * @return self
      */
     public function removeField(Field $field): self {
-        $this->fields = array_filter($this->fields, fn($f) => $f !== $field);
-        $this->fields = array_values($this->fields); // Reindex the array
+        $field->repeater(null, null); // Detach the field from the repeater
+
+        $this->rowFields = array_filter($this->rowFields, fn($f) => $f !== $field);
+        $this->rowFields = array_values($this->rowFields); // Reindex the array
+
+        $this->formFields = array_filter($this->formFields, fn($f) => $f !== $field);
+        $this->formFields = array_values($this->formFields); // Reindex the array
         return $this;
     }
 
@@ -849,17 +822,29 @@ class Repeater extends Field {
      * Removes a field from the repeater's fields array.
      * Alias for removeField() method.
      *
-     * @param Field $field The field instance to remove.
+     * @param Field|null $field The field instance to remove.
      *
      * @return self
      */
-    public function detach(Field $field): self {
-        return $this->removeField($field);
+    public function detach(?Field $field): self {
+        return $field ? $this->removeField($field) : $this;
     }
 
     // =========================================================================
     // Getters
     // =========================================================================
+
+    /**
+     * Returns all fields that belong to this repeater as a collection.
+     * 
+     * @param bool $asArray Whether to return the fields as an array or a collection.
+     *
+     * @return Collection|array 
+     */
+    public function getFields(bool $asArray = false): Collection|array {
+        $fields = array_merge($this->rowFields, $this->formFields);
+        return $asArray ? $fields : collect($fields);
+    }
 
     /**
      * Returns the fields that belong to this repeater as a collection.
@@ -868,8 +853,23 @@ class Repeater extends Field {
      *
      * @return Collection|array 
      */
-    public function getFields(bool $asArray = false): Collection|array {
-        return $asArray ? $this->fields : collect($this->fields);
+    public function getRowFields(bool $asArray = false): Collection|array {
+        return $asArray ? $this->rowFields : collect($this->rowFields);
+    }
+
+    /**
+     * Returns the fields that belong to this repeater's configuration form as a collection.
+     * 
+     * @param bool $asArray Whether to return the fields as an array or a collection.
+     *
+     * @return Collection|array 
+     */
+    public function getFormFields(bool $asArray = false): Collection|array {
+        $rowFieldsInForm = collect($this->rowFields)->where('showInRepeaterForm', true)->toArray();
+        $formOnlyFields = $this->formFields;
+
+        $allFormFields = array_merge($rowFieldsInForm, $formOnlyFields);
+        return $asArray ? $allFormFields : collect($allFormFields);
     }
 
     /**
@@ -877,8 +877,8 @@ class Repeater extends Field {
      *
      * @return array
      */
-    protected function getFieldNames(): array {
-        return collect($this->fields)
+    protected function getRowFieldNames(): array {
+        return collect($this->rowFields)
             ->map(fn($field) => $field->getName())
             ->toArray();
     }
@@ -888,10 +888,77 @@ class Repeater extends Field {
      *
      * @return array
      */
-    protected function getFieldLabels(): array {
-        return collect($this->fields)
+    protected function getRowFieldLabels(): array {
+        return collect($this->rowFields)
             ->map(fn($field) => $field->getLabel())
             ->toArray();
+    }
+
+    /**
+     * Returns the JavaScript callback function to call when a new row is added to the repeater.
+     *
+     * @return string|null
+     */
+    public function getAddRowCallback(): string {
+        return $this->onAddRow;
+    }
+
+    /**
+     * Returns the JavaScript callback function to call when a row is removed from the repeater.
+     *
+     * @return string|null
+     */
+    public function getRemoveRowCallback(): string {
+        return $this->onRemoveRow;
+    }
+
+    /**
+     * Returns the JavaScript callback function to call when a row is configured in the repeater.
+     *
+     * @return string|null
+     */
+    public function getConfigureRowCallback(): string {
+       if ($this->onConfigureRow instanceof Closure) {
+            return 'ajax';
+        }
+
+        return $this->onConfigureRow;
+    }
+
+    /**
+     * Renders the configuration dialog for a specific row in the repeater, using either a server-side callback or the default form fields.
+     *
+     * @param array $rowData
+     *
+     * @return string
+     */
+    public function renderRowConfigurationDialog(array $rowData): string {
+        if ($this->onConfigureRow instanceof Closure) {
+            $callback = $this->onConfigureRow;
+            $html = $callback($rowData, $this->getFormFields(true));
+
+            if (is_string($html)) {
+                return $this->sanitizeHtml($html);
+            }
+        }
+
+        $html = '';
+        $fields = $this->getFormFields(true);
+
+        foreach ($fields as $field) {
+            $fieldName = $field->getName();
+
+            if (in_array($fieldName, array_keys($rowData))) {
+                $field->default($rowData[$fieldName]);
+            }
+
+            $field->attribute('data-ref-field-name', $fieldName);
+            $field->name('repeater_form_' . $fieldName);
+
+            $html .= $field->html();
+        }
+
+        return $html;
     }
 
     // =========================================================================
@@ -909,9 +976,13 @@ class Repeater extends Field {
     public function toJson(bool $asString = false, string ...$flags): array|string {
         $json = parent::toJson();
 
-        $json['fields'] = array_map(function($field) {
+        $json['rowFields'] = array_map(function($field) {
             return $field->toJson();
-        }, $this->fields);
+        }, $this->rowFields);
+
+        $json['formFields'] = array_map(function($field) {
+            return $field->toJson();
+        }, $this->formFields);
         
         if ($asString) {
             return json_encode($json, ...$flags);
@@ -923,33 +994,6 @@ class Repeater extends Field {
     // =========================================================================
     // Helpers
     // =========================================================================
-
-    /**
-     * Instantiates any sub fields that are provided as an array.
-     *
-     * @return void
-     */
-    protected function instantiateFields(): void {
-        if (empty($this->fields)) {
-            return;
-        }
-
-        foreach ($this->fields as $index => $fieldData) {
-            if ($fieldData instanceof Field) {
-                continue;
-            }
-
-            if (!is_array($fieldData) || !isset($fieldData['type'])) {
-                continue; // Skip invalid field data
-            }
-
-            $field = $fieldData['type']::initFromData($fieldData);
-
-            $field->repeater($this);
-
-            $this->fields[$index] = $field;
-        }
-    }
 
     /**
      * Generates a unique name for a sub-field based on the repeater's root name, the repeater's name, the row index, and the sub-field's name.
@@ -1000,7 +1044,7 @@ class Repeater extends Field {
     protected function buildRowFields(array $rowData, string $rowToken, bool $isTemplate = false): array {
         $row = [];
 
-        foreach ($this->fields as $field) {
+        foreach ($this->rowFields as $field) {
             $fieldInstance = clone $field;
 
             // Store the original field name before generating the indexed name.

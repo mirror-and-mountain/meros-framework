@@ -18,10 +18,5 @@ class Password extends Input {
         $this->compatibleDataTypes = ['string'];
 
         $this->inputType('password');
-        $this->addSupport('icon');
-        
-        if ($this->showsIcon === null) {
-            $this->showIcon(true, $this->iconPosition ?? 'left');
-        }
     }
 }
