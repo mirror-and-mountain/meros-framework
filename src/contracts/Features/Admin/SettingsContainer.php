@@ -81,7 +81,7 @@ class SettingsContainer extends DataContainer {
         if ($item->hasField()) {
             $itemPage = $item->getPage();
 
-            if (is_string($itemPage) && empty($itemPage)) {
+            if (is_string($itemPage) && empty($itemPage) && !empty($this->page)) {
                 $item->page($this->page);
             }
         }
@@ -107,7 +107,7 @@ class SettingsContainer extends DataContainer {
      *
      * @return static
      */
-    final protected function page(string $page): static {
+    final public function page(string $page): static {
         $this->page = $page;
         return $this;
     }

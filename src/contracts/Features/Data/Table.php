@@ -340,9 +340,7 @@ class Table extends Feature implements Registrable, Makeable {
         $this->migration->down($this->handle);
         return $this;
     }
-
-
-
+    
     /**
      * Checks if the table is installed in the database, optionally checking for a specific update migration.
      *
@@ -401,7 +399,7 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return string|true
      */
-    private function canInstall(): string|true {
+    final public function canInstall(): string|true {
         $configured = $this->isConfigured();
         if ($configured !== true) {
             return $configured;
@@ -431,7 +429,7 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return string|true
      */
-    private function canUpdate(string $updateHandle): string|true {
+    final public function canUpdate(string $updateHandle): string|true {
         $configured = $this->isConfigured();
         if ($configured !== true) {
             return $configured;
@@ -467,7 +465,7 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return string|true
      */
-    private function canRollback(): string|true {
+    final public function canRollback(): string|true {
         $configured = $this->isConfigured();
         if ($configured !== true) {
             return $configured;

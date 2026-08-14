@@ -4,8 +4,8 @@ namespace MM\Meros\Database\Migrations;
 
 use Illuminate\Database\Schema\Blueprint;
 
-use MM\Meros\Support\Migration;
 use MM\Meros\Support\SchemaManager;
+use MM\Meros\Contracts\Features\Data\Migration;
 
 return new class extends Migration {
 

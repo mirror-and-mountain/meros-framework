@@ -298,7 +298,8 @@ final class Framework extends Provider {
     // =========================================================================
 
     private function registerTables(): void {
-        $test = $this->tables()->makeFromPath('001_meros_migrations');
+        // $this->tables()->makeFromPath('001_meros_migrations');
+        // dd($this->tables()->makeFromPath('002_meros_form_responses')->canRollback());
     }
 
     // =========================================================================

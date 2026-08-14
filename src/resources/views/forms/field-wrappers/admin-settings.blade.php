@@ -10,8 +10,14 @@
     }
 
     $view = $properties !== null && isset($properties['view']) ? $properties['view'] : null;
+    $description = $properties !== null && (isset($properties['description']) && $properties['description'] !== '' ) ? $properties['description'] : null;
 @endphp
 
 <div class="meros-field-wrapper">
     @include($view, $properties ?? [])
+    @if ($description !== null)
+        <div style="margin-top: 0.5rem;">
+            <small class="meros-field-description">{{ $description }}</small>
+        </div>
+    @endif
 </div>

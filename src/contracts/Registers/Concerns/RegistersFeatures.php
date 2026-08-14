@@ -77,7 +77,7 @@ trait RegistersFeatures {
 
             // If the feature class is still not found after attempting to register, throw an exception
             if ($resolvedFeature === false) {
-                throw new \InvalidArgumentException("Feature class '{$featureClassOrAlias}' has not been registered with this register.");
+                throw new \InvalidArgumentException("Feature class '{$featureClassOrAlias}' has not been registered with this register (" . static::class . ").");
             }
         }
 
@@ -90,7 +90,7 @@ trait RegistersFeatures {
             }
 
             // If the feature class is still not found, throw an exception
-            throw new \InvalidArgumentException("Feature class or alias '{$featureClassOrAlias}' has not been registered with this register.");
+            throw new \InvalidArgumentException("Feature class or alias '{$featureClassOrAlias}' has not been registered with this register (" . static::class . ").");
         }
 
         // If the feature class is an array (from registration), extract the class and alias

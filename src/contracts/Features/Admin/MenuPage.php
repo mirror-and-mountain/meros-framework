@@ -89,6 +89,20 @@ class MenuPage extends Feature implements Registrable, Makeable {
     protected ?MenuPage $parentPage = null;
 
     /**
+     * Whether this is a subpage reached via a query parameter (e.g., ?page=parent-page&subpage=subpage) rather than a standard submenu page.
+     *
+     * @var boolean
+     */
+    protected bool $isQueryPage = false;
+
+    /**
+     * The query parameter used to identify the subpage when it is a query page.
+     *
+     * @var string
+     */
+    protected string $queryPageParam = 'subpage';
+
+    /**
      * The option group associated with the page, if any.
      *
      * @var string
@@ -116,7 +130,8 @@ class MenuPage extends Feature implements Registrable, Makeable {
     // =========================================================================
 
     final protected function init(): void {
-        $this->set('parentPage', $this->passedProps['parentPage'] ?? null);
+        $this->set('parent_page', $this->passedProps['parent_page'] ?? null);
+        $this->set('is_query_page', $this->passedProps['query_page'] ?? false);
 
         // Ensure subpages are hooked after the parent page.
         $priority = $this->parentPage instanceof self ? 11 : 10;
@@ -276,17 +291,24 @@ class MenuPage extends Feature implements Registrable, Makeable {
     // Subpage Management
     // =========================================================================
 
+    /**
+     * Adds a subpage to the menu page. The subpage can be specified as a class name, an instance of MenuPage, or a closure that configures a new MenuPage instance.
+     *
+     * @param MenuPage|Closure|string $subpageOrClosure
+     * @param array                   $callbackOrProps
+     * @param array                   $props
+     *
+     * @return MenuPage The added subpage instance.
+     */
     final public function subpage(
         MenuPage|Closure|string $subpageOrClosure,
         Closure|array           $callbackOrProps = [],
         array                   $props = []
-    ): static {
-        if ($this->isSubPage()) {
-            throw new \LogicException("Cannot add a subpage to a submenu page. Submenu pages cannot have their own subpages.");
-        }
+    ): MenuPage {
+        $queryPage = false;
 
-        if ($this->area !== 'menu') {
-            throw new \LogicException("Cannot add a subpage to a menu page that is not in the 'menu' area. Subpages can only be added to top-level menu pages.");
+        if ($this->isSubPage() || $this->area !== 'menu') {
+            $queryPage = true;
         }
         
         $subpage = null;
@@ -295,7 +317,7 @@ class MenuPage extends Feature implements Registrable, Makeable {
             $classOrAlias = $subpageOrClosure;
             $props = array_merge(
                 is_array($callbackOrProps) ? $callbackOrProps : $props,
-                ['parentPage' => $this], 
+                ['parent_page' => $this, 'query_page' => $queryPage], 
             );
 
             $subpage = $this->makeItemFrom(
@@ -311,7 +333,7 @@ class MenuPage extends Feature implements Registrable, Makeable {
 
             $props = array_merge(
                 is_array($callbackOrProps) ? $callbackOrProps : $props,
-                ['parentPage' => $this], 
+                ['parent_page' => $this, 'query_page' => $queryPage],
             );
 
             $subpage = $this->makeItem(MenuPage::class, $closure, $props);
@@ -319,9 +341,62 @@ class MenuPage extends Feature implements Registrable, Makeable {
 
         else {
             $subpage = $subpageOrClosure;
+            $subpage->parent($this);
+            $subpage->isQueryPage($queryPage);
         }
 
         $this->subpages[] = $subpage;
+        return $subpage;
+    }
+
+    /**
+     * Sets the page as a query page, which means it is reached via a query parameter rather than a standard submenu page.
+     * 
+     * Example: ?page=parent-page&subpage=subpage
+     *
+     * @param boolean $isQueryPage
+     *
+     * @return static
+     */
+    final public function isQueryPage(bool $isQueryPage = true): static {
+        $this->isQueryPage = $isQueryPage;
+        return $this;
+    }
+
+    /**
+     * Sets the query parameter used to identify the subpage when it is a query page.
+     *
+     * @param string $param
+     *
+     * @return static
+     */
+    final public function queryPageParam(string $param): static {
+        $this->queryPageParam = $param;
+        return $this;
+    }
+
+    /**
+     * Sets the query parameter used to identify the subpage when it is a query page.
+     * 
+     * Alias for queryPageParam().
+     *
+     * @param string $param
+     *
+     * @return static
+     */
+    final public function subpageParam(string $param): static {
+        return $this->queryPageParam($param);
+    }
+
+    /**
+     * Sets the parent page for the menu page.
+     *
+     * @param MenuPage $parent
+     *
+     * @return static
+     */
+    final public function parent(MenuPage $parent): static {
+        $this->parentPage = $parent;
         return $this;
     }
 
@@ -570,12 +645,34 @@ class MenuPage extends Feature implements Registrable, Makeable {
     }
 
     /**
-     * Checks if the menu page is a subpage (i.e., it has a parent page).
+     * Gets a specific subpage by its slug.
+     *
+     * @param string $slug
+     *
+     * @return MenuPage|null
+     */
+    final public function getSubPage(string $slug): ?MenuPage {
+        return $this->getSubPages(true)->first(function ($subpage) use ($slug) {
+            return $subpage instanceof MenuPage && $subpage->getSlug() === $slug;
+        });
+    }
+
+    /**
+     * Checks if the menu page is a subpage (i.e., it has a parent page and is not a query page).
      *
      * @return boolean
      */
     final public function isSubPage(): bool {
-        return $this->parentPage !== null;
+        return $this->parentPage !== null && $this->isQueryPage === false;
+    }
+
+    /**
+     * Checks if the menu page is a query subpage (i.e., it has a parent page and is a query page).
+     *
+     * @return boolean
+     */
+    final public function isQuerySubPage(): bool {
+        return $this->parentPage !== null && $this->isQueryPage === true;
     }
 
     /**
@@ -661,6 +758,17 @@ class MenuPage extends Feature implements Registrable, Makeable {
      * @return void
      */
     public function render(): void {
+        if ($_GET[$this->queryPageParam] ?? null) {
+            $subpage = $this->getSubPages(true)->first(function ($subpage) {
+                return $subpage->getSlug() === $_GET[$this->queryPageParam];
+            });
+
+            if ($subpage instanceof MenuPage) {
+                $this->renderQueryPage($subpage);
+                return;
+            }
+        }
+
         echo '<div class="wrap">';
         echo '<h1>' . esc_html($this->title) . '</h1>';
 
@@ -673,6 +781,17 @@ class MenuPage extends Feature implements Registrable, Makeable {
         }
 
         echo '</div>';
+    }
+
+    /**
+     * Renders the menu page when it is a query subpage (i.e., it has a parent page and is a query page).
+     *
+     * @param MenuPage $subpage
+     *
+     * @return void
+     */
+    protected function renderQueryPage(MenuPage $subpage): void {
+        $subpage->render();
     }
 
     /**
