@@ -25,7 +25,7 @@ trait ProvidesSettings {
      * 
      * @return Setting|SettingsContainer|null The requested setting or the provider's settings container.
      */
-    protected function settings(string $name = ''): Setting|SettingsContainer|null {
+    final protected function settings(string $name = ''): Setting|SettingsContainer|null {
         if (!empty($name)) {
             return SettingsFacade::get($name, $this);
         }
@@ -40,7 +40,7 @@ trait ProvidesSettings {
      * 
      * @return array The values of all settings for the implementing class.
      */
-    protected function getSettingsValues(bool $refresh = false): array {
+    final protected function getSettingsValues(bool $refresh = false): array {
         $settingsContainer = $this->settings();
 
         if ($settingsContainer instanceof SettingsContainer) {
@@ -59,7 +59,7 @@ trait ProvidesSettings {
      * 
      * @return array The configuration values for the implementing class.
      */
-    protected function getConfiguration(bool $refresh = false): array {
+    final protected function getConfiguration(bool $refresh = false): array {
         return $this->getSettingsValues($refresh);
     }
 
@@ -71,7 +71,7 @@ trait ProvidesSettings {
      * 
      * @return mixed The value of the specified setting, or null if not found.
      */
-    protected function getSettingValue(string $name, bool $refresh = false): mixed {
+    final protected function getSettingValue(string $name, bool $refresh = false): mixed {
         $setting = $this->settings($name);
 
         if ($setting instanceof Setting) {
@@ -91,7 +91,22 @@ trait ProvidesSettings {
      * 
      * @return mixed The value of the specified configuration setting, or null if not found.
      */
-    protected function getConfigurationValue(string $name, bool $refresh = false): mixed {
+    final protected function getConfigurationValue(string $name, bool $refresh = false): mixed {
         return $this->getSettingValue($name, $refresh);
+    }
+
+    /**
+     * Checks if the implementing class has any settings with associated fields.
+     *
+     * @return boolean True if there are settings with fields, false otherwise.
+     */
+    final public function hasSettingsWithFields(): bool {
+        $settingsContainer = $this->settings();
+
+        if ($settingsContainer instanceof SettingsContainer) {
+            return $settingsContainer->hasSettingsWithFields();
+        }
+
+        return false;
     }
 }

@@ -115,12 +115,28 @@ abstract class DataItem extends Feature implements StorableItem {
                 throw new \LogicException("DataItem '{$this->name}' must have a data type set.");
             }
 
-            $this->container($this->resolveContainer());
+            if ($this->container === null) {
+                $this->container($this->resolveContainer());
+            }
         }
 
         if ($this->container === null) {
             throw new \LogicException("DataItem '{$this->name}' must be associated with a Storable.");
         }
+    }
+
+    /**
+     * Called when the data item's container is updated. Can be overridden in subclasses to perform actions related to the data item's value.
+     *
+     * @param mixed  $value      The new value of the data item.
+     * @param mixed  $oldValue   The old value of the data item.
+     * @param string $itemName   The name of the data item.
+     * @param string $optionName The name of the option in the container that was updated.
+     *
+     * @return void
+     */
+    public function whenUpdated(mixed $value, mixed $oldValue, string $itemName, string $optionName): void {
+        // This method can be overridden in subclasses to perform actions related to the data item's value when the container is updated.
     }
 
     // =========================================================================
@@ -449,15 +465,17 @@ abstract class DataItem extends Feature implements StorableItem {
     }
 
     /**
-     * Sets the data type of the data item to 'array' and returns the data item instance.
+     * Nested objects aren't currently supported. 
+     * 
+     * Sets the data type of the data item to 'object' and returns the data item instance.
      *
      * @param string $name Optional name to set for the data item.
      *
      * @return static
      */
-    final public function object(string $name = ''): static {
-        return $this->setDataType('object', $name);
-    }
+    // final public function object(string $name = ''): static {
+    //     return $this->setDataType('object', $name);
+    // }
 
     /**
      * Sets the data type of the data item to 'array' and returns the data item instance.

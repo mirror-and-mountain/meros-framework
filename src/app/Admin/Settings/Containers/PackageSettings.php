@@ -1,10 +1,12 @@
 <?php
 
-namespace MM\Meros\App\Admin\SettingsContainers;
+namespace MM\Meros\App\Admin\Settings\Containers;
 
+use Illuminate\Support\Str;
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
+use MM\Meros\Facades\Packages;
 
-class PackageSettings extends SettingsContainer {
+final class PackageSettings extends SettingsContainer {
     
     // =========================================================================
     // Initialisation

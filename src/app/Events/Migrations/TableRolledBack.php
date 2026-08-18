@@ -4,10 +4,10 @@ namespace MM\Meros\App\Events\Migrations;
 
 use MM\Meros\Contracts\Features\Data\Table;
 
-class TableCreated {
+class TableRolledBack {
     public function __construct(
         public string  $tableName, 
-        public Table   $table, 
+        public Table   $table,
         public ?string $connection = null
     ) {}
 }

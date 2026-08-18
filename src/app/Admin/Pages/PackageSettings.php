@@ -15,6 +15,7 @@ final class PackageSettings extends MenuPage {
         $this->title('Package Settings');
         $this->menuTitle('Package Settings');
         $this->area('options');
+        $this->position(0);
         $this->subpageParam('package');
     }
 }

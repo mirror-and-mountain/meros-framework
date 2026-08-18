@@ -42,6 +42,7 @@ class SettingsContainer extends DataContainer {
 
     final protected function whenConfigured(): void {
         parent::whenConfigured();
+        $this->updatedHook('pre_update_option_' . $this->name);
     }
     
     // =========================================================================
@@ -132,6 +133,21 @@ class SettingsContainer extends DataContainer {
      */
     final public function getPage(): string {
         return $this->page;
+    }
+
+    /**
+     * Checks if the settings container has any settings with associated fields.
+     *
+     * @return boolean
+     */
+    final public function hasSettingsWithFields(): bool {
+        foreach ($this->getItems() as $item) {
+            if ($item instanceof Setting && $item->hasField()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // =========================================================================

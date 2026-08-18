@@ -10,13 +10,22 @@ use MM\Meros\Registers\Admin\SettingsContainers;
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 
 use MM\Meros\Contracts\Features\Admin\MenuPage;
+use MM\Meros\Contracts\Features\Data\Table;
 
 use MM\Meros\Contracts\Providers\Concerns\IsNonFrameworkProvider;
 
 use MM\Meros\Support\ClassInfo;
+use MM\Meros\Facades\Framework;
 
 abstract class Package extends Provider {
     use IsNonFrameworkProvider;
+
+    /**
+     * Indicates whether the package is enabled.
+     *
+     * @var boolean
+     */
+    private bool $enabled;
     
     // =========================================================================
     // Initialisation
@@ -28,6 +37,7 @@ abstract class Package extends Provider {
         $this->setName(Str::headline($info->shortName));
         $this->setPath($info->path);
         $this->setUri($info->uri);
+        $this->registerTables();
     }
 
     /**
@@ -64,7 +74,7 @@ abstract class Package extends Provider {
             ? $this->getHandle() . '_settings' 
             : 'meros_' . $this->getHandle() . '_settings';
 
-        $menuPageSlug = Str::slug(Str::replace('_', '-', $this->getHandle()));
+        $menuPageSlug = $this->getHandle(true);
         $menuPage = $this->initSettingsPage($menuPageSlug)->getSlug();
 
         return $register->get($containerName, $this) ?? 
@@ -104,13 +114,99 @@ abstract class Package extends Provider {
                 $page->title($this->getName() . ' Settings');
 
                 if ($this->getDescription() !== '') {
-                    $page->callback(function () {
+                    $page->callback(function () use ($slug) {
+                        echo '<nav class="meros-breadcrumbs" aria-label="Breadcrumb">
+                            <a href="' . admin_url('admin.php?page=meros-packages') . '">Packages</a>
+                            <span class="meros-breadcrumb-separator">/ Settings</span>
+                        </nav>';
                         echo '<p>'. $this->getDescription() . '</p>';
+                        if ($this->hasRegisteredTables()) {
+                            echo '<div style="margin-bottom:2rem;">';
+                            echo '<h2>Custom Tables</h2>';
+                            echo '<p>It looks like this package has registered custom database tables: ';
+                            echo '<a href="' . admin_url('admin.php?page=meros-packages&package=' . $this->getHandle(true) . '&tables=' . $slug . '-tables') . '" title="Manage Custom Database Tables">Manage</a>';
+                            echo '</p></div>';
+                            echo '<h2>Settings</h2>';
+
+                            if (!$this->isEnabled()) {
+                                echo '<p>This package is currently disabled. Please enable it to access its settings.</p>';
+                            }
+                        }
                     });
                 }
             });
         }
 
+        if ($this->hasRegisteredTables() && $settingsPage->getSubPage($slug . '-tables') === null) {
+            $this->initTableManagementPage($settingsPage);
+        }
+
         return $settingsPage;
+    }
+
+    /**
+     * Determines whether the package is enabled.
+     *
+     * @param boolean $refresh
+     *
+     * @return boolean
+     */
+    final protected function isEnabled(bool $refresh = false): bool {
+        if (isset($this->enabled) && !$refresh) {
+            return $this->enabled;
+        }
+
+        $settingName     = $this->getHandle() . '_enabled';
+        $packageSettings = Framework::__getPackageSettings($refresh);
+        $this->enabled   = (bool) ($packageSettings[$settingName] ?? false);
+
+        return $this->enabled;
+    }
+
+    /**
+     * Called when the package is enabled. 
+     * 
+     * For internal use only: Packages should override the whenEnabled() method to define 
+     * custom behavior when the package is enabled.
+     *
+     * @return void
+     */
+    final public function __whenEnabled(): void {
+        $this->getUninstalledRequiredTables()->each(function (Table $table) {
+            $table->install();
+        });
+
+        $this->whenEnabled();
+    }
+
+    /**
+     * Called when the package is disabled. 
+     * 
+     * For internal use only: Packages should override the whenDisabled() method to define 
+     * custom behavior when the package is disabled.
+     *
+     * @return void
+     */
+    final public function __whenDisabled(): void {
+        $this->whenDisabled();
+    }
+
+    /**
+     * Called when the package is enabled. Packages can override this method to define custom behavior when the package is enabled.
+     *
+     * @return void
+     */
+    protected function whenEnabled(): void {
+        // This method can be overridden by subclasses to define custom behavior when the package is enabled.
+    }
+
+
+    /**
+     * Called when the package is disabled. Packages can override this method to define custom behavior when the package is disabled.
+     *
+     * @return void
+     */
+    protected function whenDisabled(): void {
+        // This method can be overridden by subclasses to define custom behavior when the package is disabled.
     }
 }

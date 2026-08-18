@@ -73,6 +73,9 @@ class ThemeServiceProvider extends MerosServiceProvider {
         // Call the theme's configure method
         $theme->configure();
 
+        // Call the theme's whenConfigured method
+        $theme->whenConfigured();
+
         // Run the afterBoot method
         $this->afterBoot();
     }

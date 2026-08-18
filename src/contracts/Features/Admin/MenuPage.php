@@ -26,6 +26,13 @@ class MenuPage extends Feature implements Registrable, Makeable {
     protected string $title = '';
 
     /**
+     * Whether to show the page title in the admin area. Defaults to true.
+     *
+     * @var boolean
+     */
+    protected bool $showTitle = true;
+
+    /**
      * The page's menu title.
      *
      * @var string
@@ -123,6 +130,16 @@ class MenuPage extends Feature implements Registrable, Makeable {
      */
     protected string $submenuTitle = '';
 
+    /**
+     * An array of AJAX actions handled by the page. 
+     * 
+     * Each action should include a string key representing the action name and 
+     * a callable value representing the handler function.
+     *
+     * @var array
+     */
+    private array $ajaxActions = [];
+
     use IsRegistrable, IsMakeable, IsHookable, InstantiatesItems, MakesItems;
 
     // =========================================================================
@@ -143,6 +160,18 @@ class MenuPage extends Feature implements Registrable, Makeable {
     final protected function whenConfigured(): void {
         if (!empty($this->subpages)) {
             $this->instantiate('subpages', MenuPage::class, ['parentPage' => $this]);
+        }
+
+        if (!empty($this->ajaxActions)) {
+            $this->registerAjaxActions();
+        }
+    }
+
+    private function registerAjaxActions(): void {
+        foreach ($this->ajaxActions as $action => $handler) {
+            if (is_callable($handler)) {
+                add_action('wp_ajax_' . $action, $handler);
+            }
         }
     }
 
@@ -452,6 +481,18 @@ class MenuPage extends Feature implements Registrable, Makeable {
     }
 
     /**
+     * Sets whether to show the page title in the admin area.
+     *
+     * @param boolean $show
+     *
+     * @return static
+     */
+    final public function showTitle(bool $show = true): static {
+        $this->showTitle = $show;
+        return $this;
+    }
+
+    /**
      * Sets the menu title of the menu page.
      *
      * @param string $menuTitle
@@ -595,6 +636,23 @@ class MenuPage extends Feature implements Registrable, Makeable {
      */
     final public function __hasSettings(string $optionGroup): static {
         $this->optionGroup = $optionGroup;
+        return $this;
+    }
+
+    /**
+     * Adds an AJAX action to the menu page. The action will be handled by the provided callable.
+     *
+     * @param string   $action
+     * @param callable $handler
+     *
+     * @return static
+     */
+    final public function addAjaxAction(string $action, callable $handler): static {
+        if ($this->ajaxActions[$action] ?? null) {
+            return $this;
+        }
+
+        $this->ajaxActions[$action] = $handler;
         return $this;
     }
 
@@ -770,7 +828,10 @@ class MenuPage extends Feature implements Registrable, Makeable {
         }
 
         echo '<div class="wrap">';
-        echo '<h1>' . esc_html($this->title) . '</h1>';
+
+        if ($this->showTitle) {
+            echo '<h1>' . esc_html($this->title) . '</h1>';
+        }
 
         if (is_callable($this->callback)) {
             call_user_func($this->callback);

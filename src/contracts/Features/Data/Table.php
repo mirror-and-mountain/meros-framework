@@ -7,29 +7,27 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
 use MM\Meros\Contracts\Feature;
-
-use MM\Meros\Contracts\Features\Registrable;
 use MM\Meros\Contracts\Features\Makeable;
 
 use MM\Meros\Contracts\Concerns\ResolvesPaths;
-use MM\Meros\Contracts\Features\Concerns\IsRegistrable;
 use MM\Meros\Contracts\Features\Concerns\IsMakeable;
 
 use MM\Meros\App\Models\Migration as MigrationModel;
 
 use MM\Meros\Support\SchemaManager;
+use MM\Meros\Facades\Tables;
 
-class Table extends Feature implements Registrable, Makeable {
+final class Table extends Feature implements Makeable {
     /**
-     * The table's handle (identifier). 
+     * The table's name (identifier). 
      * It should correspond exactly to the table name in the database.
      *
      * @var string
      */
-    private string $handle = '';
+    private string $name = '';
 
     /**
-     * The table's label.
+     * The label from the table's main migration file.
      *
      * @var string
      */
@@ -59,16 +57,44 @@ class Table extends Feature implements Registrable, Makeable {
     /**
      * The main Migration instance associated with the table (i.e. the migration that creates the table).
      *
-     * @var Migration|null
+     * @var TableCreator|null
      */
-    private ?Migration $migration = null;
+    private ?TableCreator $migration = null;
 
     /**
-     * An array of update migrations associated with the table, keyed by their handles.
+     * An array of update migrations associated with the table, keyed by their names.
      *
      * @var array
      */
     private array $updates = [];
+
+    /**
+     * An array of table dependents that rely on this table being installed first.
+     *
+     * @var array<Table>
+     */
+    private array $dependents = [];
+
+    /**
+     * An array of table dependencies that must be installed before this table can be installed.
+     *
+     * @var array
+     */
+    private array $dependencies = [];
+
+    /**
+     * Whether or not the table is required for the provider to function. Defaults to false.
+     *
+     * @var boolean
+     */
+    private bool $isRequired = false;
+
+    /**
+     * Whether to automatically install this table when its dependencies are installed. Defaults to true.
+     *
+     * @var boolean
+     */
+    private bool $installWithDependencies = true;
 
     /**
      * The current batch ID for the table's migrations.
@@ -84,19 +110,19 @@ class Table extends Feature implements Registrable, Makeable {
      */
     private string $lastError = '';
 
-    use IsRegistrable, IsMakeable, ResolvesPaths;
+    use IsMakeable, ResolvesPaths;
 
     // =========================================================================
     // Initialisation
     // =========================================================================
 
-    final protected function init(): void {
+    protected function init(): void {
         if (isset($this->passedProps['path'])) {
             $this->path($this->passedProps['path']);
         }
     }
 
-    final protected function whenConfigured(): void {
+    protected function whenConfigured(): void {
         if ($this->migrationDirectory === '' || $this->migrationPath === '') {
             return;
         }
@@ -116,32 +142,42 @@ class Table extends Feature implements Registrable, Makeable {
      */
     private function initialiseFromMigrationPath(): void {
         if ($this->migrationPath === '' || $this->migrationDirectory === '') {
-            throw new \RuntimeException("Migration path is not set for table '{$this->handle}'.");
+            throw new \RuntimeException("Migration path is not set for table '{$this->name}'.");
         }
 
         $migration = include $this->migrationPath;
-        if (!$migration instanceof Migration) {
-            throw new \RuntimeException("The migration file at '{$this->migrationPath}' does not return a valid Migration instance.");
+        if (!$migration instanceof TableCreator) {
+            throw new \RuntimeException("The migration file at '{$this->migrationPath}' does not return a valid TableCreator instance.");
         }
 
         if (!method_exists($migration, 'up') || !method_exists($migration, 'down')) {
             throw new \RuntimeException("The migration file at '{$this->migrationPath}' must implement both 'up' and 'down' methods.");
         }
 
-        // Create a handle from the migration file name
-        $handle = Str::snake(basename($this->migrationDirectory));
+        // Initialise the migration
+        $migration->__init();
 
-        // Remove timestamp and numeric prefixes from the handle
-        $this->handle = preg_replace('/^(?:\d{4}_\d{2}_\d{2}_\d{6}_|\d+_)/', '', $handle);
+        // Set the table's name from the migration's name
+        $this->name = $migration->getTableName();
 
-        // Set the label using the handle if not already set
-        if ($this->label === '') {
-            $this->label = Str::title(str_replace('_', ' ', $this->handle));
-        }
+        // Set the table's label from the migration's label
+        $this->label = $migration->getLabel();
+        
+        // Set the description using the migration's description
+        $this->description = $migration->getDescription();
 
-        // Set the description using the migration's description if not already set
-        if ($this->description === '') {
-            $this->description = $migration->description ?? '';
+        // Set whether the table is required for the provider to function
+        $this->isRequired = $migration->isRequired();
+
+        // Store any dependencies defined in the migration
+        $this->dependencies = $migration->getDependencies();
+
+        if (!empty($this->dependencies)) {
+            if ($this->isRequired) {
+                $this->installWithDependencies = true;
+            } else {
+                $this->installWithDependencies = $migration->installWithDependencies();
+            }
         }
 
         $this->migration = $migration;
@@ -180,29 +216,26 @@ class Table extends Feature implements Registrable, Makeable {
                 $path = $candidate->getPathname();
                 $updateMigration = include $path;
 
-                if ($updateMigration instanceof Migration) {
+                if ($updateMigration instanceof TableUpdater) {
                     if (!method_exists($updateMigration, 'up') || !method_exists($updateMigration, 'down')) {
                         continue; // Skip if the migration does not have the required methods
                     }
 
-                    // Create a handle from the migration file name, 
-                    // removing timestamp or any numeric prefixes
-                    $handle = Str::snake(
-                        preg_replace(
-                            '/^(?:\d{4}_\d{2}_\d{2}_\d{6}_|\d+_)/', 
-                            '', 
-                            $candidate->getFilenameWithoutExtension()
-                        )
-                    );
-                    
-                    // Create a label from the handle.
-                    $label = Str::title(str_replace('_', ' ', $handle));
+                    // Initialise the update migration
+                    $updateMigration->__init();
 
-                    // Get the description if available, otherwise use an empty string.
-                    $description = $updateMigration->description ?? '';
+                    // Get update's handle
+                    $handle = $updateMigration->getHandle();
+                    
+                    // Get the update's label
+                    $label = $updateMigration->getLabel();
+
+                    // Get the description
+                    $description = $updateMigration->getDescription();
 
                     $updateMigrations[$handle] = [
                         'migration'   => $updateMigration,
+                        'table'       => $this->name,
                         'handle'      => $handle,
                         'label'       => $label,
                         'description' => $description,
@@ -216,19 +249,139 @@ class Table extends Feature implements Registrable, Makeable {
     }
 
     // =========================================================================
-    // Installation, Updating, Rollback and Uninstallation
+    // Validation and Status Checks
     // =========================================================================
+
+    /**
+     * Checks if a specific migration operation can be run on the table, returning true if it can, or an error message if it cannot.
+     *
+     * @param string $operation
+     * @param string $updateHandle
+     *
+     * @return true|string
+     */
+    public function canRunOperation(string $operation, string $updateHandle = ''): true|string {
+        if (!in_array($operation, ['create', 'update', 'rollback', 'drop'])) {
+            return "Invalid operation '{$operation}'.";
+        }
+
+        if ($this->migration === null) {
+            return "No migration is set for the table '{$this->name}'.";
+        }
+
+        $schema = SchemaManager::schema($this->migration->getConnection());
+        $context = [
+            'operation'    => $operation,
+            'handle'       => $updateHandle,
+            'dependencies' => $this->dependencies,
+        ];
+
+        $result = SchemaManager::canRunOperation(
+            $this->name,
+            $schema,
+            $context,
+            false,
+            true // Return error message instead of boolean
+        );
+
+        if ($result !== true) {
+            return $result;
+        }
+
+        return true;
+    }
+
+    /**
+     * Checks if the table can be installed in the database.
+     *
+     * @return boolean
+     */
+    public function canInstall(): bool {
+        $canInstall = $this->canRunOperation('create');
+        return $canInstall === true;
+    }
+
+    /**
+     * Checks if the table is installed in the database, optionally checking for a specific update migration.
+     *
+     * @param string $updatename
+     *
+     * @return boolean
+     */
+    public function isInstalled(string $updatename = ''): bool {
+        $tableInstalled = SchemaManager::tableIsInstalled($this);
+
+        if ($updatename !== '') {
+            $updateInstalled = SchemaManager::tableUpdateIsInstalled($this, $updatename);
+            return $tableInstalled && $updateInstalled;
+        }
+
+        return $tableInstalled;
+    }
+
+    /**
+     * Checks if there are any update migrations that have not yet been applied to the table.
+     *
+     * @return boolean
+     */
+    public function hasUpdates(): bool {
+        if (empty($this->updates)) {
+            return false;
+        }
+
+        $handles = collect($this->updates)->pluck('handle')->toArray();
+        return SchemaManager::tableUpdatesAreInstalled($this, $handles) === false;
+    }
+
+    /**
+     * Checks if the table has an update that can be rolled back.
+     *
+     * @return boolean
+     */
+    public function canRollback(): bool {
+        $lastUpdate = $this->getLastUpdate();
+        if ($lastUpdate === null) {
+            return false;
+        }
+
+        $canRollback = $this->canRunOperation('rollback', $lastUpdate['handle']);
+        return $canRollback === true;
+    }
+
+    // =========================================================================
+    // Operations
+    // =========================================================================
+
+    /**
+     * Attempts to run a migration operation (up or down) on the table, returning true on success or an error message on failure.
+     *
+     * @param Migration $migration
+     * @param string    $operation
+     *
+     * @return true|string
+     */
+    private function runMigration(Migration $migration, string $operation): true|string {
+        if (!method_exists($migration, $operation)) {
+            throw new \RuntimeException("The migration does not have a method named '{$operation}'.");
+        }
+
+        try {
+            $migration->{$operation}($this);
+            return true;
+        } catch (\Exception $e) {
+            return "Migration operation '{$operation}' failed: " . $e->getMessage();
+        }
+    }
 
     /**
      * Installs the table in the database by running its main migration.
      *
      * @param string  $batchId
-     * @param boolean $update
      *
      * @return static
      */
-    final public function install(string $batchId = '', bool $update = true): static {
-        $canInstall = $this->canInstall();
+    public function install(string $batchId = ''): static {
+        $canInstall = $this->canRunOperation('create');
 
         if ($canInstall !== true) {
             $this->lastError = $canInstall;
@@ -237,13 +390,55 @@ class Table extends Feature implements Registrable, Makeable {
 
         $this->currentBatchId = $batchId ?: Str::ulid();
 
-        $this->migration->up($this->handle);
+        $result = $this->runMigration($this->migration, 'up');
 
-        if ($update) {
-            $this->update($batchId);
+        if ($result !== true) {
+            $this->lastError = $result;
+            return $this;
+        }
+
+        // Run any pending updates after the main migration is installed
+        $this->update($batchId);
+
+        if (!empty($this->dependents)) {
+            $this->installDependents();
         }
 
         return $this;
+    }
+
+    /**
+     * Installs any dependent tables that rely on this table being installed first and are 
+     * set to auto-install with their dependencies. Will skip any dependents with other uninstalled dependencies.
+     *
+     * @return void
+     */
+    private function installDependents(): void {
+        foreach ($this->dependents as $dependent) {
+            if ($dependent->isInstalled()) {
+                continue;
+            }
+
+            if (!$dependent->autoInstallsWithDependencies()) {
+                continue;
+            }
+
+            $dependencies = $dependent->getDependencies();
+
+            foreach ($dependencies as $dependency) {
+                if ($dependency === $this->name) {
+                    continue;
+                }
+
+                $table = Tables::get($dependency);
+
+                if ($table instanceof Table && !$table->isInstalled()) {
+                    continue 2; // Skip this dependent if any of its other dependencies are not installed
+                }
+            }
+
+            $dependent->install($this->currentBatchId);
+        }
     }
 
     /**
@@ -253,68 +448,69 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return static
      */
-    final public function update(string $batchId = ''): static {
+    public function update(string $batchId = ''): static {
         if (!$this->isInstalled()) {
             $this->lastError = static::class . " is not installed, so it cannot be updated.";
             return $this;
         }
 
         if (!$this->hasUpdates()) {
-            $this->lastError = static::class . " has no updates to apply.";
             return $this;
         }
 
         $updated = false;
         $this->currentBatchId = $batchId ?: Str::ulid();
 
-        $this->walkUpdates(function($migration, $handle) use (&$updated) {
-            if (!$this->isInstalled($handle)) {
-                $canUpdate = $this->canUpdate($handle);
+        $this->walkUpdates(function($migration, $name) use (&$updated) {
+            if (!$this->isInstalled($name)) {
+                $canUpdate = $this->canRunOperation('update', $migration->getHandle());
 
                 if ($canUpdate !== true) {
                     $this->lastError = $canUpdate;
                     return;
                 }
 
-                $migration->up($this->handle);
-                $updated = true;
+                $result = $this->runMigration($migration, 'up');
+                if ($result === true) {
+                    $updated = true;
+                } else {
+                    $this->lastError = $result;
+                    return;
+                }
             }
         });
-
-        if ($updated === false) {
-            $this->lastError = "No updates were applied. Either there are no updates, or all updates have already been applied.";
-        }
 
         return $this;
     }
 
-    final public function rollback(): static {
-        $canRollback = $this->canRollback();
+    /**
+     * Rolls back the last applied update migration for the table.
+     *
+     * @param string $batchId
+     *
+     * @return static
+     */
+    public function rollback(string $batchId = ''): static {
+        $lastUpdate = $this->getLastUpdate();
+
+        if ($lastUpdate === null) {
+            return $this;
+        }
+
+        $canRollback = $this->canRunOperation('rollback', $lastUpdate['handle']);
 
         if ($canRollback !== true) {
             $this->lastError = $canRollback;
             return $this;
         }
 
-        $reverseUpdates = array_reverse($this->updates);
+        $this->currentBatchId = $batchId ?: Str::ulid();
 
-        // Rollback the last installed update if available...
-        if (count($reverseUpdates) > 0) {
-            foreach ($reverseUpdates as $update) {
-                $installed = $this->isInstalled($update['handle']);
+        $migration = $lastUpdate['migration'];
+        $result    = $this->runMigration($migration, 'down');
 
-                if (!$installed) {
-                    continue;
-                }
-
-                $update['migration']->down($this->handle);
-                break; // Rollback only the most recent update
-            }
-        }
-
-        else {
-            // ...If there are no updates, rollback the main migration
-            $this->migration->down($this->handle);
+        if ($result !== true) {
+            $this->lastError = $result;
         }
 
         return $this;
@@ -325,167 +521,34 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return static
      */
-    final public function uninstall(): static {
-        if ($this->handle === 'meros_migrations') {
+    public function uninstall(): static {
+        if ($this->name === 'meros_migrations') {
             return $this; // Prevent uninstallation of the core migrations table
         }
 
-        $canUninstall = $this->canRollback();
+        if (!empty($this->dependents)) {
+            foreach ($this->dependents as $dependent) {
+                if ($dependent->isInstalled()) {
+                    $this->lastError = "Cannot uninstall '{$this->name}' because dependent table '{$dependent->getName()}' is still installed.";
+                    return $this;
+                }
+            }
+        }
+
+        $canUninstall = $this->canRunOperation('drop');
 
         if ($canUninstall !== true) {
             $this->lastError = $canUninstall;
             return $this;
         }
 
-        $this->migration->down($this->handle);
+        $result = $this->runMigration($this->migration, 'down');
+
+        if ($result !== true) {
+            $this->lastError = $result;
+        }
+
         return $this;
-    }
-    
-    /**
-     * Checks if the table is installed in the database, optionally checking for a specific update migration.
-     *
-     * @param string $updateHandle
-     *
-     * @return boolean
-     */
-    final public function isInstalled(string $updateHandle = ''): bool {
-        $serviceInstalled = SchemaManager::hasTable('meros_migrations');
-
-        if (!$serviceInstalled) {
-            return false;
-        }
-
-        $tableExists = SchemaManager::hasTable($this->handle);
-
-        if (!empty($updateHandle)) {
-            $updateLogged = MigrationModel::where('related_table', $this->handle)
-                ->where('handle', $updateHandle)
-                ->exists();
-
-            return $tableExists && $updateLogged;
-        }
-
-        $tableLogged = MigrationModel::where('related_table', $this->handle)
-            ->where('type', 'create')
-            ->exists();
-
-        return $tableExists && $tableLogged;
-    }
-
-    /**
-     * Checks if there are any update migrations that have not yet been applied to the table.
-     *
-     * @return boolean
-     */
-    final public function hasUpdates(): bool {
-        if (empty($this->updates)) {
-            return false;
-        }
-
-        $hasUpdates = false;
-
-        foreach ($this->updates as $update) {
-            if (!$this->isInstalled($update['handle'])) {
-                $hasUpdates = true;
-                break;
-            }
-        }
-
-        return $hasUpdates;
-    }
-
-    /**
-     * Checks whether the table can be installed, returning true if it can, or a string message explaining why it cannot.
-     *
-     * @return string|true
-     */
-    final public function canInstall(): string|true {
-        $configured = $this->isConfigured();
-        if ($configured !== true) {
-            return $configured;
-        }
-
-        $allowedContext = $this->isAllowedContext();
-        if ($allowedContext !== true) {
-            return $allowedContext;
-        }
-
-        $userPermission = $this->userHasPermission();
-        if ($userPermission !== true) {
-            return $userPermission;
-        }
-
-        if ($this->isInstalled()) {
-            return static::class . " is already installed.";
-        }
-
-        return true;
-    }
-
-    /**
-     * Checks whether a specific update migration can be applied to the table, returning true if it can, or a string message explaining why it cannot.
-     *
-     * @param string $updateHandle
-     *
-     * @return string|true
-     */
-    final public function canUpdate(string $updateHandle): string|true {
-        $configured = $this->isConfigured();
-        if ($configured !== true) {
-            return $configured;
-        }
-
-        $allowedContext = $this->isAllowedContext();
-        if ($allowedContext !== true) {
-            return $allowedContext;
-        }
-
-        $userPermission = $this->userHasPermission();
-        if ($userPermission !== true) {
-            return $userPermission;
-        }
-
-        if (!$this->isInstalled()) {
-            return static::class . " is not installed, so it cannot be updated.";
-        }
-
-        if (!array_key_exists($updateHandle, $this->updates)) {
-            return "Update migration '{$updateHandle}' does not exist for " . static::class . ".";
-        }
-
-        if ($this->isInstalled($updateHandle)) {
-            return "Update migration '{$updateHandle}' has already been applied to " . static::class . ".";
-        }
-
-        return true;
-    }
-
-    /**
-     * Checks whether the table can be rolled back, returning true if it can, or a string message explaining why it cannot.
-     *
-     * @return string|true
-     */
-    final public function canRollback(): string|true {
-        $configured = $this->isConfigured();
-        if ($configured !== true) {
-            return $configured;
-        }
-
-        $allowedContext = $this->isAllowedContext();
-        if ($allowedContext !== true) {
-            return $allowedContext;
-        }
-
-        $userPermission = $this->userHasPermission();
-        if ($userPermission !== true) {
-            return $userPermission;
-        }
-
-        if (!$this->isInstalled()) {
-            return static::class . " is not installed, so it cannot be rolled back.";
-        }
-
-        return true;
     }
 
     /**
@@ -504,65 +567,38 @@ class Table extends Feature implements Registrable, Makeable {
         }
     }
 
-    /**
-     * Checks that the table's migration is properly configured, returning true if it is, or a string message explaining why it is not.
-     *
-     * @return string|true
-     */
-    private function isConfigured(): string|true {
-        if ($this->migrationPath === '' || $this->migrationDirectory === '' || $this->migration === null) {
-            return "The migration for " . static::class . " is not properly configured. Please ensure the migration path and directory are set correctly.";
-        }
-
-        return true;
-    }
-
-    /**
-     * Checks whether the current context allows for table operations, returning true if it does, or a string message explaining why it does not.
-     *
-     * @return string|true
-     */
-    private function isAllowedContext(): string|true {
-        if (!is_admin() && !app()->runningInConsole()) {
-            return static::class . " can only be used in the admin area or via WP-CLI.";
-        }
-
-        return true;
-    }
-
-    /**
-     * Checks whether the current user has permission to manage tables, returning true if they do, or a string message explaining why they do not.
-     *
-     * @return string|true
-     */
-    private function userHasPermission(): string|true {
-        if (!current_user_can('manage_options')) {
-            return "Current user does not have permission to manage " . static::class . ".";
-        }
-
-        return true;
-    }
-
     // =========================================================================
     // Attribute Setters
     // =========================================================================
 
-    final public function setIdentifier(string $identifier): static {
-        return $this->handle($identifier);
+    public function setIdentifier(string $identifier): static {
+        return $this->name($identifier);
     }
 
     /**
-     * Sets the table's handle (identifier) in snake_case format.
+     * Sets the table's name (identifier) in snake_case format.
      * 
-     * Private as this class generally derives the handle from the migration file name, 
+     * Private as this class generally derives the name from the migration file name, 
      * but can be set explicitly if needed via the setIdentifier() method.
      *
-     * @param string $handle
+     * @param string $name
      *
      * @return static
      */
-    private function handle(string $handle): static {
-        $this->handle = Str::snake($handle);
+    private function name(string $name): static {
+        $this->name = Str::snake($name);
+        return $this;
+    }
+
+    /**
+     * Adds a dependent table to this table, indicating that the dependent table relies on this table being installed first.
+     *
+     * @param Table $dependent
+     *
+     * @return static
+     */
+    public function dependent(Table $dependent): static {
+        $this->dependents[] = $dependent; 
         return $this;
     }
 
@@ -573,7 +609,7 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return static
      */
-    final public function path(string $path): static {
+    public function path(string $path): static {
         $this->migrationPath = $this->resolveMigrationPath($path);
         return $this;
     }
@@ -676,8 +712,8 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return string|null
      */
-    final public function getInstalledAt(): ?string {
-        return MigrationModel::where('related_table', $this->handle)
+    public function getInstalledAt(): ?string {
+        return MigrationModel::where('related_table', $this->name)
             ->where('type', 'create')
             ->value('created_at')?->format('Y-m-d H:i:s');
     }
@@ -687,8 +723,8 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return string|null
      */
-    final public function getLastUpdated(): ?string {
-        return MigrationModel::where('related_table', $this->handle)
+    public function getLastUpdatedAt(): ?string {
+        return MigrationModel::where('related_table', $this->name)
             ->where('type', 'update')
             ->orderByDesc('created_at')
             ->value('created_at')?->format('Y-m-d H:i:s');
@@ -700,11 +736,11 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return array
      */
-    final public function getInfo(): array {
+    public function getInfo(): array {
         if (!$this->isInstalled()) {
             return [
-                'provider'    => $this->getProvider()->getHandle(),
-                'name'        => $this->getHandle(),
+                'provider'    => $this->getProvider()->getname(),
+                'name'        => $this->getName(),
                 'label'       => $this->getLabel(),
                 'description' => $this->getDescription(),
                 'installed'   => false,
@@ -712,35 +748,35 @@ class Table extends Feature implements Registrable, Makeable {
         }
 
         $installedAt = $this->getInstalledAt();
-        $lastUpdated = $this->getLastUpdated();
+        $lastUpdated = $this->getLastUpdatedAt();
 
         return [
-            'provider'     => $this->getProvider()->getHandle(),
-            'name'         => $this->getHandle(),
+            'provider'     => $this->getProvider()->getName(),
+            'name'         => $this->getName(),
             'label'        => $this->getLabel(),
             'description'  => $this->getDescription(),
             'installed'    => true,
             'installed_at' => $installedAt,
             'last_updated' => $lastUpdated,
-        ] + SchemaManager::getTableData($this->handle);
+        ] + SchemaManager::getTableData($this->name);
     }
 
     /**
-     * Returns the table's identifier (handle/name).
+     * Returns the table's identifier (name/name).
      *
      * @return string
      */
-    final public function getIdentifier(): string {
-        return $this->handle;
+    public function getIdentifier(): string {
+        return $this->name;
     }
 
     /**
-     * Returns the table's handle (identifier/name).
+     * Returns the table's name (identifier/name).
      *
      * @return string
      */
-    final public function getHandle(): string {
-        return $this->handle;
+    public function getName(): string {
+        return $this->name;
     }
 
     /**
@@ -748,7 +784,7 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return string
      */
-    final public function getLabel(): string {
+    public function getLabel(): string {
         return $this->label;
     }
 
@@ -757,8 +793,17 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return string
      */
-    final public function getDescription(): string {
+    public function getDescription(): string {
         return $this->description;
+    }
+
+    /**
+     * Returns whether the table is required for the provider to function.
+     *
+     * @return boolean
+     */
+    public function isRequired(): bool {
+        return $this->isRequired;
     }
 
     /**
@@ -766,7 +811,7 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return string
      */
-    final public function getMigrationDirectory(): string {
+    public function getMigrationDirectory(): string {
         return $this->migrationDirectory;
     }
 
@@ -775,7 +820,7 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return string
      */
-    final public function getMigrationPath(): string {
+    public function getMigrationPath(): string {
         return $this->migrationPath;
     }
 
@@ -784,17 +829,71 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return Migration|null
      */
-    final public function getMigration(): ?Migration {
+    public function getMigration(): ?Migration {
         return $this->migration;
     }
 
     /**
-     * Returns any update migrations associated with the table, keyed by their handles.
+     * Returns the database connection name associated with the table's migration.
+     *
+     * @return string|null
+     */
+    public function getConnection(): string|null {
+        if ($this->migration !== null) {
+            return $this->migration->getConnection();
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns any update migrations associated with the table, keyed by their names.
      *
      * @return array
      */
-    final public function getUpdates(): array {
+    public function getUpdates(): array {
         return $this->updates;
+    }
+
+    /**
+     * Returns the last update migration that was applied to the table, 
+     * or null if no updates have been applied.
+     *
+     * @return array|null
+     */
+    public function getLastUpdate(): ?array {
+        $reverseUpdates = array_reverse($this->updates);
+
+        if (count($reverseUpdates) === 0) {
+            return null;
+        }
+
+        foreach ($reverseUpdates as $update) {
+            $installed = SchemaManager::tableUpdateIsInstalled($this, $update['handle']);
+            if ($installed === true) {
+                return $update;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns the table's dependencies that must be installed before this table can be installed.
+     *
+     * @return array
+     */
+    public function getDependencies(): array {
+        return $this->dependencies;
+    }
+
+    /**
+     * Returns whether this table should be automatically installed when its dependencies are installed.
+     *
+     * @return boolean
+     */
+    public function autoInstallsWithDependencies(): bool {
+        return $this->installWithDependencies;
     }
 
     /**
@@ -802,7 +901,16 @@ class Table extends Feature implements Registrable, Makeable {
      *
      * @return string
      */
-    final public function getBatchId(): string {
+    public function getBatchId(): string {
         return $this->currentBatchId;
+    }
+
+    /**
+     * Returns the last error message encountered during a migration operation.
+     *
+     * @return string
+     */
+    public function getLastError(): string {
+        return $this->lastError;
     }
 }

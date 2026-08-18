@@ -1,30 +1,19 @@
 <?php
 
-namespace MM\Meros\Database\Migrations;
-
 use Illuminate\Database\Schema\Blueprint;
+use MM\Meros\Contracts\Features\Data\TableCreator;
 
-use MM\Meros\Support\SchemaManager;
-use MM\Meros\Contracts\Features\Data\Migration;
+return new class extends TableCreator {
 
-return new class extends Migration {
+    protected function configure(): void {
+        $this->description('The meros_form_responses table stores responses to forms.');
 
-    public function up(string $installable): void {
-        SchemaManager::create('meros_form_responses', $installable, function (Blueprint $table) {
+        $this->define(function (Blueprint $table) {
             $table->id();
-
             $table->foreignId('form_id')->references('id')->on('posts')->cascadeOnDelete();
-
             $table->json('response')->nullable();
-
             $table->string('status')->default('draft');
-
             $table->timestamps();
         });
-    }
-
-
-    public function down(string $installable): void {
-        SchemaManager::dropIfExists('meros_form_responses', $installable);
     }
 };

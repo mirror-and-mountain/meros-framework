@@ -39,7 +39,7 @@ trait ResolvesPaths {
      * 
      * @return string|null The resolved path if it exists and is a directory, or null if not found.
      */
-    final protected function resolveDirectoryPath(?string $path, string $defaultPath): ?string {
+    final protected function resolveDirectoryPath(?string $path = null, string $defaultPath): ?string {
         if ($path === null) {
             $path = $defaultPath;
         }
@@ -183,6 +183,58 @@ trait ResolvesPaths {
         }
 
         return null;
+    }
+
+    /**
+     * Checks if a given directory contains at least one subdirectory, or a specific subdirectory if provided.
+     *
+     * @param string $directory
+     * @param string $subdirectory
+     *
+     * @return boolean
+     */
+    final protected function directoryHasSubdirectory(string $directory, string $subdirectory = ''): bool {
+        if (!$this->pathIsDirectory($directory)) {
+            return false;
+        }
+
+        if ($subdirectory === '') {
+            return File::directories($directory) !== [];
+        }
+
+        $subdirectoryPath = rtrim($directory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . ltrim($subdirectory, DIRECTORY_SEPARATOR);
+        return $this->pathIsDirectory($subdirectoryPath);
+    }
+
+    /**
+     * Retrieves the first subdirectory within a given directory, or null if none exist.
+     *
+     * @param string $directory
+     *
+     * @return string|null
+     */
+    final protected function getFirstSubdirectory(string $directory): ?string {
+        if (!$this->pathIsDirectory($directory)) {
+            return null;
+        }
+
+        $subdirectories = File::directories($directory);
+        return $subdirectories[0] ?? null;
+    }
+
+    /**
+     * Retrieves all subdirectories within a given directory, or an empty array if none exist.
+     *
+     * @param string $directory
+     *
+     * @return array
+     */
+    final protected function getSubdirectories(string $directory): array {
+        if (!$this->pathIsDirectory($directory)) {
+            return [];
+        }
+
+        return File::directories($directory);
     }
 
     /**

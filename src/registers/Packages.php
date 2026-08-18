@@ -21,6 +21,10 @@ final class Packages {
      */
     public function register(Package $package): void {
         if (!$this->packages->contains($package)) {
+            $existingPackage = $this->packages->first(fn(Package $p) => $p->getHandle() === $package->getHandle());
+            if ($existingPackage) {
+                throw new \InvalidArgumentException("A package with the handle '{$package->getHandle()}' is already registered.");
+            }
             $this->packages->push($package);
         }
     }

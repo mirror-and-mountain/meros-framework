@@ -11,11 +11,12 @@ interface Registrar extends FeatureRegister {
      *
      * @param string $featureClass The class name of the feature to register.
      * @param string $alias An optional alias for the feature class.
-     * @param bool   $makeNow Whether to immediately create an instance of the feature after registration.
+     * @param bool   $makeNow Whether to immediately create an instance of the feature after registration. $makeNow Whether to immediately create an instance of the feature after registration. A closure may also be passed to modify the feature instance after creation.
+     * @param array  $props An array of properties to pass to the feature's constructor. Only used if $makeNow is true or a closure.
      *
-     * @return static|Registrable The newly created feature instance if $makeNow is true, otherwise the register instance.
+     * @return static|Registrable The newly created feature instance if $makeNow is true or a Closure, otherwise the register instance.
      */
-    public function register(string $featureClass, string $alias = '', bool $makeNow = false): static|Registrable;
+    public function register(string $featureClass, string $alias = '', bool|Closure $makeNow = false, array $props = []): static|Registrable;
 
     /**
      * Creates a new instance of the specified feature class, if it has been registered with this register.

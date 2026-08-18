@@ -241,6 +241,19 @@ abstract class Feature implements FeatureDefinition {
         return $this;
     }
 
+    /**
+     * Adds context data to the feature instance.
+     *
+     * @param string $key
+     * @param mixed $value
+     *
+     * @return static
+     */
+    final public function addContext(string $key, mixed $value): static {
+        $this->context[$key] = $value;
+        return $this;
+    }
+
     // =========================================================================
     // Getters
     // =========================================================================
@@ -252,6 +265,29 @@ abstract class Feature implements FeatureDefinition {
      */
     final public function getProvider(): FeatureProvider {
         return $this->provider;
+    }
+
+
+    /**
+     * Returns whether the feature is shared across all providers or only available to the provider that registered it.
+     *
+     * @return bool True if the feature is shared, false otherwise.
+     */
+    final public function isShared(): bool {
+        return $this->shared;
+    }
+
+    /**
+     * Returns the feature's context data.
+     *
+     * @return mixed The context data for the feature. If a key is provided, returns the value for that key or the default value if the key does not exist.
+     */
+    final public function getContext(string $key = '', mixed $default = ''): mixed {
+        if ($key === '') {
+            return $this->context;
+        }
+
+        return $this->context[$key] ?? $default;
     }
 
     /**

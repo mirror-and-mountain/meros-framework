@@ -23,14 +23,15 @@ trait RegistersFeatures {
     /**
      * Registers a feature class with the register for use later on.
      *
-     * @param string  $featureClass The class name of the feature to register.
-     * @param string  $alias An optional alias for the feature class.
-     * @param bool    $makeNow Whether to immediately create an instance of the feature after registration.
+     * @param string        $featureClass The class name of the feature to register.
+     * @param string        $alias An optional alias for the feature class.
+     * @param bool|Closure  $makeNow Whether to immediately create an instance of the feature after registration. A closure may also be passed to modify the feature instance after creation.
+     * @param array         $props An array of properties to pass to the feature's constructor. Only used if $makeNow is true or a closure.
      *
-     * @return static|Registrable The newly created feature instance if $makeNow is true, otherwise the register instance.
+     * @return static|Registrable The newly created feature instance if $makeNow is true or a Closure, otherwise the register instance.
      * @throws \InvalidArgumentException if the feature class is not a valid subclass of the feature definition class associated with this register.
      */
-    final public function register(string $featureClass, string $alias = '', bool $makeNow = false): static|Registrable {
+    final public function register(string $featureClass, string $alias = '', bool|Closure $makeNow = false, array $props = []): static|Registrable {
         if ($this->hasRegisteredFeature($alias !== '' ? $alias : $featureClass)) {
             return $this; // Feature class is already registered, no need to register again.
         }
@@ -45,8 +46,9 @@ trait RegistersFeatures {
             $this->registeredFeatures[] = $featureClass;
         }
 
-        if ($makeNow) {
-            return $this->makeFrom($alias !== '' ? $alias : $featureClass);
+        if ($makeNow === true || $makeNow instanceof Closure) {
+            $callback = $makeNow instanceof Closure ? $makeNow : $props;
+            return $this->makeFrom($alias !== '' ? $alias : $featureClass, $callback, $props);
         }
 
         return $this;

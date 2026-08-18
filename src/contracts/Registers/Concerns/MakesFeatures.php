@@ -11,9 +11,6 @@ use MM\Meros\Contracts\Registers\Registrar;
 trait MakesFeatures {
     use Abstracts;
 
-    abstract public function register(string $featureClass, string $alias = '', bool $makeNow = false): static|Registrable;
-    abstract public function hasRegisteredFeature(string $featureClassOrAlias): bool;
-
     /**
      * Creates a new instance of the feature definition associated with this register.
      *

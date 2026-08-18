@@ -1,0 +1,137 @@
+// Meros Modal Styles
+body:has(.meros-admin-modal-overlay:not(.meros-admin-modal-hidden)) {
+    overflow: hidden !important;
+}
+
+.meros-admin-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    &.meros-admin-modal-hidden {
+        display: none;
+    }
+
+    .meros-admin-modal {
+        background-color: #fff;
+        padding: 2rem;
+        border-radius: 8px;
+        max-width: 500px;
+        width: 100%;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+        .meros-admin-modal-buttons {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+    }
+}
+
+
+// Button Styles
+.meros-admin-button,
+.meros-admin-modal-button {
+    transition: opacity 0.3s ease;
+}
+
+.meros-admin-button.meros-small-button {
+    line-height: 26px;
+    min-height: 28px;
+    padding: 0 10px;
+}
+
+.meros-admin-button.meros-working,
+.meros-admin-modal-button.meros-working {
+    position: relative;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.meros-admin-button.meros-working::before,
+.meros-admin-modal-button.meros-working::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,0.25),
+        transparent
+    );
+    animation: meros-shimmer 1.2s infinite;
+}
+
+@keyframes meros-shimmer {
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+
+// Settings Field Title Styles
+.meros-settings-field-title-wrapper {
+    width: 500px;
+
+    .meros-settings-field-description {
+        margin-top: 0.5rem;
+        font-weight: normal;
+    }
+
+    .meros-settings-field-actions {
+        margin-top: 0.5rem;
+    }
+}
+
+// Table Management Page Styles
+.meros-tables-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.meros-table-wrapper {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+
+    .meros-table-card {
+        flex: 1;
+        flex-basis: calc((100% - 1.5rem) / 3);
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        background-color: #f9f9f9;
+
+        .meros-table-card-header {
+            display: flex;
+            justify-content: space-between;
+
+            .meros-table-card-status .installed {
+                color: green;
+            }
+
+            .meros-table-card-status .not-installed {
+                color: red;
+            }
+
+            .meros-table-card-status .has-updates {
+                color: orange;
+            }
+        }
+
+        .meros-table-card-actions {
+            margin-top: 1rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+    }
+}

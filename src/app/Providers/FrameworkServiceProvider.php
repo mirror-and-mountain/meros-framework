@@ -127,6 +127,11 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         $this->registerViteDirective();
     }
 
+    /**
+     * Registers the @viteAssets Blade directive for including Vite assets in views.
+     *
+     * @return void
+     */
     private function registerViteDirective(): void {
         Blade::directive('viteAssets', function (?string $context = null, ?string $entry = null) {
             $context  = $context ?: 'theme';

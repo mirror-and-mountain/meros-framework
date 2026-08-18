@@ -2,20 +2,26 @@
 
 namespace MM\Meros\App;
 
+use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+
 use MM\Meros\Contracts\Provider;
 
 use MM\Meros\Registers\Admin\SettingsContainers;
+
+use MM\Meros\Contracts\Features\Admin\Setting;
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 
 use MM\Meros\App\Admin\Pages\ThemeSettings as ThemeSettingsPage;
 use MM\Meros\App\Admin\Pages\PackageSettings as PackageSettingsPage;
 use MM\Meros\App\Admin\Pages\AssetSettings as AssetSettingsPage;
 
-use MM\Meros\App\Admin\SettingsContainers\FrameworkSettings;
-use MM\Meros\App\Admin\SettingsContainers\PackageSettings;
-use MM\Meros\App\Admin\SettingsContainers\ThemeSettings;
-use MM\Meros\App\Admin\SettingsContainers\AssetGroupSettings;
+use MM\Meros\App\Admin\Settings\Containers\FrameworkSettings;
+use MM\Meros\App\Admin\Settings\Containers\PackageSettings;
+use MM\Meros\App\Admin\Settings\Containers\ThemeSettings;
+use MM\Meros\App\Admin\Settings\Containers\AssetGroupSettings;
+
+use MM\Meros\App\Admin\Settings\PackageEnabled;
 
 use MM\Meros\App\FormComponents\Fields\Text;
 use MM\Meros\App\FormComponents\Fields\Number;
@@ -26,10 +32,11 @@ use MM\Meros\App\FormComponents\FieldGroups\SimpleContact;
 use MM\Meros\App\Assets\MerosAdminAssets;
 
 use MM\Meros\Contracts\Providers\Concerns\IsFrameworkProvider;
+use MM\Meros\Contracts\Providers\Concerns\IsNonPackageProvider;
 
 final class Framework extends Provider {
 
-    use IsFrameworkProvider;
+    use IsFrameworkProvider, IsNonPackageProvider;
 
     // =========================================================================
     // Initialisation
@@ -56,6 +63,9 @@ final class Framework extends Provider {
         if (getenv('MEROS_ENVIRONMENT') && getenv('MEROS_ENVIRONMENT') === 'true') {
             $this->configureLocalMailTransport();
         }
+
+        // Register tables
+        $this->tables()->register();
     }
 
     /**
@@ -71,6 +81,24 @@ final class Framework extends Provider {
         $this->registerPostTypes();
         $this->registerAssets();
         $this->registerTables();
+    }
+
+    /**
+     * Used here to register actions for when the theme is activated or deactivated.
+     * Specifically, the framework will install its migrations tracking table on activation.
+     *
+     * @return void
+     */
+    public function whenConfigured(): void {
+        // Fires when the theme is activated, triggering any necessary setup actions.
+        add_action('after_switch_theme', function () {
+            $this->__whenThemeActivated();
+        });
+
+         // Fires when the theme is deactivated, triggering any necessary cleanup actions.
+        add_action('switch_theme', function () {
+            $this->__whenThemeDeactivated();
+        });
     }
 
     // =========================================================================
@@ -161,7 +189,10 @@ final class Framework extends Provider {
         }
 
         foreach ($packages as $package) {
-            $container->add(function ($setting) use ($package) {
+            $settingName = $package->getHandle() . '_enabled';
+            $container->register(PackageEnabled::class, $settingName, function ($setting) use ($package) {
+                $setting->setProvider($package);
+                $setting->addContext('is_meros_package_setting', true);
                 $setting->boolean($package->getHandle() . '_enabled');
                 $setting->label('Enable ' . $package->getName());
                 $setting->default(false);
@@ -169,6 +200,44 @@ final class Framework extends Provider {
                 $setting->page('meros-packages');
             });
         }
+
+        add_filter('meros_settings_field_title', function (string $title, string $id, Setting $setting) {        
+            if (!$setting->getContext('is_meros_package_setting')) {
+                return $title;
+            }
+
+            $package = $setting->getProvider();
+
+            if (!($package instanceof Package)) {
+                return $title;
+            }
+
+            $slug = Str::slug(Str::replace('_', '-', $package->getHandle()));
+            $description = $package->getDescription();
+
+            $hasSettingsFields = $package->hasSettingsWithFields();
+            $hasTables = $package->hasRegisteredTables();
+
+
+            return 
+                '<div class="meros-settings-field-title-wrapper">' .
+                    '<label for="' . esc_attr($id) . '">' . esc_html($title) . '</label>' .
+                    (!empty($description) ? 
+                        '<div class="meros-settings-field-description"><span class="description">' . esc_html($description) . '</span></div>' : ''
+                    ) .
+                    ($hasSettingsFields || $hasTables ? 
+                        '<div class="meros-settings-field-actions">' .
+                            ($hasSettingsFields ? 
+                                '<a href="' . esc_url(admin_url('admin.php?page=meros-packages&package=' . $slug)) . '" title="Settings">Settings</a>' . ($hasTables ? ' | ' : '') : ''
+                            ) .
+                            ($hasTables ? 
+                                '<a href="' . esc_url(admin_url('admin.php?page=meros-packages&package=' . $slug . '&tables=' . $slug . '-tables')) . '" title="Manage Tables">Manage Tables</a>' : ''
+                            ) .
+                        '</div>' : ''
+                    ) .
+                '</div>';
+
+        }, 10, 3);
     }
 
     /**
@@ -247,6 +316,7 @@ final class Framework extends Provider {
             $postType->label('Test Post Type', 'Test Post Types');
             $postType->public(true);
             $postType->fields('test-field-group'); // Should resolve the existing one.
+
             $postType->meta(function ($meta) {
                 $meta->name('test_meta_container');
                 $meta->label('Test Meta Container');
@@ -298,8 +368,7 @@ final class Framework extends Provider {
     // =========================================================================
 
     private function registerTables(): void {
-        // $this->tables()->makeFromPath('001_meros_migrations');
-        // dd($this->tables()->makeFromPath('002_meros_form_responses')->canRollback());
+        $this->tables()->register();
     }
 
     // =========================================================================

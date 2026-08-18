@@ -82,6 +82,13 @@ abstract class DataContainer extends Feature implements Storable {
      */
     protected array $items = [];
 
+    /**
+     * The name of the hook to be used when the container is updated.
+     *
+     * @var string
+     */
+    protected string $updatedHook = '';
+
     use IsHookable, IsRegistrable, IsMakeable, InstantiatesItems, MakesItems;
 
     // =========================================================================
@@ -89,6 +96,10 @@ abstract class DataContainer extends Feature implements Storable {
     // =========================================================================
 
     protected function whenConfigured(): void {
+        if (empty($this->name)) {
+            throw new \LogicException("The container name must be set before the whenConfigured() method is called in " . static::class);
+        }
+
         if (empty($this->itemClass)) {
             throw new \LogicException("The item class must be set in the configure() method of " . static::class);
         }
@@ -113,6 +124,19 @@ abstract class DataContainer extends Feature implements Storable {
         return $this;
     }
 
+    /**
+     * Sets the hook to be fired when the container is updated. 
+     * Should be called by subclasses in the configure() method.
+     *
+     * @param string $hook
+     *
+     * @return static
+     */
+    final protected function updatedHook(string $hook): static {
+        $this->updatedHook = $hook;
+        return $this;
+    }
+
     // =========================================================================
     // Hooking
     // =========================================================================
@@ -124,10 +148,58 @@ abstract class DataContainer extends Feature implements Storable {
      */
     final public function defaultHookCallback(): void {
         $this->registerContainer();
+        $this->afterRegister();
     }
 
     abstract public function registerContainer(): void;
     abstract public function unregisterContainer(): void;
+
+    private function afterRegister(): void {
+        if (!empty($this->updatedHook)) {
+            add_filter($this->updatedHook, function (mixed $value, mixed $oldValue, string $optionName) {
+                $this->__whenUpdated($value, $oldValue, $optionName);
+                return $value;
+            }, 10, 3);
+        }
+    }
+
+    /**
+     * Fires when the container is updated. Can be overridden in subclasses to perform actions when the settings container is updated.
+     *
+     * @param mixed  $value
+     * @param mixed  $oldValue
+     * @param string $optionName
+     *
+     * @return void
+     */
+    private function __whenUpdated(mixed $value, mixed $oldValue, string $optionName): void {
+        // This method can be overridden in subclasses to perform actions when the settings container is updated.
+        $this->getItems(true)->each(function (StorableItem $item) use ($value, $oldValue, $optionName) {
+            if (method_exists($item, 'whenUpdated')) {
+                $name       = $item->getName();
+                $optionName = $optionName . '[' . $name . ']';
+                $value      = $value[$name] ?? null;
+                $oldValue   = $oldValue[$name] ?? null;
+
+                $item->whenUpdated($value, $oldValue, $name, $optionName);
+            }
+        });
+
+        $this->whenUpdated($value, $oldValue, $optionName);
+    }
+
+    /**
+     * Fires when the container is updated. Can be overridden in subclasses to perform actions when the settings container is updated.
+     *
+     * @param mixed  $value
+     * @param mixed  $oldValue
+     * @param string $optionName
+     *
+     * @return void
+     */
+    protected function whenUpdated(mixed $value, mixed $oldValue, string $optionName): void {
+        // This method can be overridden in subclasses to perform actions when the container is updated.
+    }
 
     // =========================================================================
     // DataItem Management
@@ -136,14 +208,28 @@ abstract class DataContainer extends Feature implements Storable {
     /**
      * Registers a new DataItem class with the container's item register.
      *
-     * @param string $itemClass
-     * @param string $alias
+     * @param string       $itemClass The class name of the item to register.
+     * @param string       $alias     An optional alias for the item class.
+     * @param bool|Closure $makeNow   Whether to immediately create an instance of the item after registration. A closure may also be passed to modify the item instance after creation.
      *
      * @return void
      */
-    final public function register(string $itemClass, string $alias = ''): void {
+    final public function register(string $itemClass, string $alias = '', bool|Closure $makeNow = false): void {
         $register = $this->resolveRegistrarRegister($this->itemClass);
-        $register->register($itemClass, $alias);
+
+        if ($makeNow === true || $makeNow instanceof Closure) {
+            $callback = $makeNow instanceof Closure ? $makeNow : true;
+            $item = $register->checkout($this->getProvider())->register($itemClass, $alias, $callback, ['container' => $this]);
+
+            if (!($item instanceof StorableItem)) {
+                throw new \InvalidArgumentException("The item class must implement the StorableItem interface.");
+            }
+
+            $this->items[] = $item;
+            $this->afterAdd($item);
+        }
+
+        $register->register($itemClass, $alias, false);
     }
 
     /**
@@ -163,9 +249,9 @@ abstract class DataContainer extends Feature implements Storable {
     }
 
     /**
-     * Adds a new DataItem to the container and returns the item instance.
+     * Adds a new StorableItem to the container and returns the item instance.
      *
-     * @param string|Closure|array $typeCallbackOrProps The type of the data item to add, a closure to configure the item, or an array of properties to pass to the item's constructor.
+     * @param string|Closure|array $typeCallbackOrProps The type of the StorableItem to add, a closure to configure the item, or an array of properties to pass to the item's constructor.
      * @param Closure|array        $callbackOrProps     An optional callback to modify the item instance after creation, or an array of properties to pass to the item's constructor.
      * @param array                $props               An array of properties to pass to the item's constructor.
      *
@@ -325,7 +411,7 @@ abstract class DataContainer extends Feature implements Storable {
      *
      * @return array The sanitized value.
      */
-    public function sanitizeValue(array $value): array {
+    public function sanitizeValue($value): array {
         return Sanitizer::sanitize($value, $this->getSchema());
     }
 

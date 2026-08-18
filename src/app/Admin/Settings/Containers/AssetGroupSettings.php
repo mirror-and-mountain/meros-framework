@@ -1,6 +1,6 @@
 <?php
 
-namespace MM\Meros\App\Admin\SettingsContainers;
+namespace MM\Meros\App\Admin\Settings\Containers;
 
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 

@@ -1,15 +1,14 @@
 <?php
 
-namespace MM\Meros\Database\Migrations;
-
 use Illuminate\Database\Schema\Blueprint;
+use MM\Meros\Contracts\Features\Data\TableCreator;
 
-use MM\Meros\Support\SchemaManager;
-use MM\Meros\Contracts\Features\Data\Migration;
+return new class extends TableCreator {
+    
+    protected function configure(): void {
+        $this->description('The `meros_external_connections` table stores external connection information for integrations.');
 
-return new class extends Migration {
-    public function up(string $installer): void {
-        SchemaManager::create('meros_external_connections', $installer, function (Blueprint $table) {
+        $this->define(function (Blueprint $table) {
             $table->id();
             $table->string('label')->unique();
             $table->string('integration_id')->index();
@@ -36,9 +35,5 @@ return new class extends Migration {
             $table->timestamp('last_error_at')->nullable();
             $table->timestamps();
         });
-    }
-
-    public function down(string $installer): void {
-        SchemaManager::dropIfExists('meros_external_connections', $installer);
     }
 };

@@ -54,6 +54,10 @@ abstract class Provider implements FeatureProvider {
         // Intentionally left blank for child classes to override.
     }
 
+    public function whenConfigured(): void {
+        // Intentionally left blank for child classes to override.
+    }
+
     // =========================================================================
     // Identity Setters/Getters
     // =========================================================================
@@ -81,7 +85,7 @@ abstract class Provider implements FeatureProvider {
      * @return void
      */
     protected function setHandle(string $handle): void {
-        $this->handle = Str::snake($handle);
+        $this->handle = Str::snake(Str::replace('-', '_', $handle));
 
         if (empty($this->name)) {
             $this->setName(Str::title(str_replace('_', ' ', $handle)));
@@ -168,10 +172,12 @@ abstract class Provider implements FeatureProvider {
     /**
      * Retrieves the provider's handle.
      *
+     * @param bool $slug Whether to return in slug-format. Defaults to false.
+     * 
      * @return string
      */
-    final public function getHandle(): string {
-        return $this->handle;
+    final public function getHandle(bool $slug = false): string {
+        return $slug ? Str::slug(Str::replace('_', '-', $this->handle)) : $this->handle;
     }
 
     /**
@@ -179,7 +185,7 @@ abstract class Provider implements FeatureProvider {
      *
      * @return string
      */
-    final public function getName(): string {
+    public function getName(): string {
         return $this->name;
     }
 

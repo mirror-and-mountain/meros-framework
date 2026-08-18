@@ -162,9 +162,14 @@ abstract class Register implements FeatureRegister {
     /**
      * Returns the FeatureProvider the register is currently checked-out to, if any.
      *
-     * @return FeatureProvider|null
+     * @return FeatureProvider
+     * @throws \LogicException If the register is not checked-out to any FeatureProvider.
      */
-    final protected function getProvider(): ?FeatureProvider {
+    final protected function getProvider(): FeatureProvider {
+        if ($this->checkoutTo === null) {
+            throw new \LogicException("Cannot retrieve the provider for register (" . static::class . ") because it is not checked-out to any FeatureProvider.");
+        }
+
         return $this->checkoutTo;
     }
 

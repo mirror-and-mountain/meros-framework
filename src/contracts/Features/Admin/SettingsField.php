@@ -131,9 +131,11 @@ final class SettingsField {
             ); // Ensure the default section exists
         }
 
+        $title = apply_filters('meros_settings_field_title', $this->title, $this->id, $this->setting);
+
         add_settings_field(
             $this->id,
-            $this->title,
+            $title,
             [$this, 'render'],
             $this->pageSlug,
             $this->sectionId,

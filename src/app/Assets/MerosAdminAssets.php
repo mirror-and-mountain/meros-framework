@@ -8,8 +8,8 @@ final class MerosAdminAssets extends AssetGroup {
     protected function configure(): void {
         $this->assets([
             'admin' => [
-                'meros-admin-pages/admin/index.js',
-                'meros-admin-pages/admin/style-index.css',
+                'admin/index.js',
+                'admin/style-index.css',
             ]
         ]);
 
