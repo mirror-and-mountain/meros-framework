@@ -17,6 +17,10 @@ use MM\Meros\Contracts\Features\Concerns\IsHookable;
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 use MM\Meros\Contracts\Features\Concerns\MakesItems;
 
+/**
+ * Plan to move subpage logic into a separate subpage contract.
+ */
+
 class Page extends Feature implements Registrable, Makeable {
     /**
      * The page's title.
@@ -822,7 +826,7 @@ class Page extends Feature implements Registrable, Makeable {
                 return;
             }
         }
-        
+
         echo '<div class="wrap">';
 
         if ($this->showTitle) {
