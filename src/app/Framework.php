@@ -22,8 +22,6 @@ use MM\Meros\App\Admin\Settings\Containers\ThemeSettings;
 use MM\Meros\App\Admin\Settings\Containers\PackageSettings;
 use MM\Meros\App\Admin\Settings\Containers\AssetGroupSettings;
 
-use MM\Meros\App\Admin\Settings\PackageEnabled;
-
 use MM\Meros\App\FormComponents\Fields\Text;
 use MM\Meros\App\FormComponents\Fields\Number;
 use MM\Meros\App\FormComponents\Fields\Checkbox;

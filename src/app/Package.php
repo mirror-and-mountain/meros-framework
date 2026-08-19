@@ -176,6 +176,8 @@ abstract class Package extends Provider {
             $table->install();
         });
 
+        do_action('meros_package_enabled_' . $this->getHandle(), $this);
+
         $this->whenEnabled();
     }
 
@@ -189,6 +191,8 @@ abstract class Package extends Provider {
      */
     final public function __whenDisabled(): void {
         $this->whenDisabled();
+
+        do_action('meros_package_disabled_' . $this->getHandle(), $this);
     }
 
     /**
