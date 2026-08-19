@@ -30,6 +30,7 @@ trait IsNonPackageProvider {
     private function __whenThemeActivated(): void {
         $this->installRequiredTables();
         $this->whenThemeActivated();
+        flush_rewrite_rules(); // Ensure that any new rewrite rules are applied after the theme is activated.
     }
 
     /**
