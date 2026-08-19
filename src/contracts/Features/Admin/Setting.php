@@ -21,18 +21,18 @@ class Setting extends DataItem {
     protected ?SettingsField $settingsField = null;
 
     /**
-     * The MenuPage instance or class associated with this Setting.
+     * The Page instance or class associated with this Setting.
      *
-     * @var MenuPage|string
+     * @var Page|null
      */
-    protected MenuPage|string $page = '';
+    protected ?Page $page = null;
 
     /**
      * The SettingsSection instance or class associated with this Setting.
      *
-     * @var SettingsSection|string
+     * @var SettingsSection|null
      */
-    protected SettingsSection|string $section = 'default';
+    protected ?SettingsSection $section = null;
 
     /**
      * The option group of the setting (inherited from SettingsContainer).
@@ -49,17 +49,9 @@ class Setting extends DataItem {
 
     final protected function whenConfigured(): void {
         parent::whenConfigured();
-        
-        if (is_string($this->page) && !empty($this->page)) {
-            $this->instantiate('page', MenuPage::class);
-        }
-
-        if (is_string($this->section) && $this->section !== 'default' && !empty($this->section)) {
-            $this->instantiate('section', SettingsSection::class);
-        }
 
         add_action('admin_init', function () {
-            if ($this->page instanceof MenuPage) {
+            if ($this->page instanceof Page) {
                 $this->page->__hasSettings($this->optionGroup);
             }
         });
@@ -94,7 +86,7 @@ class Setting extends DataItem {
      * @return SettingsContainer|null The associated SettingsContainer instance or null.
      */
     final protected function resolveContainer(): ?SettingsContainer {
-        return $this->provider->resolveSettingsContainer(
+        return $this->getProvider()->resolveSettingsContainer(
             SettingsContainers::instance()
         );
     }
@@ -172,22 +164,17 @@ class Setting extends DataItem {
      */
     private function configureSettingsFieldPage(): void {
         // Set the page slug on the SettingsField
-        if (is_string($this->page) && !empty($this->page)) {
-            $this->settingsField->page($this->page);
-        } else if ($this->page instanceof MenuPage) {
+        if ($this->page instanceof Page) {
             $this->settingsField->page($this->page->getSlug());
         }
 
         // Fallback to the page alias provided by the container if the page property is not set
-        else if (is_string($this->page) && empty($this->page)) {
-            $this->page = $this->container instanceof SettingsContainer 
-                ? $this->container->getPage() 
-                : '';
-
-            $this->settingsField->page($this->page);
+        else if ($this->page === null && $this->container instanceof SettingsContainer) {
+            $page = $this->container->getPage();
+            $this->settingsField->page($page);
 
             // Instantiate the page.
-            $this->page($this->page);
+            $this->page($page);
         }
     }
 
@@ -197,10 +184,7 @@ class Setting extends DataItem {
      * @return void
      */
     private function configureSettingsFieldSection(): void {
-        // Set the section ID on the SettingsField
-        if (is_string($this->section) && !empty($this->section)) {
-            $this->settingsField->section($this->section);
-        } else if ($this->section instanceof SettingsSection) {
+        if ($this->section instanceof SettingsSection) {
             $this->settingsField->section($this->section->getIdentifier());
         }
     }
@@ -210,16 +194,16 @@ class Setting extends DataItem {
     // =========================================================================
 
     /**
-     * Sets the associated MenuPage for this Setting.
+     * Sets the associated Page for this Setting.
      *
-     * @param MenuPage|Closure|string $pageOrClosure The MenuPage instance, class name, or closure to configure the MenuPage.
-     * @param Closure|array           $callbackOrProps Optional closure or array of properties for configuring the MenuPage.
-     * @param array                   $props Optional array of properties for configuring the MenuPage.
+     * @param Page|Closure|string $pageOrClosure   A Page instance or closure to configure the Page. A string can also be provided as a class name or alias to resolve the Page.
+     * @param Closure|array           $callbackOrProps Optional closure or array of properties for configuring the Page.
+     * @param array                   $props           Optional array of properties for configuring the Page.
      *
      * @return static
      */
     final public function page(
-        MenuPage|Closure|string $pageOrClosure, 
+        Page|Closure|string $pageOrClosure, 
         Closure|array           $callbackOrProps = [], 
         array                   $props = []
     ): static {
@@ -228,12 +212,12 @@ class Setting extends DataItem {
 
             $page = $this->makeItemFrom(
                 $classOrAlias,
-                MenuPage::class, 
+                Page::class, 
                 $callbackOrProps, 
                 $props
             );
 
-            if ($page instanceof MenuPage) {
+            if ($page instanceof Page) {
                 $this->page = $page;
             }
         }
@@ -241,9 +225,9 @@ class Setting extends DataItem {
         else if ($pageOrClosure instanceof Closure) {
             $closure = $pageOrClosure;
             $props   = is_array($callbackOrProps) ? $callbackOrProps : $props;
-            $page    = $this->makeItem(MenuPage::class, $closure, $props);
+            $page    = $this->makeItem(Page::class, $closure, $props);
 
-            if ($page instanceof MenuPage) {
+            if ($page instanceof Page) {
                 $this->page = $page;
             }
         }
@@ -252,7 +236,7 @@ class Setting extends DataItem {
             $this->page = $pageOrClosure;
         }
 
-        if ($this->page instanceof MenuPage && 
+        if ($this->page instanceof Page && 
             $this->settingsField instanceof SettingsField
         ) {
             $this->settingsField->page($this->page->getSlug());
@@ -262,21 +246,21 @@ class Setting extends DataItem {
     }
 
     /**
-     * Retrieves the associated MenuPage for this Setting.
+     * Retrieves the associated Page for this Setting.
      *
-     * @return MenuPage|string The associated MenuPage instance or class name.
+     * @return Page|null The associated Page instance or null if not set.
      */
-    final public function getPage(): MenuPage|string {
+    final public function getPage(): ?Page {
         return $this->page;
     }
 
     /**
-     * Checks if the setting has an associated MenuPage.
+     * Checks if the setting has an associated Page.
      *
      * @return bool
      */
     final public function hasPage(): bool {
-        return $this->page instanceof MenuPage || (is_string($this->page) && !empty($this->page));
+        return $this->page instanceof Page;
     }
 
     // =========================================================================
@@ -286,7 +270,7 @@ class Setting extends DataItem {
     /**
      * Sets the associated SettingsSection for this Setting.
      *
-     * @param SettingsSection|Closure|string $sectionOrClosure The SettingsSection instance, class name, or closure to configure the SettingsSection.
+     * @param SettingsSection|Closure|string $sectionOrClosure The SettingsSection instance, or closure to configure the SettingsSection. A string can also be provided as a class name or alias to resolve the SettingsSection.
      * @param Closure|array                  $callbackOrProps Optional closure or array of properties for configuring the SettingsSection.
      * @param array                          $props Optional array of properties for configuring the SettingsSection.
      *
@@ -298,7 +282,7 @@ class Setting extends DataItem {
         Closure|array                  $callbackOrProps = [], 
         array                          $props = []
     ): static {
-        if (!($this->page instanceof MenuPage)) {
+        if (!($this->page instanceof Page)) {
             throw new \LogicException("Cannot set a section without first setting a menu page.");
         }
 

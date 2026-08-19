@@ -14,15 +14,35 @@ abstract class Feature implements FeatureDefinition {
      *
      * @var FeatureProvider
      */
-    public FeatureProvider $provider;
+    private FeatureProvider $provider;
 
     /**
-     * A nickname for the feature. Can be used to resolve the feature 
-     * in situations where the identifier is not suitable.
+     * The name of the property used as the feature's identifier.
      *
      * @var string
      */
-    public string $nickname = '';
+    private string $identifier = '';
+
+    /**
+     * The default format of the feature's identifier. May be set to 'slug' or 'snake';
+     *
+     * @var string
+     */
+    private string $defaultIdentifierFormat = '';
+
+    /**
+     * The feature's label.
+     *
+     * @var string
+     */
+    private string $label = '';
+
+    /**
+     * The feature's description.
+     *
+     * @var string
+     */
+    private string $description = '';
 
     /**
      * Array of properties passed to the feature.
@@ -53,7 +73,7 @@ abstract class Feature implements FeatureDefinition {
      *
      * @var boolean
      */
-    protected bool $shared = false;
+    private bool $shared = false;
 
     // =========================================================================
     // Initialisation
@@ -83,13 +103,18 @@ abstract class Feature implements FeatureDefinition {
         $this->creationMethod = $context['creation_method'] ?? '';
         
         $this->init();
+
+        if (empty($this->identifier)) {
+            throw new \RuntimeException("Feature identifier not set. Please call the 'identifier()' method in the init() method of the feature class.");
+        }
+
         $this->configure();
 
         if ($callbackOrProps instanceof Closure) {
             $callbackOrProps($this);
         }
 
-        $this->whenConfigured();
+        $this->__whenConfigured();
     }
 
     /**
@@ -112,6 +137,14 @@ abstract class Feature implements FeatureDefinition {
         // This method can be overridden by subclasses to perform additional configuration.
     }
 
+    private function __whenConfigured(): void {
+        if (empty($this->label)) {
+            $this->label = Str::title(Str::replace(['-', '_'], ' ', $this->getIdentifier()));
+        }
+
+        $this->whenConfigured();
+    }
+
     /**
      * Called after the feature has been configured. This method can be used to perform any additional actions after configuration.
      * Generally recommended for abstract subclasses to perform post-configuration tasks.
@@ -120,6 +153,27 @@ abstract class Feature implements FeatureDefinition {
      */
     protected function whenConfigured(): void {
         // This method can be overridden by subclasses to perform actions after configuration.
+    }
+
+    /**
+     * Sets the property name that will be used as the feature's identifier. This method should be called in the feature's init() method.
+     *
+     * @param string $identifier    The property name that will be used as the feature's identifier. This property must exist on the feature instance.
+     * @param string $defaultFormat The default format of the identifier. Can be 'slug' or 'snake'.
+     *
+     * @return void
+     */
+    final protected function identifier(string $identifier, string $defaultFormat): void {
+        if (!property_exists($this, $identifier)) {
+            throw new \InvalidArgumentException("Property '{$identifier}' does not exist on class " . static::class);
+        }
+
+        if (!in_array($defaultFormat, ['slug', 'snake'])) {
+            throw new \InvalidArgumentException("Default identifier format must be either 'slug' or 'snake'.");
+        }
+
+        $this->identifier = $identifier;
+        $this->defaultIdentifierFormat = $defaultFormat;
     }
 
     // =========================================================================
@@ -132,25 +186,21 @@ abstract class Feature implements FeatureDefinition {
      * @param string $key   The property name to set.
      * @param mixed  $value The value to assign to the property.
      *
-     * @return static
+     * @return void
      */
-    protected function set(string $key, mixed $value): static {
+    final protected function set(string $key, mixed $value): void {
         if (method_exists($this, $key)) {
             $this->$key($value);
-            return $this;
         }
 
         if (property_exists($this, $key)) {
             $this->$key = $value;
-            return $this;
         }
 
         $camel = Str::camel($key);
         if (property_exists($this, $camel)) {
             $this->$camel = $value;
         }
-
-        return $this;
     }
 
     /**
@@ -164,7 +214,7 @@ abstract class Feature implements FeatureDefinition {
      *
      * @return void
      */
-    protected function setProps(array $props, array $ignore = [], array $merge = []): void {    
+    final protected function setProps(array $props, array $ignore = [], array $merge = []): void {    
         foreach ($props as $key => $value) {
             if (in_array($key, $ignore)) {
                 continue;
@@ -212,20 +262,48 @@ abstract class Feature implements FeatureDefinition {
      * Sets the feature's identifier. This method should be implemented by subclasses to define how the identifier is set.
      *
      * @param string $identifier The identifier to set for the feature.
+     * @param bool   $returnValue Whether to return the identifier value instead of the feature instance. Defaults to false.
      *
-     * @return static
+     * @return string|static The feature instance or the identifier value, depending on the $returnValue parameter.
      */
-    abstract public function setIdentifier(string $identifier): static;
+    final public function setIdentifier(string $identifier, bool $returnValue = true): string|static {
+        if (!property_exists($this, $this->identifier)) {
+            dd($this->identifier, $this->defaultIdentifierFormat, $identifier);
+            throw new \InvalidArgumentException("Property '{$this->identifier}' does not exist on class " . static::class);
+        }
+
+        if (empty($this->defaultIdentifierFormat)) {
+            throw new \RuntimeException("Default identifier format not set. Please call the 'identifier()' method in the init() method of the feature class.");
+        }
+
+        $this->{$this->identifier} = $this->defaultIdentifierFormat === 'slug' 
+            ? Str::slug(Str::replace('_', '-', $identifier)) 
+            : Str::snake(Str::replace('-', '_', $identifier));
+
+        return $returnValue ? $this->{$this->identifier} : $this;
+    }
 
     /**
-     * Sets the feature's nickname.
+     * Sets the label of the feature.
      *
-     * @param string $nickname The nickname to set.
+     * @param string $label
      *
      * @return static
      */
-    final public function nickname(string $nickname): static {
-        $this->nickname = $nickname;
+    public function label(string $label): static {
+        $this->label = $label;
+        return $this;
+    }
+
+    /**
+     * Sets the description of the feature.
+     *
+     * @param string $description
+     *
+     * @return static
+     */
+    final public function description(string $description): static {
+        $this->description = $description;
         return $this;
     }
 
@@ -292,8 +370,40 @@ abstract class Feature implements FeatureDefinition {
 
     /**
      * Returns the primary identifier for the feature. Should be implemented by subclasses to provide a unique identifier for the feature.
+     * 
+     * @param string $format The format of the identifier to return. Can be 'default', 'slug', or 'snake'. Defaults to 'default'.
      *
      * @return string The unique identifier for the feature.
      */
-    abstract public function getIdentifier(): string;
+    final public function getIdentifier(string $format = 'default'): string {
+        if (empty($this->identifier)) {
+            throw new \RuntimeException("Feature identifier not set. Please call the 'identifier()' method in the init() method of the feature class.");
+        }
+
+        $value = $this->{$this->identifier};
+
+        return match ($format) {
+            'slug'  =>  $this->defaultIdentifierFormat === 'snake' ? Str::slug(Str::replace('_', '-', $value)) : $value,
+            'snake' => $this->defaultIdentifierFormat === 'slug' ? Str::snake(Str::replace('-', '_', $value)) : $value,
+            default => $value
+        };
+    }
+
+    /**
+     * Returns the label of the feature.
+     *
+     * @return string The label of the feature.
+     */
+    final public function getLabel(): string {
+        return $this->label;
+    }
+
+    /**
+     * Returns the description of the feature.
+     *
+     * @return string The description of the feature.
+     */
+    final public function getDescription(): string {
+        return $this->description;
+    }
 }

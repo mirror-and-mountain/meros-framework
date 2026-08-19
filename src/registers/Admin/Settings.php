@@ -16,7 +16,7 @@ class Settings extends Register implements RegistrarMaker {
     protected function configure(): void {
         $this->private(true);
         $this->unique(true);
-        $this->definition(Setting::class);
+        $this->contract(Setting::class);
         $this->facade(SettingsFacade::class);
     }
 }

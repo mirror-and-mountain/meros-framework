@@ -11,20 +11,23 @@ interface FeatureRegister {
     /**
      * Checks out the register to a specific FeatureProvider.
      *
-     * @param FeatureProvider|null $provider An optional provider to retrieve the feature for, required if the register is private.
+     * @param string               $identifier The identifier of the feature to retrieve.
+     * @param FeatureProvider|null $provider   An optional provider to retrieve the feature for.
+     * @param bool                 $checkin    Whether to check the register back in after retrieving the feature.
      *
      * @return FeatureDefinition|null
      */
-    public function get(string $name, ?FeatureProvider $provider = null): FeatureDefinition|null;
+    public function get(string $identifier, ?FeatureProvider $provider = null, bool $checkin = true): FeatureDefinition|null;
 
     /**
      * Returns all features in the register, optionally filtered by a specific FeatureProvider.
      *
-     * @param FeatureProvider|null $provider An optional provider to retrieve the features for, required if the register is private.
+     * @param FeatureProvider|null $provider An optional provider to retrieve the features for.
+     * @param bool                 $checkin  Whether to check the register back in after retrieving the features.
      *
      * @return Collection
      */
-    public function all(?FeatureProvider $provider = null): Collection;
+    public function all(?FeatureProvider $provider = null, bool $checkin = true): Collection;
 
     /**
      * Returns the instance of the register, allowing for method chaining.

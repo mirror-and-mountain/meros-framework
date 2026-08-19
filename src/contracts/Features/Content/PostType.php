@@ -74,6 +74,7 @@ class PostType extends Feature implements Makeable, Registrable {
     // =========================================================================
 
     final protected function init(): void {
+        $this->identifier('handle', 'slug');
         $this->setHook('init', [$this, 'register']);
         $this->hook();
     }
@@ -143,7 +144,7 @@ class PostType extends Feature implements Makeable, Registrable {
             return;
         }
 
-        register_post_type($this->handle, $this->args);
+        register_post_type($this->handle, array_merge($this->args, ['description' => $this->getDescription()]));
     }
 
     // =========================================================================
@@ -326,10 +327,6 @@ class PostType extends Feature implements Makeable, Registrable {
     // Attribute Setters
     // =========================================================================
 
-    final public function setIdentifier(string $handle): static {
-        return $this->handle($handle);
-    }
-
     /**
      * Sets the post type's handle.
      *
@@ -337,8 +334,7 @@ class PostType extends Feature implements Makeable, Registrable {
      * @return static
      */
     final public function handle(string $handle): static {
-        $this->handle = Str::slug($handle);
-        return $this;
+        return $this->setIdentifier($handle, false);
     }
 
     /**
@@ -416,17 +412,6 @@ class PostType extends Feature implements Makeable, Registrable {
         ];
 
         $this->args['labels'] = $parsedLabels;
-        return $this;
-    }
-
-    /**
-     * Sets the description for the post type.
-     *
-     * @param string $description The description to set.
-     * @return static
-     */
-    final public function description(string $description): static {
-        $this->args['description'] = $description;
         return $this;
     }
 
@@ -770,17 +755,15 @@ class PostType extends Feature implements Makeable, Registrable {
     // Getters
     // =========================================================================
 
-    final public function getIdentifier(): string {
-        return $this->getHandle();
-    }
-
     /**
      * Retrieves the post type's handle.
+     * 
+     * @param string $format The format in which to retrieve the handle. Default is 'default'.
      *
      * @return string
      */
-    final public function getHandle(): string {
-        return $this->handle;
+    final public function getHandle(string $format = 'default'): string {
+        return $this->getIdentifier($format);
     }
 
     /**

@@ -2,9 +2,9 @@
 
 namespace MM\Meros\App\Admin\Pages;
 
-use MM\Meros\Contracts\Features\Admin\MenuPage;
+use MM\Meros\Contracts\Features\Admin\Page;
 
-final class PackageSettings extends MenuPage {
+final class PackageSettings extends Page {
     
     // =========================================================================
     // Initialisation

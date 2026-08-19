@@ -31,13 +31,6 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
     protected string $title = '';
 
     /**
-     * The field group's description.
-     *
-     * @var string
-     */
-    protected string $description = '';
-
-    /**
      * The field group's parent Form instance, if any.
      *
      * @var Form|null
@@ -56,6 +49,8 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
     // =========================================================================
 
     final protected function init(): void {
+        $this->identifier('id', 'slug');
+
         $this->setSerializableProperties(([
             'id',
             'title',
@@ -162,10 +157,6 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
     // Attribute Setters
     // =========================================================================
 
-    final public function setIdentifier(string $id): static {
-        return $this->id($id);
-    }
-
     /**
      * Sets the identifier for the FieldGroup instance.
      *
@@ -173,8 +164,7 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      * @return static Returns the current instance for method chaining.
      */
     final public function id(string $id): static {
-        $this->id = Str::slug($id);
-        return $this;
+        return $this->setIdentifier($id, false);
     }
 
     /**
@@ -188,32 +178,19 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
         return $this;
     }
 
-    /**
-     * Sets the description for the FieldGroup instance.
-     *
-     * @param string $description The description to set for the FieldGroup.
-     * @return static Returns the current instance for method chaining.
-     */
-    final public function description(string $description): static {
-        $this->description = $description;
-        return $this;
-    }
-
     // =========================================================================
     // Getters
     // =========================================================================
 
-    final public function getIdentifier(): string {
-        return $this->id;
-    }
-
     /**
      * Returns the field group's id.
+     * 
+     * @param string $format The format in which to return the id. Defaults to 'default'.
      *
      * @return string
      */
-    final public function getId(): string {
-        return $this->id;
+    final public function getId(string $format = 'default'): string {
+        return $this->getIdentifier($format);
     }
 
     /**
@@ -223,15 +200,6 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      */
     final public function getTitle(): string {
         return $this->title;
-    }
-
-    /**
-     * Returns the field group's description.
-     *
-     * @return string
-     */
-    final public function getDescription(): string {
-        return $this->description;
     }
 
     /**

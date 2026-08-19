@@ -308,10 +308,22 @@ final class FieldRow implements Serializable {
     // Getters
     // =========================================================================
 
-    public function getIdentifier(): string {
+    /**
+     * Returns the FieldRow's ID - format is not used.
+     *
+     * @param string $format
+     *
+     * @return string
+     */
+    public function getIdentifier(string $format = 'default'): string {
         return $this->id;
     }
 
+    /**
+     * Returns the feature provider that created the row.
+     *
+     * @return FeatureProvider
+     */
     public function getProvider(): FeatureProvider {
         return $this->provider;
     }

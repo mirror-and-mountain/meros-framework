@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 use MM\Meros\Contracts\Features\Data\Table;
 use MM\Meros\Registers\Data\Tables;
 
-use MM\Meros\Contracts\Features\Admin\MenuPage;
+use MM\Meros\Contracts\Features\Admin\Page;
 use MM\Meros\Contracts\Features\Concerns\SanitizesHtml;
 
 use MM\Meros\App\Package;
@@ -53,12 +53,12 @@ trait ProvidesTables {
     /**
      * Initialises the table management page for the provider.
      *
-     * @param MenuPage $settingsPage The settings page to which the table management page will be added.
+     * @param Page $settingsPage The settings page to which the table management page will be added.
      *
-     * @return MenuPage The initialized table management page.
+     * @return Page The initialized table management page.
      */
-    final protected function initTableManagementPage(MenuPage $settingsPage): MenuPage {
-        $page = $settingsPage->subpageParam('tables')->subpage(function (MenuPage $subpage) use ($settingsPage) {
+    final protected function initTableManagementPage(Page $settingsPage): Page {
+        $page = $settingsPage->subpageParam('tables')->subpage(function (Page $subpage) use ($settingsPage) {
             $subpage->slug($settingsPage->getSlug() . '-tables');
             $subpage->title('Manage Tables');
             $subpage->showTitle(false);

@@ -97,9 +97,9 @@ class PostMeta extends DataItem {
         $containerName = $container->getName(true);
         $this->field->name($containerName . '[' . $this->name . ']');
         $this->field->id($containerName . '-' . Str::replace('_', '-', $this->name));
-        $this->field->label($this->label);
-        $this->field->description($this->description);
-        $this->field->default($this->default);
+        $this->field->label($this->getLabel());
+        $this->field->description($this->getDescription());
+        $this->field->default($this->getDefault());
 
         $this->whenFieldSet($this->field);
         return $this->field;

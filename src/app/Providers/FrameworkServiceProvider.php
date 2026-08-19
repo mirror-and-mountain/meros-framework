@@ -21,7 +21,7 @@ use MM\Meros\Support\ViteAssets;
 
 use MM\Meros\Registers\Packages;
 
-use MM\Meros\Registers\Admin\MenuPages;
+use MM\Meros\Registers\Admin\Pages;
 use MM\Meros\Registers\Admin\Settings;
 use MM\Meros\Registers\Admin\SettingsSections;
 use MM\Meros\Registers\Admin\SettingsContainers;
@@ -69,7 +69,7 @@ class FrameworkServiceProvider extends MerosServiceProvider {
      */
     private array $registers = [
         Packages::class,
-        MenuPages::class,
+        Pages::class,
         Settings::class,
         SettingsSections::class,
         SettingsContainers::class,

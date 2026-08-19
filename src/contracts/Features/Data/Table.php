@@ -24,91 +24,77 @@ final class Table extends Feature implements Makeable {
      *
      * @var string
      */
-    private string $name = '';
-
-    /**
-     * The label from the table's main migration file.
-     *
-     * @var string
-     */
-    private string $label = '';
-
-    /**
-     * The table's description.
-     *
-     * @var string
-     */
-    private string $description = '';
+    protected string $name = '';
 
     /**
      * The directory containing the table's migration file(s).
      *
      * @var string
      */
-    private string $migrationDirectory = '';
+    protected string $migrationDirectory = '';
 
     /**
      * The path to the table's main migration file (i.e. the migration that creates the table).
      *
      * @var string
      */
-    private string $migrationPath = '';
+    protected string $migrationPath = '';
 
     /**
      * The main Migration instance associated with the table (i.e. the migration that creates the table).
      *
      * @var TableCreator|null
      */
-    private ?TableCreator $migration = null;
+    protected ?TableCreator $migration = null;
 
     /**
      * An array of update migrations associated with the table, keyed by their names.
      *
      * @var array
      */
-    private array $updates = [];
+    protected array $updates = [];
 
     /**
      * An array of table dependents that rely on this table being installed first.
      *
      * @var array<Table>
      */
-    private array $dependents = [];
+    protected array $dependents = [];
 
     /**
      * An array of table dependencies that must be installed before this table can be installed.
      *
      * @var array
      */
-    private array $dependencies = [];
+    protected array $dependencies = [];
 
     /**
      * Whether or not the table is required for the provider to function. Defaults to false.
      *
      * @var boolean
      */
-    private bool $isRequired = false;
+    protected bool $isRequired = false;
 
     /**
      * Whether to automatically install this table when its dependencies are installed. Defaults to true.
      *
      * @var boolean
      */
-    private bool $installWithDependencies = true;
+    protected bool $installWithDependencies = true;
 
     /**
      * The current batch ID for the table's migrations.
      *
      * @var string
      */
-    private string $currentBatchId = '';
+    protected string $currentBatchId = '';
 
     /**
      * The last error message encountered during a migration operation.
      *
      * @var string
      */
-    private string $lastError = '';
+    protected string $lastError = '';
 
     use IsMakeable, ResolvesPaths;
 
@@ -117,6 +103,8 @@ final class Table extends Feature implements Makeable {
     // =========================================================================
 
     protected function init(): void {
+        $this->identifier('name', 'snake');
+
         if (isset($this->passedProps['path'])) {
             $this->path($this->passedProps['path']);
         }
@@ -161,10 +149,10 @@ final class Table extends Feature implements Makeable {
         $this->name = $migration->getTableName();
 
         // Set the table's label from the migration's label
-        $this->label = $migration->getLabel();
+        $this->label($migration->getLabel());
         
         // Set the description using the migration's description
-        $this->description = $migration->getDescription();
+        $this->description($migration->getDescription());
 
         // Set whether the table is required for the provider to function
         $this->isRequired = $migration->isRequired();
@@ -571,10 +559,6 @@ final class Table extends Feature implements Makeable {
     // Attribute Setters
     // =========================================================================
 
-    public function setIdentifier(string $identifier): static {
-        return $this->name($identifier);
-    }
-
     /**
      * Sets the table's name (identifier) in snake_case format.
      * 
@@ -586,8 +570,7 @@ final class Table extends Feature implements Makeable {
      * @return static
      */
     private function name(string $name): static {
-        $this->name = Str::snake($name);
-        return $this;
+        return $this->setIdentifier($name, false);
     }
 
     /**
@@ -762,39 +745,14 @@ final class Table extends Feature implements Makeable {
     }
 
     /**
-     * Returns the table's identifier (name/name).
-     *
-     * @return string
-     */
-    public function getIdentifier(): string {
-        return $this->name;
-    }
-
-    /**
      * Returns the table's name (identifier/name).
+     * 
+     * @param string $format
      *
      * @return string
      */
-    public function getName(): string {
-        return $this->name;
-    }
-
-    /**
-     * Returns the table's label.
-     *
-     * @return string
-     */
-    public function getLabel(): string {
-        return $this->label;
-    }
-
-    /**
-     * Returns the table's description.
-     *
-     * @return string
-     */
-    public function getDescription(): string {
-        return $this->description;
+    public function getName(string $format = 'default'): string {
+        return $this->getIdentifier($format);
     }
 
     /**

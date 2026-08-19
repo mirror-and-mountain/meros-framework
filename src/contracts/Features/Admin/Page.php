@@ -17,7 +17,7 @@ use MM\Meros\Contracts\Features\Concerns\IsHookable;
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 use MM\Meros\Contracts\Features\Concerns\MakesItems;
 
-class MenuPage extends Feature implements Registrable, Makeable {
+class Page extends Feature implements Registrable, Makeable {
     /**
      * The page's title.
      *
@@ -84,16 +84,16 @@ class MenuPage extends Feature implements Registrable, Makeable {
     /**
      * An array of subpage classes or instances associated with the menu page.
      *
-     * @var array<string|MenuPage>
+     * @var array<Page>
      */
-    protected array $subpages = [];
+    private array $subpages = [];
 
     /**
      * The parent page associated with the submenu page, if any.
      *
-     * @var MenuPage|null
+     * @var Page|null
      */
-    protected ?MenuPage $parentPage = null;
+    protected ?Page $parentPage = null;
 
     /**
      * Whether this is a subpage reached via a query parameter (e.g., ?page=parent-page&subpage=subpage) rather than a standard submenu page.
@@ -147,6 +147,8 @@ class MenuPage extends Feature implements Registrable, Makeable {
     // =========================================================================
 
     final protected function init(): void {
+        $this->identifier('slug', 'slug');
+
         $this->set('parent_page', $this->passedProps['parent_page'] ?? null);
         $this->set('is_query_page', $this->passedProps['query_page'] ?? false);
 
@@ -158,15 +160,16 @@ class MenuPage extends Feature implements Registrable, Makeable {
     }
 
     final protected function whenConfigured(): void {
-        if (!empty($this->subpages)) {
-            $this->instantiate('subpages', MenuPage::class, ['parentPage' => $this]);
-        }
-
         if (!empty($this->ajaxActions)) {
             $this->registerAjaxActions();
         }
     }
 
+    /**
+     * Registers any given AJAX actions with WordPress.
+     *
+     * @return void
+     */
     private function registerAjaxActions(): void {
         foreach ($this->ajaxActions as $action => $handler) {
             if (is_callable($handler)) {
@@ -321,19 +324,19 @@ class MenuPage extends Feature implements Registrable, Makeable {
     // =========================================================================
 
     /**
-     * Adds a subpage to the menu page. The subpage can be specified as a class name, an instance of MenuPage, or a closure that configures a new MenuPage instance.
+     * Adds a subpage to the menu page. The subpage can be specified as a class name, an instance of Page, or a closure that configures a new Page instance.
      *
-     * @param MenuPage|Closure|string $subpageOrClosure
+     * @param Page|Closure|string $subpageOrClosure
      * @param array                   $callbackOrProps
      * @param array                   $props
      *
-     * @return MenuPage The added subpage instance.
+     * @return Page The added subpage instance.
      */
     final public function subpage(
-        MenuPage|Closure|string $subpageOrClosure,
+        Page|Closure|string $subpageOrClosure,
         Closure|array           $callbackOrProps = [],
         array                   $props = []
-    ): MenuPage {
+    ): Page {
         $queryPage = false;
 
         if ($this->isSubPage() || $this->area !== 'menu') {
@@ -351,7 +354,7 @@ class MenuPage extends Feature implements Registrable, Makeable {
 
             $subpage = $this->makeItemFrom(
                 $classOrAlias,
-                MenuPage::class,
+                Page::class,
                 $callbackOrProps,
                 $props
             );
@@ -365,7 +368,7 @@ class MenuPage extends Feature implements Registrable, Makeable {
                 ['parent_page' => $this, 'query_page' => $queryPage],
             );
 
-            $subpage = $this->makeItem(MenuPage::class, $closure, $props);
+            $subpage = $this->makeItem(Page::class, $closure, $props);
         }
 
         else {
@@ -420,11 +423,11 @@ class MenuPage extends Feature implements Registrable, Makeable {
     /**
      * Sets the parent page for the menu page.
      *
-     * @param MenuPage $parent
+     * @param Page $parent
      *
      * @return static
      */
-    final public function parent(MenuPage $parent): static {
+    final public function parent(Page $parent): static {
         $this->parentPage = $parent;
         return $this;
     }
@@ -432,10 +435,6 @@ class MenuPage extends Feature implements Registrable, Makeable {
     // =========================================================================
     // Attribute Setters
     // =========================================================================
-
-    final public function setIdentifier(string $identifier): static {
-        return $this->slug($identifier);
-    }
 
     /**
      * Sets the slug for the menu page.
@@ -445,8 +444,7 @@ class MenuPage extends Feature implements Registrable, Makeable {
      * @return static
      */
     final public function slug(string $slug): static {
-        $slug = Str::slug($slug);
-        $this->slug = $slug;
+        $slug = $this->setIdentifier($slug);
 
         if (empty($this->title)) {
             $this->title = Str::title(str_replace('-', ' ', $slug));
@@ -660,17 +658,13 @@ class MenuPage extends Feature implements Registrable, Makeable {
     // Getters
     // =========================================================================
 
-    final public function getIdentifier(): string {
-        return $this->slug;
-    }
-
     /**
      * Checks if the menu page is a standalone page (i.e., it has no parent and no subpages).
      *
      * @return boolean
      */
     final public function isStandalonePage(): bool {
-        return !$this->isParentPage() && !$this->isSubPage();
+        return !$this->isParentPage() && !$this->isSubPage() && !$this->isQuerySubPage();
     }
 
     /**
@@ -707,11 +701,11 @@ class MenuPage extends Feature implements Registrable, Makeable {
      *
      * @param string $slug
      *
-     * @return MenuPage|null
+     * @return Page|null
      */
-    final public function getSubPage(string $slug): ?MenuPage {
+    final public function getSubPage(string $slug): ?Page {
         return $this->getSubPages(true)->first(function ($subpage) use ($slug) {
-            return $subpage instanceof MenuPage && $subpage->getSlug() === $slug;
+            return $subpage instanceof Page && $subpage->getSlug() === $slug;
         });
     }
 
@@ -736,9 +730,9 @@ class MenuPage extends Feature implements Registrable, Makeable {
     /**
      * Gets the parent page of the menu page, if any.
      *
-     * @return MenuPage|null
+     * @return Page|null
      */
-    final public function getParentPage(): ?MenuPage {
+    final public function getParentPage(): ?Page {
         return $this->parentPage;
     }
 
@@ -753,11 +747,13 @@ class MenuPage extends Feature implements Registrable, Makeable {
 
     /**
      * Gets the slug of the menu page.
+     * 
+     * @param string $format The format of the slug to return. Can be 'default', 'slug', or 'snake'. Defaults to 'default'.
      *
      * @return string
      */
-    final public function getSlug(): string {
-        return $this->slug;
+    final public function getSlug(string $format = 'default'): string {
+        return $this->getIdentifier($format);
     }
 
     /**
@@ -821,12 +817,12 @@ class MenuPage extends Feature implements Registrable, Makeable {
                 return $subpage->getSlug() === $_GET[$this->queryPageParam];
             });
 
-            if ($subpage instanceof MenuPage) {
+            if ($subpage instanceof Page) {
                 $this->renderQueryPage($subpage);
                 return;
             }
         }
-
+        
         echo '<div class="wrap">';
 
         if ($this->showTitle) {
@@ -847,11 +843,11 @@ class MenuPage extends Feature implements Registrable, Makeable {
     /**
      * Renders the menu page when it is a query subpage (i.e., it has a parent page and is a query page).
      *
-     * @param MenuPage $subpage
+     * @param Page $subpage
      *
      * @return void
      */
-    protected function renderQueryPage(MenuPage $subpage): void {
+    protected function renderQueryPage(Page $subpage): void {
         $subpage->render();
     }
 

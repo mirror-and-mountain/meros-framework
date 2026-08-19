@@ -2,10 +2,10 @@
 
 namespace MM\Meros\App\Admin\Pages;
 
-use MM\Meros\Contracts\Features\Admin\MenuPage;
+use MM\Meros\Contracts\Features\Admin\Page;
 use MM\Meros\Facades\Theme;
 
-final class ThemeSettings extends MenuPage {
+final class ThemeSettings extends Page {
     
     // =========================================================================
     // Initialisation

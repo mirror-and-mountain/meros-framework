@@ -15,7 +15,7 @@ class SettingsSections extends Register implements RegistrarMaker {
 
     protected function configure(): void {
         $this->unique(true);
-        $this->definition(SettingsSection::class);
+        $this->contract(SettingsSection::class);
         $this->facade(SettingsSectionsFacade::class);
     }
 }

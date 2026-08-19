@@ -23,112 +23,129 @@ trait RegistersFeatures {
     /**
      * Registers a feature class with the register for use later on.
      *
-     * @param string        $featureClass The class name of the feature to register.
-     * @param string        $alias An optional alias for the feature class.
-     * @param bool|Closure  $makeNow Whether to immediately create an instance of the feature after registration. A closure may also be passed to modify the feature instance after creation.
-     * @param array         $props An array of properties to pass to the feature's constructor. Only used if $makeNow is true or a closure.
-     *
-     * @return static|Registrable The newly created feature instance if $makeNow is true or a Closure, otherwise the register instance.
-     * @throws \InvalidArgumentException if the feature class is not a valid subclass of the feature definition class associated with this register.
+     * @param string      $featureClass The class name of the feature to register.
+     * @param string      $alias        An optional alias for the feature class.
+     * @param string|null $onBehalfOf   An optional provider classname to register the feature on behalf of. If null, the current provider will be used.
+     * 
+     * @return static
      */
-    final public function register(string $featureClass, string $alias = '', bool|Closure $makeNow = false, array $props = []): static|Registrable {
-        if ($this->hasRegisteredFeature($alias !== '' ? $alias : $featureClass)) {
-            return $this; // Feature class is already registered, no need to register again.
+    final public function register(string $featureClass, string $alias = '', ?string $onBehalfOf = null): static {
+        $this->ensureCheckout('register');
+        $provider = $this->getProvider();
+
+        if ($this->hasRegisteredFeatureClass($featureClass, null, false) && $featureClass !== $this->getContract()) {
+            return $this; // Unique class is already registered, no need to register again.
         }
 
         if (!$this->hasCorrectDefinition($featureClass)) {
-            throw new \InvalidArgumentException("Feature class '{$featureClass}' is not a valid subclass of '{$this->getDefinition()}'.");
+            throw new \InvalidArgumentException("Feature class '{$featureClass}' is not a valid subclass of '{$this->getContract()}'.");
         }
 
-        if ($alias !== '') {
-            $this->registeredFeatures[Str::snake($alias)] = $featureClass;
-        } else {
-            $this->registeredFeatures[] = $featureClass;
-        }
+        $this->registeredFeatures[] = [
+            'class'      => $featureClass,
+            'alias'      => $alias,
+            'provider'   => $provider,
+            'onBehalfOf' => $onBehalfOf !== $provider::class ? $onBehalfOf : null,
+        ];
 
-        if ($makeNow === true || $makeNow instanceof Closure) {
-            $callback = $makeNow instanceof Closure ? $makeNow : $props;
-            return $this->makeFrom($alias !== '' ? $alias : $featureClass, $callback, $props);
-        }
-
+        $this->checkin();
         return $this;
     }
 
     /**
-     * Attempts to create a new instance of the specified feature class, if it has been registered with this register.
-     * If the feature class has not been registered, it will attempt to register it if it has the correct definition.
-     * If registration fails, it will check for an existing instance using the provided alias.
-     *
-     * @param string          $featureClassOrAlias The class name or alias of the feature to create.
-     * @param Closure|array   $callbackOrProps     An optional callback to modify the feature instance after creation, or an array of properties to pass to the feature's constructor.
-     * @param array           $props               An array of properties to pass to the feature's constructor.
+     * Creates a new instance of the specified feature class, if it has been registered with this register.
+     * 
+     * @param string               $featureClassOrAlias  The class name or alias of the feature to create.
+     * @param Closure|array|string $callbackPropsOrAlias An optional callback to modify the feature instance after creation, an array of properties to pass to the feature's constructor, or a string alias for the feature.
+     * @param array                $props                An array of properties to pass to the feature's constructor.
      *
      * @return Registrable The newly created feature instance.
-     * @throws \InvalidArgumentException if the feature class has not been registered with this register or cannot be located.
+     * @throws \InvalidArgumentException if the feature class has not been registered with this register.
      */
-    final public function makeFrom(string $featureClassOrAlias, Closure|array $callbackOrProps = [], array $props = []): Registrable {
+    final public function makeFrom(string $featureClassOrAlias, Closure|array|string $callbackPropsOrAlias = [], array $props = []): Registrable {
         $this->ensureCheckout('makeFrom');
-        $provider = $this->getProvider();
-        
-        // Try to find the registered feature class by alias or class name
-        $resolvedFeature = $this->resolveRegisteredFeatureClass($featureClassOrAlias);
 
-        // If the feature class is not found and the provided string looks like a fully qualified class name, attempt to register it
-        if ($resolvedFeature === null && Str::contains($featureClassOrAlias, '\\')) {
-            $resolvedFeature = $this->tryToRegisterFeature($featureClassOrAlias);
+        // If we've been given an alias, register the feature class with the alias before making the instance.
+        if (is_string($callbackPropsOrAlias) && Str::contains($featureClassOrAlias, '\\')) {
+            $givenAlias         = $callbackPropsOrAlias;
+            $checkedOutProvider = $this->getProvider();
 
-            // If the feature class is still not found after attempting to register, throw an exception
-            if ($resolvedFeature === false) {
-                throw new \InvalidArgumentException("Feature class '{$featureClassOrAlias}' has not been registered with this register (" . static::class . ").");
-            }
+            $this->register($featureClassOrAlias, $givenAlias);
+            $this->checkout($checkedOutProvider); // Re-checkout the original provider after registering the feature class with the alias.
+
+            $callbackOrProps = $props;
+            $props = [];
+        } else {
+            $callbackOrProps = $callbackPropsOrAlias;
         }
 
-        // If feature class still not found, check for an existing instance using the alias.
-        else if ($resolvedFeature === null) {
-            $existingInstance = $this->getExistingInstanceByAlias($featureClassOrAlias, $this->isPrivate() ? $provider : null);
+        $registeredFeature    = $this->getRegisteredFeature($featureClassOrAlias, null, false);
+        $featureClass         = $registeredFeature ? $registeredFeature['class'] ?? null : null;
+        $featureAlias         = $registeredFeature ? $registeredFeature['alias'] ?? '' : '';
+        $registeringProvider  = $registeredFeature ? $registeredFeature['provider'] ?? null : null;
+        $registeredOnBehalfOf = $registeredFeature ? $registeredFeature['onBehalfOf'] ?? null : null;
+
+        if ($registeringProvider === null) {
+            throw new \RuntimeException("Couldn't get registering provider when making instance of '{$featureClass}.' (" . static::class . ").");
+        }
+
+        $provider = $registeringProvider;
+        if ($registeredOnBehalfOf !== null) {
+            $provider = app()->make($registeredOnBehalfOf);
+        }
+
+        // See if we already have an instance setup with the alias as the identifier.
+        if (!empty($featureAlias)) {
+            $existingInstance = $this->getExistingInstance($featureAlias, $provider);
 
             if ($existingInstance !== null) {
+                $this->checkin();
                 return $existingInstance;
             }
-
-            // If the feature class is still not found, throw an exception
-            throw new \InvalidArgumentException("Feature class or alias '{$featureClassOrAlias}' has not been registered with this register (" . static::class . ").");
         }
 
-        // If the feature class is an array (from registration), extract the class and alias
-        $featureClass = $resolvedFeature['class'];
-        $alias = $resolvedFeature['alias'];
+        // If we're not registered and the provided string doesn't look like a fully qualified class name, throw an exception.
+        if ($featureClass === null && !Str::contains($featureClassOrAlias, '\\')) {
+            $this->checkin();
+            throw new \InvalidArgumentException("Feature class or alias '{$featureClassOrAlias}' has not been registered with this register (" . static::class . ").");
+        } 
+        // Else, if the provided string looks like a fully qualified class name, use it as the feature class and validate it.
+        else if ($featureClass === null) {
+            $featureClass = $featureClassOrAlias;
 
-        // Check for an existing instance using the alias before creating a new one
-        $existingInstance = $this->getExistingInstanceByAlias($alias, $this->isPrivate() ? $provider : null);
+            if (!$this->hasCorrectDefinition($featureClass)) {
+                $this->checkin();
+                throw new \InvalidArgumentException("Feature class '{$featureClass}' is not a valid subclass of '{$this->getContract()}'.");
+            }
+        }
+
+        $instance         = $featureClass::__make_from_registered($provider, $callbackOrProps, $props);
+        $identifier       = $instance->getIdentifier();
+        $existingInstance = $this->getExistingInstance($identifier, $provider);
 
         if ($existingInstance !== null) {
+            $this->checkin();
             return $existingInstance;
         }
 
-        // Setup a new instance and attach to the register
-        $featureInstance = $featureClass::__make_from_registered($provider, $callbackOrProps, $props);
-
-        if (empty($featureInstance->getIdentifier())) {
-            $featureInstance->setIdentifier($alias !== '' ? $alias : Str::snake(class_basename($featureClass)));
+        if (empty($identifier) && !empty($featureAlias)) {
+            $instance->setIdentifier($featureAlias);
         }
-        
-        $this->attachInstance($featureInstance, $provider);
+
+        $this->attachInstance($instance, $provider);
         $this->checkin();
-        return $featureInstance;
-        
+        return $instance;
     }
 
     /**
-     * Retrieves an existing instance of a feature by its alias, if it exists and the register is set to use unique instances.
+     * Retrieves an existing instance of a feature by its identifier, if it exists and the register is set to use unique instances.
      *
-     * @param FeatureProvider|null $provider An optional provider to filter the features by. Required if the register is private.
-     * @param string $alias The alias of the feature instance to retrieve.
+     * @param string $identifier The identifier of the feature instance to retrieve.
      *
      * @return Registrable|null The existing feature instance if found, or null if not found or if unique instances are not enforced.
      */
-    private function getExistingInstanceByAlias(string $alias, ?FeatureProvider $provider = null): Registrable|null {
-        $instance = $this->get($alias, $provider);
+    private function getExistingInstance(string $identifier, FeatureProvider $provider): Registrable|null {
+        $instance = $this->get($identifier, $provider, false);
 
         if ($instance instanceof Registrable && $this->usesUniqueInstances()) {
             return $instance;
@@ -145,7 +162,7 @@ trait RegistersFeatures {
      * @return bool
      */
     private function hasCorrectDefinition(string $featureClass): bool {
-        $baseClass = $this->getDefinition();
+        $baseClass = $this->getContract();
         $classInfo = ClassInfo::get($featureClass);
 
         $correctClass  = $featureClass === $classInfo->name || $classInfo->extends($baseClass);
@@ -155,74 +172,99 @@ trait RegistersFeatures {
     }
 
     /**
-     * Resolves the registered feature class name from the provided class name or alias.
-     *
-     * @param string $featureClassOrAlias The class name or alias of the feature to resolve.
-     *
-     * @return array|null An array containing the resolved feature class name and alias if found, or null if not found.
-     */
-    private function resolveRegisteredFeatureClass(string $featureClassOrAlias): ?array {
-        $class = $this->registeredFeatures[$featureClassOrAlias] ?? (in_array($featureClassOrAlias, $this->registeredFeatures) ? $featureClassOrAlias : null);
-
-        if ($class === null) {
-            return null;
-        }
-
-        return [
-            'alias' => in_array($featureClassOrAlias, array_keys($this->registeredFeatures)) ? $featureClassOrAlias : Str::snake(class_basename($class)),
-            'class' => $class
-        ];
-    }
-
-    /**
-     * Attempts to register a feature class with the register if it has the correct definition.
-     *
-     * @param string $featureClass
-     *
-     * @return array|false An array containing the registered class name and alias if successfully registered, false otherwise.
-     */
-    private function tryToRegisterFeature(string $featureClass): array|false {
-        if ($this->hasCorrectDefinition($featureClass)) {
-            $alias = Str::snake(class_basename($featureClass));
-            $this->register($featureClass, $alias);
-
-            return [
-                'alias' => $alias,
-                'class' => $featureClass
-            ];
-        }
-
-        return false;
-    }
-
-    /**
      * Returns an array of feature classes that have been registered with this register.
+     * 
+     * @param FeatureProvider|null $provider An optional provider to filter the features by. Required if the register is private.
+     * @param bool                 $checkin  Whether to check the register back in after retrieving the features.
      *
      * @return array
      */
-    final public function getRegisteredFeatures(): array {
-        return $this->registeredFeatures;
+    final public function getRegisteredFeatures(?FeatureProvider $provider = null, bool $checkin = true): array {
+        if (empty($this->registeredFeatures)) {
+            return $this->returnValue($checkin, []);
+        }
+
+        if ($this->isPrivate()) {
+            $this->ensureCheckout('getRegisteredFeatures');
+            $provider = $this->getProvider();
+        }
+
+        if ($provider !== null) {
+            $features = collect($this->registeredFeatures)
+                ->where(function ($feature) use ($provider) {
+                    return $feature['provider'] === $provider || ($feature['onBehalfOf'] 
+                        ? $provider instanceof $feature['onBehalfOf'] 
+                        : false
+                    );
+                })
+                ->toArray();
+
+            return $this->returnValue($checkin, $features ?? []);
+        }
+
+        return $this->returnValue($checkin, $this->registeredFeatures);
+    }
+
+    /**
+     * Returns the registered feature for a given alias or class name, if it exists.
+     *
+     * @param string               $featureClassOrAlias The class name or alias of the registered feature.
+     * @param FeatureProvider|null $provider An optional provider to filter the features by.
+     * @param bool                 $checkin Whether to check the register back in after retrieving the feature.
+     *
+     * @return array|null The registered feature if found, or null if not found.
+     */
+    final public function getRegisteredFeature(string $featureClassOrAlias, ?FeatureProvider $provider = null, bool $checkin = true): ?array {
+        $features = $this->getRegisteredFeatures($provider, false);
+
+        if (!empty($features)) {
+            $looksLikeClass = Str::contains($featureClassOrAlias, '\\');
+            $feature = collect($features)->firstWhere($looksLikeClass ? 'class' : 'alias', $featureClassOrAlias) ?? null;
+            return $this->returnValue($checkin, $feature);
+        }
+
+        return $this->returnValue($checkin, null);
     }
 
     /**
      * Returns the registered feature class name for a given alias, if it exists.
      *
-     * @param string $alias The alias of the registered feature.
+     * @param string               $featureClassOrAlias The class name or alias of the registered feature.
+     * @param FeatureProvider|null $provider An optional provider to filter the features by.
+     * @param bool                 $checkin Whether to check the register back in after retrieving the feature.
      *
      * @return string|null The registered feature class name if found, or null if not found.
      */
-    final public function getRegisteredFeature(string $alias): ?string {
-        return $this->registeredFeatures[$alias] ?? null;
+    final public function getRegisteredFeatureClass(string $featureClassOrAlias, ?FeatureProvider $provider = null, bool $checkin = true): ?string {
+        $feature = $this->getRegisteredFeature($featureClassOrAlias, $provider, false);
+        return $this->returnValue($checkin, $feature['class'] ?? null);
+    }
+
+    /**
+     * Checks if a specific feature has been registered with this register.
+     *
+     * @param string               $featureClassOrAlias The class name or alias of the feature to check.
+     * @param FeatureProvider|null $provider An optional provider to filter the features by.
+     * @param bool                 $checkin Whether to check the register back in after checking for the feature.
+     *
+     * @return bool True if the feature class has been registered, false otherwise.
+     */
+    final public function hasRegisteredFeature(string $featureClassOrAlias, ?FeatureProvider $provider = null, bool $checkin = true): bool {
+        $feature = $this->getRegisteredFeature($featureClassOrAlias, $provider, false);
+        return $this->returnValue($checkin, $feature !== null);
     }
 
     /**
      * Checks if a specific feature class has been registered with this register.
      *
-     * @param string $featureClassOrAlias The class name or alias of the feature to check.
+     * @param string               $featureClass The class name of the feature to check.
+     * @param FeatureProvider|null $provider An optional provider to filter the features by.
+     * @param bool                 $checkin Whether to check the register back in after checking for the feature.
      *
      * @return bool True if the feature class has been registered, false otherwise.
      */
-    final public function hasRegisteredFeature(string $featureClassOrAlias): bool {
-        return isset($this->registeredFeatures[$featureClassOrAlias]) || in_array($featureClassOrAlias, $this->registeredFeatures);
+    final public function hasRegisteredFeatureClass(string $featureClass, ?FeatureProvider $provider = null, bool $checkin = true): bool {
+        $class = $this->getRegisteredFeatureClass($featureClass, $provider, false);
+        return $this->returnValue($checkin, $class !== null);
     }
 }

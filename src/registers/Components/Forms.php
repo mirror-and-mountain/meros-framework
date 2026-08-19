@@ -14,7 +14,7 @@ class Forms extends Register implements RegistrarMaker {
     use IsRegistrarMaker;
 
     protected function configure(): void {
-        $this->definition(Form::class);
+        $this->contract(Form::class);
         $this->unique(true);
         $this->facade(FormsFacade::class);
     }

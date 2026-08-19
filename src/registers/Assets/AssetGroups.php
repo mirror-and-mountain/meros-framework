@@ -16,7 +16,7 @@ class AssetGroups extends Register implements RegistrarMaker {
     protected function configure(): void {
         $this->private(true);
         $this->unique(true);
-        $this->definition(AssetGroup::class);
+        $this->contract(AssetGroup::class);
         $this->facade(AssetGroupsFacade::class);
     }
 }

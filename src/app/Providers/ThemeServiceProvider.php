@@ -10,7 +10,6 @@ use MM\Meros\App\BaseTheme;
 use MM\Meros\Support\ClassInfo;
 
 class ThemeServiceProvider extends MerosServiceProvider {
-
     /**
      * The instance of the theme being registered.
      *

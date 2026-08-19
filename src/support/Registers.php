@@ -47,7 +47,7 @@ final class Registers {
      */
     public function getRegisterFor(string $requiredClassDefinition): ?Register {
         return $this->registers->first(function (Register $register) use ($requiredClassDefinition) {
-            return $register->getDefinition() === $requiredClassDefinition;
+            return $register->getContract() === $requiredClassDefinition;
         });
     }
 }

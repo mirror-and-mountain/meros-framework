@@ -23,7 +23,7 @@ trait MakesFeatures {
     final public function make(Closure|array $callbackOrProps = [], array $props = []): Makeable {
         $this->ensureCheckout('make');
         $provider = $this->getProvider();
-        $featureClass = $this->getDefinition();
+        $featureClass = $this->getContract();
 
         if (!method_exists($featureClass, '__make')) {
             throw new \InvalidArgumentException("Feature class '{$featureClass}' is not makeable.");
@@ -35,7 +35,8 @@ trait MakesFeatures {
 
         if ($featureInstance instanceof Registrable && $this instanceof Registrar) {
             $identifier = $featureInstance->getIdentifier();
-            if (!$this->hasRegisteredFeature($identifier)) {
+
+            if (!$this->hasRegisteredFeature($identifier, null, false)) {
                 $this->register(get_class($featureInstance), $identifier);
             }
         }

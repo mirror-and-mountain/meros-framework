@@ -34,20 +34,6 @@ abstract class DataContainer extends Feature implements Storable {
     protected string $name = '';
 
     /**
-     * The human-readable label of the container.
-     *
-     * @var string
-     */
-    protected string $label = '';
-
-    /**
-     * The description of the container.
-     *
-     * @var string
-     */
-    protected string $description = '';
-
-    /**
      * The default value of the container.
      *
      * @var array
@@ -76,9 +62,9 @@ abstract class DataContainer extends Feature implements Storable {
     protected string $itemClass = '';
 
     /**
-     * An array of DataItem instances or classes associated with this container.
+     * An array of DataItem instances associated with this container.
      *
-     * @var array<StorableItem|string>
+     * @var array<StorableItem>
      */
     protected array $items = [];
 
@@ -89,11 +75,22 @@ abstract class DataContainer extends Feature implements Storable {
      */
     protected string $updatedHook = '';
 
+    /**
+     * The callback to be executed when the container's value is updated.
+     *
+     * @var Closure|null
+     */
+    private ?Closure $onUpdateCallback = null;
+
     use IsHookable, IsRegistrable, IsMakeable, InstantiatesItems, MakesItems;
 
     // =========================================================================
     // Initialisation
     // =========================================================================
+
+    protected function init(): void {
+        $this->identifier('name', 'snake');
+    }
 
     protected function whenConfigured(): void {
         if (empty($this->name)) {
@@ -102,10 +99,6 @@ abstract class DataContainer extends Feature implements Storable {
 
         if (empty($this->itemClass)) {
             throw new \LogicException("The item class must be set in the configure() method of " . static::class);
-        }
-
-        if (!empty($this->items)) {
-            $this->instantiate('items', $this->itemClass);
         }
 
         $this->hook();
@@ -198,7 +191,9 @@ abstract class DataContainer extends Feature implements Storable {
      * @return void
      */
     protected function whenUpdated(mixed $value, mixed $oldValue, string $optionName): void {
-        // This method can be overridden in subclasses to perform actions when the container is updated.
+        if (is_callable($this->onUpdateCallback)) {
+            call_user_func($this->onUpdateCallback, $value, $oldValue, $optionName);
+        }
     }
 
     // =========================================================================
@@ -208,28 +203,14 @@ abstract class DataContainer extends Feature implements Storable {
     /**
      * Registers a new DataItem class with the container's item register.
      *
-     * @param string       $itemClass The class name of the item to register.
-     * @param string       $alias     An optional alias for the item class.
-     * @param bool|Closure $makeNow   Whether to immediately create an instance of the item after registration. A closure may also be passed to modify the item instance after creation.
+     * @param string $itemClass The class name of the item to register.
+     * @param string $alias     An optional alias for the item class.
      *
      * @return void
      */
-    final public function register(string $itemClass, string $alias = '', bool|Closure $makeNow = false): void {
+    final public function register(string $itemClass, string $alias = ''): void {
         $register = $this->resolveRegistrarRegister($this->itemClass);
-
-        if ($makeNow === true || $makeNow instanceof Closure) {
-            $callback = $makeNow instanceof Closure ? $makeNow : true;
-            $item = $register->checkout($this->getProvider())->register($itemClass, $alias, $callback, ['container' => $this]);
-
-            if (!($item instanceof StorableItem)) {
-                throw new \InvalidArgumentException("The item class must implement the StorableItem interface.");
-            }
-
-            $this->items[] = $item;
-            $this->afterAdd($item);
-        }
-
-        $register->register($itemClass, $alias, false);
+        $register->checkout($this->getProvider())->register($itemClass, $alias);
     }
 
     /**
@@ -241,7 +222,7 @@ abstract class DataContainer extends Feature implements Storable {
      *
      * @return StorableItem The newly created StorableItem instance.
      */
-    final public function make(string $itemClassOrAlias, Closure|array $callbackOrProps = [], array $props = []): StorableItem {
+    final public function makeFrom(string $itemClassOrAlias, Closure|array $callbackOrProps = [], array $props = []): StorableItem {
         $item = $this->makeItemFrom($itemClassOrAlias, $this->itemClass, $callbackOrProps, $props);
         $this->items[] = $item;
         $this->afterAdd($item);
@@ -419,10 +400,6 @@ abstract class DataContainer extends Feature implements Storable {
     // Attribute Setters
     // =========================================================================
 
-    final public function setIdentifier(string $identifier): static {
-        return $this->name($identifier);
-    }
-
     /**
      * Sets the unique name of the container and returns the container instance.
      *
@@ -431,12 +408,8 @@ abstract class DataContainer extends Feature implements Storable {
      * @return static
      */
     final public function name(string $name): static {
-        $snakeName  = Str::snake($name);
-        $this->name = $this->prefix !== '' ? $this->prefix . '_' . $snakeName : $snakeName;
-
-        if (empty($this->label)) {
-            $this->label = Str::title(str_replace('_', ' ', $name));
-        }
+        $name = $this->setIdentifier($name);
+        $this->name = $this->prefix !== '' ? $this->prefix . '_' . $name : $name;
 
         $this->afterNameSet();
         return $this;
@@ -455,30 +428,6 @@ abstract class DataContainer extends Feature implements Storable {
     }
 
     /**
-     * Sets the human-readable label of the container and returns the container instance.
-     *
-     * @param string $label
-     *
-     * @return static
-     */
-    final public function label(string $label): static {
-        $this->label = $label;
-        return $this;
-    }
-
-    /**
-     * Sets the description of the container and returns the container instance.
-     *
-     * @param string $description
-     *
-     * @return static
-     */
-    final public function description(string $description): static {
-        $this->description = $description;
-        return $this;
-    }
-
-    /**
      * Sets whether the container should be exposed in the REST API and returns the container instance.
      *
      * @param bool $show
@@ -490,6 +439,18 @@ abstract class DataContainer extends Feature implements Storable {
         return $this;
     }
 
+     /**
+     * Sets a callback to be executed when the container's value is updated and returns the container instance.
+     *
+     * @param Closure $callback The callback to execute on update. It should accept parameters: value, oldValue, and optionName.
+     *
+     * @return static
+     */
+    final public function onUpdate(Closure $callback): static {
+        $this->onUpdateCallback = $callback;
+        return $this;
+    }
+
     // =========================================================================
     // Getters
     // =========================================================================
@@ -497,20 +458,23 @@ abstract class DataContainer extends Feature implements Storable {
     /**
      * Returns the name of the container, optionally with or without the prefix.
      *
-     * @param bool $withPrefix Whether to include the prefix in the name (default: false).
+     * @param bool   $withPrefix Whether to include the prefix in the name (default: false).
+     * @param string $format The format of the name to return. Can be 'default', 'snake', or 'slug'. Defaults to 'default'.
      *
      * @return string
      */
-    final public function getName(bool $withPrefix = false): string {
+    final public function getName(bool $withPrefix = false, string $format = 'default'): string {
+        $name = $this->getIdentifier($format);
+        
         if ($withPrefix && $this->prefix !== '') {
-            return $this->name;
+            return $name;
         }
 
         if (!$withPrefix && $this->prefix !== '') {
-            return Str::replace($this->prefix . '_', '', $this->name);
+            return Str::replace($this->prefix . '_', '', $name);
         }
 
-        return $this->name;
+        return $name;
     }
 
     /**
@@ -525,11 +489,11 @@ abstract class DataContainer extends Feature implements Storable {
         ];
 
         if (!empty($this->label)) {
-            $schema['title'] = $this->label;
+            $schema['title'] = $this->getLabel();
         }
 
         if (!empty($this->description)) {
-            $schema['description'] = $this->description;
+            $schema['description'] = $this->getDescription();
         }
 
         $default = $this->getDefault();
@@ -583,14 +547,5 @@ abstract class DataContainer extends Feature implements Storable {
         });
 
         return ['schema' => $schema];
-    }
-
-    /**
-     * Returns the unique name of the container, which serves as its identifier.
-     *
-     * @return string The unique name of the container.
-     */
-    final public function getIdentifier(): string {
-        return $this->getName();
     }
 }

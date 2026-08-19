@@ -16,7 +16,7 @@ class SettingsContainers extends Register implements RegistrarMaker {
     protected function configure(): void {
         $this->private(true);
         $this->unique(true);
-        $this->definition(SettingsContainer::class);
+        $this->contract(SettingsContainer::class);
         $this->facade(SettingsContainersFacade::class);
     }
 }

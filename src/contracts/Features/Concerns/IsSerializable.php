@@ -6,7 +6,14 @@ use MM\Meros\Contracts\Features\Serializable;
 
 trait IsSerializable {
 
-    abstract public function getIdentifier(): string;
+    /**
+     * Returns the unique identifier for the feature instance.
+     *
+     * @param string $format The format in which to return the identifier. Defaults to 'default'.
+     *
+     * @return string
+     */
+    abstract public function getIdentifier(string $format = 'default'): string;
 
     /**
      * An array of property names that should be serialised when the object is converted to an array or JSON.

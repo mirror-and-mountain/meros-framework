@@ -5,6 +5,7 @@ namespace MM\Meros\App;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
+use MM\Meros\App\BaseTheme;
 use MM\Meros\Contracts\Provider;
 
 use MM\Meros\Registers\Admin\SettingsContainers;
@@ -17,8 +18,8 @@ use MM\Meros\App\Admin\Pages\PackageSettings as PackageSettingsPage;
 use MM\Meros\App\Admin\Pages\AssetSettings as AssetSettingsPage;
 
 use MM\Meros\App\Admin\Settings\Containers\FrameworkSettings;
-use MM\Meros\App\Admin\Settings\Containers\PackageSettings;
 use MM\Meros\App\Admin\Settings\Containers\ThemeSettings;
+use MM\Meros\App\Admin\Settings\Containers\PackageSettings;
 use MM\Meros\App\Admin\Settings\Containers\AssetGroupSettings;
 
 use MM\Meros\App\Admin\Settings\PackageEnabled;
@@ -131,10 +132,8 @@ final class Framework extends Provider {
      * @return SettingsContainer The settings container for the framework.
      */
     public function resolveSettingsContainer(SettingsContainers $register): SettingsContainer {
-        return $register->get('meros_framework_settings', $this) ?? 
-               $register
-                ->checkout($this)
-                ->makeFrom('meros_framework_settings');
+        return $register->get('meros_framework_settings', null, false) ?? 
+               $register->makeFrom('meros_framework_settings');
     }
 
     /**
@@ -144,7 +143,7 @@ final class Framework extends Provider {
      */
     private function registerMenuPages(): void {
         $this->menuPages()->register(PackageSettingsPage::class, 'meros-packages');
-        $this->menuPages()->register(ThemeSettingsPage::class, 'meros-theme-settings');
+        $this->menuPages()->register(ThemeSettingsPage::class, 'meros-theme-settings', BaseTheme::class);
         $this->menuPages()->register(AssetSettingsPage::class, 'meros-assets');
     }
 
@@ -155,7 +154,7 @@ final class Framework extends Provider {
      */
     private function registerSettingsContainers(): void {
         $this->settingsContainers()->register(FrameworkSettings::class, 'meros_framework_settings');
-        $this->settingsContainers()->register(ThemeSettings::class, 'meros_theme_settings');
+        $this->settingsContainers()->register(ThemeSettings::class, 'meros_theme_settings', BaseTheme::class);
         $this->settingsContainers()->register(PackageSettings::class, 'meros_package_settings');
         $this->settingsContainers()->register(AssetGroupSettings::class, 'meros_asset_group_settings');
     }
@@ -189,15 +188,24 @@ final class Framework extends Provider {
         }
 
         foreach ($packages as $package) {
-            $settingName = $package->getHandle() . '_enabled';
-            $container->register(PackageEnabled::class, $settingName, function ($setting) use ($package) {
-                $setting->setProvider($package);
+            $container->add('boolean', function ($setting) use ($package) {
                 $setting->addContext('is_meros_package_setting', true);
-                $setting->boolean($package->getHandle() . '_enabled');
+                $setting->setProvider($package);
+                $setting->name($package->getHandle() . '_enabled');
                 $setting->label('Enable ' . $package->getName());
                 $setting->default(false);
                 $setting->field();
-                $setting->page('meros-packages');
+                $setting->onUpdate(function ($value, $oldValue, $itemName, $optionName) use ($package) {
+                    if ($value === $oldValue) {
+                        return;
+                    }
+
+                    if ($value === true) {
+                        $package->__whenEnabled();
+                    } else {
+                        $package->__whenDisabled();
+                    }
+                });
             });
         }
 
@@ -360,7 +368,7 @@ final class Framework extends Provider {
      * @return void
      */
     private function registerAssets(): void {
-        $this->assetGroups()->register(MerosAdminAssets::class, 'meros_admin_assets', true);
+        $this->assetGroups()->makeFrom(MerosAdminAssets::class, 'meros_admin_assets');
     }
 
     // =========================================================================

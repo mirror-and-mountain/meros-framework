@@ -87,6 +87,8 @@ class PostMetaContainer extends DataContainer {
     // =========================================================================
 
     final protected function init(): void {
+        parent::init();
+
         if (is_string($this->passedProps['name'] ?? '') && !empty($this->passedProps['name'])) {
             $this->set('name', $this->passedProps['name']);
         }
@@ -130,8 +132,8 @@ class PostMetaContainer extends DataContainer {
 
         $args = array_merge($this->args, [
             'type'              => 'object',
-            'label'             => $this->label,
-            'description'       => $this->description,
+            'label'             => $this->getLabel(),
+            'description'       => $this->getDescription(),
             'default'           => $this->getDefault(),
             'sanitize_callback' => [$this, 'sanitizeValue'],
             'single'            => true,
@@ -166,7 +168,7 @@ class PostMetaContainer extends DataContainer {
             add_action('add_meta_boxes_' . $postType, function () use ($postType) {
                 add_meta_box(
                     $this->name . '_meta_box',
-                    $this->label,
+                    $this->getLabel(),
                     [$this, 'renderMetaBox'],
                     $postType,
                     $this->metaBoxContext,
@@ -192,8 +194,8 @@ class PostMetaContainer extends DataContainer {
             $values = $this->getValue(true);
 
             echo '<div class="meros-meta-box">';
-            if (!empty($this->description)) {
-                echo '<p class="description">' . esc_html($this->description) . '</p>';
+            if (!empty($this->getDescription())) {
+                echo '<p class="description">' . esc_html($this->getDescription()) . '</p>';
             }
 
             echo $this->fieldGroupInstance->__renderAsMetaBox($this->name, $values);
@@ -419,8 +421,8 @@ class PostMetaContainer extends DataContainer {
 
         $fieldGroupInstance = $this->makeItem(FieldGroup::class, function (FieldGroup $fieldGroup) {
             $fieldGroup->id($this->name . '_field_group');
-            $fieldGroup->title($this->label);
-            $fieldGroup->description($this->description);
+            $fieldGroup->title($this->getLabel());
+            $fieldGroup->description($this->getDescription());
         });
 
         if (!($fieldGroupInstance instanceof FieldGroup)) {

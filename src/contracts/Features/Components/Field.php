@@ -38,20 +38,6 @@ abstract class Field extends Feature implements FormComponent {
     protected string $name = '';
 
     /**
-     * The field's label.
-     *
-     * @var string
-     */
-    protected string $label = '';
-
-    /**
-     * The field's description.
-     *
-     * @var string
-     */
-    protected string $description = '';
-
-    /**
      * The field's default value.
      *
      * @var string|array|null
@@ -285,6 +271,7 @@ abstract class Field extends Feature implements FormComponent {
      * @return void
      */
     protected function init(): void {
+        $this->identifier('handle', 'snake');
         $idNameSuffix = Str::substr(Str::uuid(), 0, 8);
 
         $this->setProps($this->passedProps, ['defaultValue', 'attributes', 'classes', 'form', 'group'], [
@@ -653,15 +640,6 @@ abstract class Field extends Feature implements FormComponent {
     // Attribute Methods
     // =========================================================================
 
-    final public function setIdentifier(string $identifier): static {
-        $this->type($identifier);
-        return $this;
-    }
-
-    final public function getIdentifier(): string {
-        return $this->handle;
-    }
-
     /**
      * Returns the field's handle.
      *
@@ -717,26 +695,6 @@ abstract class Field extends Feature implements FormComponent {
     }
 
     /**
-     * Sets the field's label.
-     *
-     * @param string $label The label to set.
-     * @return static
-     */
-    public function label(string $label): static {
-        $this->label = $label;
-        return $this;
-    }
-
-    /**
-     * Returns the field's label.
-     *
-     * @return string
-     */
-    public function getLabel(): string {
-        return $this->label;
-    }
-
-    /**
      * Sets the field's placeholder, if supported.
      *
      * @param string $placeholder The placeholder to set.
@@ -758,30 +716,6 @@ abstract class Field extends Feature implements FormComponent {
      */
     public function getPlaceholder(): ?string {
         return $this->attributes['placeholder'] ?? null;
-    }
-
-    /**
-     * Sets the field's description, if supported.
-     *
-     * @param string $description The description to set.
-     * @return static
-     */
-    public function description(string $description): static {
-        if (!$this->supports('description')) {
-            return $this;
-        }
-
-        $this->description = $description;
-        return $this;
-    }
-
-    /**
-     * Returns the field's description, if supported and set.
-     *
-     * @return string
-     */
-    public function getDescription(): string {
-        return $this->description;
     }
 
     /**

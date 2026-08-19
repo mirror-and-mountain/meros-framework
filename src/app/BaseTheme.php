@@ -177,7 +177,6 @@ abstract class BaseTheme extends Provider {
     // =========================================================================
     // Settings Management
     // =========================================================================
-
     /**
      * Resolves the settings container for the theme.
      *
@@ -186,10 +185,8 @@ abstract class BaseTheme extends Provider {
      * @return SettingsContainer The settings container for the theme.
      */
     final public function resolveSettingsContainer(SettingsContainers $register): SettingsContainer {
-        $container = $register->get('meros_theme_settings', $this) ?? 
-               $register
-                ->checkout($this)
-                ->makeFrom('meros_theme_settings');
+        $container = $register->get('meros_theme_settings', null, false) ?? 
+            $register->makeFrom('meros_theme_settings');
 
         $hasRegisteredTables = $this->hasRegisteredTables();
 

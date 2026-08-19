@@ -32,6 +32,8 @@ class SettingsContainer extends DataContainer {
     // =========================================================================
 
     final protected function init(): void {
+        parent::init();
+        
         if (!empty($this->name)) {
             $this->optionGroup = $this->name . '_group';
         }
@@ -52,8 +54,8 @@ class SettingsContainer extends DataContainer {
     final public function registerContainer(): void {
         $args = [
             'type'              => 'object',
-            'label'             => $this->label,
-            'description'       => $this->description,
+            'label'             => $this->getLabel(),
+            'description'       => $this->getDescription(),
             'default'           => $this->getDefault(),
             'sanitize_callback' => [$this, 'sanitizeValue'],
             'show_in_rest'      => $this->showInRest ? $this->getSchema() : false,
@@ -82,7 +84,7 @@ class SettingsContainer extends DataContainer {
         if ($item->hasField()) {
             $itemPage = $item->getPage();
 
-            if (is_string($itemPage) && empty($itemPage) && !empty($this->page)) {
+            if ($itemPage === null && !empty($this->page)) {
                 $item->page($this->page);
             }
         }

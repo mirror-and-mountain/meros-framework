@@ -14,7 +14,7 @@ class Fields extends Register implements Registrar {
     use RegistersFeatures;
 
     protected function configure(): void {
-        $this->definition(Field::class);
+        $this->contract(Field::class);
         $this->facade(FieldsFacade::class);
     }
 }

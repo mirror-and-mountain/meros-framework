@@ -397,25 +397,25 @@ abstract class Provider implements FeatureProvider {
      * Resolves a feature or register based on the required feature class and an optional name.
      *
      * @param string $requiredFeatureClass The class name of the required feature.
-     * @param string $name Optional. The name of the specific feature to retrieve.
+     * @param string $identifier Optional. The identifier of the specific feature to retrieve.
      *
      * @return Feature|Register|null The resolved feature or register, or null if the feature with the provided name is not found.
      *
      * @throws \RuntimeException If no register or facade is found for the required feature class, or if the register's definition does not match the required feature class.
      */
-    final protected function resolveRequestFor(string $requiredFeatureClass, string $name = ''): Feature|Register|null {
+    final protected function resolveRequestFor(string $requiredFeatureClass, string $identifier = ''): Feature|Register|null {
         $register = $this->getRegisterFor($requiredFeatureClass);
 
         if ($register === null) {
             throw new \RuntimeException("No register found for the feature class: {$requiredFeatureClass}");
         }
 
-        if ($register->getDefinition() !== $requiredFeatureClass) {
+        if ($register->getContract() !== $requiredFeatureClass) {
             throw new \RuntimeException("The register's definition does not match the required feature class: {$requiredFeatureClass}");
         }
 
-        if (!empty($name)) {
-            return $register->get($name, $register->isPrivate() ? $this : null);
+        if (!empty($identifier)) {
+            return $register->checkout($this)->get($identifier);
         }
 
         return $register->checkout($this);

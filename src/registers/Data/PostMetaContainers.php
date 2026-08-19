@@ -16,7 +16,7 @@ class PostMetaContainers extends Register implements RegistrarMaker {
     protected function configure(): void {
         $this->private(true);
         $this->unique(true);
-        $this->definition(PostMetaContainer::class);
+        $this->contract(PostMetaContainer::class);
         $this->facade(PostMetaContainersFacade::class);
     }
 }

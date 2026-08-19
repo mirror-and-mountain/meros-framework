@@ -2,10 +2,10 @@
 
 namespace MM\Meros\Contracts\Providers\Concerns;
 
-use MM\Meros\Contracts\Features\Admin\MenuPage;
+use MM\Meros\Contracts\Features\Admin\Page;
 use MM\Meros\Contracts\Features\Admin\SettingsSection;
 
-use MM\Meros\Registers\Admin\MenuPages;
+use MM\Meros\Registers\Admin\Pages;
 use MM\Meros\Registers\Admin\SettingsSections;
 
 trait ProvidesAdminFeatures {
@@ -16,10 +16,10 @@ trait ProvidesAdminFeatures {
      *
      * @param string $slug Optional. The slug of the menu page to retrieve.
      * 
-     * @return MenuPage|MenuPages|null The requested menu page or the menu pages register.
+     * @return Page|Pages|null The requested menu page or the menu pages register.
      */
-    final protected function menuPages(string $slug = ''): MenuPage|MenuPages|null {
-        return $this->resolveRequestFor(MenuPage::class, $slug);
+    final protected function menuPages(string $slug = ''): Page|Pages|null {
+        return $this->resolveRequestFor(Page::class, $slug);
     }
 
     /**

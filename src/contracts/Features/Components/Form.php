@@ -48,6 +48,8 @@ class Form extends Feature implements FormComponent, Makeable {
     // =========================================================================
 
     final protected function init(): void {
+        $this->identifier('id', 'slug');
+
         $this->setSerializableProperties(([
             'id',
             'title',
@@ -137,10 +139,6 @@ class Form extends Feature implements FormComponent, Makeable {
     // Attribute Setters
     // =========================================================================
 
-    final public function setIdentifier(string $id): static {
-        return $this->id($id);
-    }
-
     /**
      * Sets the form's id.
      *
@@ -149,8 +147,7 @@ class Form extends Feature implements FormComponent, Makeable {
      * @return static
      */
     final public function id(string $id): static {
-        $this->id = Str::slug($id);
-        return $this;
+        return $this->setIdentifier($id, false);
     }
 
     /**
@@ -165,33 +162,19 @@ class Form extends Feature implements FormComponent, Makeable {
         return $this;
     }
 
-    /**
-     * Sets the form's description.
-     *
-     * @param string $description
-     *
-     * @return static
-     */
-    final public function description(string $description): static {
-        $this->description = $description;
-        return $this;
-    }
-
     // =========================================================================
     // Getters
     // =========================================================================
 
-    final public function getIdentifier(): string {
-        return $this->id;
-    }
-
     /**
      * Returns the form's id.
+     * 
+     * @string $format The format of the identifier to return. Defaults to 'default'.
      *
      * @return string
      */
-    final public function getId(): string {
-        return $this->id;
+    final public function getId(string $format = 'default'): string {
+        return $this->getIdentifier($format);
     }
 
     /**
@@ -201,15 +184,6 @@ class Form extends Feature implements FormComponent, Makeable {
      */
     final public function getTitle(): string {
         return $this->title;
-    }
-
-    /**
-     * Returns the form's description.
-     *
-     * @return string
-     */
-    final public function getDescription(): string {
-        return $this->description;
     }
 
     /**

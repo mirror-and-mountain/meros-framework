@@ -38,20 +38,6 @@ abstract class DataItem extends Feature implements StorableItem {
     protected string $name = '';
 
     /**
-     * The human-readable label of the data item.
-     *
-     * @var string
-     */
-    protected string $label = '';
-
-    /**
-     * The description of the data item.
-     *
-     * @var string
-     */
-    protected string $description = '';
-
-    /**
      * The default value of the data item.
      *
      * @var mixed
@@ -93,6 +79,13 @@ abstract class DataItem extends Feature implements StorableItem {
         'object'
     ];
 
+    /**
+     * The callback to be executed when the data item's value is updated.
+     *
+     * @var Closure|null
+     */
+    private ?Closure $onUpdateCallback = null;
+
     use IsRegistrable, IsMakeable, InstantiatesItems;
 
     // =========================================================================
@@ -100,6 +93,8 @@ abstract class DataItem extends Feature implements StorableItem {
     // =========================================================================
 
     final protected function init(): void {
+        $this->identifier('name', 'snake');
+
         if (isset($this->passedProps['container']) && $this->passedProps['container'] instanceof Storable) {
             $this->container($this->passedProps['container']);
         }
@@ -136,7 +131,9 @@ abstract class DataItem extends Feature implements StorableItem {
      * @return void
      */
     public function whenUpdated(mixed $value, mixed $oldValue, string $itemName, string $optionName): void {
-        // This method can be overridden in subclasses to perform actions related to the data item's value when the container is updated.
+        if (is_callable($this->onUpdateCallback)) {
+            call_user_func($this->onUpdateCallback, $value, $oldValue, $itemName, $optionName);
+        }
     }
 
     // =========================================================================
@@ -263,9 +260,9 @@ abstract class DataItem extends Feature implements StorableItem {
         $containerName = $this->container->getName(true);
         $this->field->name($containerName . '[' . $this->name . ']');
         $this->field->id($containerName . '-' . Str::replace('_', '-', $this->name));
-        $this->field->label($this->label);
-        $this->field->description($this->description);
-        $this->field->default($this->default);
+        $this->field->label($this->getLabel());
+        $this->field->description($this->getDescription());
+        $this->field->default($this->getDefault());
     
         $this->whenFieldSet($this->field);
         return $this->field;
@@ -339,10 +336,6 @@ abstract class DataItem extends Feature implements StorableItem {
     // Attribute Setters
     // =========================================================================
 
-    final public function setIdentifier(string $identifier): static {
-        return $this->name($identifier);
-    }
-
     /**
      * Sets the unique name of the data item and returns the data item instance.
      *
@@ -351,36 +344,12 @@ abstract class DataItem extends Feature implements StorableItem {
      * @return static
      */
     final public function name(string $name): static {
-        $this->name = Str::snake($name);
+        $name = $this->setIdentifier($name);
 
-        if (empty($this->label)) {
-            $this->label = Str::title(str_replace('_', ' ', $name));
+        if (empty($this->getLabel())) {
+            $this->label(Str::title(Str::replace('_', ' ', $name)));
         }
 
-        return $this;
-    }
-
-    /**
-     * Sets the human-readable label of the data item and returns the data item instance.
-     *
-     * @param string $label
-     *
-     * @return static
-     */
-    final public function label(string $label): static {
-        $this->label = $label;
-        return $this;
-    }
-
-    /**
-     * Sets the description of the data item and returns the data item instance.
-     *
-     * @param string $description
-     *
-     * @return static
-     */
-    final public function description(string $description): static {
-        $this->description = $description;
         return $this;
     }
 
@@ -413,6 +382,18 @@ abstract class DataItem extends Feature implements StorableItem {
         }
 
         $this->default = $value;
+        return $this;
+    }
+
+    /**
+     * Sets a callback to be executed when the data item's value is updated and returns the data item instance.
+     *
+     * @param Closure $callback The callback to execute on update. It should accept parameters: value, oldValue, itemName, and optionName.
+     *
+     * @return static
+     */
+    final public function onUpdate(Closure $callback): static {
+        $this->onUpdateCallback = $callback;
         return $this;
     }
 
@@ -578,29 +559,13 @@ abstract class DataItem extends Feature implements StorableItem {
 
     /**
      * Returns the unique name of the data item.
+     * 
+     * @param string $format The format of the name to return. Can be 'default', 'slug', or 'snake'. Defaults to 'default'.
      *
      * @return string
      */
-    final public function getName(): string {
-        return $this->name;
-    }
-
-    /**
-     * Returns the human-readable label of the data item.
-     *
-     * @return string
-     */
-    final public function getLabel(): string {
-        return $this->label;
-    }
-
-    /**
-     * Returns the description of the data item.
-     *
-     * @return string
-     */
-    final public function getDescription(): string {
-        return $this->description;
+    final public function getName(string $format = 'default'): string {
+        return $this->getIdentifier($format);
     }
 
     /**
@@ -621,18 +586,5 @@ abstract class DataItem extends Feature implements StorableItem {
      */
     final public function getValue(bool $refresh = false): mixed {
         return $this->container->getItemValue($this->name, $refresh);
-    }
-
-    /**
-     * Returns the args array of the data item.
-     * 
-     * @return array The args array of the data item.
-     */
-    final public function getArgs(): array {
-        return $this->args;
-    }
-
-    final public function getIdentifier(): string {
-        return $this->name;
     }
 }

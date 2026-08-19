@@ -29,19 +29,6 @@ class AssetGroup extends Feature implements Registrable, Makeable {
      */
     protected string $name = '';
 
-    /**
-     * The label for the asset group, used in the admin interface.
-     *
-     * @var string
-     */
-    protected string $label = '';
-
-    /**
-     * A description of the asset group, providing additional context in the admin interface.
-     *
-     * @var string
-     */
-    protected string $description = '';
 
     /**
      * An array of Asset instances, class names or paths to be included in the asset group. 
@@ -56,6 +43,10 @@ class AssetGroup extends Feature implements Registrable, Makeable {
     // =========================================================================
     // Initialisation / Switching
     // =========================================================================
+
+    final protected function init(): void {
+        $this->identifier('name', 'snake');
+    }
 
     /**
      * Resolves the settings container for the asset group, which holds its switch setting.
@@ -199,10 +190,6 @@ class AssetGroup extends Feature implements Registrable, Makeable {
     // Attribute Setters
     // =========================================================================
 
-    final public function setIdentifier(string $identifier): static {
-        return $this->name($identifier);
-    }
-
     /**
      * Sets the name of the asset group. If the label is not already set, it will be automatically generated from the name.
      *
@@ -211,36 +198,7 @@ class AssetGroup extends Feature implements Registrable, Makeable {
      * @return static
      */
     public function name(string $name): static {
-        $this->name = Str::snake($name);
-
-        if ($this->label === '') {
-            $this->label = Str::title(Str::replace(['-', '_'], ' ', $name));
-        }
-
-        return $this;
-    }
-
-    /**
-     * Sets the label for the asset group.
-     *
-     * @param string $label
-     *
-     * @return static
-     */
-    public function label(string $label): static {
-        $this->label = $label;
-        return $this;
-    }
-
-    /**
-     * Sets the description for the asset group.
-     *
-     * @param string $description
-     *
-     * @return static
-     */
-    public function description(string $description): static {
-        $this->description = $description;
+        $name = $this->setIdentifier($name);
         return $this;
     }
 
@@ -277,39 +235,15 @@ class AssetGroup extends Feature implements Registrable, Makeable {
     // Getters
     // =========================================================================
 
-    final public function getIdentifier(): string {
-        return $this->name;
-    }
-
     /**
      * Gets the name of the asset group.
+     * 
+     * @param string $format The format of the name to return. Can be 'default', 'slug', or 'snake'. Defaults to 'default'.
      *
      * @return string
      */
-    public function getName(): string {
-        return $this->name;
-    }
-
-    /**
-     * Gets the label of the asset group.
-     *
-     * @return string
-     */
-    public function getLabel(): string {
-        if ($this->label === '') {
-            return Str::title(Str::replace(['-', '_'], ' ', $this->name));
-        }
-
-        return $this->label;
-    }
-
-    /**
-     * Gets the description of the asset group.
-     *
-     * @return string
-     */
-    public function getDescription(): string {
-        return $this->description;
+    public function getName(string $format = 'default'): string {
+        return $this->getIdentifier($format);
     }
 
     /**

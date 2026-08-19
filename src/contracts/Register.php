@@ -34,11 +34,11 @@ abstract class Register implements FeatureRegister {
     private bool $uniqueInstances = false;
 
     /**
-     * The class name of the feature definition that this register will create.
+     * The class name of the feature contract that this register will create.
      *
      * @var string
      */
-    private string $definitionClass = FeatureDefinition::class;
+    private string $contractClass = FeatureDefinition::class;
 
     /**
      * The class name of the facade associated with this register, if any.
@@ -112,23 +112,23 @@ abstract class Register implements FeatureRegister {
     }
 
     /**
-     * Sets the class name of the feature definition that this register will create.
+     * Sets the class name of the feature contract that this register will create.
      *
-     * @param string $definitionClass The class name of the feature definition.
+     * @param string $contractClass The class name of the feature contract.
      *
      * @return void
      */
-    final protected function definition(string $definitionClass): void {
-        $this->definitionClass = $definitionClass;
+    final protected function contract(string $contractClass): void {
+        $this->contractClass = $contractClass;
     }
 
     /**
-     * Returns the class name of the feature definition that this register will create.
+     * Returns the class name of the feature contract that this register will create.
      *
      * @return string
      */
-    final public function getDefinition(): string {
-        return $this->definitionClass;
+    final public function getContract(): string {
+        return $this->contractClass;
     }
 
     /**
@@ -234,7 +234,7 @@ abstract class Register implements FeatureRegister {
     final protected function attachInstance(FeatureDefinition $feature, FeatureProvider $provider): void {
         if ($this->usesUniqueInstances()) {
             $handle = $feature->getIdentifier();
-            $hasExisting = $this->has($handle, null, $provider);
+            $hasExisting = $this->has($handle, null, $provider, false);
 
             if ($hasExisting) {
                 throw new \LogicException("A feature with handle '{$feature->getIdentifier()}' is already attached to this register (" . static::class . ") and the register is set to use unique instances.");
@@ -248,50 +248,59 @@ abstract class Register implements FeatureRegister {
      * Returns a collection of instantiated features associated with this register.
      * 
      * @param FeatureProvider|null $provider An optional provider to filter the features by. Required if the register is private.
+     * @param bool                 $checkin Whether to check the register back in after retrieving the features.
      *
      * @return Collection
      * @throws \LogicException If the register is private and no provider is specified.
      */
-    final public function all(?FeatureProvider $provider = null): Collection {
-        if (($this->isPrivate && $provider !== null) || $provider !== null) {
-            $features = $this->features->where('provider', $provider);
-            return $features;
+    final public function all(?FeatureProvider $provider = null, bool $checkin = true): Collection {
+        if ($this->isPrivate()) {
+            $this->ensureCheckout('all');
+            $provider = $this->getProvider();
         }
 
-        if ($this->isPrivate && $provider === null) {
-            throw new \LogicException("Cannot retrieve all features from a private register without specifying the provider.");
+        if ($provider !== null) {
+            $features = $this->features->where(function ($f) use ($provider) {
+                return $f->getProvider() === $provider;
+            });
+
+            return $this->returnValue($checkin, $features);
         }
-        
-        return $this->features;
+
+        return $this->returnValue($checkin, $this->features);
     }
 
     /**
      * Returns a specific feature by name.
      *
-     * @param string               $name The name of the feature to retrieve.
-     * @param FeatureProvider|null $provider An optional provider to retrieve the feature for, required if the register is private.
+     * @param string               $identifier The identifier of the feature to retrieve.
+     * @param FeatureProvider|null $provider An optional provider to retrieve the feature for.
+     * @param bool                 $checkin Whether to check the register back in after retrieving the feature.
      *
      * @return FeatureDefinition|null
      * @throws \LogicException If the register is private and no provider is specified.
      */
-    final public function get(string $name, ?FeatureProvider $provider = null): FeatureDefinition|null {
-        $this->checkout($provider);
+    final public function get(string $identifier, ?FeatureProvider $provider = null, bool $checkin = true): FeatureDefinition|null {
+        if ($this->isPrivate()) {
+            $this->ensureCheckout('get');
+            $provider = $this->getProvider();
+        }
         
-        if (($this->isPrivate && $provider !== null) || $provider !== null) {
-            $feature = $this->features->where('provider', $provider)->where(function ($f) use ($name) {
-                return $f->getIdentifier() === $name;
+        if ($provider !== null) {
+            $feature = $this->features->where(function ($f) use ($provider) {
+                return $f->getProvider() === $provider;
+            })->where(function ($f) use ($identifier) {
+                return $f->getIdentifier() === $identifier;
             })->first();
 
-            return $feature;
+            return $this->returnValue($checkin, $feature);
         }
 
-        if ($this->isPrivate && $provider === null) {
-            throw new \LogicException("Cannot retrieve a feature by name from a private register without specifying the provider.");
-        }
-
-        return $this->features->firstWhere(function ($f) use ($name) {
-            return $f->getIdentifier() === $name;
+        $feature = $this->features->firstWhere(function ($f) use ($identifier) {
+            return $f->getIdentifier() === $identifier;
         });
+
+        return $this->returnValue($checkin, $feature);
     }
 
     /**
@@ -299,18 +308,35 @@ abstract class Register implements FeatureRegister {
      *
      * @param string                 $name The name of the feature to check for.
      * @param FeatureDefinition|null $excludingFeature An optional feature to exclude from the check.
-     * @param FeatureProvider|null   $provider An optional provider to check out the register to before checking for the feature.
+     * @param FeatureProvider|null   $provider An optional provider to retrieve the features for.
+     * @param bool                   $checkin Whether to check the register back in after checking for the feature.
      *
      * @return bool
      */
-    final public function has(string $name, ?FeatureDefinition $excludingFeature = null, ?FeatureProvider $provider = null): bool {
-        $feature = $this->get($name, $provider);
+    final public function has(string $name, ?FeatureDefinition $excludingFeature = null, ?FeatureProvider $provider = null, bool $checkin = true): bool {
+        $feature = $this->get($name, $provider, $checkin);
 
         if ($excludingFeature !== null && $feature === $excludingFeature) {
-            return false;
+            return $this->returnValue($checkin, false);
         }
 
-        return $feature !== null;
+        return $this->returnValue($checkin, $feature !== null);
+    }
+
+    /**
+     * Helper to return a requested value and check the register back in if needed.
+     *
+     * @param boolean $checkin
+     * @param mixed   $value
+     *
+     * @return mixed
+     */
+    final protected function returnValue(bool $checkin, mixed $value): mixed {
+        if ($checkin && $this->isCheckedOut()) {
+            $this->checkin();
+        }
+
+        return $value;
     }
 
 

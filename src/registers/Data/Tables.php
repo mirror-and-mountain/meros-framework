@@ -28,7 +28,7 @@ class Tables extends Register implements Maker {
 
     protected function configure(): void {
         $this->unique(true);
-        $this->definition(Table::class);
+        $this->contract(Table::class);
         $this->facade(TablesFacade::class);
     }
 

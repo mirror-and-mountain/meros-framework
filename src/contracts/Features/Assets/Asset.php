@@ -89,7 +89,9 @@ abstract class Asset extends Feature implements Registrable, Makeable {
     // Initialisation
     // =========================================================================
 
-    protected function init(): void {
+    final protected function init(): void {
+        $this->identifier('handle', 'slug');
+
         if (isset($this->passedProps['discovered']) && is_bool($this->passedProps['discovered'])) {
             $this->set('wasDiscovered', $this->passedProps['discovered']);
         }
@@ -179,10 +181,6 @@ abstract class Asset extends Feature implements Registrable, Makeable {
     // Attribute Setters
     // =========================================================================
 
-    final public function setIdentifier(string $identifier): static {
-        return $this->handle($identifier);
-    }
-
     /**
      * Sets the handle for the asset, which is used as the identifier when enqueuing in WordPress.
      *
@@ -191,8 +189,7 @@ abstract class Asset extends Feature implements Registrable, Makeable {
      * @return static
      */
     final public function handle(string $handle): static {
-        $this->handle = Str::slug($handle);
-        return $this;
+        return $this->setIdentifier($handle, false);
     }
 
     /**
@@ -433,7 +430,12 @@ abstract class Asset extends Feature implements Registrable, Makeable {
     // Getters
     // =========================================================================
 
-    final public function getIdentifier(): string {
+    /**
+     * Returns the handle of the asset.
+     *
+     * @return string
+     */
+    final public function getHandle(): string {
         return $this->handle;
     }
 

@@ -16,7 +16,7 @@ class PostMetaDefinitions extends Register implements RegistrarMaker {
     protected function configure(): void {
         $this->private(true);
         $this->unique(true);
-        $this->definition(PostMeta::class);
+        $this->contract(PostMeta::class);
         $this->facade(PostMetaDefinitionsFacade::class);
     }
 }

@@ -3,7 +3,6 @@
 namespace MM\Meros\Contracts\Features\Admin;
 
 use Closure;
-use Illuminate\Support\Str;
 
 use MM\Meros\Contracts\Feature;
 
@@ -57,11 +56,10 @@ class SettingsSection extends Feature implements Registrable, Makeable {
     // =========================================================================
 
     final protected function init(): void {
-        $this->id = Str::slug($this->id);
+        $this->identifier('id', 'slug');
         $this->setHook('admin_init', [$this, 'register']);
         $this->hook();
     }
-
 
     // =========================================================================
     // Hooking
@@ -85,10 +83,6 @@ class SettingsSection extends Feature implements Registrable, Makeable {
     // Attribute Setters
     // =========================================================================
 
-    final public function setIdentifier(string $identifier): static {
-        return $this->id($identifier);
-    }
-
     /**
      * Sets the id of the settings section.
      *
@@ -97,8 +91,7 @@ class SettingsSection extends Feature implements Registrable, Makeable {
      * @return static
      */
     final public function id(string $id): static {
-        $this->id = Str::slug($id);
-        return $this;
+        return $this->setIdentifier($id, false);
     }
 
     /**
@@ -141,17 +134,15 @@ class SettingsSection extends Feature implements Registrable, Makeable {
     // Getters
     // =========================================================================
 
-    final public function getIdentifier(): string {
-        return $this->id;
-    }
-
     /**
      * Gets the id of the settings section.
+     * 
+     * @param string $format The format of the identifier to return. Can be 'default', 'slug', or 'snake'. Defaults to 'default'.
      *
      * @return string
      */
-    final public function getId(): string {
-        return $this->id;
+    final public function getId(string $format = 'default'): string {
+        return $this->getIdentifier($format);
     }
 
     /**

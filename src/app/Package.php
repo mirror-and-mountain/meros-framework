@@ -9,7 +9,7 @@ use MM\Meros\Contracts\Provider;
 use MM\Meros\Registers\Admin\SettingsContainers;
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 
-use MM\Meros\Contracts\Features\Admin\MenuPage;
+use MM\Meros\Contracts\Features\Admin\Page;
 use MM\Meros\Contracts\Features\Data\Table;
 
 use MM\Meros\Contracts\Providers\Concerns\IsNonFrameworkProvider;
@@ -77,10 +77,8 @@ abstract class Package extends Provider {
         $menuPageSlug = $this->getHandle(true);
         $menuPage = $this->initSettingsPage($menuPageSlug)->getSlug();
 
-        return $register->get($containerName, $this) ?? 
-               $register
-                ->checkout($this)
-                ->make(function ($container) use ($containerName, $menuPage) {
+        return $register->get($containerName, null, false) ?? 
+               $register->make(function ($container) use ($containerName, $menuPage) {
                     $container->name($containerName);
                     $container->label($this->getName() . ' Settings');
                     $container->description('Settings for the ' . $this->getName() . ' package.');
@@ -93,23 +91,23 @@ abstract class Package extends Provider {
      *
      * @param string $slug
      *
-     * @return MenuPage
+     * @return Page
      */
-    private function initSettingsPage(string $slug): MenuPage {
+    private function initSettingsPage(string $slug): Page {
         $packageSettingsPage = $this->menuPages()->get('meros-packages');
 
         if ($packageSettingsPage === null) {
             $packageSettingsPage = $this->menuPages()->makeFrom('meros-packages');
         }
 
-        if (!($packageSettingsPage instanceof MenuPage)) {
-            throw new \RuntimeException('The "meros-packages" menu page must be an instance of MenuPage.');
+        if (!($packageSettingsPage instanceof Page)) {
+            throw new \RuntimeException('The "meros-packages" menu page must be an instance of Page.');
         }
 
         $settingsPage = $packageSettingsPage->getSubPage($slug);
 
         if ($settingsPage === null) {
-            $settingsPage = $packageSettingsPage->subpage(function (MenuPage $page) use ($slug) {
+            $settingsPage = $packageSettingsPage->subpage(function (Page $page) use ($slug) {
                 $page->slug($slug);
                 $page->title($this->getName() . ' Settings');
 
@@ -119,7 +117,9 @@ abstract class Package extends Provider {
                             <a href="' . admin_url('admin.php?page=meros-packages') . '">Packages</a>
                             <span class="meros-breadcrumb-separator">/ Settings</span>
                         </nav>';
+                        
                         echo '<p>'. $this->getDescription() . '</p>';
+
                         if ($this->hasRegisteredTables()) {
                             echo '<div style="margin-bottom:2rem;">';
                             echo '<h2>Custom Tables</h2>';

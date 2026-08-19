@@ -41,10 +41,12 @@ trait IsSwitchable {
 
     /**
      * Resolves the unique identifier for the feature, used for naming the switch setting.
+     * 
+     * @param string $format The format of the identifier to return. Can be 'default', 'slug', or 'snake'. Defaults to 'default'.
      *
      * @return string
      */
-    abstract protected function getIdentifier(): string;
+    abstract public function getIdentifier(string $format = 'default'): string;
 
     /**
      * Resolves the settings container for the feature to register its switch setting.

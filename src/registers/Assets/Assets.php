@@ -43,7 +43,7 @@ abstract class Assets extends Register implements RegistrarMaker {
     final protected function configure(): void {
         $this->private(true);
         $this->unique(true);
-        $this->definition($this->assetClass);
+        $this->contract($this->assetClass);
     }
 
     /**
