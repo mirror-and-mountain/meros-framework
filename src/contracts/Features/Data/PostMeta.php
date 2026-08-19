@@ -115,4 +115,27 @@ class PostMeta extends DataItem {
         $this->whenFieldSet($this->field);
         return $this;
     }
+
+    // =========================================================================
+    // Value Setting
+    // =========================================================================
+
+    /**
+     * Sets the value of the PostMeta item for a specific post ID.
+     *
+     * @param int   $postId The ID of the post for which to set the value.
+     * @param mixed $value  The value to set for the PostMeta item.
+     *
+     * @return void
+     * @throws \BadMethodCallException If the PostMeta item is not associated with a PostMetaContainer.
+     */
+    final public function setValue(int $postId, mixed $value): void {
+        $container = $this->resolveContainer();
+
+        if (!($container instanceof PostMetaContainer)) {
+            throw new \BadMethodCallException("The PostMeta item '{$this->name}' must be associated with a PostMetaContainer before setting its value.");
+        }
+
+        $container->currentPostId($postId)->setItemValue($this->name, $value);
+    }
 }

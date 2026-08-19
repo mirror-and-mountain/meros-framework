@@ -4,6 +4,7 @@ namespace MM\Meros\App;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 use MM\Meros\App\BaseTheme;
 use MM\Meros\Contracts\Provider;
@@ -163,8 +164,18 @@ final class Framework extends Provider {
      * @return void
      */
     private function registerSettings(): void {
-        add_action('meros_packages_registered', function (Collection $packages) {
-            $this->registerPackageSettings($packages);
+        $packageToggleSetting = $this->settings()->add('boolean', function ($setting) {
+            $setting->name('meros_package_toggled');
+            $setting->default(false);
+        });
+
+        add_action('meros_packages_registered', function (Collection $packages) use ($packageToggleSetting) {
+            $this->registerPackageSettings($packages, $packageToggleSetting);
+
+            if ($packageToggleSetting->getValue() === true && $packageToggleSetting instanceof Setting) {
+                flush_rewrite_rules(); // Ensure that any new rewrite rules are applied after packages have been toggled.
+                $packageToggleSetting->setValue(false);
+            }
         });
     }
 
@@ -173,7 +184,7 @@ final class Framework extends Provider {
      *
      * @return void
      */
-    private function registerPackageSettings(Collection $packages): void {
+    private function registerPackageSettings(Collection $packages, Setting $packageToggleSetting): void {
         if ($packages->isEmpty()) {
             return;
         }
@@ -204,6 +215,14 @@ final class Framework extends Provider {
                         $package->__whenDisabled();
                     }
                 });
+            });
+
+            add_action('meros_package_enabled_' . $package->getHandle(), function ($package) use ($packageToggleSetting) {
+                $packageToggleSetting->setValue(true);
+            });
+
+            add_action('meros_package_disabled_' . $package->getHandle(), function ($package) use ($packageToggleSetting) {
+                $packageToggleSetting->setValue(true);
             });
         }
 

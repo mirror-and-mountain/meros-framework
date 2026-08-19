@@ -386,6 +386,32 @@ abstract class DataContainer extends Feature implements Storable {
     }
 
     /**
+     * Sets the value of the container and updates the underlying storage.
+     * Must be implemented by subclasses to define how the value is stored.
+     *
+     * @param array $value The value to set for the container.
+     *
+     * @return void
+     */
+    abstract protected function setValue(array $value): void;
+
+    /**
+     * Sets the value of a specific item in the container by its key and updates the container's value.
+     *
+     * @param string $key
+     * @param mixed  $value
+     *
+     * @return void
+     */
+    public function setItemValue(string $key, mixed $value): void {
+        $oldValue = $this->getValue(true);
+        $newValue = $this->sanitizeValue(array_merge($oldValue, [$key => $value]));
+        $this->setValue($newValue);
+        $this->cachedValue = $newValue;
+        $this->__whenUpdated($newValue, $oldValue, $this->name);
+    }
+
+    /**
      * Sanitizes the given value based on the container's schema and returns the sanitized value.
      *
      * @param array $value The value to be sanitized.

@@ -346,6 +346,17 @@ class PostMetaContainer extends DataContainer {
     }
 
     /**
+     * Sets the post ID for the PostMeta. Alias for `currentPostId`.
+     *
+     * @param int $postId
+     *
+     * @return static
+     */
+    final public function postId(int $postId): static {
+        return $this->currentPostId($postId);
+    }
+
+    /**
      * Sets the context in which the meta box should be displayed.
      *
      * @param string $context
@@ -522,6 +533,7 @@ class PostMetaContainer extends DataContainer {
             $rawValue = [];
         }
 
+        $this->currentPostId = null;
         return $rawValue;
     }
 
@@ -534,5 +546,22 @@ class PostMetaContainer extends DataContainer {
      */
     final protected function processRawValue(array $rawValue): array {
         return $rawValue;
+    }
+
+    /**
+     * Sets the value of the post meta for the current post ID.
+     *
+     * @param array $value
+     *
+     * @return void
+     * @throws \RuntimeException if the current post ID is not set.
+     */
+    final protected function setValue(array $value): void {
+        if ($this->currentPostId === null) {
+            throw new \RuntimeException("Current post ID is not set. Use the 'currentPostId' method to set it before setting the value.");
+        }
+
+        update_post_meta($this->currentPostId, $this->name, $value);
+        $this->currentPostId = null;
     }
 }

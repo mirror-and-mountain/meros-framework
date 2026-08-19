@@ -156,6 +156,11 @@ class SettingsContainer extends DataContainer {
     // Sanitization and Value Processing
     // =========================================================================
 
+    /**
+     * Retrieves the raw value of the settings container from the WordPress options table.
+     *
+     * @return array
+     */
     final protected function getRawValue(): array {
         $rawValue = get_option($this->name, $this->getDefault());
 
@@ -166,7 +171,25 @@ class SettingsContainer extends DataContainer {
         return $rawValue;
     }
 
+    /**
+     * Processes the raw value retrieved from the WordPress options table.
+     *
+     * @param array $rawValue The raw value to process.
+     *
+     * @return array The processed value.
+     */
     final protected function processRawValue(array $rawValue): array {
         return $rawValue;
+    }
+
+    /**
+     * Sets the value of the settings container in the WordPress options table.
+     *
+     * @param array $value The value to set.
+     *
+     * @return void
+     */
+    final protected function setValue(array $value): void {
+        update_option($this->name, $value);
     }
 }

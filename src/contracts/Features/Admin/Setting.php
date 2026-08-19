@@ -171,10 +171,11 @@ class Setting extends DataItem {
         // Fallback to the page alias provided by the container if the page property is not set
         else if ($this->page === null && $this->container instanceof SettingsContainer) {
             $page = $this->container->getPage();
-            $this->settingsField->page($page);
 
-            // Instantiate the page.
-            $this->page($page);
+            if (!empty($page)) {
+                $this->settingsField->page($page);
+                $this->page($page);
+            }
         }
     }
 
@@ -325,5 +326,27 @@ class Setting extends DataItem {
         }
 
         return $this;
+    }
+
+    // =========================================================================
+    // Value Setting
+    // =========================================================================
+
+    /**
+     * Sets the value of this Setting in the associated SettingsContainer.
+     *
+     * @param mixed $value The value to set for this Setting.
+     *
+     * @return void
+     * @throws \BadMethodCallException if the Setting is not associated with a SettingsContainer.
+     */
+    final public function setValue(mixed $value): void {
+        $container = $this->container ?? $this->resolveContainer();
+
+        if (!($container instanceof SettingsContainer)) {
+            throw new \BadMethodCallException("The Setting '{$this->name}' must be associated with a SettingsContainer before setting its value.");
+        }
+
+        $container->setItemValue($this->name, $value);
     }
 }

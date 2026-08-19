@@ -34,4 +34,14 @@ interface Storable extends Registrable, Makeable {
      * @return mixed
      */
     public function getItemValue(string $key, bool $refresh = false): mixed;
+
+    /**
+     * Sets the value of a specific data item in the container.
+     *
+     * @param string $key   The key of the data item to set.
+     * @param mixed  $value The value to set for the data item.
+     *
+     * @return void
+     */
+    public function setItemValue(string $key, mixed $value): void;
 }

@@ -176,12 +176,7 @@ abstract class Package extends Provider {
             $table->install();
         });
 
-        if ($this->postTypes()->all()->isNotEmpty()) {
-            flush_rewrite_rules(); // Ensure that any new rewrite rules are applied after the package is enabled if it registers custom post types.
-        }
-
         do_action('meros_package_enabled_' . $this->getHandle(), $this);
-
         $this->whenEnabled();
     }
 
@@ -194,9 +189,8 @@ abstract class Package extends Provider {
      * @return void
      */
     final public function __whenDisabled(): void {
-        $this->whenDisabled();
-
         do_action('meros_package_disabled_' . $this->getHandle(), $this);
+        $this->whenDisabled();
     }
 
     /**
