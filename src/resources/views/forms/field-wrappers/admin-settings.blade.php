@@ -17,7 +17,7 @@
     @include($view, $properties ?? [])
     @if ($description !== null)
         <div style="margin-top: 0.5rem;">
-            <small class="meros-field-description">{{ $description }}</small>
+            <small class="meros-field-description">{!! $description !!}</small>
         </div>
     @endif
 </div>

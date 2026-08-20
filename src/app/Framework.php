@@ -23,18 +23,30 @@ use MM\Meros\App\Admin\Settings\Containers\ThemeSettings;
 use MM\Meros\App\Admin\Settings\Containers\PackageSettings;
 use MM\Meros\App\Admin\Settings\Containers\AssetGroupSettings;
 
-use MM\Meros\App\FormComponents\Fields\Text;
-use MM\Meros\App\FormComponents\Fields\Number;
-use MM\Meros\App\FormComponents\Fields\Checkbox;
-use MM\Meros\App\FormComponents\Fields\Email;
-use MM\Meros\App\FormComponents\FieldGroups\SimpleContact;
+use MM\Meros\App\Components\Fields\Text;
+use MM\Meros\App\Components\Fields\Number;
+use MM\Meros\App\Components\Fields\Checkbox;
+use MM\Meros\App\Components\Fields\Email;
+use MM\Meros\App\Components\FieldGroups\SimpleContact;
 
-use MM\Meros\App\Assets\MerosAdminAssets;
+use MM\Meros\App\Assets\MFormsDeps;
+use MM\Meros\App\Assets\MForms;
+use MM\Meros\App\Assets\Admin as MerosAdminAssets;
 
 use MM\Meros\Contracts\Providers\Concerns\IsFrameworkProvider;
 use MM\Meros\Contracts\Providers\Concerns\IsNonPackageProvider;
 
 final class Framework extends Provider {
+    private array $fields = [
+        'text'     => Text::class,
+        'number'   => Number::class,
+        'checkbox' => Checkbox::class,
+        'email'    => Email::class,
+    ];
+
+    private array $fieldGroups = [
+        'simple-contact-fields' => SimpleContact::class,
+    ];
 
     use IsFrameworkProvider, IsNonPackageProvider;
 
@@ -74,7 +86,7 @@ final class Framework extends Provider {
      * @return void
      */
     public function configure(): void {
-        $this->registerFormComponents();
+        $this->registerComponents();
         $this->registerMenuPages();
         $this->registerSettingsContainers();
         $this->registerSettings();
@@ -106,17 +118,18 @@ final class Framework extends Provider {
     // =========================================================================
 
     /**
-     * Registers the framework's form components.
+     * Registers the framework's components.
      *
      * @return void
      */
-    private function registerFormComponents(): void {
-        $this->fields()->register(Text::class, 'text');
-        $this->fields()->register(Number::class, 'number');
-        $this->fields()->register(Checkbox::class, 'checkbox');
-        $this->fields()->register(Email::class, 'email');
+    private function registerComponents(): void {
+        foreach ($this->fields as $alias => $fieldClass) {
+            $this->fields()->register($fieldClass, $alias);
+        }
 
-        $this->fieldGroups()->register(SimpleContact::class, 'simple-contact-fields');
+        foreach ($this->fieldGroups as $alias => $groupClass) {
+            $this->fieldGroups()->register($groupClass, $alias);
+        }
     }
 
     // =========================================================================
@@ -385,7 +398,13 @@ final class Framework extends Provider {
      * @return void
      */
     private function registerAssets(): void {
+        $this->assetGroups()->makeFrom(MFormsDeps::class, 'meros_forms_dependencies');
+        $this->assetGroups()->makeFrom(MForms::class, 'meros_forms_assets');
         $this->assetGroups()->makeFrom(MerosAdminAssets::class, 'meros_admin_assets');
+
+        // add_action('admin_init', function () {
+        //     dd($this->assetGroups()->all());
+        // }, 20);
     }
 
     // =========================================================================

@@ -2,6 +2,7 @@
 <input
     id="{{ $id }}"
     name="{{ $name }}"
+    title="{{ $label }}"
     {!! $attributeString !!}
     value="1"
     {{ $defaultValue ? 'checked' : '' }}

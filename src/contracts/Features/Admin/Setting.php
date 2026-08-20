@@ -190,6 +190,33 @@ class Setting extends DataItem {
         }
     }
 
+    /**
+     * Sets the description position in the associated SettingsField instance.
+     *
+     * @param string $position
+     *
+     * @return static
+     */
+    final public function descriptionPosition(string $position): static {
+        if ($this->settingsField instanceof SettingsField) {
+            $this->settingsField->descriptionPosition($position);
+        }
+        return $this;
+    }
+
+    /**
+     * Sets the position of the description to after the field in the associated SettingsField instance.
+     *
+     * @param bool $after Whether to place the description after the field (true) or before (false).
+     * @return static
+     */
+    final public function descriptionAfter(bool $after = true): static {
+        if ($this->settingsField instanceof SettingsField) {
+            $this->settingsField->descriptionAfter($after);
+        }
+        return $this;
+    }
+
     // =========================================================================
     // Page Handling
     // =========================================================================

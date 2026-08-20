@@ -1,0 +1,1 @@
+(()=>{"use strict";const n=()=>({init(){console.log("mformsInput init",this.$el)},onChange(n){const t=n?.target?.value||this.$el.value;console.log("mformsInput onChange",t)}});document.addEventListener("alpine:init",()=>{Alpine.data("mformsInput",n)})})();

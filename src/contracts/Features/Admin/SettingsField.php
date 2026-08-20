@@ -38,6 +38,13 @@ final class SettingsField {
     private string $sectionId = 'default';
 
     /**
+     * The position of the description relative to the field.
+     * 
+     * @var string
+     */
+    private string $descriptionPosition = 'before';
+
+    /**
      * An array of additional arguments to for the field.
      *
      * @var array
@@ -131,6 +138,11 @@ final class SettingsField {
             ); // Ensure the default section exists
         }
 
+        if ($this->descriptionPosition === 'before') {
+            $this->placeDescriptionBeforeField();
+            $this->field->description(''); // Clear the field's description to avoid duplication
+        }
+
         $title = apply_filters('meros_settings_field_title', $this->title, $this->id, $this->setting);
 
         add_settings_field(
@@ -141,6 +153,30 @@ final class SettingsField {
             $this->sectionId,
             $this->args
         );
+    }
+
+    /**
+     * Filters the settings field title to include the description before the field if the description position is set to 'before'.
+     *
+     * @return void
+     */
+    private function placeDescriptionBeforeField(): void {
+        add_filter('meros_settings_field_title', function ($title, $id, $setting) {
+            $description = $setting->getDescription();
+            if ($id === $this->id && $setting === $this->setting && !empty($description)) {
+                return 
+                    '<div class="meros-settings-field-title-wrapper">
+                        <label for="' . esc_attr($id) . '">' . $setting->getLabel() . '</label>
+                        <div class="meros-settings-field-description">
+                            <span class="description">
+                                ' . $description . '
+                            </span>
+                        </div>
+                    </div>';
+            }
+
+            return $title;
+        }, 10, 3);
     }
 
     /**
@@ -183,6 +219,33 @@ final class SettingsField {
      */
     public function title(string $title): static {
         $this->title = $title;
+        return $this;
+    }
+
+    /**
+     * Sets the position of the description relative to the field.
+     *
+     * @param string $position The position to set ('before' or 'after').
+     * @return static
+     */
+    public function descriptionPosition(string $position): static {
+        if (!in_array($position, ['before', 'after'])) {
+            return $this; // Invalid position, do nothing
+        }
+
+        $this->descriptionPosition = $position;
+        return $this;
+    }
+
+    /**
+     * Sets the position of the description to after the field.
+     *
+     * @param boolean $after
+     *
+     * @return static
+     */
+    public function descriptionAfter(bool $after = true): static {
+        $this->descriptionPosition = $after ? 'after' : 'before';
         return $this;
     }
 
@@ -231,6 +294,10 @@ final class SettingsField {
 
         $this->id = $field->getId();
         $this->title = $field->getLabel();
+
+        if ($this->field->getDescription() !== '' && $this->setting->getDescription() === '') {
+            $this->setting->description($this->field->getDescription());
+        }
 
         return $this;
     }

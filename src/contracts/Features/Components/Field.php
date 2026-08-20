@@ -9,7 +9,7 @@ use MM\Meros\Contracts\Feature;
 use MM\Meros\Contracts\Features\Admin\SettingsField;
 use MM\Meros\Contracts\Features\Components\Concerns\IsFormComponent;
 
-use MM\Meros\App\FormComponents\Fields\Repeater;
+use MM\Meros\App\Components\Fields\Repeater;
 
 abstract class Field extends Feature implements FormComponent {
     /**

@@ -17,6 +17,8 @@ use MM\Meros\Contracts\Features\Concerns\IsRegistrable;
 // use MM\Meros\Contracts\Features\Concerns\IsDiscoverable; // Coming soon
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 
+use MM\Meros\Facades\Assets\AssetGroups;
+
 abstract class Asset extends Feature implements Registrable, Makeable {
     /**
      * The unique handle for the asset, used as the identifier when enqueuing in WordPress.
@@ -99,7 +101,49 @@ abstract class Asset extends Feature implements Registrable, Makeable {
 
     protected function whenConfigured(): void {
         if (isset($this->passedProps['path']) && is_string($this->passedProps['path'])) {
-            $this->registerFromPath($this->passedProps['path']);
+            $handle = isset($this->passedProps['handle']) && is_string($this->passedProps['handle']) && !empty($this->passedProps['handle'])
+                ? $this->passedProps['handle']
+                : '';
+
+            $dependencies = isset($this->passedProps['dependencies']) && is_array($this->passedProps['dependencies'])
+                ? $this->passedProps['dependencies']
+                : [];
+
+            $this->registerFromPath($this->passedProps['path'], $handle, $dependencies);
+        }
+
+        if (!empty($this->dependencies)) {
+            $this->initialiseDependencyGroups();
+        }
+    }
+
+    /**
+     * Initialises any dependency groups that are specified in the asset's dependencies.
+     * This method looks for dependencies that start with 'group-' and attempts to resolve them to an AssetGroup instance,
+     * converting the group dependency into the individual asset handles of the group.
+     *
+     * @return void
+     */
+    private function initialiseDependencyGroups(): void {
+        foreach ($this->dependencies as $dependency) {
+            if (Str::startsWith($dependency, 'group_')) {
+                $groupName = Str::after($dependency, 'group_');
+                $group     = AssetGroups::get($groupName);
+
+                if (!($group instanceof AssetGroup)) {
+                    unset($this->dependencies[array_search($dependency, $this->dependencies)]);
+                    continue;
+                }
+
+                $area = $this->area;
+
+                $groupDependencies = $this instanceof Script
+                    ? $group->getScriptHandles($area)
+                    : ($this instanceof Style ? $group->getStyleHandles($area) : []);
+
+                unset($this->dependencies[array_search($dependency, $this->dependencies)]);
+                $this->dependencies = array_merge($this->dependencies, $groupDependencies);
+            }
         }
     }
 
@@ -446,6 +490,24 @@ abstract class Asset extends Feature implements Registrable, Makeable {
      */
     final public function isGrouped(): bool {
         return $this->group !== null;
+    }
+
+    /**
+     * Returns the asset's area context.
+     *
+     * @return string
+     */
+    final public function getArea(): string {
+        return $this->area;
+    }
+
+    /**
+     * Returns the type of the asset, either 'script' or 'style'.
+     *
+     * @return string
+     */
+    final public function getType(): string {
+        return $this instanceof Script ? 'script' : ($this instanceof Style ? 'style' : 'style');
     }
 }
 

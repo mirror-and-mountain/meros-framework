@@ -45,40 +45,8 @@ abstract class BaseTheme extends Provider {
      * @return void
      */
     final public function whenConfigured(): void {
-        add_filter('meros_settings_field_title', function (string $title, string $id, Setting $setting) {
-            $name = $setting->getName();
-            if ($name !== 'meros_uninstall_all_tables_on_deactivate' && $name !== 'meros_reset_settings_on_deactivate') {
-                return $title;
-            }
-
-            $message = $name === 'meros_uninstall_all_tables_on_deactivate' 
-                ? 'uninstall all custom tables registered by the meros framework, the theme, and any meros packages' 
-                : 'reset all meros settings stored in the database, including settings for the theme and any meros packages';
-
-            return 
-                '<div class="meros-settings-field-title-wrapper">
-                    <label for="' . esc_attr($id) . '">' . $setting->getLabel() . '</label>
-                    <div class="meros-settings-field-description">
-                        <span class="description">
-                            Toggling this setting on will ' . $message . ' when the theme is deactivated. This action will likely lead to data loss, so use with caution and always make sure your site is backed-up.
-                        </span>
-                    </div>
-                </div>';
-        }, 10, 3);
-
-        $this->settings()->add('boolean', function ($setting) {
-            $setting->name('meros_reset_settings_on_deactivate');
-            $setting->label('Reset All Settings On Theme Deactivation');
-            $setting->default(false);
-            $setting->field();
-        });
-
-        $this->settings()->add('boolean', function ($setting) {
-            $setting->name('meros_uninstall_all_tables_on_deactivate');
-            $setting->label('Reset All Customisations On Theme Deactivation');
-            $setting->default(false);
-            $setting->field();
-        });
+        // Adds framework settings to the theme's settings container.
+        $this->addMerosSettings();
 
         // Fires when the theme is activated, triggering any necessary setup actions.
         add_action('after_switch_theme', function () {
@@ -89,6 +57,65 @@ abstract class BaseTheme extends Provider {
         add_action('switch_theme', function () {
             $this->__whenThemeDeactivated();
         });
+    }
+
+    /**
+     * Adds Meros framework settings to the theme's settings container, allowing users to 
+     * configure certain behaviors of framework.
+     *
+     * @return void
+     */
+    private function addMerosSettings(): void {
+        // Features
+        $this->settings()->add('boolean', function ($setting) {
+            $setting->name('meros_forms_enabled');
+            $setting->label('Enable Meros Forms');
+            $setting->description($this->getMerosSettingDescription('meros_forms_enabled'));
+            $setting->default(false);
+            $setting->field();
+        });
+
+
+        // Deactivation preferences
+        $this->settings()->add('boolean', function ($setting) {
+            $setting->name('meros_reset_settings_on_deactivate');
+            $setting->label('Reset All Settings On Theme Deactivation');
+            $setting->description($this->getMerosSettingDescription('meros_reset_settings_on_deactivate', 'deactivation'));
+            $setting->default(false);
+            $setting->field();
+        });
+
+        $this->settings()->add('boolean', function ($setting) {
+            $setting->name('meros_uninstall_all_tables_on_deactivate');
+            $setting->label('Reset All Customisations On Theme Deactivation');
+            $setting->description($this->getMerosSettingDescription('meros_uninstall_all_tables_on_deactivate', 'deactivation'));
+            $setting->default(false);
+            $setting->field();
+        });
+    }
+
+    /**
+     * Gets descriptions for specific Meros settings to be shown in the wp-admin ui.
+     *
+     * @param string $settingName
+     * @param string $type
+     *
+     * @return string
+     */
+    private function getMerosSettingDescription(string $settingName, string $type = ''): string {
+        if ($type === 'deactivation') {
+            $message = $settingName === 'meros_uninstall_all_tables_on_deactivate' 
+                ? 'uninstall all custom tables registered by the meros framework, the theme, and any meros packages' 
+                : 'reset all meros settings stored in the database, including settings for the theme and any meros packages';
+
+            return 'Toggling this setting on will ' . $message . ' when the theme is deactivated. This action will likely lead to data loss, so use with caution and always make sure your site is backed-up.';
+        }
+
+        if ($settingName === 'meros_forms_enabled') {
+            return 'Toggling this setting on will enable the Meros Forms feature, allowing you to create and manage forms within your theme. <a href="https://docs.merosframework.com/forms" target="_blank">Learn more</a>.';
+        }
+
+        return '';
     }
 
     /**

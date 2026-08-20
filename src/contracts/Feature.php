@@ -303,7 +303,7 @@ abstract class Feature implements FeatureDefinition {
      * @return static
      */
     final public function description(string $description): static {
-        $this->description = $description;
+        $this->description = wp_kses_post($description);
         return $this;
     }
 
