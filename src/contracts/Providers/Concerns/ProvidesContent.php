@@ -16,6 +16,6 @@ trait ProvidesContent {
      * @return PostType|PostTypes|null The requested post type or the post types register.
      */
     final protected function postTypes(string $name = ''): PostType|PostTypes|null {
-        return $this->resolveRequestFor(PostType::class, $name);
+        return $this->resolveFeatureRequestFor(PostType::class, $name);
     }
 }

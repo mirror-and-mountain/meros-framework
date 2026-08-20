@@ -8,15 +8,24 @@ use MM\Meros\Contracts\Providers\FeatureProvider;
 
 interface Registrar extends FeatureRegister {
     /**
+     * Preloads a feature class for use with this register.
+     *
+     * @param string $featureClass
+     *
+     * @return static|Registrable
+     */
+    public function preload(string $featureClass): static|Registrable;
+
+    /**
      * Registers a feature class with the register for use later on.
      *
-     * @param string      $featureClass The class name of the feature to register.
+     * @param string      $featureClass The class name of the feature to register. Optional only if the register has been preloaded with a classname.
      * @param string      $alias        An optional alias for the feature class.
      * @param string|null $onBehalfOf   An optional provider classname to register the feature on behalf of. If null, the current provider will be used.
      * 
      * @return static
      */
-    public function register(string $featureClass, string $alias = '', ?string $onBehalfOf = null): static;
+    public function register(string $featureClass = '', string $alias = '', ?string $onBehalfOf = null): static;
 
     /**
      * Creates a new instance of the specified feature class, if it has been registered with this register.

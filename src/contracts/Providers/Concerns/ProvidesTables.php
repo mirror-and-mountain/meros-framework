@@ -25,7 +25,7 @@ trait ProvidesTables {
      * @return Table|Tables|null The requested table or the tables register.
      */
     final public function tables(string $handle = ''): Table|Tables|null {
-        return $this->resolveRequestFor(Table::class, $handle);
+        return $this->resolveFeatureRequestFor(Table::class, $handle);
     }
 
     /**
@@ -63,7 +63,7 @@ trait ProvidesTables {
             $subpage->title('Manage Tables');
             $subpage->showTitle(false);
 
-            $providerHandle = $this->getHandle();
+            $providerHandle = $this->getProvider()->getHandle();
 
             $subpage->addAjaxAction('meros_handle_table_action_' . $providerHandle, function () use ($providerHandle) {
                 $isValid = $this->validateTableOperation(
@@ -99,13 +99,14 @@ trait ProvidesTables {
     private function renderTableManagementPage(): void {
         $tables = $this->tables()->init();
 
-        $enabled = true;
-        $isPackage = $this instanceof Package;
-        $providerHandle = $this->getHandle();
-        $providerName = $this->getName();
+        $enabled        = true;
+        $provider       = $this->getProvider();
+        $isPackage      = $provider instanceof Package;
+        $providerHandle = $provider->getHandle();
+        $providerName   = $provider->getName();
 
-        if ($isPackage && method_exists($this, 'isEnabled')) {
-            $enabled = $this->isEnabled(true);
+        if ($provider instanceof Package) {
+            $enabled = $provider->isEnabled(true);
         }
 
         echo '<h1>' . esc_html($providerName) . ' Tables</h1>';

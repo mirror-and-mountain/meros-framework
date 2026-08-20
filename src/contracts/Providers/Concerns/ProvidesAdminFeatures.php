@@ -19,7 +19,7 @@ trait ProvidesAdminFeatures {
      * @return Page|Pages|null The requested menu page or the menu pages register.
      */
     final protected function menuPages(string $slug = ''): Page|Pages|null {
-        return $this->resolveRequestFor(Page::class, $slug);
+        return $this->resolveFeatureRequestFor(Page::class, $slug);
     }
 
     /**
@@ -30,6 +30,6 @@ trait ProvidesAdminFeatures {
      * @return SettingsSection|SettingsSections|null The requested settings section or the settings sections register.
      */
     final protected function settingsSections(string $id = ''): SettingsSection|SettingsSections|null {
-        return $this->resolveRequestFor(SettingsSection::class, $id);
+        return $this->resolveFeatureRequestFor(SettingsSection::class, $id);
     }
 }

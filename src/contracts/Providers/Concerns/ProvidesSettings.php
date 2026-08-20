@@ -2,13 +2,11 @@
 
 namespace MM\Meros\Contracts\Providers\Concerns;
 
-use MM\Meros\App\Framework;
 use MM\Meros\Contracts\Features\Admin\Setting;
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 
 use MM\Meros\Registers\Admin\SettingsContainers;
 
-use MM\Meros\Facades\Framework as FrameworkFacade;
 use MM\Meros\Facades\Admin\Settings as SettingsFacade;
 use MM\Meros\Facades\Admin\SettingsContainers as SettingsContainersFacade;
 
@@ -29,10 +27,10 @@ trait ProvidesSettings {
      */
     final protected function settings(string $name = ''): Setting|SettingsContainer|null {
         if (!empty($name)) {
-            return SettingsFacade::checkout($this)->get($name);
+            return SettingsFacade::checkout($this->getProvider())->get($name);
         }
 
-        return $this->resolveSettingsContainer(SettingsContainersFacade::checkout($this));
+        return $this->resolveSettingsContainer(SettingsContainersFacade::checkout($this->getProvider()));
     }
 
     /**

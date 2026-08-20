@@ -272,11 +272,14 @@ abstract class Field extends Feature implements FormComponent {
      */
     protected function init(): void {
         $this->identifier('handle', 'snake');
+        
+        // Set default ID and name
         $idNameSuffix = Str::substr(Str::uuid(), 0, 8);
+        $this->id("mforms-field-{$idNameSuffix}");
+        $this->name("mforms_field_{$idNameSuffix}");
 
-        $this->setProps($this->passedProps, ['defaultValue', 'attributes', 'classes', 'form', 'group'], [
-            'id'   => "mforms-field-{$idNameSuffix}", 
-            'name' => "mforms_field_{$idNameSuffix}"
+        $this->ignoreProps([
+            'defaultValue', 'attributes', 'classes', 'form', 'group'
         ]);
 
         $this->setSerializableProperties([

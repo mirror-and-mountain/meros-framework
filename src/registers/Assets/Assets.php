@@ -4,10 +4,6 @@ namespace MM\Meros\Registers\Assets;
 
 use MM\Meros\Contracts\Register;
 
-// Coming soon: Discoverable assets will be supported in the future, but for now, this register is only for assets that are explicitly registered/made.
-use MM\Meros\Contracts\Registers\AllFeatureRegistrationMethods;
-use MM\Meros\Contracts\Registers\Concerns\ProvidesAllFeatureRegistrationMethods;
-
 use MM\Meros\Contracts\Registers\RegistrarMaker;
 use MM\Meros\Contracts\Registers\Concerns\IsRegistrarMaker;
 

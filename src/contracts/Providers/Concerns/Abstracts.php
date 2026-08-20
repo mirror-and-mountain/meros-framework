@@ -4,6 +4,7 @@ namespace MM\Meros\Contracts\Providers\Concerns;
 
 use MM\Meros\Contracts\Feature;
 use MM\Meros\Contracts\Register;
+use MM\Meros\Contracts\Providers\FeatureProvider;
 
 trait Abstracts {
     /**
@@ -16,7 +17,14 @@ trait Abstracts {
      *
      * @throws \RuntimeException If no register or facade is found for the required feature class, or if the register's definition does not match the required feature class.
      */
-    abstract protected function resolveRequestFor(string $requiredFeatureClass, string $identifier = ''): Feature|Register|null;
+    abstract protected function resolveFeatureRequestFor(string $requiredFeatureClass, string $identifier = ''): Feature|Register|null;
+
+    /**
+     * Retrieves the provider instance associated with the current context.
+     *
+     * @return FeatureProvider The provider instance.
+     */
+    abstract public function getProvider(): FeatureProvider;
 
     /**
      * Retrieves the handle of the provider.

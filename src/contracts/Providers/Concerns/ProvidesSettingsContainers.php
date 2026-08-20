@@ -16,6 +16,6 @@ trait ProvidesSettingsContainers {
      * @return SettingsContainer|SettingsContainers|null The requested settings container or the register.
      */
     final protected function settingsContainers(string $name = ''): SettingsContainer|SettingsContainers|null {
-        return $this->resolveRequestFor(SettingsContainer::class, $name);
+        return $this->resolveFeatureRequestFor(SettingsContainer::class, $name);
     }
 }

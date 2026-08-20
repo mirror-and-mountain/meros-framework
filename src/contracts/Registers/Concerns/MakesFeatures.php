@@ -17,10 +17,10 @@ trait MakesFeatures {
      * @param Closure|array   $callbackOrProps An optional callback to modify the feature instance after creation, or an array of properties to be passed to the feature's constructor.
      * @param array           $props           An array of properties to be passed to the feature's constructor.
      *
-     * @return Makeable The newly created feature instance.
+     * @return Makeable|Registrable The newly created feature instance.
      * @throws \InvalidArgumentException if the feature definition class is not makeable.
      */
-    final public function make(Closure|array $callbackOrProps = [], array $props = []): Makeable {
+    final public function make(Closure|array $callbackOrProps = [], array $props = []): Makeable|Registrable {
         $this->ensureCheckout('make');
         $provider = $this->getProvider();
         $featureClass = $this->getContract();

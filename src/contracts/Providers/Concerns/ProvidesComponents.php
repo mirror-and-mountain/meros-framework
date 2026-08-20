@@ -21,7 +21,7 @@ trait ProvidesComponents {
      * @return Field|Fields|null The requested field or the fields register.
      */
     final protected function fields(string $type = ''): Field|Fields|null {
-        return $this->resolveRequestFor(Field::class, $type);
+        return $this->resolveFeatureRequestFor(Field::class, $type);
     }
 
     /**
@@ -32,7 +32,7 @@ trait ProvidesComponents {
      * @return FieldGroup|FieldGroups|null The requested field group or the field groups register.
      */
     final protected function fieldGroups(string $id = ''): FieldGroup|FieldGroups|null {
-        return $this->resolveRequestFor(FieldGroup::class, $id);
+        return $this->resolveFeatureRequestFor(FieldGroup::class, $id);
     }
 
     /**
@@ -43,6 +43,6 @@ trait ProvidesComponents {
      * @return Form|Forms|null The requested form or the forms register.
      */
     final protected function forms(string $id = ''): Form|Forms|null {
-        return $this->resolveRequestFor(Form::class, $id);
+        return $this->resolveFeatureRequestFor(Form::class, $id);
     }
 }

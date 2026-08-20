@@ -6,7 +6,6 @@ use Illuminate\Support\Str;
 use MM\Meros\Contracts\Provider;
 
 use MM\Meros\Registers\Admin\SettingsContainers;
-use MM\Meros\Contracts\Features\Admin\Setting;
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 
 use MM\Meros\Contracts\Providers\Concerns\IsNonFrameworkProvider;

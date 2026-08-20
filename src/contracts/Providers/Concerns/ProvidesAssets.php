@@ -37,7 +37,7 @@ trait ProvidesAssets {
      * @return AssetGroup|AssetGroups|null The requested asset group or the asset groups register.
      */
     final protected function assetGroups(string $name = ''): AssetGroup|AssetGroups|null {
-        return $this->resolveRequestFor(AssetGroup::class, $name);
+        return $this->resolveFeatureRequestFor(AssetGroup::class, $name);
     }
 
     /**
@@ -100,7 +100,7 @@ trait ProvidesAssets {
      * @return Script|Scripts|null The requested script or the scripts register.
      */
     final protected function frontendScripts(string $handle = ''): Script|Scripts|null {
-        return $this->resolveRequestFor(Script::class, $handle);
+        return $this->resolveFeatureRequestFor(Script::class, $handle);
     }
 
     /**
@@ -111,7 +111,7 @@ trait ProvidesAssets {
      * @return Style|Styles|null The requested style or the styles register.
      */
     final protected function frontendStyles(string $handle = ''): Style|Styles|null {
-        return $this->resolveRequestFor(Style::class, $handle);
+        return $this->resolveFeatureRequestFor(Style::class, $handle);
     }
 
     /**
@@ -122,7 +122,7 @@ trait ProvidesAssets {
      * @return AdminScript|AdminScripts|null The requested admin script or the admin scripts register.
      */
     final protected function adminScripts(string $handle = ''): AdminScript|AdminScripts|null {
-        return $this->resolveRequestFor(AdminScript::class, $handle);
+        return $this->resolveFeatureRequestFor(AdminScript::class, $handle);
     }
 
     /**
@@ -133,7 +133,7 @@ trait ProvidesAssets {
      * @return AdminStyle|AdminStyles|null The requested admin style or the admin styles register.
      */
     final protected function adminStyles(string $handle = ''): AdminStyle|AdminStyles|null {
-        return $this->resolveRequestFor(AdminStyle::class, $handle);
+        return $this->resolveFeatureRequestFor(AdminStyle::class, $handle);
     }
 
     /**
@@ -144,7 +144,7 @@ trait ProvidesAssets {
      * @return EditorScript|EditorScripts|null The requested editor script or the editor scripts register.
      */
     final protected function editorScripts(string $handle = ''): EditorScript|EditorScripts|null {
-        return $this->resolveRequestFor(EditorScript::class, $handle);
+        return $this->resolveFeatureRequestFor(EditorScript::class, $handle);
     }
 
     /**
@@ -155,6 +155,6 @@ trait ProvidesAssets {
      * @return EditorStyle|EditorStyles|null The requested editor style or the editor styles register.
      */
     final protected function editorStyles(string $handle = ''): EditorStyle|EditorStyles|null {
-        return $this->resolveRequestFor(EditorStyle::class, $handle);
+        return $this->resolveFeatureRequestFor(EditorStyle::class, $handle);
     }
 }

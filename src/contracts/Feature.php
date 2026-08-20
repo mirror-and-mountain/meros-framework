@@ -52,6 +52,34 @@ abstract class Feature implements FeatureDefinition {
     protected array $passedProps = [];
 
     /**
+     * Indicates whether all properties should be ignored when setting properties on the feature instance.
+     *
+     * @var boolean
+     */
+    private bool $ignoreAllProps = false;
+
+    /**
+     * An array of properties to be ignored when setting properties on the feature instance.
+     *
+     * @var array
+     */
+    private array $ignoredProps = [];
+
+    /**
+     * An array of properties that are allowed to be set on the feature instance via the passedProps array.
+     *
+     * @var array
+     */
+    private array $allowedProps = [];
+
+    /**
+     * An array of properties to be merged with existing values on the feature instance.
+     *
+     * @var array
+     */
+    private array $mergeProps = [];
+
+    /**
      * Array of context data for the feature.
      *
      * @var array
@@ -106,6 +134,10 @@ abstract class Feature implements FeatureDefinition {
 
         if (empty($this->identifier)) {
             throw new \RuntimeException("Feature identifier not set. Please call the 'identifier()' method in the init() method of the feature class.");
+        }
+
+        if ($this->ignoreAllProps === false) {
+            $this->setProps();
         }
 
         $this->configure();
@@ -188,7 +220,7 @@ abstract class Feature implements FeatureDefinition {
      *
      * @return void
      */
-    final protected function set(string $key, mixed $value): void {
+    private function setProp(string $key, mixed $value): void {
         if (method_exists($this, $key)) {
             $this->$key($value);
         }
@@ -204,46 +236,109 @@ abstract class Feature implements FeatureDefinition {
     }
 
     /**
-     * Sets properties on the feature instance based on the provided array.
-     *
-     * @param array $props  An associative array of properties to set on the feature instance.
-     * @param array $ignore An array of property names to ignore when setting properties.
-     * @param array $merge  An array of property names to merge with existing values instead of 
-     *                      overwriting when the property is an array. If a key in this array does 
-     *                      not exist in the $props array, it will be set to the value provided in this array.
+     * Sets properties on the feature instance based on the passed properties
+     * It ignores any properties specified in the ignoredProps array and 
+     * merges any properties specified in the mergeProps array.
      *
      * @return void
      */
-    final protected function setProps(array $props, array $ignore = [], array $merge = []): void {    
+    private function setProps(): void {
+        $props = empty($this->allowedProps) 
+            ? $this->passedProps 
+            : array_intersect_key($this->passedProps, array_flip($this->allowedProps));
+
         foreach ($props as $key => $value) {
-            if (in_array($key, $ignore)) {
+            if (in_array($key, $this->ignoredProps)) {
+                continue;
+            }
+            
+            $camel = Str::camel($key);
+            if (in_array($camel, $this->ignoredProps)) {
                 continue;
             }
 
-            if (!is_array($value)) {
-                $this->set($key, $value);
-                continue;
+            $property = property_exists($this, $key) ? $key : (property_exists($this, $camel) ? $camel : null);
+            $propertyExists = $property !== null;
+
+            if (in_array($key, $this->mergeProps) &&
+                $propertyExists &&
+                is_array($value)
+            ) {
+                $existingValue = $this->$property ?? [];
+                $mergedValue   = array_merge($existingValue, $value);
+                $this->setProp($property, $mergedValue);
             }
 
-            if (is_array($value) && !in_array($key, $merge)) {
-                $this->set($key, $value);
-                continue;
-            }
-
-            if (is_array($value) && in_array($key, $merge)) {
-                $existingValue = $this->$key ?? [];
-                if (is_array($existingValue)) {
-                    $mergedValue = array_merge($existingValue, $value);
-                    $this->set($key, $mergedValue);
-                }
+            if ($propertyExists) {
+                $this->setProp($property, $value);
             }
         }
+    }
 
-        foreach ($merge as $key => $mergeValue) {
-            if (!array_key_exists($key, $props)) {
-                $this->set($key, $mergeValue);
-            }
-        }
+    /**
+     * Sets a property on the feature instance. If a method with the same name as the property exists, 
+     * it will be called with the value as an argument. Otherwise, the property will be set directly.
+     *
+     * @param string $key
+     * @param mixed  $value
+     *
+     * @return void
+     */
+    final protected function set(string $key, mixed $value): void {
+        $this->setProp($key, $value);
+    }
+
+    /**
+     * Defines a list of properties to be merged with existing values on the 
+     * feature instance based on the provided array of passed properties.
+     * 
+     * Should be called in the feature's init() method to specify which properties should be merged rather than overwritten.
+     *
+     * @param array $props
+     *
+     * @return void
+     */
+    final protected function mergeProps(array $props): void {
+        $this->mergeProps = array_merge($this->mergeProps, $props);
+    }
+
+    /**
+     * Defines a list of properties that are allowed to be set on the feature instance via the passedProps array.
+     * 
+     * Should be called in the feature's init() method to specify which properties are allowed to be set on the feature instance.
+     *
+     * @param array $props
+     *
+     * @return void
+     */
+    final protected function allowedProps(array $props): void {
+        $this->allowedProps = array_merge($this->allowedProps, $props);
+    }
+
+    /**
+     * Defines a list of properties to be ignored when setting properties on the feature instance.
+     * 
+     * Should be called in the feature's init() method to specify which properties should be ignored when setting properties on the feature instance.
+     *
+     * @param array $props
+     *
+     * @return void
+     */
+    final protected function ignoreProps(array $props): void {
+        $this->ignoredProps = array_merge($this->ignoredProps, $props);
+    }
+
+    /**
+     * Sets whether all properties should be ignored when setting properties on the feature instance.
+     * 
+     * Should be called in the feature's init() method to specify whether all properties should be ignored when setting properties on the feature instance.
+     *
+     * @param bool $ignore
+     *
+     * @return void
+     */
+    final protected function ignoreAllProps(bool $ignore = true): void {
+        $this->ignoreAllProps = $ignore;
     }
 
     /**
@@ -268,7 +363,6 @@ abstract class Feature implements FeatureDefinition {
      */
     final public function setIdentifier(string $identifier, bool $returnValue = true): string|static {
         if (!property_exists($this, $this->identifier)) {
-            dd($this->identifier, $this->defaultIdentifierFormat, $identifier);
             throw new \InvalidArgumentException("Property '{$this->identifier}' does not exist on class " . static::class);
         }
 

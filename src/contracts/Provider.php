@@ -8,8 +8,8 @@ use MM\Meros\Contracts\Providers\FeatureProvider;
 use MM\Meros\Support\Context;
 use MM\Meros\Facades\Support\Context as ContextAccessor;
 
-use MM\Meros\Facades\Support\Registers;
-use MM\Meros\Contracts\Register;
+use MM\Meros\Support\ClassInfo;
+use MM\Meros\Contracts\Concerns\ResolvesFeatureRequests;
 
 abstract class Provider implements FeatureProvider {
     /**
@@ -32,6 +32,8 @@ abstract class Provider implements FeatureProvider {
 
     private array $defaultPreferences = [];
     private array $preferences = [];
+
+    use ResolvesFeatureRequests;
 
     // =========================================================================
     // Initialisation
@@ -349,6 +351,40 @@ abstract class Provider implements FeatureProvider {
     }
 
     // =========================================================================
+    // Orchestration
+    // =========================================================================
+
+    /**
+     * Creates and initialises an instance of the specified orchestrator class, passing the current provider instance to it.
+     *
+     * @param string $orchestratorClass
+     *
+     * @return void
+     */
+    final protected function orchestrate(string $orchestratorClass): void {
+        $classInfo = ClassInfo::get($orchestratorClass);
+
+        if ($classInfo->extends(Orchestrator::class)) {
+            $orchestratorClass::create($this);
+            return;
+        }
+
+        throw new \RuntimeException("The class '{$orchestratorClass}' does not extend the Orchestrator class.");
+    }
+
+    /**
+     * Initialises an instance of the specified orchestrator class, passing the current provider instance to it.
+     * Alias for the `orchestrate` method.
+     *
+     * @param string $orchestratorClass
+     *
+     * @return void
+     */
+    final protected function initialise(string $orchestratorClass): void {
+        $this->orchestrate($orchestratorClass);
+    }
+
+    // =========================================================================
     // Getters
     // =========================================================================
 
@@ -361,63 +397,12 @@ abstract class Provider implements FeatureProvider {
         return $this;
     }
 
-    // =========================================================================
-    // Feature Helpers
-    // =========================================================================
-
     /**
-     * Retrieves the register for the feature class.
+     * Returns the feature provider instance.
      *
-     * @param string $requiredFeatureClass
-     *
-     * @return Register|null
+     * @return FeatureProvider
      */
-    final protected function getRegisterFor(string $requiredFeatureClass): ?Register {
-        return Registers::getRegisterFor($requiredFeatureClass);
-    }
-
-    /**
-     * Returns the facade class associated with a specific feature register, if any.
-     *
-     * @param string $requiredFeatureClass
-     *
-     * @return string|null
-     */
-    final protected function getFacadeFor(string $requiredFeatureClass): ?string {
-        $register = $this->getRegisterFor($requiredFeatureClass);
-
-        if ($register) {
-            return $register->getFacade();
-        }
-
-        return null;
-    }
-
-    /**
-     * Resolves a feature or register based on the required feature class and an optional name.
-     *
-     * @param string $requiredFeatureClass The class name of the required feature.
-     * @param string $identifier Optional. The identifier of the specific feature to retrieve.
-     *
-     * @return Feature|Register|null The resolved feature or register, or null if the feature with the provided name is not found.
-     *
-     * @throws \RuntimeException If no register or facade is found for the required feature class, or if the register's definition does not match the required feature class.
-     */
-    final protected function resolveRequestFor(string $requiredFeatureClass, string $identifier = ''): Feature|Register|null {
-        $register = $this->getRegisterFor($requiredFeatureClass);
-
-        if ($register === null) {
-            throw new \RuntimeException("No register found for the feature class: {$requiredFeatureClass}");
-        }
-
-        if ($register->getContract() !== $requiredFeatureClass) {
-            throw new \RuntimeException("The register's definition does not match the required feature class: {$requiredFeatureClass}");
-        }
-
-        if (!empty($identifier)) {
-            return $register->checkout($this)->get($identifier);
-        }
-
-        return $register->checkout($this);
+    public function getProvider(): FeatureProvider {
+        return $this;
     }
 }
