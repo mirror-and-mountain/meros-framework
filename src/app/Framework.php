@@ -40,7 +40,7 @@ final class Framework extends Provider {
 
         // Configure MEROS_ENVIRONMENT services for local development
         if (getenv('MEROS_ENVIRONMENT') && getenv('MEROS_ENVIRONMENT') === 'true') {
-            $this->configureLocalMailTransport();
+            $this->configureMerosEnv();
         }
 
         // Register tables
@@ -213,19 +213,13 @@ final class Framework extends Provider {
         $this->tables()->register();
     }
 
+
     // =========================================================================
-    // Helpers
+    // Local Environment Configuration
     // =========================================================================
 
-    /**
-     * Returns the URI to the framework's image resources.
-     * 
-     * @param string $path Optional. A relative path to an image within the framework's resources/img directory.
-     *
-     * @return string
-     */
-    public function img(string $path = ''): string {
-        return $this->getUri() . 'resources/img/' . ltrim($path, '/');
+    private function configureMerosEnv(): void {
+        $this->configureLocalMailTransport();
     }
 
     /**
@@ -247,5 +241,20 @@ final class Framework extends Provider {
             $phpmailer->SMTPSecure = '';
             $phpmailer->SMTPAutoTLS = false;
         });
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    /**
+     * Returns the URI to the framework's image resources.
+     * 
+     * @param string $path Optional. A relative path to an image within the framework's resources/img directory.
+     *
+     * @return string
+     */
+    public function img(string $path = ''): string {
+        return $this->getUri() . 'resources/img/' . ltrim($path, '/');
     }
 }
