@@ -2,11 +2,20 @@
 
 namespace MM\Meros\Contracts\Registers\Concerns;
 
+use Illuminate\Support\Collection;
+
 use MM\Meros\Contracts\Feature;
 use MM\Meros\Contracts\Providers\FeatureProvider;
 use MM\Meros\Contracts\Features\FeatureDefinition;
 
 trait Abstracts {
+    /**
+     * Internal method to retrieve the collection of features associated with this register.
+     *
+     * @return Collection
+     */
+    abstract protected function getFeatures(): Collection;
+
     /**
      * Attaches a feature instance to the register for tracking and management.
      *

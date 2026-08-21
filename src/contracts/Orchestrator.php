@@ -106,6 +106,17 @@ abstract class Orchestrator {
     }
 
     /**
+     * Determines whether the given string looks like a fully qualified classname.
+     *
+     * @param string $string
+     *
+     * @return boolean
+     */
+    final protected function looksLikeClass(string $string): bool {
+        return Str::contains($string, '\\');
+    }
+
+    /**
      * Retrieves the name of the associated feature provider.
      *
      * @return string

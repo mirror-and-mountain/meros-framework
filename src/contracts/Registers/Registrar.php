@@ -27,17 +27,18 @@ interface Registrar extends FeatureRegister {
      */
     public function register(string $featureClass = '', string $alias = '', ?string $onBehalfOf = null): static;
 
+    
     /**
      * Creates a new instance of the specified feature class, if it has been registered with this register.
      * 
-     * @param string               $featureClassOrAlias  The class name or alias of the feature to create.
-     * @param Closure|array|string $callbackPropsOrAlias An optional callback to modify the feature instance after creation, an array of properties to pass to the feature's constructor, or a string alias for the feature.
-     * @param array                $props                An array of properties to pass to the feature's constructor.
+     * @param string               $featureClassOrAlias            The class name or alias of the feature to create.
+     * @param Closure|array|string $callbackPropsAliasOrOnBehalfOf An optional callback to modify the feature instance after creation, an array of properties to pass to the feature's constructor, or a string alias for the feature. An 'onBehalfOf' provider can also be specified here as a string, if the feature is to be registered on behalf of another provider.
+     * @param array                $props                          An array of properties to pass to the feature's constructor.
      *
      * @return Registrable The newly created feature instance.
      * @throws \InvalidArgumentException if the feature class has not been registered with this register.
      */
-    public function makeFrom(string $featureClassOrAlias, Closure|array|string $callbackPropsOrAlias = [], array $props = []): Registrable;
+    public function makeFrom(string $featureClassOrAlias, Closure|array|string $callbackPropsAliasOrOnBehalfOf = [], array $props = []): Registrable;
 
     /**
      * Checks if a specific feature class has been registered with this register.

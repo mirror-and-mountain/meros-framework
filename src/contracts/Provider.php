@@ -405,4 +405,19 @@ abstract class Provider implements FeatureProvider {
     public function getProvider(): FeatureProvider {
         return $this;
     }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    /**
+     * Determines if a given string looks like a fully qualified class name.
+     *
+     * @param string $string
+     *
+     * @return bool
+     */
+    final protected function looksLikeClass(string $string): bool {
+        return Str::contains($string, '\\');
+    }
 }

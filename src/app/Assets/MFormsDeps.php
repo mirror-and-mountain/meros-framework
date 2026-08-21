@@ -18,6 +18,6 @@ final class MFormsDeps extends AssetGroup {
 
         $this->name('meros_forms_dependencies');
         $this->description('Dependencies for MForms.');
-        $this->registerWhenEnabled(true);
+        $this->register();
     }
 }

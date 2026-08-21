@@ -6,15 +6,12 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
 use MM\Meros\Contracts\Feature;
-
-// use MM\Meros\Contracts\Features\Discoverable; // Coming soon
 use MM\Meros\Contracts\Features\Registrable;
 use MM\Meros\Contracts\Features\Makeable;
 
 use MM\Meros\Contracts\Concerns\ResolvesPaths;
 use MM\Meros\Contracts\Features\Concerns\IsMakeable;
 use MM\Meros\Contracts\Features\Concerns\IsRegistrable;
-// use MM\Meros\Contracts\Features\Concerns\IsDiscoverable; // Coming soon
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 
 use MM\Meros\Facades\Assets\AssetGroups;
@@ -65,16 +62,30 @@ abstract class Asset extends Feature implements Registrable, Makeable {
     protected string $area = 'frontend';
 
     /**
-     * Indicates whether the asset has been registered with WordPress.
+     * Indicates that the register() method has been called on the asset.
      *
      * @var boolean
+     */
+    protected bool $preRegistered = false;
+
+    /**
+     * Indicates whether the asset has been registered with WordPress.
+     *
+     * @var bool
      */
     protected bool $isRegistered = false;
 
     /**
-     * Indicates whether the asset has been enqueued with WordPress.
+     * Indicates that the enqueue() method has been called on the asset.
      *
      * @var boolean
+     */
+    protected bool $preEnqueued = false;
+
+    /**
+     * Indicates whether the asset has been enqueued with WordPress.
+     *
+     * @var bool
      */
     protected bool $isEnqueued = false;
 
@@ -93,10 +104,6 @@ abstract class Asset extends Feature implements Registrable, Makeable {
 
     final protected function init(): void {
         $this->identifier('handle', 'slug');
-
-        if (isset($this->passedProps['discovered']) && is_bool($this->passedProps['discovered'])) {
-            $this->set('wasDiscovered', $this->passedProps['discovered']);
-        }
     }
 
     protected function whenConfigured(): void {
@@ -114,6 +121,10 @@ abstract class Asset extends Feature implements Registrable, Makeable {
 
         if (!empty($this->dependencies)) {
             $this->initialiseDependencyGroups();
+        }
+
+        if (empty($this->handle) && !empty($this->path)) {
+            $this->handle = $this->generateHandleFromPath();
         }
     }
 
@@ -175,17 +186,17 @@ abstract class Asset extends Feature implements Registrable, Makeable {
      * Registers the asset with WordPress. This method should be called to make the asset available for use.
      * Implementing classes should ensure assets aren't registered multiple times using the $isRegistered property.
      *
-     * @return void
+     * @return static
      */
-    abstract public function register(): void;
+    abstract public function register(): static;
 
     /**
      * Enqueues the asset with WordPress. This method should be called to include the asset in the page.
      * Implementing classes should ensure assets aren't enqueued multiple times using the $isEnqueued property.
      *
-     * @return void
+     * @return static
      */
-    abstract public function enqueue(): void;
+    abstract public function enqueue(): static;
 
     /**
      * Resolves the appropriate WordPress hook for registering the script based on the specified area.
@@ -240,11 +251,17 @@ abstract class Asset extends Feature implements Registrable, Makeable {
      * Sets the asset's file path.
      *
      * @param string $path
+     * @param bool   $configure Optional. Whether to configure the asset from the path (sets src and version). Default is false.
      *
      * @return static
      */
-    final public function path(string $path): static {
-        $this->path = $path;
+    final public function path(string $path, bool $configure = false): static {
+        if ($configure) {
+            $this->configureFromPath($path);
+        } else {
+            $this->path = $path;
+        }
+
         return $this;
     }
 
@@ -442,7 +459,11 @@ abstract class Asset extends Feature implements Registrable, Makeable {
      *
      * @return string
      */
-    private function generateHandleFromPath(string $path): string {
+    final protected function generateHandleFromPath(string $path = ''): string {
+        if (empty($path)) {
+            $path = $this->path;
+        }
+
         if (!$this->pathIsFile($path)) {
             throw new \InvalidArgumentException("The provided path '{$path}' does not point to a valid file.");
         }

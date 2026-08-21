@@ -287,7 +287,7 @@ abstract class Register implements FeatureRegister {
         }
         
         if ($provider !== null) {
-            $feature = $this->features->where(function ($f) use ($provider) {
+            $feature = $this->getFeatures()->where(function ($f) use ($provider) {
                 return $f->getProvider() === $provider;
             })->where(function ($f) use ($identifier) {
                 return $f->getIdentifier() === $identifier;
@@ -296,7 +296,7 @@ abstract class Register implements FeatureRegister {
             return $this->returnValue($checkin, $feature);
         }
 
-        $feature = $this->features->firstWhere(function ($f) use ($identifier) {
+        $feature = $this->getFeatures()->firstWhere(function ($f) use ($identifier) {
             return $f->getIdentifier() === $identifier;
         });
 
@@ -353,5 +353,14 @@ abstract class Register implements FeatureRegister {
      */
     final public function instance(?FeatureProvider $provider = null): static {
         return $this->checkout($provider);
+    }
+
+    /**
+     * Internal method to retrieve the collection of features associated with this register.
+     *
+     * @return Collection
+     */
+    final protected function getFeatures(): Collection {
+        return $this->features;
     }
 }

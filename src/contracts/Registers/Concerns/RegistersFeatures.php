@@ -7,11 +7,18 @@ use MM\Meros\Contracts\Features\Makeable;
 use Illuminate\Support\Str;
 
 use MM\Meros\Contracts\Registers\Maker;
+
 use MM\Meros\Contracts\Features\Registrable;
 use MM\Meros\Contracts\Providers\FeatureProvider;
 
 use MM\Meros\Support\ClassInfo;
 
+use MM\Meros\Contracts\Features\Assets\Groups\SiteDependencies;
+
+/**
+ * Notes:
+ * This is probably slightly over-complicated at the moment, but allows for a lot of flexibility on how features are registered and instantiated.
+ */
 trait RegistersFeatures {
     /**
      * An array of feature classes that have been registered with this register.
@@ -20,8 +27,18 @@ trait RegistersFeatures {
      */
     private array $registeredFeatures = [];
 
+    /**
+     * The type of preloading for the register, either 'classname' or 'instance'. This determines how the register will handle feature classes when passed to the preload() method.
+     *
+     * @var string
+     */
     private string $preloadType = 'classname';
 
+    /**
+     * The preloaded feature class or instance, if any.
+     *
+     * @var Registrable|string|null
+     */
     private Registrable|string|null $preloadedItem = null;
 
     use Abstracts;
@@ -51,8 +68,22 @@ trait RegistersFeatures {
     // Operations
     // =========================================================================
 
+    /**
+     * Preloads a feature class for use with this register.
+     *
+     * @param string $featureClass
+     *
+     * @return static|Registrable
+     */
     final public function preload(string $featureClass): static|Registrable {
         $this->ensureCheckout('preload');
+        $this->preloadedItem = null; // Unload any previously preloaded item.
+
+        $registeredFeature = $this->getRegisteredFeature($featureClass, null, false);
+
+        if ($registeredFeature !== null && $registeredFeature['initialised'] === true) {
+            return $this->get($registeredFeature['identifier']);
+        }
 
         if ($this->preloadType === 'classname') {
             $this->preloadedItem = $featureClass;
@@ -63,9 +94,8 @@ trait RegistersFeatures {
             throw new \InvalidArgumentException("Feature class '{$featureClass}' is not a valid subclass of '{$this->getContract()}'.");
         }
 
-        $this->preloadedItem = $this->makeFrom($featureClass);
-        $this->checkin();
-        return $this->preloadedItem;   
+        $this->preloadedItem = $this->makeFrom($featureClass, '');
+        return $this->returnValue(true, $this->preloadedItem);
     }
 
     /**
@@ -80,9 +110,14 @@ trait RegistersFeatures {
     final public function register(string $featureClass = '', string $alias = '', ?string $onBehalfOf = null): static {
         $this->ensureCheckout('register');
 
-        if ($this->preloadType === 'classname' && $this->preloadedItem !== null) {
-            $alias        = $featureClass;
-            $onBehalfOf   = $alias;
+        if ($this->preloadType === 'classname' && $this->isPreloaded()) {
+            if ($onBehalfOf === null && Str::contains($alias, '\\')) {
+                $onBehalfOf = $alias;
+                $alias      = $featureClass;
+            } else if (!empty($featureClass)) {
+                $alias = $featureClass;
+            }
+
             $featureClass = $this->preloadedItem;
         } else if (empty($featureClass) && !is_string($this->preloadedItem)) {
             throw new \InvalidArgumentException("Feature class must be provided when registering a feature.");
@@ -107,6 +142,7 @@ trait RegistersFeatures {
             'initialised' => false,
         ];
 
+        $this->unload(); // Unload any preloaded item after registering.
         $this->checkin();
         return $this;
     }
@@ -114,23 +150,33 @@ trait RegistersFeatures {
     /**
      * Creates a new instance of the specified feature class, if it has been registered with this register.
      * 
-     * @param string               $featureClassOrAlias  The class name or alias of the feature to create.
-     * @param Closure|array|string $callbackPropsOrAlias An optional callback to modify the feature instance after creation, an array of properties to pass to the feature's constructor, or a string alias for the feature.
-     * @param array                $props                An array of properties to pass to the feature's constructor.
+     * @param string               $featureClassOrAlias            The class name or alias of the feature to create.
+     * @param Closure|array|string $callbackPropsAliasOrOnBehalfOf An optional callback to modify the feature instance after creation, an array of properties to pass to the feature's constructor, or a string alias for the feature. An 'onBehalfOf' provider can also be specified here as a string, if the feature is to be registered on behalf of another provider.
+     * @param array                $props                          An array of properties to pass to the feature's constructor.
      *
      * @return Registrable The newly created feature instance.
      * @throws \InvalidArgumentException if the feature class has not been registered with this register.
      */
-    final public function makeFrom(string $featureClassOrAlias, Closure|array|string $callbackPropsOrAlias = [], array $props = []): Registrable {
+    final public function makeFrom(string $featureClassOrAlias, Closure|array|string $callbackPropsAliasOrOnBehalfOf = [], array $props = []): Registrable {
         $this->ensureCheckout('makeFrom');
         $givenAlias         = null;
         $checkedOutProvider = $this->getProvider();
 
+        // Resolve the $callbackPropsAliasOrOnBehalfOf parameter to determine if it's a callback, an array of properties, or a string representing an alias or provider.
+        // $onBehalfOf providers may be passed when a preloaded feature class is being made via the make() method.
+        $onBehalfOf = is_string($callbackPropsAliasOrOnBehalfOf) && Str::contains($callbackPropsAliasOrOnBehalfOf, '\\') 
+            ? $callbackPropsAliasOrOnBehalfOf 
+            : null;
+
+        $callbackPropsOrAlias = $onBehalfOf !== null ? '' : $callbackPropsAliasOrOnBehalfOf;
+
         // If we've been given an alias, register the feature class with the alias before making the instance.
+        // This block will also be used to handle preloaded feature classes being made via the make() method.
         if (is_string($callbackPropsOrAlias) && Str::contains($featureClassOrAlias, '\\')) {
             $givenAlias = $callbackPropsOrAlias;
+            $passingOnBehalfOfAsAlias = $onBehalfOf !== null;
 
-            $this->register($featureClassOrAlias, $givenAlias);
+            $this->register($featureClassOrAlias, $onBehalfOf ?? $givenAlias, $passingOnBehalfOfAsAlias ? null : $onBehalfOf);
             $this->checkout($checkedOutProvider); // Re-checkout the original provider after registering the feature class with the alias.
 
             $callbackOrProps = $props;
@@ -221,38 +267,62 @@ trait RegistersFeatures {
         }
 
         $this->attachInstance($instance, $provider);
+        $this->unload(); // Unload any preloaded item after making the instance.
         $this->checkin();
+
         return $instance;
     }
 
     /**
      * Creates a new instance of the feature definition associated with this register.
      *
-     * @param Closure|array   $callbackOrProps An optional callback to modify the feature instance after creation, or an array of properties to be passed to the feature's constructor.
-     * @param array           $props           An array of properties to be passed to the feature's constructor.
+     * @param Closure|array|string $callbackPropsOrOnBehalfOf An optional callback to modify the feature instance after creation, an array of properties to be passed to the feature's constructor, or a string representing the provider on behalf of whom the feature is being created.
+     * @param array                $props                     An array of properties to be passed to the feature's constructor.
      *
      * @return Makeable|Registrable The newly created feature instance.
      * @throws \InvalidArgumentException if the feature definition class is not makeable.
      */
-    final public function make(Closure|array $callbackOrProps = [], array $props = []): Makeable|Registrable {
+    final public function make(Closure|array|string $callbackPropsOrOnBehalfOf = [], array $props = []): Makeable|Registrable {
         $this->ensureCheckout('make');
 
-        if ($this->preloadType === 'classname' && $this->preloadedItem !== null) {
+        if ($this->preloadType === 'classname' && $this->isPreloaded()) {
             $featureClass = $this->preloadedItem;
-            return $this->makeFrom($featureClass, $callbackOrProps, $props);
+            $onBehalfOf   = is_string($callbackPropsOrOnBehalfOf) ? $callbackPropsOrOnBehalfOf : '';
+
+            return $this->makeFrom($featureClass, $onBehalfOf);
         }
 
         else if ($this instanceof Maker && method_exists($this, 'makeFeature')) {
+            $callbackOrProps = is_string($callbackPropsOrOnBehalfOf) ? [] : $callbackPropsOrOnBehalfOf;
+            $this->unload(); // Unload any preloaded item after making the instance.
             return $this->makeFeature($callbackOrProps, $props);
         }
 
         throw new \InvalidArgumentException("Feature class must be provided when making a feature instance.");
     }
 
-
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    /**
+     * Checks if the register has been preloaded with a feature class.
+     *
+     * @return boolean
+     */
+    final protected function isPreloaded(): bool {
+        return $this->preloadedItem !== null;
+    }
+
+    /**
+     * Clears the preloaded feature class or instance from the register.
+     *
+     * @return static
+     */
+    final protected function unload(): static {
+        $this->preloadedItem = null;
+        return $this;
+    }
 
     /**
      * Retrieves an existing instance of a feature by its identifier, if it exists and the register is set to use unique instances.

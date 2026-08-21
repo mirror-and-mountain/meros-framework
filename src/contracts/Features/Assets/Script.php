@@ -37,24 +37,30 @@ class Script extends Asset {
     final public function __enqueueAsset(): void {
         if ($this->isRegistered) {
             wp_enqueue_script($this->handle);
-            $this->isEnqueued = true;
         } else {
-            $this->register();
+            $this->__registerAsset();
             wp_enqueue_script($this->handle);
-            $this->isEnqueued = true;
         }
+
+        $this->isEnqueued = true;
     }
 
-    final public function register(): void {
-        if (!$this->isRegistered) {
+    final public function register(): static {
+        if (!$this->preRegistered) {
             add_action($this->resolveRegisterHook(), [$this, '__registerAsset']);
+            $this->preRegistered = true;
         }
+
+        return $this;
     }
 
-    final public function enqueue(): void {
-        if (!$this->isEnqueued) {
+    final public function enqueue(): static {
+        if (!$this->preEnqueued) {
             add_action($this->resolveEnqueueHook(), [$this, '__enqueueAsset']);
+            $this->preEnqueued = true;
         }
+
+        return $this;
     }
 
     // =========================================================================

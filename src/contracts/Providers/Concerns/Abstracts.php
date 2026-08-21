@@ -5,19 +5,20 @@ namespace MM\Meros\Contracts\Providers\Concerns;
 use MM\Meros\Contracts\Feature;
 use MM\Meros\Contracts\Register;
 use MM\Meros\Contracts\Providers\FeatureProvider;
+use MM\Meros\Contracts\Features\Registrable;
 
 trait Abstracts {
     /**
      * Resolves a feature or register based on the required feature class and an optional name.
      *
      * @param string $requiredFeatureClass The class name of the required feature.
-     * @param string $identifier Optional. The identifier of the specific feature to retrieve.
+     * @param string $identifier Optional. The identifier of the specific feature to retrieve. May be passed as a class name for preloading if the feature implements the `Registrable` interface.
      *
-     * @return Feature|Register|null The resolved feature or register, or null if the feature with the provided name is not found.
+     * @return Feature|Register|Registrable|null The resolved feature or register, or null if the feature with the provided name is not found.
      *
      * @throws \RuntimeException If no register or facade is found for the required feature class, or if the register's definition does not match the required feature class.
      */
-    abstract protected function resolveFeatureRequestFor(string $requiredFeatureClass, string $identifier = ''): Feature|Register|null;
+    abstract protected function resolveFeatureRequestFor(string $requiredFeatureClass, string $identifier = ''): Feature|Register|Registrable|null;
 
     /**
      * Retrieves the provider instance associated with the current context.
@@ -51,4 +52,13 @@ trait Abstracts {
      * @return mixed The value of the preference, or null if not found.
      */
     abstract public function getPreference(string $key, bool $fullPath = true): mixed;
+
+    /**
+     * Determines if a given string resembles a class name.
+     *
+     * @param string $string The string to evaluate.
+     *
+     * @return bool True if the string resembles a class name, false otherwise.
+     */
+    abstract protected function looksLikeClass(string $string): bool;
 }
