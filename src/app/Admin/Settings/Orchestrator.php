@@ -7,9 +7,12 @@ use Illuminate\Support\Collection;
 
 use MM\Meros\Contracts\Features\Admin\Setting;
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
+
 use MM\Meros\App\Admin\Pages\ThemeSettings as ThemeSettingsPage;
 use MM\Meros\App\Admin\Pages\PackageSettings as PackageSettingsPage;
 use MM\Meros\App\Admin\Pages\AssetSettings as AssetSettingsPage;
+
+use MM\Meros\App\Admin\Sections\MerosSettings;
 
 use MM\Meros\App\Admin\Settings\Containers\FrameworkSettings;
 use MM\Meros\App\Admin\Settings\Containers\ThemeSettings;
@@ -27,6 +30,7 @@ class Orchestrator extends SettingsOrchestrator {
 
     protected function configure(): void {
         $this->registerMenuPages();
+        $this->registerSettingsSections();
         $this->registerSettingsContainers();
         $this->registerSettings();
     }
@@ -40,6 +44,15 @@ class Orchestrator extends SettingsOrchestrator {
         $this->menuPages()->register(PackageSettingsPage::class, 'meros-packages');
         $this->menuPages()->register(ThemeSettingsPage::class, 'meros-theme-settings', BaseTheme::class);
         $this->menuPages()->register(AssetSettingsPage::class, 'meros-assets');
+    }
+
+    /**
+     * Registers the framework's settings sections.
+     *
+     * @return void
+     */
+    private function registerSettingsSections(): void {
+        $this->settingsSections()->register(MerosSettings::class, 'meros-theme-settings-section');
     }
 
     /**

@@ -66,14 +66,14 @@ abstract class BaseTheme extends Provider {
      */
     private function addMerosSettings(): void {
         // Features
-        $this->settings()->add('boolean', function ($setting) {
+        $test = $this->settings()->add('boolean', function ($setting) {
             $setting->name('meros_forms_enabled');
             $setting->label('Enable Meros Forms');
             $setting->description($this->getMerosSettingDescription('meros_forms_enabled'));
             $setting->default(false);
             $setting->field();
+            $setting->section('meros-theme-settings-section');
         });
-
 
         // Deactivation preferences
         $this->settings()->add('boolean', function ($setting) {
@@ -82,6 +82,7 @@ abstract class BaseTheme extends Provider {
             $setting->description($this->getMerosSettingDescription('meros_reset_settings_on_deactivate', 'deactivation'));
             $setting->default(false);
             $setting->field();
+            $setting->section('meros-theme-settings-section');
         });
 
         $this->settings()->add('boolean', function ($setting) {
@@ -90,6 +91,7 @@ abstract class BaseTheme extends Provider {
             $setting->description($this->getMerosSettingDescription('meros_uninstall_all_tables_on_deactivate', 'deactivation'));
             $setting->default(false);
             $setting->field();
+            $setting->section('meros-theme-settings-section');
         });
     }
 

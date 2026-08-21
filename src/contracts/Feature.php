@@ -35,14 +35,14 @@ abstract class Feature implements FeatureDefinition {
      *
      * @var string
      */
-    private string $label = '';
+    protected string $label = '';
 
     /**
      * The feature's description.
      *
      * @var string
      */
-    private string $description = '';
+    protected string $description = '';
 
     /**
      * Array of properties passed to the feature.

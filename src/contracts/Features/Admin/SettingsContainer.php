@@ -21,11 +21,18 @@ class SettingsContainer extends DataContainer {
     private string $optionGroup = '';
 
     /**
-     * The alias of the menu page associated with this settings container.
+     * The slug or alias of a menu page associated with this settings container.
      *
      * @var string
      */
     private string $page = '';
+
+    /**
+     * The id of a settings section associated with this settings container.
+     *
+     * @var string
+     */
+    private string $section = '';
 
     // =========================================================================
     // Initialisation
@@ -83,9 +90,14 @@ class SettingsContainer extends DataContainer {
 
         if ($item->hasField()) {
             $itemPage = $item->getPage();
+            $itemSection = $item->getSection();
 
             if ($itemPage === null && !empty($this->page)) {
                 $item->page($this->page);
+            }
+
+            if ($itemSection === null && !empty($this->section)) {
+                $item->section($this->section);
             }
         }
     }
@@ -104,7 +116,7 @@ class SettingsContainer extends DataContainer {
     }
 
     /**
-     * Sets the menuPage alias associated with this SettingsContainer.
+     * Sets the page slug or alias associated with this SettingsContainer.
      *
      * @param string $page The page identifier.
      *
@@ -112,6 +124,18 @@ class SettingsContainer extends DataContainer {
      */
     final public function page(string $page): static {
         $this->page = $page;
+        return $this;
+    }
+
+    /**
+     * Sets the id of a settings section associated with this SettingsContainer.
+     *
+     * @param string $section The id of the settings section.
+     *
+     * @return static
+     */
+    final public function section(string $section): static {
+        $this->section = $section;
         return $this;
     }
 
@@ -129,12 +153,21 @@ class SettingsContainer extends DataContainer {
     }
 
     /**
-     * Retrieves the menuPage alias associated with this SettingsContainer.
-     *
-     * @return string The menuPage alias.
+     * Retrieves the page slug or alias associated with this SettingsContainer.
+
+     * @return string The page slug or alias.
      */
     final public function getPage(): string {
         return $this->page;
+    }
+
+    /**
+     * Retrieves the id of a settings section associated with this SettingsContainer.
+     *
+     * @return string The id of the settings section.
+     */
+    final public function getSection(): string {
+        return $this->section;
     }
 
     /**

@@ -176,6 +176,11 @@ class SettingsSection extends Feature implements Registrable, Makeable {
     public function render(): void {
         if (is_callable($this->callback)) {
             call_user_func($this->callback);
+            return;
+        }
+
+        if (!empty($this->description)) {
+            echo '<p class="meros-settings-section-description">' . $this->description . '</p>';
         }
     }
 }

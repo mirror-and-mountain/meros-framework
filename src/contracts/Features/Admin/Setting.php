@@ -35,6 +35,13 @@ class Setting extends DataItem {
     protected ?SettingsSection $section = null;
 
     /**
+     * A provisional section id or closure to be used when the section is set before the page.
+     *
+     * @var Closure|string|null
+     */
+    private Closure|string|null $provisionalSection = null;
+
+    /**
      * The option group of the setting (inherited from SettingsContainer).
      *
      * @var string
@@ -225,39 +232,26 @@ class Setting extends DataItem {
      * Sets the associated Page for this Setting.
      *
      * @param Page|Closure|string $pageOrClosure   A Page instance or closure to configure the Page. A string can also be provided as a class name or alias to resolve the Page.
-     * @param Closure|array           $callbackOrProps Optional closure or array of properties for configuring the Page.
-     * @param array                   $props           Optional array of properties for configuring the Page.
+     * @param Closure|array       $callbackOrProps Optional closure or array of properties for configuring the Page.
+     * @param array               $props           Optional array of properties for configuring the Page.
      *
      * @return static
      */
     final public function page(
         Page|Closure|string $pageOrClosure, 
-        Closure|array           $callbackOrProps = [], 
-        array                   $props = []
+        Closure|array       $callbackOrProps = [], 
+        array               $props = []
     ): static {
         if (is_string($pageOrClosure)) {
-            $classOrAlias = $pageOrClosure;
-
-            $page = $this->makeItemFrom(
-                $classOrAlias,
-                Page::class, 
-                $callbackOrProps, 
-                $props
+            $this->makeAssociationFromClassOrAlias(
+                'page', Page::class, $pageOrClosure, $callbackOrProps, $props
             );
-
-            if ($page instanceof Page) {
-                $this->page = $page;
-            }
         }
 
         else if ($pageOrClosure instanceof Closure) {
-            $closure = $pageOrClosure;
-            $props   = is_array($callbackOrProps) ? $callbackOrProps : $props;
-            $page    = $this->makeItem(Page::class, $closure, $props);
-
-            if ($page instanceof Page) {
-                $this->page = $page;
-            }
+            $this->makeAssociationFromClosure(
+                'page', Page::class, $pageOrClosure, $callbackOrProps, $props
+            );
         }
 
         else {
@@ -268,6 +262,11 @@ class Setting extends DataItem {
             $this->settingsField instanceof SettingsField
         ) {
             $this->settingsField->page($this->page->getSlug());
+
+            if ($this->provisionalSection !== null) {
+                $this->section($this->provisionalSection);
+                $this->provisionalSection = null;
+            }
         }
 
         return $this;
@@ -311,33 +310,33 @@ class Setting extends DataItem {
         array                          $props = []
     ): static {
         if (!($this->page instanceof Page)) {
+            if (is_string($sectionOrClosure) || $sectionOrClosure instanceof Closure) {
+                $this->provisionalSection = $sectionOrClosure;
+                return $this;
+            }
+
             throw new \LogicException("Cannot set a section without first setting a menu page.");
         }
 
         if (is_string($sectionOrClosure)) {
             $classOrAlias = $sectionOrClosure;
 
-            $section = $this->makeItemFrom(
-                $classOrAlias,
-                SettingsSection::class, 
-                $callbackOrProps, 
-                $props
+            $section = $this->makeAssociationFromClassOrAlias(
+                'section', SettingsSection::class, $classOrAlias, $callbackOrProps, $props
             );
 
             if ($section instanceof SettingsSection) {
-                $this->section = $section;
-                $this->section->page($this->page->getSlug());
+                $section->page($this->page->getSlug());
             }
         }
 
         else if ($sectionOrClosure instanceof Closure) {
-            $closure = $sectionOrClosure;
-            $props   = is_array($callbackOrProps) ? $callbackOrProps : $props;
-            $section = $this->makeItem(SettingsSection::class, $closure, $props);
+            $section = $this->makeAssociationFromClosure(
+                'section', SettingsSection::class, $sectionOrClosure, $callbackOrProps, $props
+            );
 
             if ($section instanceof SettingsSection) {
-                $this->section = $section;
-                $this->section->page($this->page->getSlug());
+                $section->page($this->page->getSlug());
             }
         }
 
@@ -353,6 +352,24 @@ class Setting extends DataItem {
         }
 
         return $this;
+    }
+
+    /**
+     * Retrieves the associated SettingsSection for this Setting.
+     *
+     * @return SettingsSection|null
+     */
+    final public function getSection(): ?SettingsSection {
+        return $this->section;
+    }
+
+    /**
+     * Checks if the setting has an associated SettingsSection.
+     *
+     * @return bool
+     */
+    final public function hasSection(): bool {
+        return $this->section instanceof SettingsSection;
     }
 
     // =========================================================================
@@ -375,5 +392,69 @@ class Setting extends DataItem {
         }
 
         $container->setItemValue($this->name, $value);
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    /**
+     * Makes an association for a Setting from a class name or alias.
+     *
+     * @param string $property
+     * @param string $contract
+     * @param string $classOrAlias
+     * @param array  $callbackOrProps
+     * @param array  $props
+     *
+     * @return Page|SettingsSection|null
+     */
+    private function makeAssociationFromClassOrAlias(
+        string         $property,
+        string         $contract,
+        string         $classOrAlias, 
+        Closure|array  $callbackOrProps = [], 
+        array          $props = []
+    ): Page|SettingsSection|null {
+        $item = $this->makeItemFrom(
+            $classOrAlias,
+            $contract, 
+            $callbackOrProps, 
+            $props
+        );
+
+        if ($item instanceof $contract) {
+            $this->{$property} = $item;
+        }
+
+        return $item;
+    }
+
+    /**
+     * Makes an association for a Setting from a closure.
+     *
+     * @param string  $property
+     * @param string  $contract
+     * @param Closure $closure
+     * @param array   $callbackOrProps
+     * @param array   $props
+     *
+     * @return Page|SettingsSection|null
+     */
+    private function makeAssociationFromClosure(
+        string         $property,
+        string         $contract,
+        Closure        $closure, 
+        Closure|array  $callbackOrProps = [], 
+        array          $props = []
+    ): Page|SettingsSection|null {
+        $props = is_array($callbackOrProps) ? $callbackOrProps : $props;
+        $item  = $this->makeItem($contract, $closure, $props);
+
+        if ($item instanceof $contract) {
+            $this->{$property} = $item;
+        }
+
+        return $item;
     }
 }
