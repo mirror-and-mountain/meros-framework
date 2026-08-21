@@ -1,6 +1,6 @@
 <?php 
 
-namespace MM\Meros\Contracts\Features\Concerns;
+namespace MM\Meros\Contracts\Concerns;
 
 use Illuminate\Support\Str;
 
@@ -33,6 +33,13 @@ trait IsSwitchable {
     private string $switchSettingName = '';
 
     /**
+     * The arguments used to configure the switch.
+     *
+     * @var array
+     */
+    private array $switchSettingArgs = [];
+
+    /**
      * Resolves the provider of the feature, used to access the provider's settings and preferences.
      *
      * @return FeatureProvider
@@ -55,7 +62,7 @@ trait IsSwitchable {
      *
      * @return SettingsContainer
      */
-    abstract protected function resolveSettingsContainer(SettingsContainers $register): SettingsContainer;
+    abstract public function resolveSettingsContainer(SettingsContainers $register): SettingsContainer;
 
     /**
      * Runs when the feature is configured, registering the switch setting if applicable.
@@ -83,9 +90,9 @@ trait IsSwitchable {
                 $enabled   = $container->getItemValue($this->switchSettingName, true);
 
                 if ($enabled) {
-                    $this->runWhenEnabled();
+                    $this->whenEnabled();
                 } else {
-                    $this->runWhenDisabled();
+                    $this->whenDisabled();
                 }
             });
         } else {
@@ -110,7 +117,7 @@ trait IsSwitchable {
      *
      * @return void
      */
-    abstract protected function runWhenEnabled(): void;
+    abstract protected function whenEnabled(): void;
 
     /**
      * Runs the feature's functionality when it is disabled. 
@@ -120,7 +127,7 @@ trait IsSwitchable {
      *
      * @return void
      */
-    protected function runWhenDisabled(): void {
+    protected function whenDisabled(): void {
         // This method can be overridden by implementing classes to define behavior when the feature is disabled.
     }
 
@@ -130,13 +137,13 @@ trait IsSwitchable {
      * This method can be overridden by subclasses to 
      * define the feature's behavior when it is not switchable.
      * 
-     * By default, this method calls the runWhenEnabled method, as the 
+     * By default, this method calls the whenEnabled method, as the 
      * feature is always considered enabled when it is not switchable.
      *
      * @return void
      */
     protected function runWhenNotSwitchable(): void {
-        $this->runWhenEnabled();
+        $this->whenEnabled();
     }
 
     /**
@@ -153,23 +160,56 @@ trait IsSwitchable {
             SettingsContainersFacade::instance($this->getProvider())
         );
 
-        $container->add('boolean', function ($setting) {
-            $providerHandle = $this->getProvider()->getHandle();
-            $name           = Str::replace('-', '_', $this->getIdentifier());
-            $label          = Str::headline($name);
+        $args = $this->switchSettingArgs;
+        $label       = $args['label'] ?? '';
+        $description = $args['description'] ?? '';
+        $default     = $args['default'] ?? true;
+        $name        = $args['name'] ?? '';
 
-            // Store the switch setting name for later use
+        $customName = $name !== '';
+
+        $providerHandle = $this->getProvider()->getHandle();
+        $label          = $label ?: Str::headline(Str::replace('-', '_', $this->getIdentifier()));
+        $name           = $name ?: Str::replace('-', '_', $this->getIdentifier());
+        $description    = $description ?: "Enable/Disable {$label}";
+
+        if ($customName) {
+            $this->switchSettingName = $name;
+        } else {
             $this->switchSettingName = "{$providerHandle}_{$name}_enabled";
+        }
 
+
+        $container->add('boolean', function ($setting) use ($label, $description, $default) {
             $setting->name($this->switchSettingName);
             $setting->label($label);
-            $setting->description("Enable/Disable {$label}");
-            $setting->default(true);
+            $setting->description($description);
+            $setting->default($default);
             $setting->field('checkbox');
         });
 
         // Store the switch setting container for later use
         $this->switchSettingContainer = $container;
+    }
+
+    /**
+     * Configures the feature as switchable, allowing it to be enabled or disabled in WP Admin.
+     *
+     * @param string $label       The label for the switch setting.
+     * @param string $description Optional. The description for the switch setting. Defaults to an empty string.
+     * @param bool   $default     Optional. The default value for the switch setting. Defaults to true (enabled).
+     * @param string $name        Optional. The name for the switch setting. If not provided, a name will be generated based on the feature's identifier.
+     *
+     * @return void
+     */
+    final protected function switch(string $label, string $description = '', bool $default = true, string $name = ''): void {
+        $this->isSwitchable(true);
+        $this->switchSettingArgs = [
+            'label'       => $label,
+            'description' => $description,
+            'default'     => $default,
+            'name'        => $name,
+        ];
     }
 
     /**

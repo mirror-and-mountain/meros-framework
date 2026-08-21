@@ -2,52 +2,19 @@
 
 namespace MM\Meros\App;
 
-use Illuminate\Support\Str;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
-
-use MM\Meros\App\BaseTheme;
 use MM\Meros\Contracts\Provider;
 
 use MM\Meros\Registers\Admin\SettingsContainers;
-
-use MM\Meros\Contracts\Features\Admin\Setting;
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 
-use MM\Meros\App\Admin\Pages\ThemeSettings as ThemeSettingsPage;
-use MM\Meros\App\Admin\Pages\PackageSettings as PackageSettingsPage;
-use MM\Meros\App\Admin\Pages\AssetSettings as AssetSettingsPage;
-
-use MM\Meros\App\Admin\Settings\Containers\FrameworkSettings;
-use MM\Meros\App\Admin\Settings\Containers\ThemeSettings;
-use MM\Meros\App\Admin\Settings\Containers\PackageSettings;
-use MM\Meros\App\Admin\Settings\Containers\AssetGroupSettings;
-
-use MM\Meros\App\Components\Fields\Text;
-use MM\Meros\App\Components\Fields\Number;
-use MM\Meros\App\Components\Fields\Checkbox;
-use MM\Meros\App\Components\Fields\Email;
-use MM\Meros\App\Components\FieldGroups\SimpleContact;
-
-use MM\Meros\App\Assets\MFormsDeps;
-use MM\Meros\App\Assets\MForms;
-use MM\Meros\App\Assets\Admin as MerosAdminAssets;
+use MM\Meros\App\Components\Orchestrator as ComponentsOrchestrator;
+use MM\Meros\App\Assets\Orchestrator as AssetsOrchestrator;
+use MM\Meros\App\Admin\Settings\Orchestrator as SettingsOrchestrator;
 
 use MM\Meros\Contracts\Providers\Concerns\IsFrameworkProvider;
 use MM\Meros\Contracts\Providers\Concerns\IsNonPackageProvider;
 
 final class Framework extends Provider {
-    private array $fields = [
-        'text'     => Text::class,
-        'number'   => Number::class,
-        'checkbox' => Checkbox::class,
-        'email'    => Email::class,
-    ];
-
-    private array $fieldGroups = [
-        'simple-contact-fields' => SimpleContact::class,
-    ];
-
     use IsFrameworkProvider, IsNonPackageProvider;
 
     // =========================================================================
@@ -86,12 +53,11 @@ final class Framework extends Provider {
      * @return void
      */
     public function configure(): void {
-        $this->registerComponents();
-        $this->registerMenuPages();
-        $this->registerSettingsContainers();
-        $this->registerSettings();
+        $this->initialise(ComponentsOrchestrator::class);
+        $this->initialise(AssetsOrchestrator::class);
+        $this->initialise(SettingsOrchestrator::class);
+
         $this->registerPostTypes();
-        $this->registerAssets();
         $this->registerTables();
     }
 
@@ -114,25 +80,6 @@ final class Framework extends Provider {
     }
 
     // =========================================================================
-    // Form Components
-    // =========================================================================
-
-    /**
-     * Registers the framework's components.
-     *
-     * @return void
-     */
-    private function registerComponents(): void {
-        foreach ($this->fields as $alias => $fieldClass) {
-            $this->fields()->register($fieldClass, $alias);
-        }
-
-        foreach ($this->fieldGroups as $alias => $groupClass) {
-            $this->fieldGroups()->register($groupClass, $alias);
-        }
-    }
-
-    // =========================================================================
     // Settings Management
     // =========================================================================
 
@@ -146,136 +93,6 @@ final class Framework extends Provider {
     public function resolveSettingsContainer(SettingsContainers $register): SettingsContainer {
         return $register->get('meros_framework_settings', null, false) ?? 
                $register->makeFrom('meros_framework_settings');
-    }
-
-    /**
-     * Registers the framework's wp-admin menu pages.
-     *
-     * @return void
-     */
-    private function registerMenuPages(): void {
-        $this->menuPages()->register(PackageSettingsPage::class, 'meros-packages');
-        $this->menuPages()->register(ThemeSettingsPage::class, 'meros-theme-settings', BaseTheme::class);
-        $this->menuPages()->register(AssetSettingsPage::class, 'meros-assets');
-    }
-
-    /**
-     * Registers the framework's settings containers.
-     *
-     * @return void
-     */
-    private function registerSettingsContainers(): void {
-        $this->settingsContainers()->register(FrameworkSettings::class, 'meros_framework_settings');
-        $this->settingsContainers()->register(ThemeSettings::class, 'meros_theme_settings', BaseTheme::class);
-        $this->settingsContainers()->register(PackageSettings::class, 'meros_package_settings');
-        $this->settingsContainers()->register(AssetGroupSettings::class, 'meros_asset_group_settings');
-    }
-
-    /**
-     * Registers the framework's settings.
-     *
-     * @return void
-     */
-    private function registerSettings(): void {
-        $packageToggleSetting = $this->settings()->add('boolean', function ($setting) {
-            $setting->name('meros_package_toggled');
-            $setting->default(false);
-        });
-
-        add_action('meros_packages_registered', function (Collection $packages) use ($packageToggleSetting) {
-            $this->registerPackageSettings($packages, $packageToggleSetting);
-
-            if ($packageToggleSetting->getValue() === true && $packageToggleSetting instanceof Setting) {
-                flush_rewrite_rules(); // Ensure that any new rewrite rules are applied after packages have been toggled.
-                $packageToggleSetting->setValue(false);
-            }
-        });
-    }
-
-    /**
-     * Registers on/off toggle settings for all installed packages.
-     *
-     * @return void
-     */
-    private function registerPackageSettings(Collection $packages, Setting $packageToggleSetting): void {
-        if ($packages->isEmpty()) {
-            return;
-        }
-
-        $container = $this->settingsContainers('meros_package_settings')
-            ?? $this->settingsContainers()->makeFrom('meros_package_settings');
-
-        if (!($container instanceof SettingsContainer)) {
-            throw new \RuntimeException("The settings container for the framework must be an instance of SettingsContainer.");
-        }
-
-        foreach ($packages as $package) {
-            $container->add('boolean', function ($setting) use ($package) {
-                $setting->addContext('is_meros_package_setting', true);
-                $setting->setProvider($package);
-                $setting->name($package->getHandle() . '_enabled');
-                $setting->label('Enable ' . $package->getName());
-                $setting->default(false);
-                $setting->field();
-                $setting->onUpdate(function ($value, $oldValue, $itemName, $optionName) use ($package) {
-                    if ($value === $oldValue) {
-                        return;
-                    }
-
-                    if ($value === true) {
-                        $package->__whenEnabled();
-                    } else {
-                        $package->__whenDisabled();
-                    }
-                });
-            });
-
-            add_action('meros_package_enabled_' . $package->getHandle(), function ($package) use ($packageToggleSetting) {
-                $packageToggleSetting->setValue(true);
-            });
-
-            add_action('meros_package_disabled_' . $package->getHandle(), function ($package) use ($packageToggleSetting) {
-                $packageToggleSetting->setValue(true);
-            });
-        }
-
-        add_filter('meros_settings_field_title', function (string $title, string $id, Setting $setting) {        
-            if (!$setting->getContext('is_meros_package_setting')) {
-                return $title;
-            }
-
-            $package = $setting->getProvider();
-
-            if (!($package instanceof Package)) {
-                return $title;
-            }
-
-            $slug = Str::slug(Str::replace('_', '-', $package->getHandle()));
-            $description = $package->getDescription();
-
-            $hasSettingsFields = $package->hasSettingsWithFields();
-            $hasTables = $package->hasRegisteredTables();
-
-
-            return 
-                '<div class="meros-settings-field-title-wrapper">' .
-                    '<label for="' . esc_attr($id) . '">' . esc_html($title) . '</label>' .
-                    (!empty($description) ? 
-                        '<div class="meros-settings-field-description"><span class="description">' . esc_html($description) . '</span></div>' : ''
-                    ) .
-                    ($hasSettingsFields || $hasTables ? 
-                        '<div class="meros-settings-field-actions">' .
-                            ($hasSettingsFields ? 
-                                '<a href="' . esc_url(admin_url('admin.php?page=meros-packages&package=' . $slug)) . '" title="Settings">Settings</a>' . ($hasTables ? ' | ' : '') : ''
-                            ) .
-                            ($hasTables ? 
-                                '<a href="' . esc_url(admin_url('admin.php?page=meros-packages&package=' . $slug . '&tables=' . $slug . '-tables')) . '" title="Manage Tables">Manage Tables</a>' : ''
-                            ) .
-                        '</div>' : ''
-                    ) .
-                '</div>';
-
-        }, 10, 3);
     }
 
     /**
@@ -386,25 +203,6 @@ final class Framework extends Provider {
             $postType->name('page');
             $postType->core(true);
         });
-    }
-
-    // =========================================================================
-    // Assets
-    // =========================================================================
-
-    /**
-     * Registers the framework's asset groups and assets.
-     *
-     * @return void
-     */
-    private function registerAssets(): void {
-        $this->assetGroups()->makeFrom(MFormsDeps::class, 'meros_forms_dependencies');
-        $this->assetGroups()->makeFrom(MForms::class, 'meros_forms_assets');
-        $this->assetGroups()->makeFrom(MerosAdminAssets::class, 'meros_admin_assets');
-
-        // add_action('admin_init', function () {
-        //     dd($this->assetGroups()->all());
-        // }, 20);
     }
 
     // =========================================================================

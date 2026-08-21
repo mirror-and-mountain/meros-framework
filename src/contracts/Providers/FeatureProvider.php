@@ -16,9 +16,11 @@ interface FeatureProvider {
     /**
      * Retrieves provider's handle.
      *
+     * @param bool $slug Whether to return the slug version of the handle.
+     *
      * @return string
      */
-    public function getHandle(): string;
+    public function getHandle(bool $slug = false): string;
 
     /**
      * Retrieves provider's name.

@@ -11,9 +11,9 @@ use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 use MM\Meros\Contracts\Features\Registrable;
 use MM\Meros\Contracts\Features\Makeable;
 
+use MM\Meros\Contracts\Concerns\IsSwitchable;
 use MM\Meros\Contracts\Features\Concerns\IsMakeable;
 use MM\Meros\Contracts\Features\Concerns\IsRegistrable;
-use MM\Meros\Contracts\Features\Concerns\IsSwitchable;
 
 use MM\Meros\Contracts\Features\Concerns\MakesItems;
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
@@ -62,7 +62,7 @@ class AssetGroup extends Feature implements Registrable, Makeable {
      *
      * @return SettingsContainer
      */
-    final protected function resolveSettingsContainer(SettingsContainers $register): SettingsContainer {
+    final public function resolveSettingsContainer(SettingsContainers $register): SettingsContainer {
         $container = $register->get('meros_asset_group_settings', Framework::get());
 
         if ($container === null) {
@@ -202,7 +202,7 @@ class AssetGroup extends Feature implements Registrable, Makeable {
      *
      * @return void
      */
-    final protected function runWhenEnabled(): void {
+    final protected function whenEnabled(): void {
         if (empty($this->assets)) {
             return;
         }
