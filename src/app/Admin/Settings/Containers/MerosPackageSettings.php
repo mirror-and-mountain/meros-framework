@@ -4,7 +4,7 @@ namespace MM\Meros\App\Admin\Settings\Containers;
 
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 
-final class PackageSettings extends SettingsContainer {
+final class MerosPackageSettings extends SettingsContainer {
     
     // =========================================================================
     // Initialisation

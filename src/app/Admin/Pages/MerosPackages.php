@@ -4,7 +4,7 @@ namespace MM\Meros\App\Admin\Pages;
 
 use MM\Meros\Contracts\Features\Admin\Page;
 
-final class PackageSettings extends Page {
+final class MerosPackages extends Page {
     
     // =========================================================================
     // Initialisation

@@ -8,16 +8,16 @@ use Illuminate\Support\Collection;
 use MM\Meros\Contracts\Features\Admin\Setting;
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 
-use MM\Meros\App\Admin\Pages\ThemeSettings as ThemeSettingsPage;
-use MM\Meros\App\Admin\Pages\PackageSettings as PackageSettingsPage;
-use MM\Meros\App\Admin\Pages\AssetSettings as AssetSettingsPage;
+use MM\Meros\App\Admin\Pages\MerosThemeSettings as ThemeSettingsPage;
+use MM\Meros\App\Admin\Pages\MerosPackages as PackageSettingsPage;
+use MM\Meros\App\Admin\Pages\MerosAssets as AssetGroupSettingsPage;
 
 use MM\Meros\App\Admin\Sections\MerosSettings;
 
-use MM\Meros\App\Admin\Settings\Containers\FrameworkSettings;
-use MM\Meros\App\Admin\Settings\Containers\ThemeSettings;
-use MM\Meros\App\Admin\Settings\Containers\PackageSettings;
-use MM\Meros\App\Admin\Settings\Containers\AssetGroupSettings;
+use MM\Meros\App\Admin\Settings\Containers\MerosFrameworkSettings;
+use MM\Meros\App\Admin\Settings\Containers\MerosThemeSettings;
+use MM\Meros\App\Admin\Settings\Containers\MerosPackageSettings;
+use MM\Meros\App\Admin\Settings\Containers\MerosAssetGroupSettings;
 
 use MM\Meros\Contracts\Orchestrators\SettingsOrchestrator;
 use MM\Meros\Contracts\Providers\Concerns\ProvidesSettingsContainers;
@@ -41,9 +41,9 @@ class Orchestrator extends SettingsOrchestrator {
      * @return void
      */
     private function registerMenuPages(): void {
-        $this->menuPages()->register(PackageSettingsPage::class, 'meros-packages');
-        $this->menuPages()->register(ThemeSettingsPage::class, 'meros-theme-settings', BaseTheme::class);
-        $this->menuPages()->register(AssetSettingsPage::class, 'meros-assets');
+        $this->pages(PackageSettingsPage::class)->register();
+        $this->pages(ThemeSettingsPage::class)->register(BaseTheme::class);
+        $this->pages(AssetGroupSettingsPage::class)->register();
     }
 
     /**
@@ -61,10 +61,10 @@ class Orchestrator extends SettingsOrchestrator {
      * @return void
      */
     private function registerSettingsContainers(): void {
-        $this->settingsContainers()->register(FrameworkSettings::class, 'meros_framework_settings');
-        $this->settingsContainers()->register(ThemeSettings::class, 'meros_theme_settings', BaseTheme::class);
-        $this->settingsContainers()->register(PackageSettings::class, 'meros_package_settings');
-        $this->settingsContainers()->register(AssetGroupSettings::class, 'meros_asset_group_settings');
+        $this->settingsContainers(MerosFrameworkSettings::class)->register();
+        $this->settingsContainers(MerosThemeSettings::class)->register(BaseTheme::class);
+        $this->settingsContainers(MerosPackageSettings::class)->register();
+        $this->settingsContainers(MerosAssetGroupSettings::class)->register();
     }
 
     /**

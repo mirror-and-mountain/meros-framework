@@ -34,6 +34,13 @@ abstract class Register implements FeatureRegister {
     private bool $uniqueInstances = false;
 
     /**
+     * The default format of the feature's identifier. Can be 'slug' or 'snake'.
+     *
+     * @var string
+     */
+    private string $identifierFormat = 'snake';
+
+    /**
      * The class name of the feature contract that this register will create.
      *
      * @var string
@@ -69,6 +76,30 @@ abstract class Register implements FeatureRegister {
 
     protected function configure(): void {
         // This method can be overridden by subclasses to provide additional configuration.
+    }
+
+    /**
+     * Sets the format of the feature's identifier. Can be 'slug' or 'snake'.
+     *
+     * @param string $format
+     *
+     * @return void
+     */
+    final protected function identifierFormat(string $format): void {
+        if (!in_array($format, ['slug', 'snake'])) {
+            throw new \InvalidArgumentException("Invalid identifier format '{$format}' specified for register (" . static::class . "). Valid formats are 'slug' and 'snake'.");
+        }
+
+        $this->identifierFormat = $format;
+    }
+
+    /**
+     * Returns the format of the feature's identifier. Can be 'slug' or 'snake'.
+     *
+     * @return string
+     */
+    final protected function getIdentifierFormat(): string {
+        return $this->identifierFormat;
     }
 
     /**

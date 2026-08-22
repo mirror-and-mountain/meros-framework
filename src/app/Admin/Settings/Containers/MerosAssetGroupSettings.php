@@ -4,16 +4,16 @@ namespace MM\Meros\App\Admin\Settings\Containers;
 
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 
-class ThemeSettings extends SettingsContainer {
-
+class MerosAssetGroupSettings extends SettingsContainer {
+    
     // =========================================================================
     // Initialisation
     // =========================================================================
-    
+
     protected function configure(): void {
-        $this->name('meros_theme_settings');
-        $this->label('Meros Theme Settings');
-        $this->description('Settings provided by the current Meros theme.');
-        $this->page('meros-theme-settings');
+        $this->name('meros_asset_group_settings');
+        $this->label('Meros Asset Group Settings');
+        $this->description('Toggles for asset groups registered via the Meros framework. ');
+        $this->page('meros-assets');
     }
 }

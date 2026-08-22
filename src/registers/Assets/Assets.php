@@ -34,6 +34,7 @@ abstract class Assets extends Register implements RegistrarMaker {
         $this->unique(true);
         $this->contract($this->assetContract);
         $this->preloadType('instance');
+        $this->identifierFormat('slug');
     }
 
     /**

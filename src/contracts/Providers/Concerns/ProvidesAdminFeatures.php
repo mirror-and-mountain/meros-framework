@@ -23,6 +23,18 @@ trait ProvidesAdminFeatures {
     }
 
     /**
+     * Retrieves a specific menu page by handle or returns the menu pages register.
+     * Alias for `menuPages()`.
+     *
+     * @param string $slug Optional. The slug of the menu page to retrieve.
+     * 
+     * @return Page|Pages|null The requested menu page or the menu pages register.
+     */
+    final protected function pages(string $slug = ''): Page|Pages|null {
+        return $this->resolveFeatureRequestFor(Page::class, $slug);
+    }
+
+    /**
      * Retrieves a specific settings section by name or returns the settings sections register.
      *
      * @param string $id Optional. The ID of the settings section to retrieve.

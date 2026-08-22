@@ -17,5 +17,6 @@ class Pages extends Register implements RegistrarMaker {
         $this->unique(true);
         $this->contract(Page::class);
         $this->facade(PagesFacade::class);
+        $this->identifierFormat('slug');
     }
 }

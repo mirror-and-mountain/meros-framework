@@ -169,6 +169,11 @@ abstract class Feature implements FeatureDefinition {
         // This method can be overridden by subclasses to perform additional configuration.
     }
 
+    /**
+     * Called after the feature has been configured. 
+     *
+     * @return void
+     */
     private function __whenConfigured(): void {
         if (empty($this->label)) {
             $this->label = Str::title(Str::replace(['-', '_'], ' ', $this->getIdentifier()));
@@ -481,6 +486,15 @@ abstract class Feature implements FeatureDefinition {
             'snake' => $this->defaultIdentifierFormat === 'slug' ? Str::snake(Str::replace('-', '_', $value)) : $value,
             default => $value
         };
+    }
+
+    /**
+     * Returns the default format of the feature's identifier.
+     *
+     * @return string The default format of the feature's identifier. Can be 'slug' or 'snake'.
+     */
+    final public function getDefaultIdentifierFormat(): string {
+        return $this->defaultIdentifierFormat;
     }
 
     /**

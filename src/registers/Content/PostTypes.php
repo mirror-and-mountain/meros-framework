@@ -18,5 +18,6 @@ class PostTypes extends Register implements RegistrarMaker {
         $this->unique(true);
         $this->contract(PostType::class);
         $this->facade(PostTypesFacade::class);
+        $this->identifierFormat('slug');
     }
 }

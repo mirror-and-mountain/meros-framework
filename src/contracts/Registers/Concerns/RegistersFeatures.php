@@ -13,7 +13,8 @@ use MM\Meros\Contracts\Providers\FeatureProvider;
 
 use MM\Meros\Support\ClassInfo;
 
-use MM\Meros\Contracts\Features\Assets\Groups\SiteDependencies;
+use MM\Meros\Registers\Admin\Pages;
+use MM\Meros\Registers\Assets\AssetGroups;
 
 /**
  * Notes:
@@ -109,21 +110,14 @@ trait RegistersFeatures {
      */
     final public function register(string $featureClass = '', string $alias = '', ?string $onBehalfOf = null): static {
         $this->ensureCheckout('register');
+        $provider = $this->getProvider();
 
         if ($this->preloadType === 'classname' && $this->isPreloaded()) {
-            if ($onBehalfOf === null && Str::contains($alias, '\\')) {
-                $onBehalfOf = $alias;
-                $alias      = $featureClass;
-            } else if (!empty($featureClass)) {
-                $alias = $featureClass;
-            }
-
-            $featureClass = $this->preloadedItem;
-        } else if (empty($featureClass) && !is_string($this->preloadedItem)) {
-            throw new \InvalidArgumentException("Feature class must be provided when registering a feature.");
+            $config = $this->getPreloadConfig($featureClass, $alias);
+            $featureClass = $config['featureClass'];
+            $alias        = $config['alias'];
+            $onBehalfOf   = $config['onBehalfOf'];
         }
-
-        $provider = $this->getProvider();
 
         if ($this->hasRegisteredFeatureClass($featureClass, null, false) && $featureClass !== $this->getContract()) {
             return $this; // Unique class is already registered, no need to register again.
@@ -135,7 +129,7 @@ trait RegistersFeatures {
 
         $this->registeredFeatures[] = [
             'class'       => $featureClass,
-            'alias'       => empty($alias) ? Str::snake(class_basename($featureClass)) : $alias,
+            'alias'       => $this->getAlias($featureClass, $alias),
             'provider'    => $provider,
             'onBehalfOf'  => $onBehalfOf !== $provider::class ? $onBehalfOf : null,
             'identifier'  => '',
@@ -144,55 +138,100 @@ trait RegistersFeatures {
 
         $this->unload(); // Unload any preloaded item after registering.
         $this->checkin();
+        
         return $this;
+    }
+
+    /**
+     * Helper to resolve the preloaded feature class, alias and onBehalfOf provider from the given inputs.
+     *
+     * @param string $input1
+     * @param string $input2
+     *
+     * @return array
+     */
+    private function getPreloadConfig(string $input1 = '', string $input2 = ''): array {
+        if (!$this->isPreloaded()) {
+            throw new \RuntimeException("Cannot register a feature class when the register has not been preloaded with a feature class.");
+        }
+
+        if (!empty($input1) && Str::contains($input1, '\\')) {
+            $onBehalfOf = $input1;
+            $alias      = $input2;
+        } else if (!empty($input2) && Str::contains($input2, '\\')) {
+            $onBehalfOf = $input2;
+            $alias      = $input1;
+        } else {
+            $onBehalfOf = null;
+            $alias      = $input1;
+        }
+
+        return [
+            'featureClass' => $this->preloadedItem,
+            'alias'        => $alias,
+            'onBehalfOf'   => $onBehalfOf,
+        ];
     }
 
     /**
      * Creates a new instance of the specified feature class, if it has been registered with this register.
      * 
-     * @param string               $featureClassOrAlias            The class name or alias of the feature to create.
-     * @param Closure|array|string $callbackPropsAliasOrOnBehalfOf An optional callback to modify the feature instance after creation, an array of properties to pass to the feature's constructor, or a string alias for the feature. An 'onBehalfOf' provider can also be specified here as a string, if the feature is to be registered on behalf of another provider.
-     * @param array                $props                          An array of properties to pass to the feature's constructor.
+     * @param string               $featureClassOrAlias The class name or alias of the feature to create.
+     * @param Closure|array|string $input               An optional callback to modify the feature instance after creation, an array of properties to pass to the feature's constructor, or a classname representing the provider on behalf of whom the feature is being created.
+     * @param array                $props               An array of properties to pass to the feature's constructor.
      *
      * @return Registrable The newly created feature instance.
      * @throws \InvalidArgumentException if the feature class has not been registered with this register.
      */
-    final public function makeFrom(string $featureClassOrAlias, Closure|array|string $callbackPropsAliasOrOnBehalfOf = [], array $props = []): Registrable {
+    final public function makeFrom(string $featureClassOrAlias, Closure|array|string $input = [], array $props = []): Registrable {
         $this->ensureCheckout('makeFrom');
-        $givenAlias         = null;
         $checkedOutProvider = $this->getProvider();
 
-        // Resolve the $callbackPropsAliasOrOnBehalfOf parameter to determine if it's a callback, an array of properties, or a string representing an alias or provider.
-        // $onBehalfOf providers may be passed when a preloaded feature class is being made via the make() method.
-        $onBehalfOf = is_string($callbackPropsAliasOrOnBehalfOf) && Str::contains($callbackPropsAliasOrOnBehalfOf, '\\') 
-            ? $callbackPropsAliasOrOnBehalfOf 
-            : null;
-
-        $callbackPropsOrAlias = $onBehalfOf !== null ? '' : $callbackPropsAliasOrOnBehalfOf;
-
-        // If we've been given an alias, register the feature class with the alias before making the instance.
-        // This block will also be used to handle preloaded feature classes being made via the make() method.
-        if (is_string($callbackPropsOrAlias) && Str::contains($featureClassOrAlias, '\\')) {
-            $givenAlias = $callbackPropsOrAlias;
-            $passingOnBehalfOfAsAlias = $onBehalfOf !== null;
-
-            $this->register($featureClassOrAlias, $onBehalfOf ?? $givenAlias, $passingOnBehalfOfAsAlias ? null : $onBehalfOf);
-            $this->checkout($checkedOutProvider); // Re-checkout the original provider after registering the feature class with the alias.
-
-            $callbackOrProps = $props;
-            $props = [];
+        if ($this->preloadType === 'classname' && $this->isPreloaded($featureClassOrAlias)) {
+            $featureClass = $this->preloadedItem;
         } else {
-            $callbackOrProps = $callbackPropsOrAlias;
+            $featureClass = '';
         }
 
+        $config = $this->getMakeFromConfig($input, $props);
+        $callback   = $config['callback'];
+        $props      = $config['props'];
+        $onBehalfOf = $config['onBehalfOf'];
+
+
         // Retrieve the registered feature information for the given class or alias, if it exists.
-        $registeredFeature    = $this->getRegisteredFeature($featureClassOrAlias, null, false);
-        $registered           = $registeredFeature !== null;
-        $featureClass         = $registered ? $registeredFeature['class'] : null;
-        $featureAlias         = $registered ? $registeredFeature['alias'] : '';
-        $featureIdentifier    = $registered ? $registeredFeature['identifier'] : '';
-        $registeringProvider  = $registered ? $registeredFeature['provider'] : null;
-        $registeredOnBehalfOf = $registered ? $registeredFeature['onBehalfOf'] : null;
+        $registeredFeature = $this->getRegisteredFeature(empty($featureClass) ? $featureClassOrAlias : $featureClass, null, false);
+
+        // If the feature class has not been registered, try to register it now.
+        if ($registeredFeature === null) {
+            $classToRegister = empty($featureClass) ? $featureClassOrAlias : $featureClass;
+
+            if (!Str::contains($classToRegister, '\\')) {
+                $this->checkin();
+                throw new \InvalidArgumentException("Feature class or alias '{$featureClassOrAlias}' has not been registered with this register (" . static::class . ").");
+            }
+
+            if ($this->isPreloaded($classToRegister)) {
+                $this->register($onBehalfOf !== null ? $onBehalfOf : '');
+            } else {
+                $this->register($classToRegister, '', $onBehalfOf);
+            }
+
+            $this->checkout($checkedOutProvider); // Re-checkout the original provider after registering the feature class with the alias.
+            
+            $registeredFeature = $this->getRegisteredFeature($classToRegister, null, false);
+            if ($registeredFeature === null) {
+                $this->checkin();
+                throw new \RuntimeException("Failed to register feature class '{$classToRegister}' with this register (" . static::class . ").");
+            }
+        }
+
+        // Parse the registered feature information.
+        $featureClass         = $registeredFeature['class'];
+        $featureAlias         = $registeredFeature['alias'];
+        $featureIdentifier    = $registeredFeature['identifier'];
+        $registeringProvider  = $registeredFeature['provider'];
+        $registeredOnBehalfOf = $registeredFeature['onBehalfOf'];
 
         // If we don't have a registering provider, throw an exception.
         if ($registeringProvider === null) {
@@ -218,27 +257,9 @@ trait RegistersFeatures {
             }
         }
 
-        // If we're not registered and the provided string doesn't look like a fully qualified class name, throw an exception.
-        if (!$registered && $featureClass === null && !Str::contains($featureClassOrAlias, '\\')) {
-            $this->checkin();
-            throw new \InvalidArgumentException("Feature class or alias '{$featureClassOrAlias}' has not been registered with this register (" . static::class . ").");
-        } 
-
-        // Else, if the provided string looks like a fully qualified class name, use it as the feature class, validate and register it.
-        else if (!$registered && $featureClass === null) {
-            $featureClass = $featureClassOrAlias;
-
-            if (!$this->hasCorrectDefinition($featureClass)) {
-                $this->checkin();
-                throw new \InvalidArgumentException("Feature class '{$featureClass}' is not a valid subclass of '{$this->getContract()}'.");
-            }
-
-           $this->register($featureClass, $givenAlias ?? '');
-           $this->checkout($checkedOutProvider); // Re-checkout the original provider after registering the feature class with the alias.
-        }
-
         // Instantiate the feature class
-        $instance         = $featureClass::__make_from_registered($provider, $callbackOrProps, $props);
+        $callbackOrProps  = $callback ?? $props; // If a callback is provided, use it. Otherwise, use the props array.
+        $instance         = $featureClass::__make_from_registered($provider, $callbackOrProps, !is_array($callbackOrProps) ? $props : []);
         $identifier       = $instance->getIdentifier();
         $existingInstance = $this->getExistingInstance($identifier, $provider);
 
@@ -249,8 +270,8 @@ trait RegistersFeatures {
         }
 
         // If the instance doesn't have an identifier, set it to the alias if one was provided.
-        if (empty($identifier) && (!empty($featureAlias) || $givenAlias !== null)) {
-            $instance->setIdentifier($givenAlias ?? $featureAlias);
+        if (empty($identifier) && !empty($featureAlias)) {
+            $instance->setIdentifier($featureAlias);
         }
 
         // Update the registered feature entry with the instance's identifier and mark it as initialised.
@@ -274,26 +295,44 @@ trait RegistersFeatures {
     }
 
     /**
+     * Helper to resolve the callback, props and onBehalfOf provider from the given inputs for the makeFrom method.
+     *
+     * @param Closure|array|string $input
+     * @param array                $props
+     *
+     * @return array
+     */
+    private function getMakeFromConfig(Closure|array|string $input, array $props): array {
+        $callback   = $input instanceof Closure ? $input : null;
+        $props      = is_array($input) ? $input : $props;
+        $onBehalfOf = is_string($input) && Str::contains($input, '\\') ? $input : null;
+
+        return [
+            'callback'   => $callback,
+            'props'      => $props,
+            'onBehalfOf' => $onBehalfOf,
+        ];
+    }
+
+    /**
      * Creates a new instance of the feature definition associated with this register.
      *
-     * @param Closure|array|string $callbackPropsOrOnBehalfOf An optional callback to modify the feature instance after creation, an array of properties to be passed to the feature's constructor, or a string representing the provider on behalf of whom the feature is being created.
-     * @param array                $props                     An array of properties to be passed to the feature's constructor.
+     * @param Closure|array|string $input An optional callback to modify the feature instance after creation, an array of properties to be passed to the feature's constructor, or a string representing the provider on behalf of whom the feature is being created.
+     * @param array                $props An array of properties to be passed to the feature's constructor.
      *
      * @return Makeable|Registrable The newly created feature instance.
      * @throws \InvalidArgumentException if the feature definition class is not makeable.
      */
-    final public function make(Closure|array|string $callbackPropsOrOnBehalfOf = [], array $props = []): Makeable|Registrable {
+    final public function make(Closure|array|string $input = [], array $props = []): Makeable|Registrable {
         $this->ensureCheckout('make');
 
         if ($this->preloadType === 'classname' && $this->isPreloaded()) {
             $featureClass = $this->preloadedItem;
-            $onBehalfOf   = is_string($callbackPropsOrOnBehalfOf) ? $callbackPropsOrOnBehalfOf : '';
-
-            return $this->makeFrom($featureClass, $onBehalfOf);
+            return $this->makeFrom($featureClass, $input, $props);
         }
 
         else if ($this instanceof Maker && method_exists($this, 'makeFeature')) {
-            $callbackOrProps = is_string($callbackPropsOrOnBehalfOf) ? [] : $callbackPropsOrOnBehalfOf;
+            $callbackOrProps = is_string($input) ? [] : $input; // If the input is a string (onBehalfOf), we don't want to pass it to the makeFeature method.
             $this->unload(); // Unload any preloaded item after making the instance.
             return $this->makeFeature($callbackOrProps, $props);
         }
@@ -306,11 +345,39 @@ trait RegistersFeatures {
     // =========================================================================
 
     /**
+     * Retrieves or creates an alias for the given feature class. If an alias is provided, it will be used. 
+     * Otherwise, the alias will be generated based on the feature class name and the register's identifier format.
+     *
+     * @param string $featureClass
+     * @param string $alias
+     *
+     * @return string
+     */
+    final protected function getAlias(string $featureClass, string $alias): string {
+        if (!empty($alias)) {
+            return $alias;
+        }
+
+        $snake  = Str::snake(class_basename($featureClass));
+        $format = $this->getIdentifierFormat();
+
+        return $format === 'snake' 
+            ? $snake
+            : Str::replace('_', '-', $snake);
+    }
+
+    /**
      * Checks if the register has been preloaded with a feature class.
+     * 
+     * @param Registrable|string|null $item An optional feature class or instance to check against the preloaded item. If null, the method will simply check if any item has been preloaded.
      *
      * @return boolean
      */
-    final protected function isPreloaded(): bool {
+    final protected function isPreloaded(Registrable|string|null $item = null): bool {
+        if ($item !== null) {
+            return $this->preloadedItem === $item;
+        }
+
         return $this->preloadedItem !== null;
     }
 

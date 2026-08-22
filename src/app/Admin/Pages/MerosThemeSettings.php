@@ -5,7 +5,7 @@ namespace MM\Meros\App\Admin\Pages;
 use MM\Meros\Contracts\Features\Admin\Page;
 use MM\Meros\Facades\Theme;
 
-final class ThemeSettings extends Page {
+final class MerosThemeSettings extends Page {
     
     // =========================================================================
     // Initialisation

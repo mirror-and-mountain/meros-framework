@@ -53,6 +53,13 @@ trait Abstracts {
     abstract protected function returnValue(bool $checkin, mixed $value): mixed;
 
     /**
+     * Retrieves the format of the feature's identifier.
+     *
+     * @return string The format of the feature's identifier. Can be 'slug' or 'snake'.
+     */
+    abstract protected function getIdentifierFormat(): string;
+
+    /**
      * Checks out the register to a specific provider.
      *
      * @param FeatureProvider|null $provider The provider to check out the register to.

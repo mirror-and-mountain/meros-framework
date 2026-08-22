@@ -17,5 +17,6 @@ class FieldGroups extends Register implements RegistrarMaker {
         $this->contract(FieldGroup::class);
         $this->unique(true);
         $this->facade(FieldGroupsFacade::class);
+        $this->identifierFormat('slug');
     }
 }

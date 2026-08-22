@@ -4,7 +4,7 @@ namespace MM\Meros\App\Admin\Pages;
 
 use MM\Meros\Contracts\Features\Admin\Page;
 
-final class AssetSettings extends Page {
+final class MerosAssets extends Page {
     
     // =========================================================================
     // Initialisation
