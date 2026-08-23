@@ -16,7 +16,7 @@ use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 
 use MM\Meros\Facades\Assets\AssetGroups;
 
-abstract class Asset extends Feature implements Registrable, Makeable {
+class Asset extends Feature implements Registrable, Makeable {
     /**
      * The unique handle for the asset, used as the identifier when enqueuing in WordPress.
      * Currently set to the class's identifier and will likely be deprecated in the future.
@@ -31,6 +31,13 @@ abstract class Asset extends Feature implements Registrable, Makeable {
      * @var string
      */
     protected string $path = '';
+
+    /**
+     * Whether the asset has been configured from a file path.
+     *
+     * @var boolean
+     */
+    private bool $configuredFromPath = false;
     
     /**
      * The source URL for the asset, which is used when enqueuing in WordPress.
@@ -55,11 +62,33 @@ abstract class Asset extends Feature implements Registrable, Makeable {
 
     /**
      * The area of the site where the asset should be loaded. 
-     * Can be either 'frontend,' 'admin' or 'editor'.
+     * Can be either 'site,' 'admin' or 'editor', or an array of these areas for multiple contexts.
+     *
+     * @var string|array<string>
+     */
+    protected string|array $area = 'site';
+
+    /**
+     * The type of the asset, either 'script' or 'style'.
      *
      * @var string
      */
-    protected string $area = 'frontend';
+    protected string $type = '';
+
+    /**
+     * Whether the script should be loaded in the footer of the page.
+     * Relevant only for script assets; ignored for styles.
+     *
+     * @var bool
+     */
+    protected bool $inFooter = false;
+
+    /**
+     * An instance of the asset's group if set.
+     *
+     * @var AssetGroup|null
+     */
+    protected ?AssetGroup $group = null;
 
     /**
      * Indicates that the register() method has been called on the asset.
@@ -89,13 +118,6 @@ abstract class Asset extends Feature implements Registrable, Makeable {
      */
     protected bool $isEnqueued = false;
 
-    /**
-     * An instance of the asset's group if set.
-     *
-     * @var AssetGroup|null
-     */
-    protected ?AssetGroup $group = null;
-
     use ResolvesPaths, IsRegistrable, IsMakeable, InstantiatesItems;
 
     // =========================================================================
@@ -107,16 +129,10 @@ abstract class Asset extends Feature implements Registrable, Makeable {
     }
 
     protected function whenConfigured(): void {
-        if (isset($this->passedProps['path']) && is_string($this->passedProps['path'])) {
-            $handle = isset($this->passedProps['handle']) && is_string($this->passedProps['handle']) && !empty($this->passedProps['handle'])
-                ? $this->passedProps['handle']
-                : '';
-
-            $dependencies = isset($this->passedProps['dependencies']) && is_array($this->passedProps['dependencies'])
-                ? $this->passedProps['dependencies']
-                : [];
-
-            $this->registerFromPath($this->passedProps['path'], $handle, $dependencies);
+        if ($this->configuredFromPath === false && 
+            empty($this->path) === false
+        ) {
+            $this->configureFromPath($this->path);
         }
 
         if (!empty($this->dependencies)) {
@@ -148,12 +164,23 @@ abstract class Asset extends Feature implements Registrable, Makeable {
 
                 $area = $this->area;
 
-                $groupDependencies = $this instanceof Script
-                    ? $group->getScriptHandles($area)
-                    : ($this instanceof Style ? $group->getStyleHandles($area) : []);
+                if (is_array($area)) {
+                    foreach ($area as $a) {
+                        $groupDependencies = $this->type === 'script'
+                            ? $group->getScriptHandles($a)
+                            : $group->getStyleHandles($a);
 
-                unset($this->dependencies[array_search($dependency, $this->dependencies)]);
-                $this->dependencies = array_merge($this->dependencies, $groupDependencies);
+                        unset($this->dependencies[array_search($dependency, $this->dependencies)]);
+                        $this->dependencies = array_merge($this->dependencies, $groupDependencies);
+                    }
+                } else {
+                    $groupDependencies = $this->type === 'script'
+                        ? $group->getScriptHandles($area)
+                        : $group->getStyleHandles($area);
+
+                    unset($this->dependencies[array_search($dependency, $this->dependencies)]);
+                    $this->dependencies = array_merge($this->dependencies, $groupDependencies);
+                }
             }
         }
     }
@@ -170,7 +197,17 @@ abstract class Asset extends Feature implements Registrable, Makeable {
      *
      * @return void
      */
-    abstract public function __registerAsset(): void;
+    final public function __registerAsset(): void {
+        if ($this->type === 'script') {
+            $this->registerScript();
+        } elseif ($this->type === 'style') {
+            $this->registerStyle();
+        } else {
+            throw new \Exception('Invalid asset type specified for GenericAsset: ' . $this->type);
+        }
+
+        $this->isRegistered = true;
+    }
 
     /**
      * Enqueues the asset with WordPress. Implementing classes should ensure the $isEnqueued 
@@ -180,30 +217,159 @@ abstract class Asset extends Feature implements Registrable, Makeable {
      *
      * @return void
      */
-    abstract public function __enqueueAsset(): void;
+    final public function __enqueueAsset(): void {
+        if ($this->type === 'script') {
+            $this->enqueueScript();
+        } elseif ($this->type === 'style') {
+            $this->enqueueStyle();
+        } else {
+            throw new \Exception('Invalid asset type specified for GenericAsset: ' . $this->type);
+        }
+
+        $this->isEnqueued = true;
+    }
+
+    /**
+     * Registers a script with WordPress.
+     *
+     * @return void
+     */
+    private function registerScript(): void {
+        wp_register_script(
+            $this->handle,
+            $this->src,
+            $this->dependencies,
+            $this->version,
+            $this->inFooter
+        );
+
+        $this->isRegistered = true;
+    }
+
+    /**
+     * Registers a style with WordPress.
+     *
+     * @return void
+     */
+    private function registerStyle(): void {
+        wp_register_style(
+            $this->handle,
+            $this->src,
+            $this->dependencies,
+            $this->version,
+        );
+
+        $this->isRegistered = true;
+    }
+
+    /**
+     * Enqueues a script with WordPress.
+     *
+     * @return void
+     */
+    private function enqueueScript(): void {
+        if ($this->isRegistered) {
+            wp_enqueue_script($this->handle);
+        } else {
+            $this->__registerAsset();
+            wp_enqueue_script($this->handle);
+        }
+
+        $this->isEnqueued = true;
+    }
+
+    /**
+     * Enqueues a style with WordPress.
+     *
+     * @return void
+     */
+    private function enqueueStyle(): void {
+        if ($this->isRegistered) {
+            wp_enqueue_style($this->handle);
+        } else {
+            $this->__registerAsset();
+            wp_enqueue_style($this->handle);
+        }
+
+        $this->isEnqueued = true;
+    }
 
     /**
      * Registers the asset with WordPress. This method should be called to make the asset available for use.
      * Implementing classes should ensure assets aren't registered multiple times using the $isRegistered property.
      *
      * @return static
+     * @throws \Exception If the asset's area is not set before registering.
      */
-    abstract public function register(): static;
+    final public function register(): static {
+        if (empty($this->area)) {
+            throw new \Exception('The area for the asset must be set before registering. Use the area() method to set it.');
+        }
+
+        if (!$this->preRegistered) {
+            $hook = $this->resolveRegisterHook();
+
+            if (is_array($hook)) {
+                foreach ($hook as $h) {
+                    add_action($h, [$this, '__registerAsset']);
+                }
+            } else {
+                add_action($hook, [$this, '__registerAsset']);
+            }
+
+            $this->preRegistered = true;
+        }
+
+        return $this;
+    }
 
     /**
      * Enqueues the asset with WordPress. This method should be called to include the asset in the page.
      * Implementing classes should ensure assets aren't enqueued multiple times using the $isEnqueued property.
      *
      * @return static
+     * @throws \Exception If the asset's area is not set before enqueuing.
      */
-    abstract public function enqueue(): static;
+    final public function enqueue(): static {
+        if (empty($this->area)) {
+            throw new \Exception('The area for the asset must be set before enqueuing. Use the area() method to set it.');
+        }
+
+        if (!$this->preEnqueued) {
+            $hook = $this->resolveEnqueueHook();
+
+            if (is_array($hook)) {
+                foreach ($hook as $h) {
+                    add_action($h, [$this, '__enqueueAsset']);
+                }
+            } else {
+                add_action($hook, [$this, '__enqueueAsset']);
+            }
+            
+            $this->preEnqueued = true;
+        }
+
+        return $this;
+    }
 
     /**
-     * Resolves the appropriate WordPress hook for registering the script based on the specified area.
+     * Resolves the appropriate WordPress hook(s) for registering the script based on the specified area(s).
      *
-     * @return string
+     * @return string|array
      */
-    final protected function resolveRegisterHook(): string {
+    final protected function resolveRegisterHook(): string|array {
+        if (is_array($this->area)) {
+            $hooks = [];
+            foreach ($this->area as $area) {
+                $hooks[] = match ($area) {
+                    'admin'  => 'admin_init',
+                    'editor' => 'admin_init',
+                    default  => 'init',
+                };
+            }
+            return $hooks;
+        }
+
         switch ($this->area) {
             case 'admin':
                 return 'admin_init';
@@ -215,11 +381,25 @@ abstract class Asset extends Feature implements Registrable, Makeable {
     }
 
     /**
-     * Resolves the appropriate WordPress hook for enqueuing the script based on the specified area.
+     * Resolves the appropriate WordPress hook(s) for enqueuing the script based on the specified area(s).
      *
-     * @return string
+     * @return string|array
      */
-    final protected function resolveEnqueueHook(): string {
+    final protected function resolveEnqueueHook(): string|array {
+        if (is_array($this->area)) {
+            $hooks = [];
+            foreach ($this->area as $area) {
+                $hooks[] = match ($area) {
+                    'admin'  => 'admin_enqueue_scripts',
+                    'editor' => $this instanceof Style 
+                        ? 'enqueue_block_assets' 
+                        : 'enqueue_block_editor_assets',
+                    default  => 'wp_enqueue_scripts',
+                };
+            }
+            return $hooks;
+        }
+
         switch ($this->area) {
             case 'admin':
                 return 'admin_enqueue_scripts';
@@ -278,6 +458,35 @@ abstract class Asset extends Feature implements Registrable, Makeable {
     }
 
     /**
+     * Sets the asset's area context, which determines where the asset will be loaded in WordPress.
+     *
+     * @param string|array $area The area(s) where the asset should be loaded. Can be 'site', 'admin', or 'editor', or an array of these areas for multiple contexts.
+     *
+     * @return static
+     */
+    final public function area(string|array $area): static {
+        $valid = function ($a) {
+            return in_array($a, ['site', 'admin', 'editor']);
+        };
+
+        if (is_array($area)) {
+            foreach ($area as $a) {
+                if (!$valid($a)) {
+                    throw new \InvalidArgumentException("Invalid area specified for asset: area = {$a}");
+                }
+            }
+            $this->area = $area;
+        } else {
+            if (!$valid($area)) {
+                throw new \InvalidArgumentException("Invalid area specified for asset: area = {$area}");
+            }
+            $this->area = $area;
+        }
+
+        return $this;
+    }
+
+    /**
      * Sets the asset's dependencies.
      *
      * @param array $dependencies
@@ -316,6 +525,37 @@ abstract class Asset extends Feature implements Registrable, Makeable {
         return $this;
     }
 
+
+    /**
+     * Sets whether the script should be loaded in the footer of the page.
+     *
+     * @param bool $inFooter
+     *
+     * @return static
+     */
+    final public function inFooter(bool $inFooter = true): static {
+        $this->inFooter = $inFooter;
+
+        return $this;
+    }
+
+    /**
+     * Sets the type of the asset, either 'script' or 'style'.
+     *
+     * @param string $type
+     *
+     * @return static
+     */
+    final public function type(string $type): static {
+        if (!in_array($type, ['script', 'style'])) {
+            throw new \Exception('Invalid asset type specified for GenericAsset: ' . $type);
+        }
+
+        $this->type = $type;
+
+        return $this;
+    }
+
     /**
      * Adds the asset to an asset group, which can be used to group related assets together for switching in wp-admin.
      *
@@ -338,74 +578,12 @@ abstract class Asset extends Feature implements Registrable, Makeable {
     }
 
     /**
-     * Configures an asset using the provided file path, setting the path, source URL, and version based on the file's properties.
-     * Registers the asset with WordPress when configured.
+     * Returns whether the asset is part of a group.
      *
-     * @param string $path The file path to the asset (relative to the provider's assets path or absolute).
-     * @param array  $handleOrDependencies Optional. The handle of the asset or an array of dependencies.
-     * @param array  $dependencies Optional. An array of dependencies for the asset.
-     *
-     * @return static
+     * @return boolean
      */
-    final public function registerFromPath(string $path, string|array $handleOrDependencies = [], array $dependencies = []): static {
-        $this->registerOrEnqueueFromPath(true, $path, $handleOrDependencies, $dependencies);
-        return $this;
-    }
-
-    /**
-     * Configures an asset using the provided file path, setting the path, source URL, and version based on the file's properties.
-     * Enqueues the asset with WordPress when configured.
-     *
-     * @param string $path The file path to the asset (relative to the provider's assets path or absolute).
-     * @param array  $handleOrDependencies Optional. The handle of the asset or an array of dependencies.
-     * @param array  $dependencies Optional. An array of dependencies for the asset.
-     *
-     * @return static
-     */
-    final public function enqueueFromPath(string $path, string|array $handleOrDependencies = [], array $dependencies = []): static {
-        $this->registerOrEnqueueFromPath(false, $path, $handleOrDependencies, $dependencies);
-        return $this;
-    }
-
-    /**
-     * Registers or enqueues the asset based on the provided path, handle, and dependencies.
-     *
-     * @param bool         $register Whether to register (true) or enqueue (false) the asset.
-     * @param string       $path The file path of the asset.
-     * @param string|array $handleOrDependencies Optional. The handle of the asset or an array of dependencies.
-     * @param array        $dependencies Optional. An array of dependencies for the asset.
-     *
-     * @return void
-     */
-    private function registerOrEnqueueFromPath(
-        bool         $register, 
-        string       $path, 
-        string|array $handleOrDependencies = [], 
-        array        $dependencies = []
-    ): void {
-        $this->configureFromPath($path);
-
-        $handle = '';
-
-        if (is_string($handleOrDependencies)) {
-            $handle = $handleOrDependencies;
-        } elseif (is_array($handleOrDependencies)) {
-            $dependencies = $handleOrDependencies;
-        }
-
-        if (!empty($handle)) {
-            $this->handle($handle);
-        } else {
-            $this->handle($this->generateHandleFromPath($this->path));
-        }
-
-        $this->dependencies($dependencies);
-
-        if ($register) {
-            $this->register();
-        } else {
-            $this->enqueue();
-        }
+    final public function isGrouped(): bool {
+        return $this->group !== null;
     }
 
     /**
@@ -416,10 +594,13 @@ abstract class Asset extends Feature implements Registrable, Makeable {
      *
      * @return void
      */
-    private function configureFromPath(string $path): void {
+    final protected function configureFromPath(string $path): void {
         $this->path    = $this->resolveAssetPath($path);
         $this->src     = $this->convertPathToUri($this->path);
         $this->version = $this->generateVersionFromPath($this->path);
+        $this->type    = Str::endsWith($this->path, '.js') ? 'script' : 'style';
+
+        $this->configuredFromPath = true;
     }
 
     /**
@@ -468,7 +649,7 @@ abstract class Asset extends Feature implements Registrable, Makeable {
             throw new \InvalidArgumentException("The provided path '{$path}' does not point to a valid file.");
         }
 
-        $type = $this instanceof Script ? 'script' : ($this instanceof Style ? 'style' : 'style');
+        $type = $this->type;
 
         // Remove the file extension
         $path = Str::replace('.' . File::extension($path), '', $path);
@@ -481,13 +662,13 @@ abstract class Asset extends Feature implements Registrable, Makeable {
             $relativePath = ltrim(Str::after($path, $providerAssetsPath), DIRECTORY_SEPARATOR);
             $snake = Str::slug(Str::replace([DIRECTORY_SEPARATOR, '_', '.'], '-', $relativePath));
 
-            return "{$providerHandle}_{$type}_{$snake}";
+            return "{$providerHandle}-{$type}-{$snake}";
         } 
         
         else {
             $basename = pathinfo($path, PATHINFO_FILENAME);
             $snake = Str::slug(Str::replace(['-', '_', '.'], '-', $basename));
-            return "{$providerHandle}_{$type}_{$snake}";
+            return "{$providerHandle}-{$type}-{$snake}";
         }
     }
 
@@ -505,20 +686,11 @@ abstract class Asset extends Feature implements Registrable, Makeable {
     }
 
     /**
-     * Returns whether the asset is part of a group.
+     * Returns the asset's area(s) context.
      *
-     * @return boolean
+     * @return string|array
      */
-    final public function isGrouped(): bool {
-        return $this->group !== null;
-    }
-
-    /**
-     * Returns the asset's area context.
-     *
-     * @return string
-     */
-    final public function getArea(): string {
+    final public function getArea(): string|array {
         return $this->area;
     }
 
@@ -528,7 +700,61 @@ abstract class Asset extends Feature implements Registrable, Makeable {
      * @return string
      */
     final public function getType(): string {
-        return $this instanceof Script ? 'script' : ($this instanceof Style ? 'style' : 'style');
+        return $this->type;
+    }
+
+    /**
+     * Returns whether the asset is a script.
+     *
+     * @return boolean
+     */
+    final public function isScript(): bool {
+        return $this->type === 'script';
+    }
+
+    /**
+     * Returns whether the asset is a style.
+     *
+     * @return boolean
+     */
+    final public function isStyle(): bool {
+        return $this->type === 'style';
+    }
+
+    /**
+     * Returns whether the asset has been registered.
+     *
+     * @return boolean
+     */
+    final public function isRegistered(): bool {
+        return $this->isRegistered;
+    }
+
+    /**
+     * Returns whether the asset has been enqueued.
+     *
+     * @return boolean
+     */
+    final public function isEnqueued(): bool {
+        return $this->isEnqueued;
+    }
+
+    /**
+     * Returns whether the asset will be registered.
+     *
+     * @return boolean
+     */
+    final public function willBeRegistered(): bool {
+        return $this->preRegistered;
+    }
+
+    /**
+     * Returns whether the asset will be enqueued.
+     *
+     * @return boolean
+     */
+    final public function willBeEnqueued(): bool {
+        return $this->preEnqueued;
     }
 }
 

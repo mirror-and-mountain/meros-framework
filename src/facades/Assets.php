@@ -1,11 +1,11 @@
 <?php 
 
-namespace MM\Meros\Facades\Assets;
+namespace MM\Meros\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
-class Scripts extends Facade {
+class Assets extends Facade {
     protected static function getFacadeAccessor() {
-        return 'meros.registers.scripts';
+        return 'meros.registers.assets';
     }
 }

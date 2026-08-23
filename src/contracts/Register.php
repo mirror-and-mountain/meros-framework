@@ -264,15 +264,31 @@ abstract class Register implements FeatureRegister {
      */
     final protected function attachInstance(FeatureDefinition $feature, FeatureProvider $provider): void {
         if ($this->usesUniqueInstances()) {
-            $handle = $feature->getIdentifier();
-            $hasExisting = $this->has($handle, null, $provider, false);
+            $identifier  = $feature->getIdentifier();
+            $existing    = $this->get($identifier, $provider, false);
+            $hasExisting = $existing !== null;
 
             if ($hasExisting) {
-                throw new \LogicException("A feature with handle '{$feature->getIdentifier()}' is already attached to this register (" . static::class . ") and the register is set to use unique instances.");
+                if (!$this->allowAttach($feature, $existing)) {
+                    throw new \LogicException("A feature with handle '{$feature->getIdentifier()}' is already attached to this register (" . static::class . ") and the register is set to use unique instances.");
+                }
             }
         }
 
         $this->features->push($feature);
+    }
+
+    /**
+     * Determines whether to allow a new feature to be attached to the register based on a comparison with a discovered existing feature.
+     * Can be overridden by subclasses to provide custom uniqueness logic.
+     *
+     * @param FeatureDefinition $newFeature
+     * @param FeatureDefinition $existingFeature
+     *
+     * @return boolean
+     */
+    protected function allowAttach(FeatureDefinition $newFeature, FeatureDefinition $existingFeature): bool {
+        return false;
     }
 
     /**

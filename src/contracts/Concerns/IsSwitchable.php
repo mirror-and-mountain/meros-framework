@@ -96,7 +96,9 @@ trait IsSwitchable {
                 }
             });
         } else {
-            $this->runWhenNotSwitchable();
+            add_action('meros_framework_booted', function () {
+                $this->runWhenNotSwitchable();
+            });
         }
     }
 

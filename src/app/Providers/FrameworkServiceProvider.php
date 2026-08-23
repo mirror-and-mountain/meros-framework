@@ -37,12 +37,7 @@ use MM\Meros\Registers\Data\PostMetaDefinitions;
 use MM\Meros\Registers\Data\Tables;
 
 use MM\Meros\Registers\Assets\AssetGroups;
-use MM\Meros\Registers\Assets\Scripts;
-use MM\Meros\Registers\Assets\Styles;
-use MM\Meros\Registers\Assets\AdminScripts;
-use MM\Meros\Registers\Assets\AdminStyles;
-use MM\Meros\Registers\Assets\EditorScripts;
-use MM\Meros\Registers\Assets\EditorStyles;
+use MM\Meros\Registers\Assets\Assets;
 
 use MM\Meros\Scripts\InstallCommands;
 use MM\Meros\Scripts\UninstallCommands;
@@ -85,12 +80,7 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         Tables::class,
 
         AssetGroups::class,
-        Scripts::class,
-        Styles::class,
-        AdminScripts::class,
-        AdminStyles::class,
-        EditorScripts::class,
-        EditorStyles::class
+        Assets::class
     ];
 
     // =========================================================================

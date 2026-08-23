@@ -17,10 +17,7 @@ final class MForms extends AssetGroup {
             ]
         ];
 
-        foreach (['site', 'admin'] as $context) {
-            $this->assets[$context] = $assets;
-        }
-
+        $this->add($assets, ['admin', 'site']);
         $this->name('meros_forms_assets');
         $this->description('Assets registered by Meros for the forms.');
     }

@@ -12,8 +12,8 @@ final class MFormsDeps extends AssetGroup {
             'mforms-tom-select-style' => 'mforms/tomselect/style-index.css',
         ];
 
-        foreach(['site', 'admin'] as $context) {
-            $this->assets[$context] = $assets;
+        foreach ($assets as $handle => $path) {
+            $this->add($path, $handle, ['site', 'admin']);
         }
 
         $this->name('meros_forms_dependencies');

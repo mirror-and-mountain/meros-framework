@@ -30,18 +30,11 @@ class AssetGroup extends Feature implements Registrable, Makeable {
     protected string $name = '';
 
     /**
-     * Whether to register assets in the group when the group is enabled instead of enqueuing them.
-     *
-     * @var boolean
-     */
-    protected bool $registerWhenEnabled = false;
-
-    /**
-     * The area assets in the group are intended for.
+     * The action to perform when the asset group is enabled. Can be empty, 'register' or 'enqueue'.
      *
      * @var string
      */
-    private string $area = '';
+    protected string $whenEnabledAction = '';
 
     /**
      * An array of Asset instances, class names or paths to be included in the asset group. 
@@ -142,7 +135,10 @@ class AssetGroup extends Feature implements Registrable, Makeable {
      * @return Asset|null
      */
     private function instantiateAssetFromClass(string $class, string $alias = ''): ?Asset {
-        if (!class_exists($class) || !is_subclass_of($class, Asset::class)) {
+        if (!class_exists($class) || 
+            $class !== Asset::class || 
+            is_subclass_of($class, Asset::class) === false
+        ) {
             return null;
         }
 
@@ -208,32 +204,18 @@ class AssetGroup extends Feature implements Registrable, Makeable {
             return null;
         }
 
-        $class = match ($type) {
-            'script' => match ($area) {
-                'site'   => Script::class,
-                'admin'  => AdminScript::class,
-                'editor' => EditorScript::class,
-                default  => null,
-            },
-            'style' => match ($area) {
-                'site'   => Style::class,
-                'admin'  => AdminStyle::class,
-                'editor' => EditorStyle::class,
-                default  => null,
-            },
-        };
-
-        if ($class === null) {
-            return null;
-        }
-
-        $props = ['path' => $path, 'dependencies' => $dependencies];
+        $props = [
+            'path'         => $path, 
+            'dependencies' => $dependencies, 
+            'type'         => $type, 
+            'area'         => $area
+        ];
 
         if (is_string($handle) && !empty($handle)) {
             $props['handle'] = $handle;
         }
 
-        return $this->makeItem($class, $props);
+        return $this->makeItem(Asset::class, $props);
     }
 
     /**
@@ -242,26 +224,37 @@ class AssetGroup extends Feature implements Registrable, Makeable {
      * @return void
      */
     final protected function whenEnabled(): void {
-        if (empty($this->assets)) {
+        if (empty($this->assets) || empty($this->whenEnabledAction)) {
             return;
         }
 
         foreach ($this->assets as $asset) {
-            if ($this->registerWhenEnabled) {
+            if ($this->whenEnabledAction === 'register') {
                 $asset->register();
-            } else {
+            } else if ($this->whenEnabledAction === 'enqueue') {
                 $asset->enqueue();
             }
         }
     }
 
     /**
-     * Sets the group to register it's assets when enabled instead of enqueuing them.
+     * Sets the group to register its assets when enabled.
      *
-     * @return void
+     * @return static
      */
-    final protected function register(): void {
-        $this->registerWhenEnabled(true);
+    final public function register(): static {
+        $this->whenEnabledAction = 'register';
+        return $this;
+    }
+
+    /**
+     * Sets the group to enqueue its assets when enabled.
+     *
+     * @return static
+     */
+    final public function enqueue(): static {
+        $this->whenEnabledAction = 'enqueue';
+        return $this;
     }
 
     // =========================================================================
@@ -281,94 +274,46 @@ class AssetGroup extends Feature implements Registrable, Makeable {
     }
 
     /**
-     * Sets the area assets in the group are intended for. Can be 'site', 'admin', or 'editor'.
+     * Adds an instantiated asset, uninstantiated asset, or multiple uninstantiated assets to the group.
      *
-     * @param string $area
-     *
-     * @return static
-     */
-    public function area(string $area): static {
-        if (!in_array($area, ['site', 'admin', 'editor'])) {
-            throw new \InvalidArgumentException("Invalid area specified for AssetGroup: {$area}. Must be one of 'site', 'admin', or 'editor'.");
-        }
-
-        $this->area = $area;
-        return $this;
-    }
-
-    /**
-     * Adds an asset to the group.
-     *
-     * @param Asset|string|array $assets or $asset 
+     * @param Asset|string|array $assets or $asset An instantiated Asset, a class name or path to an Asset, or an array of class names or paths to Assets.
+     * @param string|array       $handleOrLocation Optional. The handle for the asset or the location(s) where the asset should be added. Can be a string or an array of locations ('site', 'admin', 'editor').
+     * @param string|array       $location         Optional. The location(s) where the asset should be added. Can be a string or an array of locations ('site', 'admin', 'editor'). If provided, this will override the $handleOrLocation parameter for determining locations.
      *
      * @return static
      */
-    public function add(Asset|string|array $assets, string $handle = ''): static {
+    public function add(Asset|string|array $assets, string|array $handleOrLocation = '', string|array $location = ''): static {
         if ($assets instanceof Asset) {
             $this->assets[] = $assets;
             return $this;
         }
 
+        $locations = $this->resolveLocations($handleOrLocation, $location);
+        $handle    = $this->resolveHandle($handleOrLocation);
+
+        // Handle a single asset provided as a string, which could be a path or a class name.
         if (is_string($assets) && !empty($assets)) {
-            $looksLikeClass = Str::contains($assets, '\\');
-
-            if ($looksLikeClass) {
-                $asset = $this->instantiateAssetFromClass($assets, $handle);
-
-                if ($asset !== null) {
-                    $this->assets[] = $asset;
-                }
-
-                return $this;
-            }
-
-            $path  = $assets;
-            $asset = $this->instantiateAssetFromPath($handle, $this->getArea(), $path);
-
-            if ($asset !== null) {
-                $this->assets[] = $asset;
-            }
-
-            return $this;
+            $asset = $assets; // Could be path or class name.
+            return $this->addSingle($asset, $handle, $locations);
         }
 
+        // Handle an array of assets, which could be paths, class names, or configurations.
         if (is_array($assets)) {
-            foreach ($assets as $maybeHandle => $config) {
-                if (is_array($config)) {
-                    $handle = $config['handle'] ?? $maybeHandle;
-                    $class  = $config['class'] ?? null;
-
-                    if (is_string($class)) {
-                        $asset = $this->instantiateAssetFromClass($class, $handle);
-
-                        if ($asset !== null) {
-                            $this->assets[] = $asset;
-                        }
-
-                        continue;
-                    }
-                }
+            foreach ($assets as $handleOrLoc => $config) {
+                $assetLocations = $this->resolveLocations($handleOrLoc, $locations);
+                $assetHandle    = $this->resolveHandle($handleOrLoc);
 
                 if (is_string($config) && !empty($config)) {
-                    $looksLikeClass = Str::contains($config, '\\');
-                    $maybeHandle = is_string($maybeHandle) ? $maybeHandle : '';
-
-                    if ($looksLikeClass) {
-                        $class = $config;
-                        $asset = $this->instantiateAssetFromClass($class, $maybeHandle);
-
-                        if ($asset !== null) {
-                            $this->assets[] = $asset;
-                        }
-
-                        continue;
-                    }
+                    $asset = $config; // Could be path or class name.
+                    $this->addSingle($asset, $assetHandle, $assetLocations);
                 }
 
-                $asset = $this->instantiateAssetFromPath($maybeHandle, $this->getArea(), $config);
+                else if (is_array($config)) {
+                    $path = $config['path'] ?? '';
 
-                if ($asset !== null) {
-                    $this->assets[] = $asset;
+                    if (!empty($path)) {
+                        $this->addSingle($config, $assetHandle, $assetLocations);
+                    }
                 }
             }
         }
@@ -377,80 +322,66 @@ class AssetGroup extends Feature implements Registrable, Makeable {
     }
 
     /**
-     * Sets whether to register assets in the group when the group is enabled instead of enqueuing them.
+     * Adds a single uninstantiated asset to the group for the specified locations.
      *
-     * @param boolean $register
+     * @param string|array $classPathOrConfig
+     * @param string       $handle
+     * @param array        $locations
      *
      * @return static
      */
-    public function registerWhenEnabled(bool $register = true): static {
-        $this->registerWhenEnabled = $register;
+    private function addSingle(string|array $classPathOrConfig, string $handle = '', array $locations = []): static {
+        if (empty($locations)) {
+            $locations = ['site', 'admin', 'editor'];
+        }
+
+        foreach ($locations as $location) {
+            if ($handle !== '') {
+                $this->assets[$location][$handle] = $classPathOrConfig;
+            } else {
+                $this->assets[$location][] = $classPathOrConfig;
+            }
+        }
+
         return $this;
     }
 
     /**
-     * Sets whether to enqueue assets in the group when the group is enabled instead of registering them.
+     * Resolves locations from the provided handle or location parameters, returning an array of valid locations.
      *
-     * @param boolean $enqueue
+     * @param string|array $handleOrLocation
+     * @param string|array $location
      *
-     * @return static
+     * @return array
      */
-    public function enqueueWhenEnabled(bool $enqueue = true): static {
-        $this->registerWhenEnabled = !$enqueue;
-        return $this;
+    private function resolveLocations(string|array $handleOrLocation, string|array $location): array {
+        $locations = is_array($handleOrLocation) 
+            ? $handleOrLocation : (is_array($location) ? $location : null);
+
+        if ($locations === null && is_string($handleOrLocation) && in_array($handleOrLocation, ['site', 'admin', 'editor'])) {
+            $locations = [$handleOrLocation];
+        }
+
+        if ($locations === null && is_string($location) && in_array($location, ['site', 'admin', 'editor'])) {
+            $locations = [$location];
+        }
+
+        return $locations ?? [];
     }
 
     /**
-     * Sets assets for the group. Can be used in implementing classes to define the assets that belong to the group.
-     * 
-     * Each asset can be an instance of Asset, a class name, or an associative array with a key representing the type (site, admin, editor) and a value representing the path.
-     * 
-     * Class Name Example: MyAsset::class
-     * Location & Path Example: ['site' => ['path/to/asset.js', 'path/to/asset.css'], 'admin' => ['path/to/admin-asset.js']]
+     * Resolves the handle for an asset, given a handle or location. If the input is a valid handle, it is returned; otherwise, an empty string is returned.
      *
-     * @param array $assets
+     * @param string|array $handleOrLocation
      *
-     * @return static
+     * @return string
      */
-    final protected function assets(array $assets): static {
-        $this->assets = $assets;
-        return $this;
-    }
+    private function resolveHandle(string|array $handleOrLocation): string {
+        if (is_string($handleOrLocation) && !in_array($handleOrLocation, ['site', 'admin', 'editor'])) {
+            return $handleOrLocation;
+        }
 
-    /**
-     * Sets assets for the admin context of the group.
-     *
-     * @param array $assets
-     *
-     * @return static
-     */
-    final protected function adminAssets(array $assets): static {
-        $this->assets['admin'] = $assets;
-        return $this;
-    }
-
-    /**
-     * Sets assets for the site context of the group.
-     *
-     * @param array $assets
-     *
-     * @return static
-     */
-    final protected function siteAssets(array $assets): static {
-        $this->assets['site'] = $assets;
-        return $this;
-    }
-
-    /**
-     * Sets assets for the editor context of the group.
-     *
-     * @param array $assets
-     *
-     * @return static
-     */
-    final protected function editorAssets(array $assets): static {
-        $this->assets['editor'] = $assets;
-        return $this;
+        return '';
     }
 
     // =========================================================================
@@ -466,24 +397,6 @@ class AssetGroup extends Feature implements Registrable, Makeable {
      */
     public function getName(string $format = 'default'): string {
         return $this->getIdentifier($format);
-    }
-
-    /**
-     * Gets the area assets in the group are intended for.
-     *
-     * @return string
-     */
-    public function getArea(): string {
-        return $this->area !== '' ? $this->area : 'site';
-    }
-
-    /**
-     * Returns whether the asset group has an area set.
-     *
-     * @return boolean
-     */
-    public function hasArea(): bool {
-        return !empty($this->area);
     }
 
     /**

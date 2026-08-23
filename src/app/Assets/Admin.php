@@ -17,7 +17,7 @@ final class Admin extends AssetGroup {
             ]
         ];
 
-        $this->adminAssets($assets);
+        $this->add($assets, ['admin']);
         $this->name('meros_admin_assets');
         $this->description('Assets registered by Meros for the admin interface.');
     }

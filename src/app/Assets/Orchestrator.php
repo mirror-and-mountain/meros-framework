@@ -7,8 +7,8 @@ use MM\Meros\Contracts\Orchestrators\AssetsOrchestrator;
 class Orchestrator extends AssetsOrchestrator {
 
     protected function configure(): void {
-        $this->assetGroups(MFormsDeps::class)->make();
-        $this->assetGroups(MForms::class)->make();
-        $this->assetGroups(Admin::class)->make();
+        $this->assets()->group(MFormsDeps::class)->make()->register();
+        $this->assets()->group(MForms::class)->make()->register();
+        $this->assets()->group(Admin::class)->make()->enqueue();
     }
 }
