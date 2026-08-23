@@ -220,13 +220,13 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         $framework->configure();
         do_action('meros_framework_configured', $framework);
 
-        // Register the theme
-        $this->app->register(ThemeServiceProvider::class);
-        do_action('meros_theme_registered', ThemeFacade::get());
-
         // Register packages
         $this->registerPackages();
         do_action('meros_packages_registered', PackagesFacade::all());
+
+        // Register the theme
+        $this->app->register(ThemeServiceProvider::class);
+        do_action('meros_theme_registered', ThemeFacade::get());
 
         // Enable wp meros cli if appropriate
         if ($this->app->runningInConsole()) {
