@@ -54,8 +54,8 @@ final class Framework extends Provider {
      */
     public function configure(): void {
         $this->initialise(ComponentsOrchestrator::class);
-        $this->initialise(AssetsOrchestrator::class);
         $this->initialise(SettingsOrchestrator::class);
+        $this->initialise(AssetsOrchestrator::class);
 
         $this->registerPostTypes();
         $this->registerTables();
