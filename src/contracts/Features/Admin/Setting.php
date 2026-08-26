@@ -161,7 +161,7 @@ class Setting extends DataItem {
         $this->configureSettingsFieldSection();
 
         // Set the Field instane wrapper for admin settings
-        $field->wrapper('meros::forms.field-wrappers.admin-settings');
+        $field->addContext('field-context', 'settings');
     }
 
     /**

@@ -236,13 +236,7 @@ abstract class DataItem extends Feature implements StorableItem {
             throw new \BadMethodCallException("DataItem '{$this->name}' must have a name set before associating a field.");
         }
 
-        $dataType   = $this->getDataType();
-        $compatible = $dataType !== 'object';
-
-        if (!$compatible) {
-            throw new \BadMethodCallException("DataItem '{$this->name}' of type '{$dataType}' is not compatible with fields.");
-        }
-
+        $dataType  = $this->getDataType();
         $fieldType = is_string($type) && !empty($type) ? $type : $this->inferFieldType($dataType);
         $field     = $this->makeItemFrom($fieldType, Field::class, $callbackOrProps);
 
@@ -446,19 +440,6 @@ abstract class DataItem extends Feature implements StorableItem {
     }
 
     /**
-     * Nested objects aren't currently supported. 
-     * 
-     * Sets the data type of the data item to 'object' and returns the data item instance.
-     *
-     * @param string $name Optional name to set for the data item.
-     *
-     * @return static
-     */
-    // final public function object(string $name = ''): static {
-    //     return $this->setDataType('object', $name);
-    // }
-
-    /**
      * Sets the data type of the data item to 'array' and returns the data item instance.
      *
      * @param string $name Optional name to set for the data item.
@@ -498,6 +479,19 @@ abstract class DataItem extends Feature implements StorableItem {
         }
 
         $this->nestedDataType = $nestedType;
+        return $this;
+    }
+
+    /**
+     * Sets the data type of the data item to 'array.object' and returns the data item instance.
+     *
+     * @param string $name Optional name to set for the data item.
+     *
+     * @return static
+     */
+    final public function object(string $name = ''): static {
+        $this->setDataType('array', $name);
+        $this->nestedDataType = 'object';
         return $this;
     }
 

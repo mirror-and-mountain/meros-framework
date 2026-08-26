@@ -224,7 +224,7 @@ class PostType extends Feature implements Makeable, Registrable {
                 ? Str::slug(class_basename($classOrAlias)) 
                 : $classOrAlias;
 
-            $containerName = Str::replace('-', '_', $alias);
+            $containerName = '_meros_' . Str::replace('-', '_', $alias);
             $container = $this->getItem($containerName, PostMetaContainer::class);
 
             // Add this post type to the existing container and return it
@@ -288,7 +288,7 @@ class PostType extends Feature implements Makeable, Registrable {
         $container = $this->makeItem(
             PostMetaContainer::class,
             [
-                'name'        => Str::replace('-', '_', $id),
+                'name'        => '_meros_' . Str::replace('-', '_', $id),
                 'label'       => $title,
                 'description' => $fieldGroup->getDescription()
             ]
@@ -321,7 +321,6 @@ class PostType extends Feature implements Makeable, Registrable {
 
         return $container;
     }
-    
 
     // =========================================================================
     // Attribute Setters

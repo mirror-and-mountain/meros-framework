@@ -192,12 +192,9 @@ class PostMetaContainer extends DataContainer {
 
         if ($this->fieldGroupInstance !== null) {
             $values = $this->getValue(true);
+            $this->fieldGroupInstance->addContext('meta_box', true);
 
             echo '<div class="meros-meta-box">';
-            if (!empty($this->getDescription())) {
-                echo '<p class="description">' . esc_html($this->getDescription()) . '</p>';
-            }
-
             echo $this->fieldGroupInstance->__renderAsMetaBox($this->name, $values);
             wp_nonce_field($this->name . '_meta_box_nonce', $this->name . '_meta_box_nonce_field');
             echo '</div>';

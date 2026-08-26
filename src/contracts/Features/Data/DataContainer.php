@@ -247,6 +247,12 @@ abstract class DataContainer extends Feature implements Storable {
         if (is_string($typeCallbackOrProps)) {
             $dataType = $typeCallbackOrProps;
             $props['data_type'] = $dataType;
+
+            if ($dataType === 'object') {
+                $props['data_type'] = 'array';
+                $props['nested_data_type'] = 'object';
+            }
+            
         } else {
             $callbackOrProps = $typeCallbackOrProps;
         }

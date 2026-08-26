@@ -4,6 +4,7 @@ namespace MM\Meros\Contracts\Features\Components;
 
 use Closure;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 
 use MM\Meros\Contracts\Feature;
 use MM\Meros\Contracts\Features\Makeable;
@@ -11,8 +12,11 @@ use MM\Meros\Contracts\Features\Makeable;
 use MM\Meros\Contracts\Features\Concerns\IsMakeable;
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 
+use MM\Meros\Contracts\Concerns\UsesAjax;
 use MM\Meros\Contracts\Features\Components\Concerns\IsFormComponent;
 use MM\Meros\Contracts\Features\Components\Concerns\MakesFieldRows;
+
+use MM\Meros\Facades\Components\Fields;
 
 class Form extends Feature implements FormComponent, Makeable {
     /**
@@ -21,6 +25,13 @@ class Form extends Feature implements FormComponent, Makeable {
      * @var string
      */
     protected string $id = '';
+
+    /**
+     * The form's name.
+     *
+     * @var string
+     */
+    protected string $name = '';
 
     /**
      * The form's title.
@@ -36,12 +47,46 @@ class Form extends Feature implements FormComponent, Makeable {
      */
     protected string $description = '';
 
+    /**
+     * The view used to render the form.
+     *
+     * @var string
+     */
     private string $view = 'meros::forms.form';
+
+    /**
+     * The text shown on the form's submit button.
+     *
+     * @var string
+     */
+    protected string $submitText = 'Submit';
+
+    /**
+     * Text that can be shown when the form is submitted but is invalid.
+     *
+     * @var string
+     */
+    protected string $invalidText = "The form is invalid. Please check the information you've entered.";
+
+    /**
+     * The callback function to be executed when the form is submitted.
+     *
+     * @var Closure|string|null
+     */
+    protected Closure|string|null $onSubmit = null;
+
+    /**
+     * Whether to hide the submit button for the form.
+     *
+     * @var bool
+     */
+    protected bool $hideSubmitButton = false;
 
     use IsFormComponent,
         IsMakeable,
         MakesFieldRows,
-        InstantiatesItems;
+        InstantiatesItems,
+        UsesAjax;
 
     // =========================================================================
     // Initialisation
@@ -52,15 +97,23 @@ class Form extends Feature implements FormComponent, Makeable {
 
         $this->setSerializableProperties(([
             'id',
+            'name',
             'title',
             'description',
-            'rows'
+            'attributeString',
+            'rows',
+            'ajaxUrl',
+            'ajaxNonce',
+            'submitText',
+            'invalidText',
+            'onSubmit',
+            'hideSubmitButton'
         ]));
 
-        $this->set('id', $this->passedProps['id'] ?? 'mforms-' . Str::substr(Str::uuid(), 0, 8));
-        $this->set('title', $this->passedProps['title'] ?? '');
-        $this->set('description', $this->passedProps['description'] ?? '');
-        $this->set('rows', $this->passedProps['rows'] ?? []);
+        // Need to update this bit...
+        $defaultIdentifier = 'mforms-' . Str::substr(Str::uuid(), 0, 8);
+        $this->id($defaultIdentifier);
+        $this->name(Str::replace('-', '_', $defaultIdentifier));
     }
 
     final protected function whenConfigured(): void {
@@ -69,6 +122,31 @@ class Form extends Feature implements FormComponent, Makeable {
         } else {
             // Create an initial row if none are provided
             $this->makeNewRow();
+        }
+
+        if (is_string($this->onSubmit)) {
+            return;
+        }
+
+        $this->initAjax('meros_handle_form_submission_' . $this->name, function (array $postData) {
+            $data = json_decode(stripslashes($postData['form_data'] ?? '{}'), true);
+            $this->handleFormSubmission($data);
+
+            wp_send_json_success(['message' => 'Form submitted successfully.']);
+        });
+    }
+
+    /**
+     * Handles the form submission by executing the onSubmit callback if it exists and is a Closure.
+     * May be overridden in subclasses to provide custom form submission handling logic.
+     *
+     * @param array $data
+     *
+     * @return void
+     */
+    protected function handleFormSubmission(array $data): void {
+        if ($this->onSubmit instanceof Closure) {
+            call_user_func($this->onSubmit, $data);
         }
     }
 
@@ -87,16 +165,16 @@ class Form extends Feature implements FormComponent, Makeable {
      * @throws \RuntimeException If the field could not be created.
      */
     final public function field(string $type, Closure|array $callbackOrProps = [], bool $autoRow = true): static {
-        $field = $this->makeItemFrom($type, Field::class, $callbackOrProps);
-
-        if (!($field instanceof Field)) {
-            throw new \RuntimeException("Failed to create a Field instance of type '{$type}'.");
+        $fieldClass = Fields::getRegisteredFeatureClass($type);
+        
+        if ($fieldClass === null) {
+            throw new \RuntimeException("Field type '{$type}' is not registered.");
         }
 
         $lastRow = $this->getLastRow(true);
 
         if ($autoRow) {
-            $fieldWidth     = $field->getRowPositions();
+            $fieldWidth     = $fieldClass::getRowPositions();
             $rowHasCapacity = $lastRow->hasCapacityFor($fieldWidth);
 
             if ($rowHasCapacity) {
@@ -147,7 +225,25 @@ class Form extends Feature implements FormComponent, Makeable {
      * @return static
      */
     final public function id(string $id): static {
-        return $this->setIdentifier($id, false);
+        $id = $this->setIdentifier($id);
+
+        if (empty($this->name) || Str::startsWith($this->name, 'mforms_')) {
+            $this->name = Str::replace('-', '_', $id);   
+        }
+
+        return $this;
+    }
+
+    /**
+     * Sets the form's name.
+     *
+     * @param string $name
+     *
+     * @return static
+     */
+    final public function name(string $name): static {
+        $this->name = Str::snake($name);
+        return $this;
     }
 
     /**
@@ -162,6 +258,58 @@ class Form extends Feature implements FormComponent, Makeable {
         return $this;
     }
 
+    /**
+     * Sets the callback function to be executed when the form is submitted. If a string is provided, 
+     * it will be used as the name of a client-side event which will be triggered instead of a server-side callback.
+     * 
+     * Event names are prefixed with 'mforms::' to avoid conflicts with other events. Example:
+     * mforms::myCustomEvent.
+     *
+     * @param Closure|string $callback
+     *
+     * @return static
+     */
+    final public function onSubmit(Closure|string $callback): static {
+        $this->onSubmit = $callback;
+        return $this;
+    }
+
+    /**
+     * Sets whether to hide the submit button for the form.
+     *
+     * @param bool $hide Whether to hide the submit button. Defaults to true.
+     *
+     * @return static
+     */
+    final public function hideSubmitButton(bool $hide = true): static {
+        $this->hideSubmitButton = $hide;
+        return $this;
+    }
+
+    /**
+     * Sets the text shown on the form's submit button.
+     *
+     * @param string $text
+     *
+     * @return static
+     */
+    final public function submitText(string $text): static {
+        $this->submitText = $text;
+        return $this;
+    }
+
+    /**
+     * Sets the text shown when the form's inputs are invalid.
+     *
+     * @param string $text
+     *
+     * @return static
+     */
+    final public function invalidText(string $text): static {
+        $this->invalidText = $text;
+        return $this;
+    }
+
     // =========================================================================
     // Getters
     // =========================================================================
@@ -169,12 +317,21 @@ class Form extends Feature implements FormComponent, Makeable {
     /**
      * Returns the form's id.
      * 
-     * @string $format The format of the identifier to return. Defaults to 'default'.
+     * @param string $format The format of the identifier to return. Defaults to 'default'.
      *
      * @return string
      */
     final public function getId(string $format = 'default'): string {
         return $this->getIdentifier($format);
+    }
+
+    /**
+     * Returns the form's name.
+     *
+     * @return string
+     */
+    final public function getName(): string {
+        return $this->name;
     }
 
     /**
@@ -206,6 +363,38 @@ class Form extends Feature implements FormComponent, Makeable {
         return $index !== false ? $index : null;
     }
 
+    /**
+     * Returns the onSubmit callback if it is a string (JavaScript function name), or null if it is a Closure.
+     *
+     * @return string|null
+     */
+    final public function getOnSubmit(): string|null {
+        if ($this->onSubmit instanceof Closure) {
+            return null;
+        }
+
+        return !empty($this->onSubmit) ? $this->onSubmit : null;
+    }
+
+    /**
+     * Returns all fields from the component's rows.
+     * 
+     * @param boolean $collect Whether to return the fields as a Collection. If false, returns as an array.
+     *
+     * @return array|Collection
+     */
+    final public function getFields(bool $collect = false): array|Collection {
+        $fields = [];
+
+        foreach ($this->rows as $row) {
+            if ($row instanceof FieldRow) {
+                $fields = array_merge($fields, $row->getFields(true)->all());
+            }
+        }
+
+        return $collect ? collect($fields) : $fields;
+    }
+
     // =========================================================================
     // Rendering
     // =========================================================================
@@ -215,14 +404,14 @@ class Form extends Feature implements FormComponent, Makeable {
 
         if ($mergeProperties) {
             $properties = array_merge(
-                $this->filterSerializedProperties($this->toArray()['properties'] ?? []),
+                $this->filterSerializedProperties($this->toArray()),
                 $properties
             );
         } 
         
         else {
             $properties = empty($properties) 
-                ? $this->filterSerializedProperties($this->toArray()['properties'] ?? [])
+                ? $this->filterSerializedProperties($this->toArray())
                 : $properties;
         }
 

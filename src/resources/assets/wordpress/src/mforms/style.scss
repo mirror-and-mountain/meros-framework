@@ -1,3 +1,88 @@
-.mforms-test {
-    color: red;
+@use './styles/repeater.scss';
+
+$mf-row-gap: 1rem;
+$mf-first-row-offset: -24px;
+
+.mforms-form {
+    display: grid;
+    min-width: 0;
+
+    .mforms-submit-button {
+        margin-top: 1rem;
+    }
+
+    .mforms-submit-button--hidden {
+        display: none;
+    }
+
+    .mforms-body {
+        > .mforms-row:not(:has(> .mforms-section)) {
+            margin-top: $mf-first-row-offset;
+        }
+
+        > .mforms-row:not(:has(> .mforms-section)) ~ .mforms-row:not(:has(> .mforms-section)) {
+            margin-top: 0;
+        }
+
+        > .mforms-row:has(> .mforms-section) {
+            margin-top: 0;
+        }
+    }
+}
+
+.mforms-section {
+    .mforms-section-description {
+        margin-bottom: 1rem;
+    }
+
+    .mforms-section-description.mforms-section-description-metabox {
+        margin-top: -1rem;
+    }
+
+    .mforms-section-divider {
+        margin: 1rem 0;
+    }
+
+    > .mforms-row {
+        margin-top: $mf-first-row-offset;
+    }
+
+    > .mforms-row ~ .mforms-row {
+        margin-top: 0;
+    }
+}
+
+.mforms-body,
+.mforms-section {
+    .mforms-row {
+        display: flex;
+        gap: $mf-row-gap;
+        flex-wrap: wrap;
+        align-items: stretch;
+        min-width: 0;
+    }
+
+    .mforms-row > * {
+        flex: 1 1 calc((100% - (#{$mf-row-gap} * 2)) / 3);
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+.meros-field-wrapper.nice-form-group {
+    justify-self: stretch;
+    align-self: start;
+    width: 100%;
+    min-width: 0;
+    margin-top: 2rem;
+}
+
+.meros-field-wrapper.nice-form-group > * {
+    display: block;
+    width: 100%;
+    min-width: 0;
+}
+
+.meros-field-wrapper.nice-form-group input[type='number'] {
+    width: 100% !important;
 }

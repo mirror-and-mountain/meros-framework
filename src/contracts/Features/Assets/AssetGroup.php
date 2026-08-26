@@ -410,7 +410,7 @@ class AssetGroup extends Feature implements Registrable, Makeable {
      */
     public function getAssets(string $area = '', string $type = '', bool $collect = false): array|Collection {
         if ($area !== '') {
-            $area   = $area === 'site' ? 'frontend' : $area;
+            $area   = $area === 'frontend' ? 'site' : $area;
             $assets = collect($this->assets)->filter(fn($asset) => $asset->getArea() === $area)->values();
 
         } else {

@@ -22,7 +22,7 @@ final class MerosThemeSettings extends Page {
         $this->position(0);
         $this->setProvider($theme);
 
-        $this->callback(function () use ($theme) {
+        $this->callback(function () use ($theme) {            
             if ($theme->hasRegisteredTables()) {
                 echo '<div style="margin-bottom:2rem;">';
                 echo '<h2>Custom Tables</h2>';

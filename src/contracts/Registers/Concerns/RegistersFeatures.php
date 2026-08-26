@@ -13,9 +13,6 @@ use MM\Meros\Contracts\Providers\FeatureProvider;
 
 use MM\Meros\Support\ClassInfo;
 
-use MM\Meros\Registers\Admin\Pages;
-use MM\Meros\Registers\Assets\AssetGroups;
-
 /**
  * Notes:
  * This is probably slightly over-complicated at the moment, but allows for a lot of flexibility on how features are registered and instantiated.

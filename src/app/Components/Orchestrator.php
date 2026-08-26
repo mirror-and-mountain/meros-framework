@@ -6,6 +6,8 @@ use MM\Meros\App\Components\Fields\Text;
 use MM\Meros\App\Components\Fields\Number;
 use MM\Meros\App\Components\Fields\Checkbox;
 use MM\Meros\App\Components\Fields\Email;
+use MM\Meros\App\Components\Fields\Hidden;
+use MM\Meros\App\Components\Fields\Repeater;
 use MM\Meros\App\Components\FieldGroups\SimpleContact;
 
 use MM\Meros\Contracts\Orchestrators\ComponentsOrchestrator;
@@ -16,6 +18,8 @@ class Orchestrator extends ComponentsOrchestrator {
         'number'   => Number::class,
         'checkbox' => Checkbox::class,
         'email'    => Email::class,
+        'repeater' => Repeater::class,
+        'hidden'   => Hidden::class,
     ];
 
     private array $fieldGroups = [

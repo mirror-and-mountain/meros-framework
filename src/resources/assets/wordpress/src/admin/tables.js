@@ -1,9 +1,9 @@
 import { 
-    merosShowAdminModal, 
-    merosAdminModalHideConfirmButton,
-    merosAdminModalSetCancelButtonText,
-    merosAdminModalSetCloseButtonCallback,
-    merosAdminModalSetExtraContent
+    __meros_modal_show, 
+    __meros_modal_hideConfirmButton,
+    __meros_modal_setCancelButtonText,
+    __meros_modal_setCloseButtonCallback,
+    __meros_modal_setExtraContent
 } from './modal.js';
 
 export function merosHandleMultiTableOperation(event) {
@@ -44,7 +44,7 @@ export function merosHandleMultiTableOperation(event) {
     const modalTitle = operation.charAt(0).toUpperCase() + operation.slice(1).replace('_', ' ') + ' tables';
     const confirmButtonText = operation.charAt(0).toUpperCase() + operation.slice(1).replace('_', ' ');
 
-    merosShowAdminModal(
+    __meros_modal_show(
         modalTitle,
         modalContent,
         () => merosExecuteTableOperation(button, provider, operation, nonce),
@@ -89,7 +89,7 @@ export function merosHandleSingleTableOperation(event) {
 
     modalContent += `<p>This action cannot be undone. We strongly recommend backing up your database before carrying out any table operations.</p>`;
 
-    merosShowAdminModal(
+    __meros_modal_show(
         operation.charAt(0).toUpperCase() + operation.slice(1) + ' Table',
         modalContent,
         () => merosExecuteTableOperation(button, provider, operation, nonce, table),
@@ -222,12 +222,12 @@ function merosExecuteTableOperation(button, provider, operation, nonce, table = 
  * @param {string} color
  */
 function configureModalResponse(message, color, reload = false) {
-    merosAdminModalSetExtraContent(message, color);
-    merosAdminModalHideConfirmButton();
-    merosAdminModalSetCancelButtonText('Close');
+    __meros_modal_setExtraContent(message, color);
+    __meros_modal_hideConfirmButton();
+    __meros_modal_setCancelButtonText('Close');
     
     if (reload) {
-        merosAdminModalSetCloseButtonCallback(() => {
+        __meros_modal_setCloseButtonCallback(() => {
             location.reload();
         });
     }

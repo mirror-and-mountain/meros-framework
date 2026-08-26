@@ -428,7 +428,20 @@ abstract class Feature implements FeatureDefinition {
      */
     final public function addContext(string $key, mixed $value): static {
         $this->context[$key] = $value;
+        $this->whenContextAdded($key, $value);
         return $this;
+    }
+
+    /**
+     * Called when context is added via the addContext method. May be used by concrete classes if needed.
+     *
+     * @param string $key
+     * @param mixed  $value
+     *
+     * @return void
+     */
+    protected function whenContextAdded(string $key, mixed $value): void {
+
     }
 
     // =========================================================================

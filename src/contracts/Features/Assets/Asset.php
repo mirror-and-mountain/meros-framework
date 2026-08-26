@@ -174,6 +174,7 @@ class Asset extends Feature implements Registrable, Makeable {
                         $this->dependencies = array_merge($this->dependencies, $groupDependencies);
                     }
                 } else {
+
                     $groupDependencies = $this->type === 'script'
                         ? $group->getScriptHandles($area)
                         : $group->getStyleHandles($area);

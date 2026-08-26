@@ -226,7 +226,7 @@ final class FieldRow implements Serializable {
      *
      * @return FieldRow The newly created FieldRow instance.
      */
-    private function makeNewRowForField(string $type, Closure|array $callbackOrProps = []): FieldRow {
+    private function makeNewRowForField(string $type, Closure|array $callbackOrProps = []): FieldRow {    
         $newRow = FieldRow::make(
             $this->provider, 
             [
@@ -235,7 +235,8 @@ final class FieldRow implements Serializable {
                     'properties' => $callbackOrProps
                 ]
             ],
-            $this->form, $this->parentGroup
+            $this->form, 
+            $this->parentGroup
         );
 
         if ($this->parentGroup) {
@@ -408,7 +409,11 @@ final class FieldRow implements Serializable {
      * @return array|Collection
      */
     public function getFields(bool $collect = false): array|Collection {
-        return $collect ? collect($this->fields) : $this->fields;
+        if ($this->childGroup === null) {
+            return $collect ? collect($this->fields) : $this->fields;
+        }
+
+        return $this->childGroup->getFields($collect);
     }
 
     // =========================================================================
@@ -420,14 +425,14 @@ final class FieldRow implements Serializable {
 
         if ($mergeProperties) {
             $properties = array_merge(
-                $this->filterSerializedProperties($this->toArray()['properties'] ?? []),
+                $this->filterSerializedProperties($this->toArray()),
                 $properties
             );
         } 
         
         else {
             $properties = empty($properties) 
-                ? $this->filterSerializedProperties($this->toArray()['properties'] ?? [])
+                ? $this->filterSerializedProperties($this->toArray())
                 : $properties;
         }
 

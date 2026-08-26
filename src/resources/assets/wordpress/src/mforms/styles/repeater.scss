@@ -1,0 +1,226 @@
+.meros-repeater-field {
+    min-inline-size: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+
+    .meros-repeater-scroll {
+        overflow-x: auto;
+        overflow-y: hidden;
+        border: 1px solid #d1d5db;
+        border-radius: 0.5rem 0.5rem 0 0;
+        background-color: #ffffff;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        touch-action: pan-x;
+        scrollbar-gutter: stable both-edges;
+
+        .meros-repeater-table {
+            width: max-content;
+            min-width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.875rem;
+
+            thead th,
+            thead td {
+                padding: 1rem;
+                width: auto;
+            }
+
+            .meros-repeater-table-header {
+                background-color: #f9fafb;
+            }
+
+            th.meros-repeater-table-header-cell {
+                padding: 0.5rem 0.75rem;
+                border-bottom: 1px solid #e5e7eb;
+                text-align: left;
+                font-size: 0.75rem;
+                font-weight: 600;
+                line-height: 1rem;
+                letter-spacing: 0.02em;
+                color: #6b7280;
+            }
+
+            th.meros-repeater-table-header-cell--field {
+                .meros-repeater-field-description {
+                    cursor: pointer;
+                    padding-left: 0.25rem;
+                }
+            }
+
+            th.meros-repeater-table-header-cell--move {
+                width: 2.5rem;
+            }
+
+            th.meros-repeater-table-header-cell--actions {
+                width: 1%;
+                white-space: nowrap;
+                text-align: right;
+            }
+
+            .meros-repeater-table-body {
+                background-color: #ffffff;
+            }
+
+            .meros-repeater-table-body > tr + tr .meros-repeater-table-cell {
+                border-top: 1px solid #f3f4f6;
+            }
+
+            th.meros-repeater-table-header-cell,
+            td.meros-repeater-table-cell {
+                float: none;
+                margin: 0;
+                vertical-align: top;
+                box-sizing: border-box;
+            }
+
+            th.meros-repeater-table-header-cell--field,
+            td.meros-repeater-table-cell--field {
+                width: auto;
+                max-width: none;
+            }
+
+            th.meros-repeater-table-header-cell--hidden {
+                display: none;
+            }
+
+            td.meros-repeater-table-cell {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.875rem;
+                color: #111827;
+            }
+
+            td.meros-repeater-table-cell--move {
+                width: 2.5rem;
+                text-align: center;
+            }
+
+            .meros-repeater-table-move-handle {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                cursor: grab;
+                color: #9ca3af;
+                font-size: 1rem;
+                line-height: 1;
+                user-select: none;
+
+                &:active {
+                    cursor: grabbing;
+                }
+            }
+
+            td.meros-repeater-table-cell--actions {
+                width: 1%;
+                text-align: right;
+                white-space: nowrap;
+            }
+
+            td.meros-repeater-table-cell--hidden {
+                display: none;
+            }
+
+            .meros-repeater-table-actions {
+                display: flex;
+                flex-wrap: nowrap;
+                justify-content: flex-end;
+                gap: 0.375rem;
+            }
+
+            .meros-repeater-table-row--template {
+                display: none;
+            }
+
+            .meros-repeater-table-row--empty {
+                .meros-repeater-table-cell--empty {
+                    padding: 1.5rem 0.75rem;
+                    text-align: center;
+                    font-size: 0.8125rem;
+                    font-style: italic;
+                    color: #9ca3af;
+                }
+            }
+
+            .meros-repeater-table-row:hover:not(.meros-repeater-table-row--empty) .meros-repeater-table-cell {
+                background-color: #fafafa;
+            }
+
+            .meros-field-wrapper.nice-form-group {
+                margin: 0 !important;
+            }
+
+            .meros-repeater-table-footer {
+                background-color: #f9fafb;
+
+                td.meros-repeater-table-cell--add {
+                    padding: 0.625rem 0.75rem;
+                    border-top: 1px solid #e5e7eb;
+                }
+            }
+
+            .meros-repeater-table-button {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0;
+                padding: 0.25rem 0.625rem;
+                border: 1px solid #d1d5db;
+                border-radius: 0.375rem;
+                background-color: #ffffff;
+                font-size: 0.75rem;
+                font-weight: 500;
+                line-height: 1.25rem;
+                color: #374151;
+                cursor: pointer;
+                transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+                &:hover {
+                    background-color: #f3f4f6;
+                    border-color: #9ca3af;
+                }
+
+                &:focus-visible {
+                    outline: 2px solid #6366f1;
+                    outline-offset: 1px;
+                }
+            }
+
+            .meros-repeater-table-button--edit,
+            .meros-repeater-table-button--add {
+                padding: 0.375rem 0.875rem;
+                font-size: 0.8125rem;
+            }
+
+            .meros-repeater-table-button--remove {
+                border-color: #fecaca;
+                background-color: transparent;
+                color: #b91c1c;
+
+                &:hover {
+                    background-color: #fef2f2;
+                    border-color: #f87171;
+                }
+
+                &:focus-visible {
+                    outline-color: #ef4444;
+                }
+            }
+        }
+    }
+}
+
+.meros-repeater-tooltip {
+    position: absolute;
+    z-index: 10;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    background-color: #111827;
+    color: #ffffff;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    white-space: nowrap;
+}

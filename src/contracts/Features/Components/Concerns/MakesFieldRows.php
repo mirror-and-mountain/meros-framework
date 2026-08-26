@@ -131,7 +131,7 @@ trait MakesFieldRows {
     }
 
     /**
-     * Returns the form's rows.
+     * Returns the component's rows.
      * 
      * @param boolean $collect Whether to return the rows as a Collection. If false, returns as an array.
      *

@@ -71,6 +71,17 @@ trait IsFormComponent {
     }
 
     /**
+     * Checks if the component has a specific attribute in its html attributes array.
+     *
+     * @param string $key
+     *
+     * @return boolean
+     */
+    public function hasAttribute(string $key): bool {
+        return array_key_exists($key, $this->attributes);
+    }
+
+    /**
      * Returns the component's HTML attributes as a string.
      *
      * @return string

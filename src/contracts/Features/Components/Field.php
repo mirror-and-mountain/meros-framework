@@ -5,7 +5,6 @@ namespace MM\Meros\Contracts\Features\Components;
 use Illuminate\Support\Str;
 
 use MM\Meros\Contracts\Feature;
-
 use MM\Meros\Contracts\Features\Admin\SettingsField;
 use MM\Meros\Contracts\Features\Components\Concerns\IsFormComponent;
 
@@ -45,11 +44,14 @@ abstract class Field extends Feature implements FormComponent {
     protected string|array|null $defaultValue = null;
 
     /**
-     * The field's wrapper view.
+     * The field's wrapper views.
      *
-     * @var string
+     * @var array
      */
-    protected string $wrapper = 'meros::forms.field-wrappers.admin-settings';
+    protected array $wrapper = [
+        'site'     => 'meros::forms.field-wrappers.default',
+        'settings' => 'meros::forms.field-wrappers.admin-settings',
+    ];
 
     /**
      * The field's view.
@@ -132,20 +134,6 @@ abstract class Field extends Feature implements FormComponent {
      */
     protected ?string $repeaterId = null;
 
-    /**
-     * Whether the field is hidden in a repeater table view, if it is part of a repeater.
-     *
-     * @var bool
-     */
-    public bool $hiddenInRepeaterTable = false;
-
-    /**
-     * Whether the field is hidden in a repeater form view, if it is part of a repeater.
-     *
-     * @var bool
-     */
-    public bool $hiddenInRepeaterForm = false;
-
     // =========================================================================
     // Field Supports and Compatibility Properties
     // =========================================================================
@@ -210,7 +198,7 @@ abstract class Field extends Feature implements FormComponent {
      *
      * @var int
      */
-    protected int $occupiesRowPositions = 1;
+    protected static int $occupiesRowPositions = 1;
 
     use IsFormComponent;
 
@@ -250,8 +238,8 @@ abstract class Field extends Feature implements FormComponent {
      *
      * @return int
      */
-    public function getRowPositions(): int {
-        return $this->occupiesRowPositions > 3 ? 3 : $this->occupiesRowPositions;
+    public static function getRowPositions(): int {
+        return static::$occupiesRowPositions > 3 ? 3 : static::$occupiesRowPositions;
     }
 
     // =========================================================================
@@ -283,6 +271,7 @@ abstract class Field extends Feature implements FormComponent {
         ]);
 
         $this->setSerializableProperties([
+            'type',
             'id',
             'name',
             'label',
@@ -305,16 +294,19 @@ abstract class Field extends Feature implements FormComponent {
             'hiddenInRepeaterForm',
             'wrapper',
             'view',
+            'renderContext'
         ], false);
     }
 
     /**
      * Performs post-user configuration checks and normalises properties.
+     * 
+     * May be overridden by subclasses, but should ensure parent::whenConfigured() is called first.
      *
      * @return void
      * @throws \InvalidArgumentException if the field hasn't declared the required properties.
      */
-    final protected function whenConfigured(): void {
+    protected function whenConfigured(): void {
         if (empty($this->handle)) {
             $this->handle = Str::snake(class_basename(static::class));
         }
@@ -327,8 +319,12 @@ abstract class Field extends Feature implements FormComponent {
             throw new \InvalidArgumentException("A view must be defined for field '{$this->handle}'.");
         }
 
-        if (empty($this->wrapper)) {
-            throw new \InvalidArgumentException("A wrapper view must be defined for field '{$this->handle}'.");
+        if (empty($this->wrapper['site'])) {
+            $this->wrapper['site'] = $this->view;
+        }
+
+        if (empty($this->wrapper['settings'])) {
+            $this->wrapper['settings'] = $this->view;
         }
 
         $this->normaliseProperties();
@@ -489,12 +485,25 @@ abstract class Field extends Feature implements FormComponent {
     /**
      * Sets the field's wrapper view for rendering. 
      *
+     * @param string $context The context for which the wrapper is being set (e.g., 'site', 'settings').
      * @param string $wrapper The wrapper view to set for the field.
      *
      * @return void
      */
-    final public function wrapper(string $wrapper): void {
-        $this->wrapper = $wrapper;
+    final public function wrapper(string $context, string $wrapper): void {
+        $this->wrapper[$context] = $wrapper;
+    }
+
+    /**
+     * Returns the field's wrapper view for a given context.
+     *
+     * @param string $context The context for which to retrieve the wrapper view (default is 'site').
+     *
+     * @return string The wrapper view for the specified context, or the field's view if no wrapper is set for that context.
+     */
+    final public function getWrapper(string $context = ''): string {
+        $context = empty($context) ? $this->getContext('field-context', 'site') : $context;
+        return $this->wrapper[$context] ?? $this->view;
     }
 
     /**
@@ -685,8 +694,17 @@ abstract class Field extends Feature implements FormComponent {
      */
     public function name(string $name): static {
         $this->name = Str::snake($name);
+        $this->whenNameSet();
         return $this;
     }
+
+    /**
+     * Called when the field's name is set. 
+     * May be used by subclasses if needed.
+     *
+     * @return void
+     */
+    protected function whenNameSet(): void {}
 
     /**
      * Returns the field's name.
@@ -704,10 +722,6 @@ abstract class Field extends Feature implements FormComponent {
      * @return static
      */
     public function placeholder(string $placeholder): static {
-        if (!$this->supports('placeholder')) {
-            return $this;
-        }
-
         $this->attribute('placeholder', $placeholder);
         return $this;
     }
@@ -728,10 +742,6 @@ abstract class Field extends Feature implements FormComponent {
      * @return static
      */
     public function required(bool $isRequired = true): static {
-        if (!$this->supports('required')) {
-            return $this;
-        }
-
         if ($isRequired) {
             $this->attribute('required', true);
             $this->attribute('aria-required', 'true');
@@ -749,7 +759,7 @@ abstract class Field extends Feature implements FormComponent {
      * @return bool
      */
     public function isRequired(): bool {
-        return $this->supports('required') && isset($this->attributes['required']);
+        return isset($this->attributes['required']);
     }
 
     /**
@@ -759,10 +769,6 @@ abstract class Field extends Feature implements FormComponent {
      * @return static
      */
     public function readonly(bool $isReadonly = true): static {
-        if (!$this->supports('readonly')) {
-            return $this;
-        }
-
         if ($isReadonly) {
             $this->attribute('readonly', 'readonly');
             $this->attribute('aria-readonly', 'true');
@@ -780,7 +786,7 @@ abstract class Field extends Feature implements FormComponent {
      * @return bool
      */
     public function isReadonly(): bool {
-        return $this->supports('readonly') && isset($this->attributes['readonly']);
+        return isset($this->attributes['readonly']);
     }
 
     /**
@@ -790,10 +796,6 @@ abstract class Field extends Feature implements FormComponent {
      * @return static
      */
     public function disabled(bool $isDisabled = true): static {
-        if (!$this->supports('disabled')) {
-            return $this;
-        }
-
         if ($isDisabled) {
             $this->attribute('disabled', 'disabled');
             $this->attribute('aria-disabled', 'true');
@@ -811,7 +813,7 @@ abstract class Field extends Feature implements FormComponent {
      * @return bool
      */
     public function isDisabled(): bool {
-        return $this->supports('disabled') && isset($this->attributes['disabled']);
+        return isset($this->attributes['disabled']);
     }
 
     // =========================================================================
@@ -846,20 +848,25 @@ abstract class Field extends Feature implements FormComponent {
      * @throws \InvalidArgumentException if the value is not compatible with the field's data types.
      */
     protected function normaliseValue(mixed $value): mixed {
+        $value = $this->castValue($value, $this->getDataType());
+
         $dataType = match (gettype($value)) {
             'string'  => 'string',
             'integer' => 'integer',
             'float'   => 'number',
             'double'  => 'number',
             'boolean' => 'boolean',
-            'array'   => array_is_list($value) ? 'array.scalar' : 'array.object',
+            'array'   => (!empty($value) && array_reduce($value, fn ($carry, $item) => $carry && is_array($item), true)) ? 'array.object' : 'array.scalar',
             'NULL'    => 'null',
             default   => throw new \InvalidArgumentException("Unsupported value type '" . gettype($value) . "' for field '{$this->handle}'."),
         };
 
-        $isCompatible = $dataType === $this->dataType || in_array($dataType, $this->additionalDataTypes);
+        $isCompatible = $dataType === $this->dataType || 
+            in_array($dataType, $this->additionalDataTypes) || 
+            ($this->dataType === 'array.object' && empty($value));
 
         if (!$isCompatible) {
+            dd($this->handle, $this->dataType, $value);
             throw new \InvalidArgumentException("Invalid value type '{$dataType}' for field '{$this->handle}'.");
         }
 
@@ -924,6 +931,16 @@ abstract class Field extends Feature implements FormComponent {
     // =========================================================================
     // Context Methods
     // =========================================================================
+
+    /**
+     * Gets the context in which the field is being rendered. 
+     * This can be used to determine which wrapper or view to use when rendering the field.
+     *
+     * @return string
+     */
+    final public function getRenderContext(): string {
+        return $this->getContext('field-context', 'site');
+    }
 
     /**
      * Returns the field's type (handle).
@@ -1066,12 +1083,18 @@ abstract class Field extends Feature implements FormComponent {
     /**
      * Sets the field's associated Repeater instance.
      *
-     * @param Repeater $repeater The Repeater instance to associate with the field definition.
+     * @param Repeater|null $repeater   The Repeater instance to associate with the field definition. If null is passed, the current repeater association will be removed.
+     * @param string|null   $repeaterId The id of the Repeater field associated with this field. This is required if a Repeater instance is provided.
      * @return static
      */
-    final public function repeater(Repeater $repeater, string $repeaterId): static {
+    final public function repeater(Repeater|null $repeater, string|null $repeaterId = null): static {
+        if ($repeater !== null && (is_null($repeaterId) || empty($repeaterId))) {
+            throw new \InvalidArgumentException("A Repeater ID must be provided when associating a Repeater instance with field '{$this->handle}'.");
+        }
+
         $this->repeater = $repeater;
-        $this->repeaterId = $repeaterId;
+        $this->repeaterId = $repeater === null ? null : $repeaterId;
+
         return $this;
     }
 
@@ -1093,46 +1116,6 @@ abstract class Field extends Feature implements FormComponent {
         return $this->repeater !== null;
     }
 
-    /**
-     * Sets whether the field should be hidden in a repeater table view.
-     *
-     * @param bool $hide Whether to hide the field in a repeater table view.
-     * @return static
-     */
-    final public function hideInRepeaterTable(bool $hide = true): static {
-        $this->hiddenInRepeaterTable = $hide;
-        return $this;
-    }
-
-    /**
-     * Determines whether the field is hidden in a repeater table view.
-     *
-     * @return bool
-     */
-    final public function isHiddenInRepeaterTable(): bool {
-        return $this->hiddenInRepeaterTable;
-    }
-
-    /**
-     * Sets whether the field should be hidden in a repeater form view.
-     *
-     * @param bool $hide Whether to hide the field in a repeater form view.
-     * @return static
-     */
-    final public function hideInRepeaterForm(bool $hide = true): static {
-        $this->hiddenInRepeaterForm = $hide;
-        return $this;
-    }
-
-    /**
-     * Determines whether the field is hidden in a repeater form view.
-     *
-     * @return bool
-     */
-    final public function isHiddenInRepeaterForm(): bool {
-        return $this->hiddenInRepeaterForm;
-    }
-
     // =========================================================================
     // Rendering
     // =========================================================================
@@ -1146,25 +1129,22 @@ abstract class Field extends Feature implements FormComponent {
      * @return void
      */
     public function render(array $properties = [], bool $mergeProperties = false): void {
-        $wrapper = $this->wrapper;
+        $wrapper = $this->getWrapper();
 
         if ($mergeProperties) {
             $properties = array_merge(
-                $this->filterSerializedProperties($this->toArray()['properties'] ?? []), 
+                $this->filterSerializedProperties($this->toArray()), 
                 $properties
             );
         }
 
         else {
             $properties = empty($properties) 
-                ? $this->filterSerializedProperties($this->toArray()['properties'] ?? []) 
+                ? $this->filterSerializedProperties($this->toArray()) 
                 : $properties;
         }
         
-        echo view($wrapper, [
-            'type'       => $this->handle,
-            'properties' => $properties
-        ]);
+        echo view($wrapper, $properties);
     }
 
     /**

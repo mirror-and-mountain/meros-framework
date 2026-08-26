@@ -14,13 +14,7 @@ abstract class Choice extends Field {
         
         $this->view('meros::forms.fields.choice');
         $this->setSerializableProperties(['allowsMultiple', 'options']);
-        $this->addSupports([
-            'required',
-            'disabled',
-            'placeholder',
-            'description',
-            'multiple'
-        ]);
+        $this->addSupports(['multiple']);
     }
 
     /**

@@ -170,7 +170,7 @@ final class Framework extends Provider {
             $postType->name('tests');
             $postType->label('Test Post Type', 'Test Post Types');
             $postType->public(true);
-            $postType->fields('test-field-group'); // Should resolve the existing one.
+            // $postType->fields('test-field-group'); // Should resolve the existing one.
 
             $postType->meta(function ($meta) {
                 $meta->name('test_meta_container');
@@ -181,6 +181,30 @@ final class Framework extends Provider {
                     $item->label('Test Meta Field');
                     $item->default('Default Meta Value');
                     $item->field();
+                });
+                $meta->add('object', function ($item) {
+                    $item->name('test_meta_repeater');
+                    $item->label('Test Meta Repeater');
+                    $item->field('repeater', function ($field) {
+                        $field->field('text', function ($subfield) {
+                            $subfield->name('test_repeater_text');
+                            $subfield->label('Test Repeater Text');
+                        });
+
+                        $field->field('number', function ($subfield) {
+                            $subfield->name('test_repeater_number');
+                            $subfield->label('Test Repeater Number');
+                        });
+
+                        $field->editForm(function ($form) {
+                            $form->field('text', function ($field) {
+                                $field->name('test_meta_repeater_text');
+                                $field->label('I am a form field');
+                                $field->placeholder('Enter some text...');
+                            });
+                            return $form;
+                        });
+                    });
                 });
             });
         });

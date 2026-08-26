@@ -58,7 +58,8 @@ class Sanitizer {
             $schema = $schema['schema'];
         }
 
-        return $this->sanitizeBySchema($this->rawValue, is_array($schema) ? $schema : []);
+        $value = $this->sanitizeBySchema($this->rawValue, is_array($schema) ? $schema : []);
+        return $value;
     }
 
     // =========================================================================
@@ -166,6 +167,10 @@ class Sanitizer {
         $output = [];
 
         foreach ($input as $key => $value) {
+            if ($key === -1) {
+                continue;
+            }    
+
             $sanitizedKey = is_int($key) ? $key : $this->sanitizeArrayKey($key);
             $output[$sanitizedKey] = $this->sanitizeBySchema($value, $itemSchema);
         }

@@ -15,6 +15,8 @@ use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 use MM\Meros\Contracts\Features\Components\Concerns\IsFormComponent;
 use MM\Meros\Contracts\Features\Components\Concerns\MakesFieldRows;
 
+use MM\Meros\Facades\Components\Fields;
+
 class FieldGroup extends Feature implements FormComponent, Makeable {
     /**
      * The field group's id.
@@ -22,6 +24,13 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      * @var string
      */
     protected string $id = '';
+
+    /**
+     * The field group's name.
+     *
+     * @var string
+     */
+    protected string $name = '';
 
     /**
      * The field group's title.
@@ -37,6 +46,11 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      */
     protected ?Form $form = null;
 
+    /**
+     * The view used to render the field group.
+     *
+     * @var string
+     */
     private string $view = 'meros::forms.field-group';
 
     use IsFormComponent,
@@ -53,19 +67,16 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
 
         $this->setSerializableProperties(([
             'id',
+            'name',
             'title',
             'description',
-            'rows'
+            'rows',
+            'metaBox'
         ]));
 
-        $this->set('id', $this->passedProps['id'] ?? 'mforms-section-' . Str::substr(Str::uuid(), 0, 8));
-        $this->set('title', $this->passedProps['title'] ?? '');
-        $this->set('description', $this->passedProps['description'] ?? '');
-        $this->set('rows', $this->passedProps['rows'] ?? []);
-        
-        if ($this->passedProps['form'] ?? null instanceof Form) {
-            $this->form($this->passedProps['form']);
-        }
+        $defaultIdentifier = 'mforms-section-' . Str::substr(Str::uuid(), 0, 8);
+        $this->id($defaultIdentifier);
+        $this->name(Str::replace('-', '_', $defaultIdentifier));
     }
 
     final protected function whenConfigured(): void {
@@ -84,7 +95,7 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
     /**
      * Adds a field to the FieldGroup instance. If the last row has reached its field capacity, a new FieldRow instance is created for the field.
      *
-     * @param string        $type The type of the field to add.
+     * @param string  $type The type of the field to add.
      * @param Closure|array $callbackOrProps A closure or array of properties for the field.
      * @param bool          $autoRow Whether to automatically add the field to an existing row if it has capacity (true) or always create a new row for the field (false). Defaults to true.
      * @param bool          $returnField Whether to return the created Field instance (true) or the FieldGroup instance (false). Defaults to false.
@@ -93,10 +104,10 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      * @throws \RuntimeException If the field could not be created.
      */
     final public function field(string $type, Closure|array $callbackOrProps = [], bool $autoRow = true, bool $returnField = false): static|Field {
-        $field = $this->makeItemFrom($type, Field::class, $callbackOrProps);
+        $fieldClass = Fields::getRegisteredFeatureClass($type);
 
-        if (!($field instanceof Field)) {
-            throw new \RuntimeException("Failed to create a Field instance of type '{$type}'.");
+        if ($fieldClass === null) {
+            throw new \RuntimeException("Field type '{$type}' is not registered.");
         }
 
         $resolveAddedField = function (FieldRow $row) use ($type, $callbackOrProps): Field {
@@ -113,7 +124,7 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
         $lastRow = $this->getLastRow(true);
 
         if ($autoRow) {
-            $fieldWidth     = $field->getRowPositions();
+            $fieldWidth     = $fieldClass::getRowPositions();
             $rowHasCapacity = $lastRow->hasCapacityFor($fieldWidth);
 
             if ($rowHasCapacity) {
@@ -165,6 +176,18 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      */
     final public function id(string $id): static {
         return $this->setIdentifier($id, false);
+    }
+
+    /**
+     * Sets the field group's name.
+     *
+     * @param string $name
+     *
+     * @return static
+     */
+    final public function name(string $name): static {
+        $this->name = Str::snake($name);
+        return $this;
     }
 
     /**
@@ -243,6 +266,15 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
         return $collect ? collect($fields) : $fields;
     }
 
+    /**
+     * Returns whether the group is being rendered as a meta box.
+     *
+     * @return boolean
+     */
+    final public function isMetaBox(): bool {
+        return $this->getContext('meta_box', false);
+    }
+
     // =========================================================================
     // Rendering
     // =========================================================================
@@ -252,14 +284,14 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
 
         if ($mergeProperties) {
             $properties = array_merge(
-                $this->filterSerializedProperties($this->toArray()['properties'] ?? []),
+                $this->filterSerializedProperties($this->toArray()),
                 $properties
             );
         } 
         
         else {
             $properties = empty($properties) 
-                ? $this->filterSerializedProperties($this->toArray()['properties'] ?? [])
+                ? $this->filterSerializedProperties($this->toArray())
                 : $properties;
         }
 
@@ -286,23 +318,22 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      * @return string
      */
     final public function __renderAsMetaBox(string $containerName, array $values): string {
-        $properties = $this->filterSerializedProperties($this->toArray()['properties'] ?? []);
+        $properties = $this->filterSerializedProperties($this->toArray());
 
         if (!array_key_exists('rows', $properties)) {
             return $this->html();
         }
 
         $rows = $properties['rows'];
+        $fieldInstances = $this->getfields(true);
+
         foreach ($rows as $rowIndex => $row) {
-            if (!array_key_exists('properties', $row)) {
+            if (!array_key_exists('fields', $row)) {
                 continue;
             }
 
-            if (!array_key_exists('fields', $row['properties'])) {
-                continue;
-            }
+            $fields = $row['fields'];
 
-            $fields = $row['properties']['fields'];
             if (!is_array($fields)) {
                 continue;
             }
@@ -312,25 +343,27 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
                     continue;
                 } 
 
-                if (!array_key_exists('properties', $field)) {
+                if (!array_key_exists('name', $field)) {
                     continue;
                 }
 
-                if (!array_key_exists('name', $field['properties'])) {
+                if (!array_key_exists('defaultValue', $field)) {
                     continue;
                 }
 
-                $name = Str::between($field['properties']['name'], $containerName . '[', ']');
+                $instance = $fieldInstances->firstWhere(function ($fieldInstance) use ($field) {
+                    return $fieldInstance->getName() === $field['name'];
+                });
 
-                if (!array_key_exists($name, $values)) {
+                if ($instance === null) {
                     continue;
                 }
 
-                if (!array_key_exists('defaultValue', $field['properties'])) {
-                    continue;
-                }
 
-                $properties['rows'][$rowIndex]['properties']['fields'][$fieldIndex]['properties']['defaultValue'] = $values[$name];
+                $shortName = Str::between($field['name'], $containerName . '[', ']');
+                $instance->default($values[$shortName]);
+
+                $properties['rows'][$rowIndex]['fields'][$fieldIndex] = $instance->toArray();
             }
         }
 

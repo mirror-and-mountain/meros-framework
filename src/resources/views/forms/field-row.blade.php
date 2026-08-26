@@ -6,17 +6,7 @@
         @include('meros::forms.field-group', $childGroup)
     @else
         @foreach($fields as $field)
-            @php
-                $properties = $field['properties'] ?? [];
-                $wrapper = null;
-                if (isset($properties['wrapper'])) {
-                    $wrapper = $properties['wrapper'];
-                }
-            @endphp
-
-            @if($properties !== [] && $wrapper)
-                @include($wrapper, $field ?? [])
-            @endif
+           @include($field['wrapper'], $field)
         @endforeach
     @endif
 </div>

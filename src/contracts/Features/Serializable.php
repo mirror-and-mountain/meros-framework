@@ -12,7 +12,7 @@ interface Serializable {
      *
      * @return array|string The serialized representation of the feature instance.
      */
-    public function toSerialized(string $format = 'array', string ...$flags): array|string;
+    public function serialize(string $format = 'array', string ...$flags): array|string;
 
     /**
      * Returns an array representation of the feature instance, including its type, identifier, and specified serializable properties.

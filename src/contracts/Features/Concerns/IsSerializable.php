@@ -5,7 +5,6 @@ namespace MM\Meros\Contracts\Features\Concerns;
 use MM\Meros\Contracts\Features\Serializable;
 
 trait IsSerializable {
-
     /**
      * Returns the unique identifier for the feature instance.
      *
@@ -46,7 +45,7 @@ trait IsSerializable {
      *
      * @return array|string The serialized representation of the feature instance.
      */
-    final public function toSerialized(string $format = 'array', string ...$flags): array|string {
+    final public function serialize(string $format = 'array', string ...$flags): array|string {
         return match ($format) {
             'array' => $this->toArray(),
             'json'  => $this->toJson(...$flags),
@@ -67,7 +66,7 @@ trait IsSerializable {
     }
 
     /**
-     * Returns an array representation of the feature instance, including its type, identifier, and specified serializable properties.
+    * Returns an array representation of the feature instance's specified serializable properties.
      * Circular references are guarded to prevent infinite recursion.
      *
      * @return array
@@ -78,11 +77,7 @@ trait IsSerializable {
         $objectId = spl_object_id($this);
 
         if (isset($stack[$objectId])) {
-            return [
-                'type'       => static::class,
-                'identifier' => $this->getIdentifier(),
-                'properties' => ['__circular_reference' => true],
-            ];
+            return ['__circular_reference' => true];
         }
 
         $stack[$objectId] = true;
@@ -94,11 +89,7 @@ trait IsSerializable {
                 $properties[$property] = $this->resolveSerializableProperty($property);
             }
 
-            return [
-                'type'       => static::class,
-                'identifier' => $this->getIdentifier(),
-                'properties' => $properties,
-            ];
+            return $this->filterSerializedProperties($properties);
         } finally {
             unset($stack[$objectId]);
         }
@@ -113,6 +104,7 @@ trait IsSerializable {
     private function resolveSerializableProperty(string $property): mixed {
         $getter = 'get' . ucfirst($property);
         $isser  = 'is' . ucfirst($property);
+        $hasser = 'has' . ucfirst($property);
 
         if (method_exists($this, $getter)) {
             return $this->serializeValue($this->{$getter}());
@@ -120,6 +112,10 @@ trait IsSerializable {
 
         if (method_exists($this, $isser)) {
             return $this->serializeValue($this->{$isser}());
+        }
+
+        if (method_exists($this, $hasser)) {
+            return $this->serializeValue($this->{$hasser}());
         }
 
         if (property_exists($this, $property)) {

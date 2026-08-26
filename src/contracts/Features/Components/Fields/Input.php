@@ -13,13 +13,6 @@ abstract class Input extends Field {
         
         $this->view('meros::forms.fields.input');
         $this->setSerializableProperties(['showsIcon', 'iconPosition']);
-        $this->addSupports([
-            'required',
-            'disabled',
-            'readonly',
-            'placeholder',
-            'description',
-        ]);
     }
 
     /**

@@ -1,6 +1,6 @@
 
 /**
- * Shows the Meros admin modal with the specified title and content, creating the modal if
+ * Shows the Meros modal with the specified title and content, creating the modal if
  * it does not already exist in the DOM.
  * 
  * A callback may be passed as a third parameter which will be executed when the confirm button is clicked. 
@@ -14,20 +14,20 @@
  * @param {Function|null} callback - Optional callback function to be executed when the confirm button is clicked.
  * @returns {void}
  */
-export function merosShowAdminModal(title, content, callback = null, confirmButtonText = 'Confirm', closeModal = true) {
-    let modal = document.getElementById('meros-admin-modal-overlay');
+export function __meros_modal_show(title, content, callback = null, confirmButtonText = 'Confirm', closeModal = true) {
+    let modal = document.getElementById('meros-modal-overlay');
 
     if (!modal) {
-        merosMakeAdminModal();
-        modal = document.getElementById('meros-admin-modal-overlay');
+        __meros_modal_make();
+        modal = document.getElementById('meros-modal-overlay');
         if (!modal) {
-            console.error('Failed to create Meros admin modal.');
+            console.error('Failed to create Meros modal.');
             return;
         }
     }
 
-    const modalTitle = modal.querySelector('.meros-admin-modal-title');
-    const modalContent = modal.querySelector('.meros-admin-modal-content');
+    const modalTitle = modal.querySelector('.meros-modal-title');
+    const modalContent = modal.querySelector('.meros-modal-content');
 
     if (modalTitle) {
         modalTitle.textContent = title;
@@ -37,8 +37,8 @@ export function merosShowAdminModal(title, content, callback = null, confirmButt
         modalContent.innerHTML = content;
     }
 
-    const modalConfirmButton = modal.querySelector('.meros-admin-modal-confirm-button');
-    const modalCancelButton = modal.querySelector('.meros-admin-modal-cancel-button');
+    const modalConfirmButton = modal.querySelector('.meros-modal-confirm-button');
+    const modalCancelButton = modal.querySelector('.meros-modal-cancel-button');
 
     if (modalConfirmButton) {
         modalConfirmButton.textContent = confirmButtonText;
@@ -52,36 +52,37 @@ export function merosShowAdminModal(title, content, callback = null, confirmButt
             }
 
             if (typeof callback === 'function') {
-                callback();
+                callback(modal);
             }
 
             if (closeModal) {
-                merosHideAdminModal();
+                __meros_modal_hide();
             }
         };
     }
 
     if (modalCancelButton) {
         modalCancelButton.onclick = function() {
-            merosHideAdminModal();
+            __meros_modal_hide();
         };
     }
 
-    modal.classList.remove('meros-admin-modal-hidden');
+    modal.classList.remove('meros-modal-hidden');
 }
 
 /**
- * Appends extra content to the Meros admin modal. This function can be used to add additional information or elements to the modal after it has been displayed.
+ * Appends extra content to the Meros modal. This function can be used to add additional information or elements to the modal after it has been displayed.
  * 
  * @param {string} content - The HTML content to be added to the extra content section of the modal.
  * @param {string|null} color - Optional color for the extra content. If provided, it will be applied to the text color of the extra content.
+ * @param {string|null} marginTop - Optional. If provided, the margin will be applied to the top of the content.
  * @returns {void}
  */
-export function merosAdminModalSetExtraContent(content, color = null) {
-    const modal = document.getElementById('meros-admin-modal-overlay');
+export function __meros_modal_setExtraContent(content, color = null, marginTop = null) {
+    const modal = document.getElementById('meros-modal-overlay');
     if (!modal) return;
 
-    const extraContent = modal.querySelector('.meros-admin-modal-extra-content');
+    const extraContent = modal.querySelector('.meros-modal-extra-content');
 
     if (extraContent) {
         extraContent.innerHTML = content;
@@ -89,21 +90,25 @@ export function merosAdminModalSetExtraContent(content, color = null) {
         if (color) {
             extraContent.style.color = color;
         }
+
+        if (marginTop) {
+            extraContent.style.marginTop = marginTop;
+        }
     }
 }
 
 /**
- * Hides the confirm button in the Meros admin modal. 
+ * Hides the confirm button in the Meros modal. 
  * This function can be used to remove the confirm button from the 
  * modal when it is not needed, such as when displaying informational messages or errors.
  * 
  * @returns {void}
  */
-export function merosAdminModalHideConfirmButton() {
-    const modal = document.getElementById('meros-admin-modal-overlay');
+export function __meros_modal_hideConfirmButton() {
+    const modal = document.getElementById('meros-modal-overlay');
     if (!modal) return;
 
-    const modalConfirmButton = modal.querySelector('.meros-admin-modal-confirm-button');
+    const modalConfirmButton = modal.querySelector('.meros-modal-confirm-button');
 
     if (modalConfirmButton) {
         modalConfirmButton.style.display = 'none';
@@ -111,34 +116,46 @@ export function merosAdminModalHideConfirmButton() {
 }
 
 /**
- * Shows the confirm button in the Meros admin modal if it is currently hidden. 
+ * Shows the confirm button in the Meros modal if it is currently hidden. 
  * This function can be used to make the confirm button visible again after it has been hidden.
  * 
  * @returns {void}
  */
-export function merosAdminModalShowConfirmButton() {
-    const modal = document.getElementById('meros-admin-modal-overlay');
+export function __meros_modal_showConfirmButton() {
+    const modal = document.getElementById('meros-modal-overlay');
     if (!modal) return;
 
-    const modalConfirmButton = modal.querySelector('.meros-admin-modal-confirm-button');
+    const modalConfirmButton = modal.querySelector('.meros-modal-confirm-button');
 
     if (modalConfirmButton) {
         modalConfirmButton.style.display = 'block';
     }
 }
 
+export function __meros_modal_enableConfirmButton() {
+    const modal = document.getElementById('meros-modal-overlay');
+    if (!modal) return;
+
+    const modalConfirmButton = modal.querySelector('.meros-modal-confirm-button');
+
+    if (modalConfirmButton) {
+        modalConfirmButton.disabled = false;
+        modalConfirmButton.classList.remove('meros-working');
+    }
+}
+
 /**
- * Changes the text of the cancel button in the Meros admin modal. 
+ * Changes the text of the cancel button in the Meros modal. 
  * If the cancel button is currently disabled, it will be re-enabled.
  * 
  * @param {string} text - The text to set for the cancel button.
  * @returns {void}
  */
-export function merosAdminModalSetCancelButtonText(text) {
-    const modal = document.getElementById('meros-admin-modal-overlay');
+export function __meros_modal_setCancelButtonText(text) {
+    const modal = document.getElementById('meros-modal-overlay');
     if (!modal) return;
 
-    const modalCancelButton = modal.querySelector('.meros-admin-modal-cancel-button');
+    const modalCancelButton = modal.querySelector('.meros-modal-cancel-button');
 
     if (modalCancelButton) {
         modalCancelButton.textContent = text;
@@ -149,41 +166,57 @@ export function merosAdminModalSetCancelButtonText(text) {
     }
 }
 
-export function merosAdminModalSetCloseButtonCallback(callback) {
-    const modal = document.getElementById('meros-admin-modal-overlay');
+export function __meros_modal_setCloseButtonCallback(callback) {
+    const modal = document.getElementById('meros-modal-overlay');
     if (!modal) return;
 
     if (typeof callback !== 'function') return;
 
-    const modalCancelButton = modal.querySelector('.meros-admin-modal-cancel-button');
+    const modalCancelButton = modal.querySelector('.meros-modal-cancel-button');
 
     if (modalCancelButton) {
         modalCancelButton.onclick = function() {
             callback();
-            merosHideAdminModal(callback);
+            __meros_modal_hide(callback);
         };
     }
 }
 
+export function __meros_modal_enableCloseButton() {
+    const modal = document.getElementById('meros-modal-overlay');
+    if (!modal) return;
+
+    const modalCancelButton = modal.querySelector('.meros-modal-cancel-button');
+
+    if (modalCancelButton) {
+        modalCancelButton.disabled = false;
+    }
+}
+
+export function __meros_modal_enableButtons() {
+    __meros_modal_enableConfirmButton();
+    __meros_modal_enableCloseButton();
+}
+
 /**
- * Hides the Meros admin modal by adding the 'meros-admin-modal-hidden' class to the overlay
+ * Hides the Meros modal by adding the 'meros-modal-hidden' class to the overlay
  * and resetting its content and button states.
  * 
  * @param {Function|null} callback - Optional callback function to be executed after the modal is hidden.
  * 
  * @returns {void}
  */
-export function merosHideAdminModal(callback = null) {
-    const modal = document.getElementById('meros-admin-modal-overlay');
+export function __meros_modal_hide(callback = null) {
+    const modal = document.getElementById('meros-modal-overlay');
 
     if (!modal) {
-        console.error('Meros admin modal not found.');
+        console.error('Meros modal not found.');
         return;
     }
 
     // Reset button states
-    const modalConfirmButton = modal.querySelector('.meros-admin-modal-confirm-button');
-    const modalCancelButton = modal.querySelector('.meros-admin-modal-cancel-button');
+    const modalConfirmButton = modal.querySelector('.meros-modal-confirm-button');
+    const modalCancelButton = modal.querySelector('.meros-modal-cancel-button');
 
     if (modalConfirmButton) {
         modalConfirmButton.disabled = false;
@@ -200,9 +233,9 @@ export function merosHideAdminModal(callback = null) {
     }
 
     // Clear modal content
-    const modalTitle   = modal.querySelector('.meros-admin-modal-title');
-    const modalContent = modal.querySelector('.meros-admin-modal-content');
-    const extraContent = modal.querySelector('.meros-admin-modal-extra-content');
+    const modalTitle   = modal.querySelector('.meros-modal-title');
+    const modalContent = modal.querySelector('.meros-modal-content');
+    const extraContent = modal.querySelector('.meros-modal-extra-content');
     
     if (modalTitle) {
         modalTitle.textContent = ''; // Clear the title
@@ -214,9 +247,10 @@ export function merosHideAdminModal(callback = null) {
     if (extraContent) {
         extraContent.innerHTML = ''; // Clear any extra content
         extraContent.style.color = ''; // Reset the color of the extra content
+        extraContent.style.marginTop = ''; // Reset the content's top margin
     }
 
-    modal.classList.add('meros-admin-modal-hidden');
+    modal.classList.add('meros-modal-hidden');
 
     if (typeof callback === 'function') {
         callback();
@@ -224,38 +258,38 @@ export function merosHideAdminModal(callback = null) {
 }
 
 /**
- * Creates the Meros admin modal and appends it to the document body.
+ * Creates the Meros modal and appends it to the document body.
  * This function is called when the modal is first needed and does not exist in the DOM.
  * It sets up the structure of the modal, including title, content area, and action buttons.
  * 
  * @returns {void}
  */
-function merosMakeAdminModal() {
+function __meros_modal_make() {
     const overlay = document.createElement('div');
-    overlay.id = 'meros-admin-modal-overlay';
-    overlay.classList.add('meros-admin-modal-overlay', 'meros-admin-modal-hidden');
+    overlay.id = 'meros-modal-overlay';
+    overlay.classList.add('meros-modal-overlay', 'meros-modal-hidden');
 
     const modal = document.createElement('div');
-    modal.id = 'meros-admin-modal';
-    modal.classList.add('meros-admin-modal');
+    modal.id = 'meros-modal';
+    modal.classList.add('meros-modal');
 
     const modalTitle = document.createElement('h2');
-    modalTitle.classList.add('meros-admin-modal-title');
+    modalTitle.classList.add('meros-modal-title');
 
     const modalContent = document.createElement('div');
-    modalContent.classList.add('meros-admin-modal-content');
+    modalContent.classList.add('meros-modal-content');
 
     const modalExtraContent = document.createElement('div');
-    modalExtraContent.classList.add('meros-admin-modal-extra-content');
+    modalExtraContent.classList.add('meros-modal-extra-content');
 
     const modalButtons = document.createElement('div');
-    modalButtons.classList.add('meros-admin-modal-buttons');
+    modalButtons.classList.add('meros-modal-buttons');
 
     const modalConfirmButton = document.createElement('button');
-    modalConfirmButton.classList.add('meros-admin-modal-button', 'meros-admin-modal-confirm-button', 'button', 'button-primary');
+    modalConfirmButton.classList.add('meros-modal-button', 'meros-modal-confirm-button', 'button', 'button-primary');
 
     const modalCancelButton = document.createElement('button');
-    modalCancelButton.classList.add('meros-admin-modal-button', 'meros-admin-modal-cancel-button', 'button', 'button-primary');
+    modalCancelButton.classList.add('meros-modal-button', 'meros-modal-cancel-button', 'button', 'button-primary');
     modalCancelButton.textContent = 'Cancel';
 
     modal.appendChild(modalTitle);
