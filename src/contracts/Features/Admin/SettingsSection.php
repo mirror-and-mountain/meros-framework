@@ -182,5 +182,7 @@ class SettingsSection extends Feature implements Registrable, Makeable {
         if (!empty($this->description)) {
             echo '<p class="meros-settings-section-description">' . $this->description . '</p>';
         }
+
+        echo '<hr>';
     }
 }

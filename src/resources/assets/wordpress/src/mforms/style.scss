@@ -32,6 +32,10 @@ $mf-first-row-offset: -24px;
 }
 
 .mforms-section {
+    .mforms-section-title {
+        padding: 0 !important;
+    }
+    
     .mforms-section-description {
         margin-bottom: 1rem;
     }
