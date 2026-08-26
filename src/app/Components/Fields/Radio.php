@@ -12,8 +12,4 @@ class Radio extends Choice {
         $this->dataType('string');
         $this->removeSupport('multiple');
     }
-
-    protected function resolveFieldView(): string {
-        return 'meros::forms.fields.radio';
-    }
 }

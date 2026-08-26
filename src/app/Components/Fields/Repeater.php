@@ -4,7 +4,6 @@ namespace MM\Meros\App\Components\Fields;
 
 use Closure;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 
 use MM\Meros\Contracts\Concerns\UsesAjax;
 use MM\Meros\Contracts\Features\Components\Form;

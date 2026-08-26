@@ -1,4 +1,4 @@
-import mformsInput from './fields/input.js';
+import mformsSelect from './fields/select.js';
 import mformsRepeater from './fields/repeater.js';
 
 import './style.scss';
@@ -169,6 +169,6 @@ const mform = () => {
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('mform', mform);
-    Alpine.data('mformsInput', mformsInput);
+    Alpine.data('mformsSelect', mformsSelect);
     Alpine.data('mformsRepeater', mformsRepeater);
 });

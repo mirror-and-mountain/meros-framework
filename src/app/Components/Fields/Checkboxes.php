@@ -15,8 +15,4 @@ class Checkboxes extends Choice {
         // as checkboxes inherently allow multiple selections.
         $this->removeSupport('multiple');
     }
-
-    protected function resolveFieldView(): string {
-        return 'meros::forms.fields.checkboxes';
-    }
 }

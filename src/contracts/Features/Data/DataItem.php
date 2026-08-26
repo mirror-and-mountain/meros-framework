@@ -249,6 +249,8 @@ abstract class DataItem extends Feature implements StorableItem {
         if (!$this->field->isCompatibleWithDataType($dataType)) {
             throw new \InvalidArgumentException("Field of type '{$fieldType}' is not compatible with data type '{$dataType}'.");
         }
+
+        $fieldType = $field->getType();
         
         // Sync field attributes with this DataItem
         $containerName = $this->container->getName(true);
@@ -256,8 +258,25 @@ abstract class DataItem extends Feature implements StorableItem {
         $this->field->id($containerName . '-' . Str::replace('_', '-', $this->name));
         $this->field->label($this->getLabel());
         $this->field->description($this->getDescription());
-        $this->field->default($this->getDefault());
+
+        // Update select fields based on the data type.
+        if ($fieldType === 'select') {
+            if (method_exists($field, 'allowsMultiple') && method_exists($field, 'multiple')) {
+                $multiple = $field->allowsMultiple();
+
+                if ($dataType === 'string' && $multiple) {
+                    $field->multiple(false);
+                }
+
+                if ($dataType === 'array.scalar' && !$multiple) {
+                    $field->multiple(true);
+                }
+            }
+        }
     
+        // Set the field's default value
+        $this->field->default($this->getDefault());
+        
         $this->whenFieldSet($this->field);
         return $this->field;
     }

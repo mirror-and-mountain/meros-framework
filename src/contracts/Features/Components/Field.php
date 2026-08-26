@@ -866,7 +866,6 @@ abstract class Field extends Feature implements FormComponent {
             ($this->dataType === 'array.object' && empty($value));
 
         if (!$isCompatible) {
-            dd($this->handle, $this->dataType, $value);
             throw new \InvalidArgumentException("Invalid value type '{$dataType}' for field '{$this->handle}'.");
         }
 

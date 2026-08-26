@@ -8,7 +8,6 @@ final class MFormsDeps extends AssetGroup {
     protected function configure(): void {
         $assets = [
             'mforms-nice-forms-style' => 'mforms/nice-forms/style-index.css',
-            'mforms-tom-select'       => 'mforms/tomselect/index.js',
             'mforms-tom-select-style' => 'mforms/tomselect/style-index.css',
         ];
 

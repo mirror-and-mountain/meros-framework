@@ -224,3 +224,17 @@
     line-height: 1rem;
     white-space: nowrap;
 }
+
+/* Handling for nested TS fields */
+.meros-repeater-field .ts-wrapper.input-hidden input {
+	position: relative !important;
+}
+
+.meros-repeater-field .ts-wrapper.dropdown-active .ts-dropdown {
+	position: relative !important;
+}
+
+/* Handling for nested choice fields */
+.meros-repeater-field .meros-repeater-table-cell--field fieldset.nice-form-group {
+    margin-top: 0 !important;
+}
