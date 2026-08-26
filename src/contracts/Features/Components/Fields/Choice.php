@@ -12,6 +12,7 @@ abstract class Choice extends Field {
         parent::init();
         $this->wrapper('site', '');
         $this->wrapper('settings', '');
+        $this->fieldSet(true);
         $this->view('meros::forms.fields.choice');
         
         $this->setSerializableProperties(['allowsMultiple', 'options']);

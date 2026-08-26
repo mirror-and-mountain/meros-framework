@@ -60,6 +60,13 @@ abstract class Field extends Feature implements FormComponent {
      */
     protected string $view = '';
 
+    /**
+     * Indicates whether the field's primary wrapper tag is <fieldset>.
+     *
+     * @var boolean
+     */
+    protected bool $isFieldSet = false;
+
     // =========================================================================
     // Field Context Properties
     // =========================================================================
@@ -294,7 +301,8 @@ abstract class Field extends Feature implements FormComponent {
             'hiddenInRepeaterForm',
             'wrapper',
             'view',
-            'renderContext'
+            'renderContext',
+            'isFieldSet',
         ], false);
     }
 
@@ -575,6 +583,26 @@ abstract class Field extends Feature implements FormComponent {
      */
     final public function getDataType(): string {
         return $this->dataType;
+    }
+
+    /**
+     * Marks the field's primary wrapper tag as <fieldset>. This method should be called in the field definition's configure() method.
+     *
+     * @param boolean $isFieldSet
+     *
+     * @return void
+     */
+    final protected function fieldSet(bool $isFieldSet = true): void {
+        $this->isFieldSet = $isFieldSet;
+    }
+
+    /**
+     * Checks if the field's primary wrapper tag is <fieldset>.
+     *
+     * @return bool
+     */
+    final public function isFieldSet(): bool {
+        return $this->isFieldSet;
     }
 
     /**

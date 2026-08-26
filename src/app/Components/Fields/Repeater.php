@@ -45,6 +45,7 @@ class Repeater extends Field {
         $this->view('meros::forms.fields.repeater');
         $this->wrapper('site', '');
         $this->wrapper('settings', '');
+        $this->fieldSet(true);
         $this->type('repeater');
         $this->dataType('array.object');
         $this->setSerializableProperties([

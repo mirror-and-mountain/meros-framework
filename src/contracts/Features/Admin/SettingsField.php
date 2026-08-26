@@ -164,10 +164,14 @@ final class SettingsField {
         add_filter('meros_settings_field_title', function ($title, $id, $setting) {
             $description = $setting->getDescription();
             if ($id === $this->id && $setting === $this->setting && !empty($description)) {
+                $label = $this->field->isFieldSet()
+                    ? '<span>' . $setting->getLabel() . '</span>'
+                    : '<label for="' . esc_attr($id) . '">' . $setting->getLabel() . '</label>';
+
                 return 
-                    '<div class="meros-settings-field-title-wrapper">
-                        <label for="' . esc_attr($id) . '">' . $setting->getLabel() . '</label>
-                        <div class="meros-settings-field-description">
+                    '<div class="meros-settings-field-title-wrapper">' .
+                        $label .
+                        '<div class="meros-settings-field-description">
                             <span class="description">
                                 ' . $description . '
                             </span>
