@@ -146,68 +146,6 @@ final class Framework extends Provider {
 
     private function registerPostTypes(): void {
         $this->registerCorePostTypes();
-
-        $this->fieldGroups()->make(function ($group) {
-            $group->id('test-field-group');
-            $group->title('Test Field Group');
-            $group->description('A test field group for the test post type.');
-            $group->field('text', function ($field) {
-                $field->name('test_field');
-                $field->label('Test Field');
-                $field->default('Default Value');
-            });
-
-            $group->field('number', function ($field) {
-                $field->name('test_number_field');
-                $field->label('Test Number Field');
-                $field->default(59);
-            });
-        });
-
-        $this->postTypes('post')->fields('simple-contact-fields'); // Should resolve the existing one.
-
-        $this->postTypes()->make(function ($postType) {
-            $postType->name('tests');
-            $postType->label('Test Post Type', 'Test Post Types');
-            $postType->public(true);
-            // $postType->fields('test-field-group'); // Should resolve the existing one.
-
-            $postType->meta(function ($meta) {
-                $meta->name('test_meta_container');
-                $meta->label('Test Meta Container');
-                $meta->description('A test meta container for the test post type.');
-                $meta->add('string', function ($item) {
-                    $item->name('test_meta_field');
-                    $item->label('Test Meta Field');
-                    $item->default('Default Meta Value');
-                    $item->field();
-                });
-                $meta->add('object', function ($item) {
-                    $item->name('test_meta_repeater');
-                    $item->label('Test Meta Repeater');
-                    $item->field('repeater', function ($field) {
-                        $field->field('text', function ($subfield) {
-                            $subfield->name('test_repeater_text');
-                            $subfield->label('Test Repeater Text');
-                        });
-
-                        $field->field('number', function ($subfield) {
-                            $subfield->name('test_repeater_number');
-                            $subfield->label('Test Repeater Number');
-                        });
-
-                        $field->editForm(function ($form) {
-                            $form->field('text', function ($field) {
-                                $field->name('test_meta_repeater_text');
-                                $field->label('I am a form field');
-                                $field->placeholder('Enter some text...');
-                            });
-                            return $form;
-                        });
-                    });
-                });
-            });
-        });
     }
 
     /**
@@ -236,7 +174,6 @@ final class Framework extends Provider {
     private function registerTables(): void {
         $this->tables()->register();
     }
-
 
     // =========================================================================
     // Local Environment Configuration
