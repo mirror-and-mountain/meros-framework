@@ -359,7 +359,12 @@ final class FieldRow implements Serializable {
             return false;
         }
 
-        return count($this->fields) + $positions <= $this->fieldCapacity;
+        $occupiedSpaces = 0;
+        foreach ($this->fields as $field) {
+            $occupiedSpaces += $field::getRowPositions();
+        }
+
+        return $occupiedSpaces + $positions < $this->fieldCapacity;
     }
 
     /**
