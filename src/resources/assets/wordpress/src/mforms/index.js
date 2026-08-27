@@ -1,5 +1,7 @@
 import mformsSelect from './fields/select.js';
 import mformsRepeater from './fields/repeater.js';
+import mformsChoice from './fields/choice.js';
+import MerosFormProcessor from './form-processor.js';
 
 import './style.scss';
 
@@ -109,60 +111,19 @@ const mform = () => {
         // =========================================================================
 
         processFormData(formData) {
-            const payload = Object.fromEntries(formData.entries());
+            const data = Object.fromEntries(formData.entries());
+            const form = this.resolveForm();
+            if (!form) return data;
 
-            Object.keys(payload).forEach((key) => {
-                // Remove repeater template row data
-                if (key.includes('__template')) {
-                    delete payload[key];
-                    return;
-                }
+            const fieldProcessor = new MerosFormProcessor(form);
+            const processedData = fieldProcessor.process(data);
 
-                const looksLikeRepeaterField = /^[^\[\]]+\[\d+\]\[[^\[\]]+\]$/.test(key);
-                if (looksLikeRepeaterField) {
-                    const repeaterData = this.getRepeaterFieldValue(key);
-
-                    if (repeaterData) {
-                        Object.assign(payload, repeaterData);
-                    }
-
-                    delete payload[key];
-                }
-            });
-
-            return payload;
+            return processedData;
         },
 
-        getRepeaterFieldValue(subFieldName) {
-            const subfield = document.querySelector(`[name="${subFieldName}"]`);
-            if (!subfield) return null;
-
-            const baseName = subfield.getAttribute('data-repeater-field-name');
-            const repeater = subfield.closest('.meros-repeater-field');
-
-            if (!repeater || !baseName) return null;
-
-            const repeaterName = repeater.getAttribute('data-name');
-            const component = this.getFieldComponent(repeater);
-
-            if (component && typeof component.getValue === 'function') {
-                const repeaterValue = component.getValue();
-                if (repeaterValue && Array.isArray(repeaterValue)) {
-                    return {
-                        [repeaterName]: repeaterValue
-                    };
-                }
-            }
-
-            return null;
-        },
-
-        getFieldComponent(field) {
-            const alpineData = field.closest('[x-data]');
-            if (!alpineData) return null;
-
-            const component = Alpine.$data(alpineData);
-            return component || null;
+        resolveForm() {
+            const form = this.$el.tagName === 'FORM' ? this.$el : this.$el.closest('form');
+            return form || null;
         }
     }
 }
@@ -170,5 +131,6 @@ const mform = () => {
 document.addEventListener('alpine:init', () => {
     Alpine.data('mform', mform);
     Alpine.data('mformsSelect', mformsSelect);
+    Alpine.data('mformsChoice', mformsChoice);
     Alpine.data('mformsRepeater', mformsRepeater);
 });

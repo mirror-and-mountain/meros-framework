@@ -1,12 +1,6 @@
-import { 
-    __meros_modal_show, 
-    __meros_modal_hideConfirmButton,
-    __meros_modal_setCancelButtonText,
-    __meros_modal_setCloseButtonCallback,
-    __meros_modal_setExtraContent
-} from './modal.js';
+import MerosModal from '../classes/modal.js';
 
-export function merosHandleMultiTableOperation(event) {
+export function __meros_tables_multi_operation(event) {
     event.preventDefault();
 
     const button = event.currentTarget;
@@ -32,6 +26,20 @@ export function merosHandleMultiTableOperation(event) {
 
     if (!tables || !tables.length) return;
 
+    // Open modal
+    __meros_tables_show_multi_operation_modal(tables, operation, button, provider, nonce);
+}
+
+/**
+ * Opens a modal for a multi-table operation.
+ * 
+ * @param {*} tables 
+ * @param {*} operation 
+ * @param {*} button 
+ * @param {*} provider 
+ * @param {*} nonce 
+ */
+function __meros_tables_show_multi_operation_modal(tables, operation, button, provider, nonce) {
     let modalContent = `<p>Are you sure you want to <strong>${operation}</strong> all the following tables?</p>`;
 
     modalContent += '<ul>';
@@ -44,13 +52,19 @@ export function merosHandleMultiTableOperation(event) {
     const modalTitle = operation.charAt(0).toUpperCase() + operation.slice(1).replace('_', ' ') + ' tables';
     const confirmButtonText = operation.charAt(0).toUpperCase() + operation.slice(1).replace('_', ' ');
 
-    __meros_modal_show(
-        modalTitle,
-        modalContent,
-        () => merosExecuteTableOperation(button, provider, operation, nonce),
-        confirmButtonText,
+    const modal = new MerosModal(
+        modalTitle, 
+        modalContent, 
+        confirmButtonText, 
+        'Cancel', 
         false
     );
+
+    modal.onConfirm(() => {
+        __meros_tables_execute_operation(button, provider, operation, nonce, modal);
+    });
+
+    modal.show();
 }
 
 /**
@@ -59,7 +73,7 @@ export function merosHandleMultiTableOperation(event) {
  * @param {Event} event 
  * @returns {void}
  */
-export function merosHandleSingleTableOperation(event) {
+export function __meros_tables_single_operation(event) {
     event.preventDefault();
 
     const button = event.currentTarget;
@@ -74,8 +88,8 @@ export function merosHandleSingleTableOperation(event) {
     const nonce     = button.dataset.nonce;
     const tableCard = button.closest('.meros-table-card');
 
-    const updatesList = operation === 'update' ? merosGetUpdatesList('update', tableCard) : null;
-    const rollbackContent = operation === 'rollback' ? merosGetUpdatesList('rollback', tableCard) : null;
+    const updatesList = operation === 'update' ? __meros_tables_get_updates_list('update', tableCard) : null;
+    const rollbackContent = operation === 'rollback' ? __meros_tables_get_updates_list('rollback', tableCard) : null;
 
     let modalContent = `<p>Are you sure you want to <strong>${button.dataset.action}</strong> the table <strong>${button.dataset.table}</strong>?</p>`;
     
@@ -89,13 +103,34 @@ export function merosHandleSingleTableOperation(event) {
 
     modalContent += `<p>This action cannot be undone. We strongly recommend backing up your database before carrying out any table operations.</p>`;
 
-    __meros_modal_show(
+    // Open modal
+    __meros_tables_show_single_operation_modal(table, modalContent, operation, button, provider, nonce);
+}
+
+/**
+ * Opens a modal for a single-table operation
+ * 
+ * @param {*} table 
+ * @param {*} content 
+ * @param {*} operation 
+ * @param {*} button 
+ * @param {*} provider 
+ * @param {*} nonce 
+ */
+function __meros_tables_show_single_operation_modal(table, content, operation, button, provider, nonce) {
+    const modal = new MerosModal(
         operation.charAt(0).toUpperCase() + operation.slice(1) + ' Table',
-        modalContent,
-        () => merosExecuteTableOperation(button, provider, operation, nonce, table),
+        content,
         operation.charAt(0).toUpperCase() + operation.slice(1),
-        false
+        'Cancel',
+        false  
     );
+
+    modal.onConfirm(() => {
+        __meros_tables_execute_operation(button, provider, operation, nonce, modal, table);
+    });
+
+    modal.show();
 }
 
 /**
@@ -105,7 +140,7 @@ export function merosHandleSingleTableOperation(event) {
  * @param {HTMLElement} tableCard 
  * @returns {string|null}
  */
-function merosGetUpdatesList(operation, tableCard) {
+function __meros_tables_get_updates_list(operation, tableCard) {
     let updatesList = null;
     let rollbackContent = null;
     
@@ -173,9 +208,10 @@ function merosGetUpdatesList(operation, tableCard) {
  * @param {string} provider
  * @param {string} operation 
  * @param {string} nonce
+ * @param {MerosModal} modal
  * @param {string|null} table 
  */
-function merosExecuteTableOperation(button, provider, operation, nonce, table = null) {
+function __meros_tables_execute_operation(button, provider, operation, nonce, modal, table = null) {
     const data = new FormData();
     
     data.append('action', 'meros_handle_table_action_' + provider);
@@ -198,19 +234,19 @@ function merosExecuteTableOperation(button, provider, operation, nonce, table = 
     .then(data => {
         if (data.success) {
             button.disabled = false; // Re-enable the button after the operation completes
-            configureModalResponse('Table operation completed successfully.', 'green', true);
+            __meros_tables_configure_modal_response(modal, 'Table operation completed successfully.', 'green', true);
         } 
         
         else if (data.data && data.data.message) {
-            configureModalResponse('An error occured during the table operation: ' + data.data.message, 'red');
+            __meros_tables_configure_modal_response(modal, 'An error occured during the table operation: ' + data.data.message, 'red');
         }
 
         else {
-            configureModalResponse('An unknown error occurred during the table operation.', 'red');
+            __meros_tables_configure_modal_response(modal, 'An unknown error occurred during the table operation.', 'red');
         }
     })
     .catch((error) => {
-        configureModalResponse('An error occurred during the table operation: ' + error.message, 'red');
+        __meros_tables_configure_modal_response(modal, 'An error occurred during the table operation: ' + error.message, 'red');
     });
 }
 
@@ -218,16 +254,19 @@ function merosExecuteTableOperation(button, provider, operation, nonce, table = 
  * Displays a message in the admin modal and configures the modal buttons
  * following a table operation.
  * 
+ * @param {MerosModal} modal
  * @param {string} message 
  * @param {string} color
+ * @param {boolean} reload
  */
-function configureModalResponse(message, color, reload = false) {
-    __meros_modal_setExtraContent(message, color);
-    __meros_modal_hideConfirmButton();
-    __meros_modal_setCancelButtonText('Close');
+function __meros_tables_configure_modal_response(modal, message, color, reload = false) {
+    modal.setExtraContent(message, color);
+    modal.hideConfirmButton();
+    modal.setCancelButtonText('Close');
+    modal.enableCancelButton();
     
     if (reload) {
-        __meros_modal_setCloseButtonCallback(() => {
+        modal.onCancel(() => {
             location.reload();
         });
     }

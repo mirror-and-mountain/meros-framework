@@ -23,6 +23,14 @@ const mformsSelect = () => {
             }
         },
 
+        getValue() {
+            if (!this.ts) {
+                return this.resolveElement()?.value || null;
+            }
+
+            return this.ts.getValue();
+        },
+
         destroy() {
             if (this.ts) {
                 this.ts.destroy();
@@ -77,6 +85,15 @@ const mformsSelect = () => {
                     }
                 }
             });
+        },
+
+        resolveElement() {
+            if (this.$el.tagName === 'SELECT') {
+                return this.$el;
+            }
+
+            const select = this.$el.closest('.meros-field-wrapper')?.querySelector('select');
+            return select || null;
         }
     };
 };

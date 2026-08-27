@@ -5,6 +5,7 @@
 @endphp
 
 <fieldset
+    x-data="mformsChoice"
     id="{{ $id }}"
     class="meros-choice-field nice-form-group"
     data-name="{{ $name }}"

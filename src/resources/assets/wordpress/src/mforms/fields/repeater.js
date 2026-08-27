@@ -1,9 +1,5 @@
-import {
-    __meros_modal_show,
-    __meros_modal_hide,
-    __meros_modal_enableButtons,
-    __meros_modal_setExtraContent
-} from '../../admin/modal.js';
+import MerosFormProcessor from '../form-processor.js';
+import MerosModal from '../../classes/modal.js';
 
 const mformsRepeater = () => {
     return {
@@ -163,8 +159,16 @@ const mformsRepeater = () => {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success && data.data && data.data.html) {
-                        __meros_modal_show('Edit Row', data.data.html, (modal) => {
-                            const form = modal.querySelector('form');
+                        const modal = new MerosModal(
+                            'Edit Row',
+                            data.data.html,
+                            'Save',
+                            'Cancel',
+                            false
+                        );
+
+                        modal.onConfirm((modalElement) => {
+                            const form = modalElement.querySelector('form')
                             if (!form) return;
 
                             const component = this.getComponent(form);
@@ -172,19 +176,21 @@ const mformsRepeater = () => {
                                 const { success, invalid, error } = component.submitForm();
 
                                 if (success) {
-                                    __meros_modal_hide();
+                                    modal.hide();
                                 } else if (invalid === undefined) {
-                                    __meros_modal_enableButtons();
+                                    modal.enableButtons();
                                     alert(error);
                                 } else {
-                                    __meros_modal_setExtraContent(error, 'red', '1rem');
-                                    __meros_modal_enableButtons();
+                                    modal.setExtraContent(error, 'red', '1rem');
+                                    modal.enableButtons();
                                 }
 
                                 return;
                             }
-                        }, 'Save', false);
+                        });
+
                         this.editingRowIndex = row.getAttribute('data-row-index');
+                        modal.show();
                     }
 
                     else if (data.data && data.data.message) {
@@ -220,7 +226,6 @@ const mformsRepeater = () => {
             });
 
             formDataField.value = JSON.stringify(formData);
-
             this.editingRowIndex = null;
         },
 
@@ -392,9 +397,10 @@ const mformsRepeater = () => {
 
             fields.forEach((field) => {
                 const fieldName = field.getAttribute('data-repeater-field-name');
-                const fieldValue = field.value;
-
                 if (!fieldName) return;
+
+                const fieldProcessor = new MerosFormProcessor(row);
+                const fieldValue     = fieldProcessor.getFieldValue(field);
 
                 // The hidden field contains the edited row form payload.
                 if (fieldName === '__form_data') {
