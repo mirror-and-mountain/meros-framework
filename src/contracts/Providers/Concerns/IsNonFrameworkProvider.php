@@ -8,5 +8,6 @@ trait IsNonFrameworkProvider {
         ProvidesAdminFeatures,
         ProvidesContent,
         ProvidesComponents,
-        ProvidesTables;
+        ProvidesTables,
+        ProvidesIntegrations;
 }

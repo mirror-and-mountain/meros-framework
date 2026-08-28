@@ -3,7 +3,7 @@
 namespace MM\Meros\Registers\Data;
 
 use MM\Meros\Contracts\Register;
-use MM\Meros\Contracts\Features\Data\Integration;
+use MM\Meros\Contracts\Features\Integrations\Integration;
 
 use MM\Meros\Contracts\Registers\Registrar;
 use MM\Meros\Contracts\Registers\Concerns\RegistersFeatures;

@@ -82,6 +82,10 @@ $mf-first-row-offset: -24px;
     margin-top: 2rem;
 }
 
+.meros-field-wrapper.nice-form-group:has([data-hidden]) {
+    display: none;
+}
+
 .meros-field-wrapper.nice-form-group > * {
     display: block;
     width: 100%;

@@ -86,6 +86,13 @@ class Page extends Feature implements Registrable, Makeable {
     protected string $area = 'menu';
 
     /**
+     * Whether to automatically show any settings associated with the page, if there are any.
+     *
+     * @var boolean
+     */
+    protected bool $showSettings = true;
+
+    /**
      * An array of subpage classes or instances associated with the menu page.
      *
      * @var array<Page>
@@ -642,6 +649,18 @@ class Page extends Feature implements Registrable, Makeable {
     }
 
     /**
+     * Hides any settings associated with the page. This allows for custom rendering if needed.
+     *
+     * @param boolean $hide
+     *
+     * @return static
+     */
+    final public function hideSettings(bool $hide = true): static {
+        $this->showSettings = !$hide;
+        return $this;
+    }
+
+    /**
      * Adds an AJAX action to the menu page. The action will be handled by the provided callable.
      *
      * @param string   $action
@@ -805,6 +824,15 @@ class Page extends Feature implements Registrable, Makeable {
         return $this->position;
     }
 
+    /**
+     * Returns the page's option group.
+     *
+     * @return string
+     */
+    final public function getOptionGroup(): string {
+        return $this->optionGroup;
+    }
+
     // =========================================================================
     // Rendering
     // =========================================================================
@@ -834,10 +862,10 @@ class Page extends Feature implements Registrable, Makeable {
         }
 
         if (is_callable($this->callback)) {
-            call_user_func($this->callback);
+            call_user_func($this->callback, $this);
         }
 
-        if ($this->hasSettings()) {
+        if ($this->hasSettings() && $this->showSettings) {
             $this->renderSettings();
         }
 

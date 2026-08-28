@@ -412,6 +412,7 @@ abstract class DataContainer extends Feature implements Storable {
     public function setItemValue(string $key, mixed $value): void {
         $oldValue = $this->getValue(true);
         $newValue = $this->sanitizeValue(array_merge($oldValue, [$key => $value]));
+
         $this->setValue($newValue);
         $this->cachedValue = $newValue;
         $this->__whenUpdated($newValue, $oldValue, $this->name);
@@ -514,7 +515,7 @@ abstract class DataContainer extends Feature implements Storable {
      *
      * @return array
      */
-    final protected function getSchema(): array {
+    final public function getSchema(): array {
         $schema = [
             'type' => 'object',
             'properties' => [],

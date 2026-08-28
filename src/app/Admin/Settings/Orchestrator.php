@@ -10,11 +10,13 @@ use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 
 use MM\Meros\App\Admin\Pages\MerosThemeSettings as ThemeSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosPackages as PackageSettingsPage;
+use MM\Meros\App\Admin\Pages\MerosIntegrations as IntegrationsSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosAssets as AssetGroupSettingsPage;
 
 use MM\Meros\App\Admin\Sections\MerosSettings;
 
 use MM\Meros\App\Admin\Settings\Containers\MerosFrameworkSettings;
+use MM\Meros\App\Admin\Settings\Containers\MerosIntegrationSettings;
 use MM\Meros\App\Admin\Settings\Containers\MerosThemeSettings;
 use MM\Meros\App\Admin\Settings\Containers\MerosPackageSettings;
 use MM\Meros\App\Admin\Settings\Containers\MerosAssetGroupSettings;
@@ -43,6 +45,7 @@ class Orchestrator extends SettingsOrchestrator {
     private function registerMenuPages(): void {
         $this->pages(PackageSettingsPage::class)->register();
         $this->pages(ThemeSettingsPage::class)->register(BaseTheme::class);
+        $this->pages(IntegrationsSettingsPage::class)->register();
         $this->pages(AssetGroupSettingsPage::class)->register();
     }
 
@@ -62,6 +65,7 @@ class Orchestrator extends SettingsOrchestrator {
      */
     private function registerSettingsContainers(): void {
         $this->settingsContainers(MerosFrameworkSettings::class)->register();
+        $this->settingsContainers(MerosIntegrationSettings::class)->register();
         $this->settingsContainers(MerosThemeSettings::class)->register(BaseTheme::class);
         $this->settingsContainers(MerosPackageSettings::class)->register();
         $this->settingsContainers(MerosAssetGroupSettings::class)->register();
@@ -152,8 +156,7 @@ class Orchestrator extends SettingsOrchestrator {
             $hasSettingsFields = $package->hasSettingsWithFields();
             $hasTables = $package->hasRegisteredTables();
 
-
-            return 
+            return  
                 '<div class="meros-settings-field-title-wrapper">' .
                     '<label for="' . esc_attr($id) . '">' . esc_html($title) . '</label>' .
                     (!empty($description) ? 
@@ -170,7 +173,6 @@ class Orchestrator extends SettingsOrchestrator {
                         '</div>' : ''
                     ) .
                 '</div>';
-
         }, 10, 3);
     }
 }

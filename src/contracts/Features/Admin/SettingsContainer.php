@@ -18,21 +18,21 @@ class SettingsContainer extends DataContainer {
      *
      * @var string
      */
-    private string $optionGroup = '';
+    protected string $optionGroup = '';
 
     /**
      * The slug or alias of a menu page associated with this settings container.
      *
      * @var string
      */
-    private string $page = '';
+    protected string $page = '';
 
     /**
      * The id of a settings section associated with this settings container.
      *
      * @var string
      */
-    private string $section = '';
+    protected string $section = '';
 
     // =========================================================================
     // Initialisation

@@ -798,7 +798,7 @@ abstract class Field extends Feature implements FormComponent {
      */
     public function readonly(bool $isReadonly = true): static {
         if ($isReadonly) {
-            $this->attribute('readonly', 'readonly');
+            $this->attribute('readonly', true);
             $this->attribute('aria-readonly', 'true');
         } else {
             $this->removeAttribute('readonly');
@@ -825,7 +825,7 @@ abstract class Field extends Feature implements FormComponent {
      */
     public function disabled(bool $isDisabled = true): static {
         if ($isDisabled) {
-            $this->attribute('disabled', 'disabled');
+            $this->attribute('disabled', true);
             $this->attribute('aria-disabled', 'true');
         } else {
             $this->removeAttribute('disabled');

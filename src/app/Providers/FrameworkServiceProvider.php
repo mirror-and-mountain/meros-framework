@@ -35,6 +35,7 @@ use MM\Meros\Registers\Content\PostTypes;
 use MM\Meros\Registers\Data\PostMetaContainers;
 use MM\Meros\Registers\Data\PostMetaDefinitions;
 use MM\Meros\Registers\Data\Tables;
+use MM\Meros\Registers\Data\Integrations;
 
 use MM\Meros\Registers\Assets\AssetGroups;
 use MM\Meros\Registers\Assets\Assets;
@@ -78,6 +79,7 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         PostMetaContainers::class,
         PostMetaDefinitions::class,
         Tables::class,
+        Integrations::class,
 
         AssetGroups::class,
         Assets::class
@@ -218,6 +220,7 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         $this->registerRoutes($framework);
 
         $framework->configure();
+        $framework->whenConfigured();
         do_action('meros_framework_configured', $framework);
 
         // Register packages

@@ -6,6 +6,7 @@ use MM\Meros\Contracts\Features\Data\TableCreator;
 return new class extends TableCreator {
     
     protected function configure(): void {
+        $this->required(true);
         $this->description('The `meros_external_connections` table stores external connection information for integrations.');
 
         $this->define(function (Blueprint $table) {

@@ -52,6 +52,13 @@ final class SettingsField {
     private array $args = [];
 
     /**
+     * Indicates whether the settings field should be hidden on the page.
+     *
+     * @var boolean
+     */
+    private bool $isHidden = false;
+
+    /**
      * The Setting instance associated with this SettingsField.
      *
      * @var Setting
@@ -137,13 +144,14 @@ final class SettingsField {
                 $this->pageSlug
             ); // Ensure the default section exists
         }
+        
+        $title = apply_filters('meros_settings_field_title', $this->title, $this->id, $this->setting);
+        $hasTitleWrapper = Str::startsWith($title, '<div class="meros-settings-field-title-wrapper');
 
-        if ($this->descriptionPosition === 'before') {
-            $this->placeDescriptionBeforeField();
+        if ($this->descriptionPosition === 'before' && !$hasTitleWrapper) {
+            $title = $this->getRichLabel();
             $this->field->description(''); // Clear the field's description to avoid duplication
         }
-
-        $title = apply_filters('meros_settings_field_title', $this->title, $this->id, $this->setting);
 
         add_settings_field(
             $this->id,
@@ -158,29 +166,31 @@ final class SettingsField {
     /**
      * Filters the settings field title to include the description before the field if the description position is set to 'before'.
      *
-     * @return void
+     * @return string
      */
-    private function placeDescriptionBeforeField(): void {
-        add_filter('meros_settings_field_title', function ($title, $id, $setting) {
-            $description = $setting->getDescription();
-            if ($id === $this->id && $setting === $this->setting && !empty($description)) {
-                $label = $this->field->isFieldSet()
-                    ? '<span>' . $setting->getLabel() . '</span>'
-                    : '<label for="' . esc_attr($id) . '">' . $setting->getLabel() . '</label>';
+    private function getRichLabel(): string {
+        $setting = $this->setting;
+        $id      = $this->id;
+        $description = $setting->getDescription();
 
-                return 
-                    '<div class="meros-settings-field-title-wrapper">' .
-                        $label .
-                        '<div class="meros-settings-field-description">
-                            <span class="description">
-                                ' . $description . '
-                            </span>
-                        </div>
-                    </div>';
-            }
+        $label = $this->field->isFieldSet()
+            ? '<span>' . $setting->getLabel() . '</span>'
+            : '<label for="' . esc_attr($id) . '">' . $setting->getLabel() . '</label>';
 
-            return $title;
-        }, 10, 3);
+        $class = 'meros-settings-field-title-wrapper';
+        if ($this->isHidden) {
+            $class .= ' meros-settings-field-title-wrapper-hidden';
+        }
+
+        return 
+            '<div class="' . $class . '">' .
+                $label .
+                '<div class="meros-settings-field-description">
+                    <span class="description">
+                        ' . $description . '
+                    </span>
+                </div>
+            </div>';
     }
 
     /**
@@ -272,6 +282,18 @@ final class SettingsField {
      */
     public function section(string $id): static {
         $this->sectionId = Str::slug($id);
+        return $this;
+    }
+
+    /**
+     * Sets the settings field to be hidden on the page.
+     *
+     * @param bool $hide
+     * @return static
+     */
+    public function hide(bool $hide = true): static {
+        $this->isHidden = $hide;
+        $this->descriptionPosition('before');
         return $this;
     }
 

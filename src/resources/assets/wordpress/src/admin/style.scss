@@ -81,6 +81,10 @@ body:has(.meros-modal-overlay:not(.meros-modal-hidden)) {
 
 
 // Settings Field Title Styles
+.form-table tr:has(.meros-settings-field-title-wrapper-hidden) {
+    display: none;
+}
+
 .meros-settings-field-title-wrapper {
     width: 500px;
 

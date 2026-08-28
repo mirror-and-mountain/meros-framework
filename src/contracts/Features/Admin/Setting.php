@@ -154,6 +154,10 @@ class Setting extends DataItem {
             throw new \LogicException("SettingsField instance is not properly initialised.");
         }
 
+        if ($field->hasAttribute('data-hidden')) {
+            $this->settingsField->hide();
+        }
+
         // Set the field on the SettingsField instance
         $this->settingsField->field($field);
 
