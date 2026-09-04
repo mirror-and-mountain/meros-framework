@@ -1,16 +1,17 @@
 <?php 
 
-namespace MM\Meros\Services\Components;
+namespace MM\Meros\Contracts\Features\Components;
 
 use Illuminate\Support\Str;
 
-use MM\Meros\Services\Contracts\FeatureDefinition;
+use MM\Meros\Contracts\Feature;
+use MM\Meros\Contracts\Features\Makeable;
 
-use MM\Meros\Services\Concerns\IsHookable;
-use MM\Meros\Services\Concerns\IsDiscoverable;
-use MM\Meros\Services\Components\Concerns\IsSwitchable;
+use MM\Meros\Contracts\Concerns\IsSwitchable;
+use MM\Meros\Contracts\Features\Concerns\IsHookable;
+use MM\Meros\Contracts\Features\Concerns\IsMakeable;
 
-class Block extends FeatureDefinition {
+class Block extends Feature implements Makeable {
     /**
      * The name of the block, in namespace/block-name format. Required for the block to be registered.
      *
@@ -40,14 +41,16 @@ class Block extends FeatureDefinition {
      */
     final protected bool $autoQueue = false;
 
-    use IsSwitchable, IsDiscoverable, IsHookable;
+    use IsHookable, IsMakeable;
 
     // =========================================================================
     // Initialisation
     // =========================================================================
 
     protected function init(): void {
-        $this->name = $this->identifier;
+        $this->identifier('name', 'snake');
+        $this->setHook('init', [$this, 'register']);
+        $this->hook();
     }
 
     // =========================================================================
@@ -55,32 +58,11 @@ class Block extends FeatureDefinition {
     // =========================================================================
 
     /**
-     * Queues the block for registration by hooking into WordPress' 'init' action.
-     * 
-     * @return void
-     */
-    protected function hook(): void {
-        if (empty($this->name)) {
-            return;
-        }
-
-        $this->setIsEnabled();
-
-        if (!$this->hooked && $this->isEnabled) {
-            add_action('init', function() {
-                $this->register();
-            });
-        }
-
-        $this->hooked = true;
-    }
-
-    /**
      * Registers the block with WordPress via the 'init' hook.
      *
      * @return void
      */
-    protected function register(): void { 
+    public function register(): void {
         $blockType = $this->path !== '' ? $this->path : $this->name;
 
         register_block_type($blockType, $this->args);
@@ -102,6 +84,11 @@ class Block extends FeatureDefinition {
         return $this;
     }
 
+    public function path(string $path): static {
+        $this->path = $path;
+        return $this;
+    }
+
     // =========================================================================
     // Attribute Getters
     // =========================================================================
@@ -117,15 +104,6 @@ class Block extends FeatureDefinition {
         }
 
         return $this->name;
-    }
-
-    /**
-     * Returns the description of the block, either from the block's arguments or from the block.json file if a path is set.
-     *
-     * @return string
-     */
-    public function getDescription(): string {
-        return $this->args['description'] ?? '';
     }
 
     /**

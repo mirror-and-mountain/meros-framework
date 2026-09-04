@@ -26,6 +26,7 @@ use MM\Meros\Registers\Admin\Settings;
 use MM\Meros\Registers\Admin\SettingsSections;
 use MM\Meros\Registers\Admin\SettingsContainers;
 
+use MM\Meros\Registers\Components\Blocks;
 use MM\Meros\Registers\Components\Forms;
 use MM\Meros\Registers\Components\Fields;
 use MM\Meros\Registers\Components\FieldGroups;
@@ -70,6 +71,7 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         SettingsSections::class,
         SettingsContainers::class,
 
+        Blocks::class,
         Forms::class,
         Fields::class,
         FieldGroups::class,
@@ -236,8 +238,10 @@ class FrameworkServiceProvider extends MerosServiceProvider {
             $this->initMerosCli();
         }
 
-        // Fire the framework booted action
-        do_action('meros_framework_booted');
+        // Fire the framework booted action when the service container is ready.
+        $this->app->booted(function () {
+            do_action('meros_framework_booted');
+        });
     }
 
     /**

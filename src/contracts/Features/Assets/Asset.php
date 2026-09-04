@@ -392,7 +392,7 @@ class Asset extends Feature implements Registrable, Makeable {
             foreach ($this->area as $area) {
                 $hooks[] = match ($area) {
                     'admin'  => 'admin_enqueue_scripts',
-                    'editor' => $this instanceof Style 
+                    'editor' => $this->type === 'style'
                         ? 'enqueue_block_assets' 
                         : 'enqueue_block_editor_assets',
                     default  => 'wp_enqueue_scripts',
@@ -405,7 +405,7 @@ class Asset extends Feature implements Registrable, Makeable {
             case 'admin':
                 return 'admin_enqueue_scripts';
             case 'editor':
-                return $this instanceof Style 
+                return $this->type === 'style'
                     ? 'enqueue_block_assets' 
                     : 'enqueue_block_editor_assets';
             default:
@@ -630,6 +630,22 @@ class Asset extends Feature implements Registrable, Makeable {
 
         // Validate the file extension (throws error on failure)
         $this->fileHasExtensions($path, ['js', 'css'], true);
+
+        // See if there are any dependency files in path directory.
+        if (Str::endsWith($path, '.js')) {
+            $dir = dirname($path);
+            $depsFile = $dir . DIRECTORY_SEPARATOR . 'index.asset.php';
+            
+            if (file_exists($depsFile)) {
+                $deps = include $depsFile;
+
+                if (is_array($deps) && array_key_exists('dependencies', $deps)) {
+                    if (is_array($deps['dependencies']) && !empty($deps['dependencies'])) {
+                        $this->dependencies = array_merge($this->dependencies, $deps['dependencies']);
+                    }
+                }
+            }
+        }
 
         return $path;
     }

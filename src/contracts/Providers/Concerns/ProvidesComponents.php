@@ -2,10 +2,12 @@
 
 namespace MM\Meros\Contracts\Providers\Concerns;
 
+use MM\Meros\Contracts\Features\Components\Block;
 use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\Form;
 
+use MM\Meros\Registers\Components\Blocks;
 use MM\Meros\Registers\Components\Fields;
 use MM\Meros\Registers\Components\FieldGroups;
 use MM\Meros\Registers\Components\Forms;
@@ -44,5 +46,16 @@ trait ProvidesComponents {
      */
     final protected function forms(string $id = ''): Form|Forms|null {
         return $this->resolveFeatureRequestFor(Form::class, $id);
+    }
+
+    /**
+     * Retrieves a specific block by its name or returns the blocks register.
+     *
+     * @param string $name Optional. The name of the block to retrieve.
+     *
+     * @return Block|Blocks|null The requested block or the blocks register.
+     */
+    final protected function blocks(string $name = ''): Block|Blocks|null {
+        return $this->resolveFeatureRequestFor(Block::class, $name);
     }
 }
