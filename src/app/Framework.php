@@ -14,6 +14,8 @@ use MM\Meros\App\Admin\Settings\Orchestrator as SettingsOrchestrator;
 use MM\Meros\Contracts\Providers\Concerns\IsFrameworkProvider;
 use MM\Meros\Contracts\Providers\Concerns\IsNonPackageProvider;
 
+use MM\Meros\Crm\Facades\Salesforce;
+
 final class Framework extends Provider {
     use IsFrameworkProvider, IsNonPackageProvider;
 
@@ -59,6 +61,10 @@ final class Framework extends Provider {
 
         $this->registerPostTypes();
         $this->registerTables();
+
+        add_action('admin_init', function () {
+            dd(Salesforce::contact('003QH00000QuPbAYAV')->get()->Name);
+        });
     }
 
     /**

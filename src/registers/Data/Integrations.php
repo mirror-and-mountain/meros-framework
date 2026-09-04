@@ -14,8 +14,8 @@ class Integrations extends Register implements Registrar {
     use RegistersFeatures;
 
     protected function configure(): void {
-        $this->private(true);
         $this->unique(true);
+        $this->bindAsSingletons(true);
         $this->contract(Integration::class);
         $this->facade(IntegrationsFacade::class);
     }

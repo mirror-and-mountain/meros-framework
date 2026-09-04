@@ -10,9 +10,15 @@
     data-name="{{ $name }}"
     data-ajax-url="{{ $ajaxUrl }}"
     data-ajax-nonce="{{ $ajaxNonce }}"
+    @if($onInit !== '')
+        data-on-init="{{ $onInit }}"
+    @endif
+    @if($onRemove !== '')
+        data-on-remove="{{ $onRemove }}"
+    @endif
 >
     @if($renderContext !== 'settings')
-        <legend class="meros-repeater-field-legend">{{ $label }}</legend>
+        <legend class="meros-repeater-field-legend" style="margin-bottom: 0.5rem;">{{ $label }}</legend>
         @if($description !== '')
             <div style="margin-bottom: 0.5rem;">
                 <small class="meros-field-description">{!! $description !!}</small>
@@ -55,7 +61,7 @@
                 </tr>
             </thead>
             {{-- Table Body Rows --}}
-            <tbody class="meros-repeater-table-body" x-sort="handleReorderRows">
+            <tbody class="meros-repeater-table-body" @if($allowsReorder)x-sort="handleReorderRows"@endif>
                 @if (count($tableRows) > 0)
                     @foreach($tableRows as $rowIndex => $rowData)
                         @php

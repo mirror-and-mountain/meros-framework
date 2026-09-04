@@ -11,6 +11,8 @@ const mformsRepeater = () => {
         ajaxNonce: null,
         editingRowIndex: null,
         onFormSubmit: null,
+        onInit: null,
+        onRemove: null,
 
         // =========================================================================
         // Initialisation
@@ -28,9 +30,23 @@ const mformsRepeater = () => {
                 this.ajaxurl = this.container.dataset.ajaxUrl || null;
                 this.ajaxNonce = this.container.dataset.ajaxNonce || null;
 
+                this.onInit = this.container.dataset.onInit && this.container.dataset.onInit !== 'false'
+                    ? this.container.dataset.onInit
+                    : null;
+
+                this.onRemove = this.container.dataset.onRemove && this.container.dataset.onRemove !== 'false'
+                    ? this.container.dataset.onRemove
+                    : null;
+
                 this.container.removeAttribute('data-ajax-url');
                 this.container.removeAttribute('data-ajax-nonce');
+                this.container.removeAttribute('data-on-remove');
                 this.numRows = this.resolveRows().length;
+
+                if (this.onInit && typeof window[this.onInit] === 'function') {
+                    const onInitFunc = window[this.onInit];
+                    onInitFunc(this);
+                }
             }
 
             this.onFormSubmit = (event) => {
@@ -236,6 +252,15 @@ const mformsRepeater = () => {
         handleRemoveRow(event) {
             const row = event.target.closest('tr.meros-repeater-table-row');
             if (!row) return;
+
+            if (this.onRemove && typeof window[this.onRemove] === 'function') {
+                const onRemoveFunc = window[this.onRemove];
+                const remove = onRemoveFunc(row);
+                
+                if (remove === false) {
+                    return;
+                }
+            }
 
             row.remove();
             this.reindexTableFields();

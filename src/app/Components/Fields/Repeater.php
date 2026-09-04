@@ -13,16 +13,81 @@ use MM\Meros\Facades\Components\Forms;
 use MM\Meros\Facades\Components\Fields;
 
 class Repeater extends Field {
+    /**
+     * Indicates whether the repeater allows adding new rows.
+     *
+     * @var bool
+     */
     protected bool $allowsAdd = true;
+
+    /**
+     * Indicates whether the repeater allows removing rows.
+     *
+     * @var bool
+     */
     protected bool $allowsRemove = true;
+
+    /**
+     * Indicates whether the repeater allows reordering rows.
+     *
+     * @var bool
+     */
     protected bool $allowsReorder = true;
 
-    protected string $addText    = 'Add Row';
-    protected string $removeText = 'Remove';
-    protected string $formText   = 'Edit';
-    protected string $emptyText  = 'Nothing added yet.';
+    /**
+     * The text for the "Add Row" button in the repeater.
+     *
+     * @var string
+     */
+    protected string $addText = 'Add Row';
 
+    /**
+     * The text for the "Remove Row" button in the repeater.
+     *
+     * @var string
+     */
+    protected string $removeText = 'Remove';
+
+    /**
+     * The text for the "Edit Row" button in the repeater.
+     *
+     * @var string
+     */
+    protected string $formText = 'Edit';
+
+    /**
+     * The text to display when the repeater has no rows.
+     *
+     * @var string
+     */
+    protected string $emptyText = 'Nothing added yet.';
+
+    /**
+     * The JavaScript callback function to be executed when the repeater is initialized.
+     *
+     * @var string
+     */
+    protected string $onInit = '';
+
+    /**
+     * The JavaScript callback function to be executed when a row is removed from the repeater.
+     *
+     * @var string
+     */
+    protected string $onRemove = '';
+
+    /**
+     * The edit form instance for the repeater, if defined.
+     *
+     * @var Form|null
+     */
     protected ?Form $editForm = null;
+
+    /**
+     * The callback function to generate the edit form for a repeater row, if defined.
+     *
+     * @var Closure|null
+     */
     protected ?Closure $editFormCallback = null;
 
     /**
@@ -57,6 +122,8 @@ class Repeater extends Field {
             'removeText',
             'allowsReorder',
             'editForm',
+            'onInit',
+            'onRemove',
             'fields',
             'ajaxUrl',
             'ajaxNonce',
@@ -131,6 +198,30 @@ class Repeater extends Field {
     public function removeRowText(string $text): static {
         $this->removeText = $text;
         $this->allowRemove(true);
+        return $this;
+    }
+
+    /**
+     * Sets the JavaScript callback function to be executed when the repeater is initialized.
+     *
+     * @param string $jsCallback
+     *
+     * @return static
+     */
+    public function onInit(string $jsCallback): static {
+        $this->onInit = $jsCallback;
+        return $this;
+    }
+
+    /**
+     * Sets the JavaScript callback function to be executed when a row is removed from the repeater.
+     *
+     * @param string $jsCallback
+     *
+     * @return static
+     */
+    public function onRemove(string $jsCallback): static {
+        $this->onRemove = $jsCallback;
         return $this;
     }
 

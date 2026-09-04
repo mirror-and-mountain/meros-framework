@@ -3,6 +3,8 @@
 namespace MM\Meros\Contracts\Features\Admin;
 
 use Closure;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Crypt;
 
 use MM\Meros\Contracts\Features\Data\DataItem;
 use MM\Meros\Contracts\Features\Components\Field;
@@ -48,7 +50,21 @@ class Setting extends DataItem {
      */
     private string $optionGroup = '';
 
+    /**
+     * Whether or not the value of the setting is encrypted.
+     *
+     * @var boolean
+     */
+    private bool $isEncrypted = false;
+
     use MakesItems;
+
+    /**
+     * Prevent cloned settings from sharing the original field registration.
+     */
+    public function __clone(): void {
+        $this->settingsField = null;
+    }
 
     // =========================================================================
     // Initialisation
@@ -62,6 +78,27 @@ class Setting extends DataItem {
                 $this->page->__hasSettings($this->optionGroup);
             }
         });
+    }
+
+    public function whenUpdated(mixed $value, mixed $oldValue, string $itemName, string $optionName): void {
+        if ($this->isEncrypted()) {
+            add_filter('pre_update_option_' . $this->container->getName(true), function (mixed $value, mixed $oldValue, string $optionName) {
+                $name = $this->getName();
+
+                if (!is_array($value) || !in_array($name, array_keys($value))) {
+                    return $value;
+                }
+
+                if (!is_string($value[$name]) || empty($value[$name])) {
+                    return $value;
+                }
+
+                $encryptedValue = Crypt::encryptString($value[$name]);
+                $value[$name] = $encryptedValue;
+                
+                return $value;
+            }, 100, 3);
+        }
     }
 
     // =========================================================================
@@ -81,6 +118,30 @@ class Setting extends DataItem {
     final public function __optionGroup(string $optionGroup): static {
         $this->optionGroup = $optionGroup;
         return $this;
+    }
+
+    /**
+     * Sets the setting to encrypt its value in the database.
+     *
+     * @return static
+     * @throws \InvalidArgumentException if the data type of the setting is not set to 'string'
+     */
+    final public function encrypt(): static {
+        if ($this->getDataType() !== 'string') {
+            throw new \InvalidArgumentException('Currently, it is only possible to encrypt string-type settings');
+        }
+
+        $this->isEncrypted = true;
+        return $this;
+    }
+
+    /**
+     * Returns whether the setting's value should be encrypted for storage.
+     *
+     * @return boolean
+     */
+    final public function isEncrypted(): bool {
+        return $this->isEncrypted;
     }
 
     // =========================================================================
@@ -142,10 +203,16 @@ class Setting extends DataItem {
      * the associated field's wrapper view when the field property is set.
      * 
      * @param Field $field The Field instance that has been set for this Setting.
+     * @param bool  $override Whether the field has been set as the result of the __overrideField method being called. Should only be used internally.
      *
      * @return void
      */
-    final protected function whenFieldSet(Field $field): void {
+    final protected function whenFieldSet(Field $field, bool $override = false): void {
+        if ($override === true && $this->settingsField !== null) {
+            $this->settingsField->unregister();
+            $this->settingsField = null;
+        }
+
         if ($this->settingsField === null) {
             $this->settingsField = SettingsField::make($this);
         }

@@ -80,7 +80,14 @@ abstract class DataContainer extends Feature implements Storable {
      *
      * @var Closure|null
      */
-    private ?Closure $onUpdateCallback = null;
+    protected ?Closure $onUpdateCallback = null;
+
+    /**
+     * An optional callback to be called when an item is added to the container.
+     *
+     * @var Closure|null
+     */
+    private ?Closure $onAddCallback = null;
 
     use IsHookable, IsRegistrable, IsMakeable, InstantiatesItems, MakesItems;
 
@@ -260,8 +267,26 @@ abstract class DataContainer extends Feature implements Storable {
         $item = $this->makeDataItem($callbackOrProps, array_merge($props, ['container' => $this]));
 
         $this->items[] = $item;
+
+        if (is_callable($this->onAddCallback)) {
+            call_user_func($this->onAddCallback, $item, $this);
+        }
+
         $this->afterAdd($item);
         return $item;
+    }
+
+    /**
+     * For internal use only. Pushes an instantiated StorableItem to the container's items array.
+     *
+     * @param StorableItem $item
+     *
+     * @return static
+     */
+    final public function __pushItem(StorableItem $item): static {
+        $this->items[] = $item;
+        $this->afterAdd($item);
+        return $this;
     }
 
     /**
@@ -304,6 +329,17 @@ abstract class DataContainer extends Feature implements Storable {
      */
     final public function getItems(bool $collect = false): array|Collection {
         return $collect ? collect($this->items) : $this->items;
+    }
+
+    /**
+     * Checks if the container has an item with the specified name.
+     *
+     * @param string $name
+     *
+     * @return boolean
+     */
+    final public function hasItem(string $name): bool {
+        return $this->getItems(true)->contains(fn(StorableItem $item) => $item->getName() === $name);
     }
 
     // =========================================================================
@@ -469,6 +505,18 @@ abstract class DataContainer extends Feature implements Storable {
      */
     final public function showInRest(bool $show = true): static {
         $this->showInRest = $show;
+        return $this;
+    }
+
+    /**
+     * Sets a callback which is called when an item is added to the container.
+     *
+     * @param Closure $callback
+     *
+     * @return static
+     */
+    final public function onAdd(Closure $callback): static {
+        $this->onAddCallback = $callback;
         return $this;
     }
 

@@ -2,6 +2,9 @@
 
 namespace MM\Meros\Contracts\Features\Admin;
 
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Crypt;
+
 use MM\Meros\Contracts\Features\Data\DataContainer;
 use MM\Meros\Contracts\Features\StorableItem;
 
@@ -185,6 +188,32 @@ class SettingsContainer extends DataContainer {
         return false;
     }
 
+    /**
+     * Returns a collection of settings in the container that should have their values encrypted.
+     *
+     * @return Collection
+     */
+    protected function getEncryptedSettings(): Collection {
+        $encryptedSettings = $this->getItems(true)->where(function (Setting $item) {
+            return $item->isEncrypted();
+        });
+
+        return $encryptedSettings;
+    }
+
+    /**
+     * Retrieves a single encrypted setting by its name if one exists.
+     *
+     * @param string $name
+     *
+     * @return Setting|null
+     */
+    protected function getEncryptedSetting(string $name): ?Setting {
+        return $this->getEncryptedSettings()->firstWhere(function (Setting $setting) use ($name) {
+            return $setting->getName() === $name && $setting->isEncrypted();
+        });
+    }
+
     // =========================================================================
     // Sanitization and Value Processing
     // =========================================================================
@@ -212,7 +241,28 @@ class SettingsContainer extends DataContainer {
      * @return array The processed value.
      */
     final protected function processRawValue(array $rawValue): array {
-        return $rawValue;
+        $value = $rawValue;
+        $encryptedItems = $this->getEncryptedSettings();
+
+        if ($encryptedItems->isNotEmpty()) {
+            foreach ($encryptedItems as $item) {
+                $name = $item->getName();
+                $encryptedValue = $value[$name] ?? '';
+
+                if (!is_string($encryptedValue) || empty($encryptedValue)) {
+                    continue;
+                }
+
+                if (!Crypt::appearsEncrypted($encryptedValue)) {
+                    continue;
+                }
+
+                $decryptedValue = Crypt::decryptString($encryptedValue);
+                $value[$name] = $decryptedValue;
+            }
+        }
+
+        return $value;
     }
 
     /**
@@ -224,5 +274,21 @@ class SettingsContainer extends DataContainer {
      */
     final protected function setValue(array $value): void {
         update_option($this->name, $value);
+    }
+    
+    final public function getIemValue(string $key, bool $refresh = false): mixed {
+        $value = parent::getItemValue($key, $refresh);
+
+        if (is_string($value) && !empty($value)) {
+            $isEncrypted = $this->getEncryptedSetting($key) !== null;
+
+            if ($isEncrypted && Crypt::appearsEncrypted($value)) {
+                return Crypt::decryptString($value);
+            }
+
+            return $value;
+        }
+
+        return $value;
     }
 }

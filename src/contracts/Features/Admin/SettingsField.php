@@ -79,7 +79,7 @@ final class SettingsField {
     // =========================================================================
     
     /**
-     * Private constructor to enforce the use of the static make method.
+     * Private constructor to enforce the use of the self make method.
      *
      * @param Setting $setting  The Setting instance to associate with this SettingsField.
      * @param Closure|null      $callback A callback function to configure the SettingsField instance.
@@ -101,6 +101,18 @@ final class SettingsField {
     private function init(): void {
         $this->setHook('admin_init', [$this, 'register']);
         $this->hook();
+    }
+
+    /**
+     * Unregisters the settings field.
+     *
+     * @return void
+     */
+    public function unregister(): void {
+        if ($this->hooked) {
+            remove_action('admin_init', [$this, 'register']);
+            $this->hooked = false;
+        }
     }
 
     /**
@@ -151,6 +163,8 @@ final class SettingsField {
         if ($this->descriptionPosition === 'before' && !$hasTitleWrapper) {
             $title = $this->getRichLabel();
             $this->field->description(''); // Clear the field's description to avoid duplication
+        } else if ($hasTitleWrapper) {
+            $this->field->description('');
         }
 
         add_settings_field(
@@ -218,9 +232,9 @@ final class SettingsField {
      * Sets the id of the SettingsField.
      *
      * @param string $id The id to set.
-     * @return static
+     * @return self
      */
-    public function id(string $id): static {
+    public function id(string $id): self {
         $this->id = Str::slug($id);
         return $this;
     }
@@ -229,9 +243,9 @@ final class SettingsField {
      * Sets the title of the SettingsField.
      *
      * @param string $title The title to set.
-     * @return static
+     * @return self
      */
-    public function title(string $title): static {
+    public function title(string $title): self {
         $this->title = $title;
         return $this;
     }
@@ -240,9 +254,9 @@ final class SettingsField {
      * Sets the position of the description relative to the field.
      *
      * @param string $position The position to set ('before' or 'after').
-     * @return static
+     * @return self
      */
-    public function descriptionPosition(string $position): static {
+    public function descriptionPosition(string $position): self {
         if (!in_array($position, ['before', 'after'])) {
             return $this; // Invalid position, do nothing
         }
@@ -256,9 +270,9 @@ final class SettingsField {
      *
      * @param boolean $after
      *
-     * @return static
+     * @return self
      */
-    public function descriptionAfter(bool $after = true): static {
+    public function descriptionAfter(bool $after = true): self {
         $this->descriptionPosition = $after ? 'after' : 'before';
         return $this;
     }
@@ -267,9 +281,9 @@ final class SettingsField {
      * Sets the slug of the menu page associated with this SettingsField.
      *
      * @param string $slug The slug to set.
-     * @return static
+     * @return self
      */
-    public function page(string $slug): static {
+    public function page(string $slug): self {
         $this->pageSlug = $slug;
         return $this;
     }
@@ -278,9 +292,9 @@ final class SettingsField {
      * Sets the id of the section associated with this SettingsField.
      *
      * @param string $id The section id to set.
-     * @return static
+     * @return self
      */
-    public function section(string $id): static {
+    public function section(string $id): self {
         $this->sectionId = Str::slug($id);
         return $this;
     }
@@ -289,9 +303,9 @@ final class SettingsField {
      * Sets the settings field to be hidden on the page.
      *
      * @param bool $hide
-     * @return static
+     * @return self
      */
-    public function hide(bool $hide = true): static {
+    public function hide(bool $hide = true): self {
         $this->isHidden = $hide;
         $this->descriptionPosition('before');
         return $this;
@@ -301,9 +315,9 @@ final class SettingsField {
      * Sets additional arguments for the SettingsField.
      *
      * @param array $args The arguments to set.
-     * @return static
+     * @return self
      */
-    public function args(array $args): static {
+    public function args(array $args): self {
         $this->args = $args;
         return $this;
     }
@@ -312,9 +326,9 @@ final class SettingsField {
      * Associates a Field instance with this SettingsField.
      *
      * @param Field $field The Field instance to associate.
-     * @return static
+     * @return self
      */
-    public function field(Field $field): static {
+    public function field(Field $field): self {
         $this->field = $field;
         $this->field->settingsField($this);
 

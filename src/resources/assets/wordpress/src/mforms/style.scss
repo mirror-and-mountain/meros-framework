@@ -96,6 +96,16 @@ $mf-first-row-offset: -24px;
     width: 100% !important;
 }
 
+.meros-field-wrapper.nice-form-group [readonly] {
+    background-color: #f5f5f5;
+    border-color: #e0e0e0;
+    border-width: 1px;
+
+    &:focus {
+        border: 1px solid #e0e0e0;
+    }
+}
+
 .meros-choice-field .nice-form-group label {
     margin: 0 !important;
 }

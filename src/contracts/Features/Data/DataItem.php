@@ -282,6 +282,26 @@ abstract class DataItem extends Feature implements StorableItem {
     }
 
     /**
+     * For internal use only. Forces a new field instance in-place of an existing one, if any.
+     *
+     * @param Field $field
+     *
+     * @return static
+     */
+    final public function __overrideField(Field $field): static {
+        $this->field = $field;
+        
+        if ($this->container !== null) {
+            $containerName = $this->container->getName(true);
+            $this->field->name($containerName . '[' . $this->name . ']');
+            $this->field->id($containerName . '-' . Str::replace('_', '-', $this->name));
+        }
+
+        $this->whenFieldSet($this->field, true);
+        return $this;
+    }
+
+    /**
      * Infers the field type based on the data type of the item.
      *
      * @return string The inferred field type.
@@ -316,10 +336,11 @@ abstract class DataItem extends Feature implements StorableItem {
      * when a field is associated with the DataItem.
      * 
      * @param Field $field The Field instance that has been set for the DataItem.
+     * @param bool  $override Whether the field has been set as the result of the __overrideField method being called. Should only be used internally.
      *
      * @return void
      */
-    protected function whenFieldSet(Field $field): void {
+    protected function whenFieldSet(Field $field, bool $override = false): void {
         // This method can be overridden in subclasses to perform actions when a field is set.
     }
 

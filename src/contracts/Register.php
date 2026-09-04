@@ -34,6 +34,13 @@ abstract class Register implements FeatureRegister {
     private bool $uniqueInstances = false;
 
     /**
+     * Whether to bind feature instances as singleton's to the service container.
+     *
+     * @var boolean
+     */
+    private bool $bindAsSingletons = false;
+
+    /**
      * The default format of the feature's identifier. Can be 'slug' or 'snake'.
      *
      * @var string
@@ -140,6 +147,17 @@ abstract class Register implements FeatureRegister {
      */
     final public function usesUniqueInstances(): bool {
         return $this->uniqueInstances;
+    }
+
+    /**
+     * Sets the register to bind feature instances as singletons to the service container.
+     *
+     * @param boolean $bindAsSingleton
+     *
+     * @return void
+     */
+    final public function bindAsSingletons(bool $bindAsSingleton = true): void {
+        $this->bindAsSingletons = true;
     }
 
     /**
@@ -276,6 +294,10 @@ abstract class Register implements FeatureRegister {
         }
 
         $this->features->push($feature);
+
+        if ($this->bindAsSingletons === true) {
+            app()->instance($feature::class, $feature);
+        }
     }
 
     /**
