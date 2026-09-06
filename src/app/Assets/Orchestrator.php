@@ -10,5 +10,6 @@ class Orchestrator extends AssetsOrchestrator {
         $this->assets()->group(MFormsDeps::class)->make()->register();
         $this->assets()->group(MForms::class)->make()->register();
         $this->assets()->group(Admin::class)->make()->enqueue();
+        $this->assets()->group(BlockEditor::class)->make()->enqueue();
     }
 }

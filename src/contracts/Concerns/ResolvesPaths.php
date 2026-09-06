@@ -163,6 +163,40 @@ trait ResolvesPaths {
     }
 
     /**
+     * Checks if the given filename exists as a file in the given directory.
+     *
+     * @param string $directory
+     * @param string $fileName
+     *
+     * @return boolean
+     */
+    final protected function directoryHasFile(string $directory, string $fileName): bool {
+        if (!$this->pathIsDirectory($directory)) {
+            return false;
+        }
+
+        $file = rtrim($directory . DIRECTORY_SEPARATOR . $fileName);
+
+        return File::exists($file) && File::isFile($file);
+    }
+
+    /**
+     * Returns the given file path if it exists in the given directory.
+     *
+     * @param string $directory
+     * @param string $fileName
+     *
+     * @return string|null
+     */
+    final protected function getDirectoryFile(string $directory, string $fileName): ?string {
+        if ($this->directoryHasFile($directory, $fileName)) {
+            return rtrim($directory . DIRECTORY_SEPARATOR . $fileName);
+        }
+
+        return null;
+    }
+
+    /**
      * Retrieves the first file in the given directory that has one of the specified extensions.
      *
      * @param string $directory

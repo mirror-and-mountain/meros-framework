@@ -12,6 +12,7 @@ use MM\Meros\App\Admin\Pages\MerosThemeSettings as ThemeSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosPackages as PackageSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosIntegrations as IntegrationsSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosAssets as AssetGroupSettingsPage;
+use MM\Meros\App\Admin\Pages\MerosBlocksSettings as BlocksSettingsPage;
 
 use MM\Meros\App\Admin\Sections\MerosSettings;
 
@@ -20,6 +21,7 @@ use MM\Meros\App\Admin\Settings\Containers\MerosIntegrationSettings;
 use MM\Meros\App\Admin\Settings\Containers\MerosThemeSettings;
 use MM\Meros\App\Admin\Settings\Containers\MerosPackageSettings;
 use MM\Meros\App\Admin\Settings\Containers\MerosAssetGroupSettings;
+use MM\Meros\App\Admin\Settings\Containers\MerosBlocksSettings;
 
 use MM\Meros\Contracts\Orchestrators\SettingsOrchestrator;
 use MM\Meros\Contracts\Providers\Concerns\ProvidesSettingsContainers;
@@ -47,6 +49,7 @@ class Orchestrator extends SettingsOrchestrator {
         $this->pages(ThemeSettingsPage::class)->register(BaseTheme::class);
         $this->pages(IntegrationsSettingsPage::class)->register();
         $this->pages(AssetGroupSettingsPage::class)->register();
+        $this->pages(BlocksSettingsPage::class)->register();
     }
 
     /**
@@ -69,6 +72,7 @@ class Orchestrator extends SettingsOrchestrator {
         $this->settingsContainers(MerosThemeSettings::class)->register(BaseTheme::class);
         $this->settingsContainers(MerosPackageSettings::class)->register();
         $this->settingsContainers(MerosAssetGroupSettings::class)->register();
+        $this->settingsContainers(MerosBlocksSettings::class)->register();
     }
 
     /**

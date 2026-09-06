@@ -118,6 +118,21 @@ class Asset extends Feature implements Registrable, Makeable {
      */
     protected bool $isEnqueued = false;
 
+    /**
+     * Whether or not Wordpress's AJAX URL should be added to the script.
+     * This is only relevant for 'script' type assets and when the script is not being enqueued in the admin area.
+     *
+     * @var boolean
+     */
+    protected bool $usesAjax = false;
+
+    /**
+     * An array of data keys and values to be localized in the script (if it uses Ajax).
+     *
+     * @var array
+     */
+    protected array $ajaxData = [];
+
     use ResolvesPaths, IsRegistrable, IsMakeable, InstantiatesItems;
 
     // =========================================================================
@@ -243,6 +258,13 @@ class Asset extends Feature implements Registrable, Makeable {
             $this->version,
             $this->inFooter
         );
+
+        if ($this->usesAjax) {
+            wp_localize_script($this->handle, 'meros_script_data', [
+                'ajax_url' => admin_url('admin-ajax.php'),
+                ...$this->ajaxData
+            ]);
+        }
 
         $this->isRegistered = true;
     }
@@ -536,6 +558,40 @@ class Asset extends Feature implements Registrable, Makeable {
      */
     final public function inFooter(bool $inFooter = true): static {
         $this->inFooter = $inFooter;
+
+        return $this;
+    }
+
+    /**
+     * Tells the Asset to include Wordpress's AJAX url in the script if it isn't already available.
+     * Relevant only for script-type assets.
+     *
+     * @param array $data
+     *
+     * @return static
+     */
+    final public function usesAjax($data = []): static {
+        $this->usesAjax = true;
+        $this->ajaxData = $data;
+        return $this;
+    }
+
+    /**
+     * Adds data to the ajaxData array.
+     *
+     * @param array $data
+     *
+     * @return static
+     */
+    final public function addAjaxData(array $data): static {
+        foreach ($data as $key => $value) {
+            if (array_key_exists($key, $this->ajaxData) && is_array($value)) {
+                $existingData = $this->ajaxData[$key];
+                $this->ajaxData[$key] = array_merge($existingData, $value);
+            } else {
+                $this->ajaxData[$key] = $value;
+            }
+        }
 
         return $this;
     }
