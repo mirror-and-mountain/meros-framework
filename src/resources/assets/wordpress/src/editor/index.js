@@ -28,7 +28,12 @@ const TestBlockControls = createHigherOrderComponent((BlockEdit) => {
                                     return (
                                         <ToggleControl
                                             key={attribute}
-                                            label={config.label || __('Test Toggle Control', 'meros-theme')}
+                                            label={config.label || attribute
+                                                .replace(/([a-z])([A-Z])/g, '$1 $2')
+                                                .replace(/[-_]+/g, ' ')
+                                                .replace(/\s+/g, ' ')
+                                                .trim()
+                                                .replace(/^./, (character) => character.toUpperCase())}
                                             checked={Boolean(attributes[attribute])}
                                             onChange={(value) => {
                                                 setAttributes({

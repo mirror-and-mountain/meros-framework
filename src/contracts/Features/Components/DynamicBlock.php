@@ -43,7 +43,9 @@ class DynamicBlock extends Block {
         $attributes = $this->attributes;
 
         foreach ($attributes as $key => $attribute) {
-            $type = $attribute['type'] ?? null;
+            $type  = $attribute['type'] ?? null;
+            $label = isset($attribute['label']) && is_string($attribute['label']) ? $attribute['label'] : '';
+
             if ($type === null) {
                 continue;
             }
@@ -60,8 +62,9 @@ class DynamicBlock extends Block {
                     array_merge(
                         $this->attributes['merosControls']['default'] ?? [], [
                             $key => [
-                                'for'  => $key, 
-                                'type' => $controlType
+                                'for'   => $key, 
+                                'type'  => $controlType,
+                                'label' => !empty($label) ? $label : ucfirst($key)
                             ]
                         ]
                     )
