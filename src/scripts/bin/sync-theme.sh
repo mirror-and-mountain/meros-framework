@@ -74,7 +74,6 @@ if [ $SOURCE_ENV = 'local_dev' ]; then
             --exclude='/vendor/mirror-and-mountain/**/node_modules/' \
             --exclude='/vendor/mirror-and-mountain/**/webpack.assets.config.js' \
             --exclude='/vendor/mirror-and-mountain/meros-framework/src/scripts/EnvironmentCommands.php' \
-            --exclude='/vendor/mirror-and-mountain/meros-framework/src/scripts/EnvironmentCommands.php' \
             --exclude='/vendor/mirror-and-mountain/meros-framework/src/scripts/EnvironmentManager.php' \
             --exclude='/vendor/mirror-and-mountain/meros-framework/src/scripts/bin/' \
             --delete \
