@@ -114,7 +114,7 @@ class Orchestrator extends SettingsOrchestrator {
         }
 
         foreach ($packages as $package) {
-            $container->add('boolean', function ($setting) use ($package) {
+            $container->add('boolean', function (Setting $setting) use ($package) {
                 $setting->addContext('is_meros_package_setting', true);
                 $setting->setProvider($package);
                 $setting->name($package->getHandle() . '_enabled');

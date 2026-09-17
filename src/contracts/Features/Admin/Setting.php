@@ -99,6 +99,8 @@ class Setting extends DataItem {
                 return $value;
             }, 100, 3);
         }
+
+        parent::whenUpdated($value, $oldValue, $itemName, $optionName);
     }
 
     // =========================================================================
