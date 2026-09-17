@@ -254,9 +254,11 @@ class EnvironmentManager {
      * @return bool  True on success, false on failure.
      */
     public function installPackage(string $serviceProvider): bool {
-        if ($this->error !== '') {
+        if ($this->error !== '' && $this->error !== 'Package already installed.') {
             return false;
         }
+
+        $this->error = '';
 
         if (! $this->isLocal) {
             $this->error = 'Packages can only be installed in a local environment.';
