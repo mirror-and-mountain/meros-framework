@@ -27,6 +27,7 @@ use MM\Meros\Registers\Admin\SettingsSections;
 use MM\Meros\Registers\Admin\SettingsContainers;
 
 use MM\Meros\Registers\Components\Blocks;
+use MM\Meros\Registers\Components\DynamicBlocks;
 use MM\Meros\Registers\Components\Forms;
 use MM\Meros\Registers\Components\Fields;
 use MM\Meros\Registers\Components\FieldGroups;
@@ -71,6 +72,7 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         SettingsSections::class,
         SettingsContainers::class,
 
+        DynamicBlocks::class,
         Blocks::class,
         Forms::class,
         Fields::class,

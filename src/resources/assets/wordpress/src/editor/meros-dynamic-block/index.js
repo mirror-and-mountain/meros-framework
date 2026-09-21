@@ -1,7 +1,6 @@
 import { __ } from '@wordpress/i18n';
 import { registerBlockType} from '@wordpress/blocks';
 import Edit from './edit';
-import Save from './save';
 
 wp.domReady(() => {
     if (typeof window.meros_script_data !== 'object') return;

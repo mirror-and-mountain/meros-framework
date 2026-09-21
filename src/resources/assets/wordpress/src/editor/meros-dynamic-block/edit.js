@@ -1,19 +1,21 @@
 import { useBlockProps } from '@wordpress/block-editor';
 import { useEffect, useState } from '@wordpress/element';
 
-export default function Edit({ attributes }) {
-    const ajaxUrl = window.meros_script_data?.ajax_url;
+export default function Edit({ name, attributes }) {
+    const ajaxUrl    = window.meros_script_data?.ajax_url;
+    const ajaxData   = window.meros_script_data?.blocks[name];
+    const ajaxAction = ajaxData?.ajaxAction;
     const [html, setHtml] = useState('');
 
     useEffect(() => {
-        if (!ajaxUrl) {
+        if (!ajaxUrl || !ajaxAction) {
             return;
         }
 
         let cancelled = false;
 
         const params = new URLSearchParams({
-            action: 'meros_dynamic_block_meros-blocks/test-block',
+            action: ajaxAction,
             attributes: JSON.stringify(attributes),
         });
 
@@ -41,7 +43,7 @@ export default function Edit({ attributes }) {
         return () => {
             cancelled = true;
         };
-    }, [ajaxUrl, attributes]);
+    }, [ajaxUrl, ajaxAction, attributes]);
 
     return (
         <div {...useBlockProps()} dangerouslySetInnerHTML={{ __html: html }} />

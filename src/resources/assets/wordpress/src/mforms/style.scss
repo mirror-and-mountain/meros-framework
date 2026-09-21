@@ -92,7 +92,7 @@ $mf-first-row-offset: -24px;
     min-width: 0;
 }
 
-.meros-field-wrapper.nice-form-group input {
+.meros-field-wrapper.nice-form-group input:not[type='checkbox'] {
     width: 100% !important;
 }
 

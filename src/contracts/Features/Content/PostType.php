@@ -4,13 +4,17 @@ namespace MM\Meros\Contracts\Features\Content;
 
 use Closure;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 
 use MM\Meros\Contracts\Feature;
+use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
+use MM\Meros\Contracts\Features\Components\DynamicBlock;
 
 use MM\Meros\Contracts\Features\Makeable;
 use MM\Meros\Contracts\Features\Registrable;
 
+use MM\Meros\Contracts\Features\Data\PostMeta;
 use MM\Meros\Contracts\Features\Data\PostMetaContainer;
 
 use MM\Meros\Contracts\Features\Concerns\IsMakeable;
@@ -55,6 +59,13 @@ class PostType extends Feature implements Makeable, Registrable {
      * @var array<PostMetaContainer|array>
      */
     protected array $metaContainers = [];
+
+    /**
+     * An array of metaBlocks created for this port type
+     *
+     * @var array<DynamicBlock>
+     */
+    private array $metaBlocks = [];
 
     /**
      * Whether the post type is a core post type (like 'post' or 'page').
@@ -122,6 +133,51 @@ class PostType extends Feature implements Makeable, Registrable {
                 }
             }
         }
+
+        if ($this->metaBlocks !== []) {
+            $this->configureMetaBlocks();
+        }
+    }
+
+    private function configureMetaBlocks(): void {
+        if ($this->metaBlocks === []) {
+            return;
+        }
+
+        $names = [];
+        foreach ($this->metaBlocks as $block) {
+            if (!($block instanceof DynamicBlock)) {
+                continue;
+            }
+
+            $names[] = $block->getName();
+        }
+
+        add_filter( 'allowed_block_types_all', function (array|bool $allowedBlocks, \WP_Block_Editor_Context $context) use ($names) {
+            if ($context->post instanceof \WP_Post) {
+                $post = $context->post;
+
+                if ($post->post_type !== $this->handle) {
+                    if (is_array($allowedBlocks)) {
+                        return array_values(array_diff($allowedBlocks, $names));
+                    }
+
+                    if ($allowedBlocks === true) {
+                        $blocks = \WP_Block_Type_Registry::get_instance()->get_all_registered();
+
+                        if (!is_array($blocks)) {
+                            return $allowedBlocks;
+                        }
+
+                        $blocks = array_keys($blocks);
+
+                        return array_values(array_diff($blocks, $names));
+                    }
+                }
+            }
+
+            return $allowedBlocks;
+        }, 20, 2 );
     }
 
     /**
@@ -326,6 +382,30 @@ class PostType extends Feature implements Makeable, Registrable {
         }
 
         return $container;
+    }
+
+    /**
+     * Retrieves the fields associated with the post type, if any exist.
+     *
+     * @param boolean $collect
+     *
+     * @return Collection|array|null
+     */
+    final public function getFields(bool $collect = false): Collection|array|null {
+        if ($this->metaContainers === []) {
+            return null;
+        }
+
+        $fields = [];
+
+        foreach ($this->metaContainers as $container) {
+            if ($container instanceof PostMetaContainer) {
+                $name = $container->getName();
+                $fields[$name] = $container->getFields();
+            }
+        }
+
+        return empty($fields) ? null : ($collect ? collect($fields) : $fields);
     }
 
     // =========================================================================
@@ -592,6 +672,87 @@ class PostType extends Feature implements Makeable, Registrable {
             return $allowedBlocks;
         }, 10, 2);
 
+        return $this;
+    }
+
+    /**
+     * Creates a dynamic block type using the value of meta associated with this post type.
+     *
+     * @param string       $metaKey
+     * @param Closure|null $callback
+     *
+     * @return static
+     */
+    final public function metaBlock(string $metaKey, ?Closure $callback = null): static {
+        $containers = $this->metaContainers;
+        $selectedContainer = null;
+        $item = null;
+
+        foreach ($containers as $container) {
+            if (!($container instanceof PostMetaContainer)) {
+                continue;
+            }
+
+            $item = $container->getItems(true)->firstWhere(function ($item) use ($metaKey) {
+                return $item->getName() === $metaKey;
+            });
+
+            if ($item instanceof PostMeta) {
+                $selectedContainer = $container;
+                break;
+            }
+        }
+
+        if ($item === null || $selectedContainer === null) {
+            return $this;
+        }
+
+        $label = $item->getLabel();
+        $block = $this->makeItem(DynamicBlock::class, $callback ?? [], [
+            'name'  => $this->handle . '-' . Str::replace('_', '-', $metaKey),
+            'title' => $label !== '' ? Str::title($this->handle) . ' ' . $label : Str::title($this->handle) . ' ' . Str::title($metaKey)
+        ]);
+
+        if (!($block instanceof DynamicBlock)) {
+            return $this;
+        }
+
+        add_filter("meros_render_block_args_{$block->getName()}", function (array $args) use ($selectedContainer, $metaKey) {
+            if (!isset($args['post_id']) || !is_int($args['post_id'])) {
+                return $args;
+            }
+
+            $postID = $args['post_id'];
+
+            if ($postID === 0) {
+                return $args;
+            }
+
+            $containerValue = array_merge(
+                $selectedContainer->getDefault(),
+                $selectedContainer->value($postID, true)
+            );
+
+            $value = $containerValue[$metaKey] ?? null;
+
+            return array_merge($args, [
+                'meta_value' => $value
+            ]);
+        });
+
+        if ($block->hasRenderCallback() === false) {
+            $block->renderCallback(function (array $args) {
+                $value = '';
+
+                if (isset($args['meta_value'])) {
+                    $value = $args['meta_value'];
+                }
+
+                return '<p>' . esc_attr($value) . '</p>';
+            });
+        }
+
+        $this->metaBlocks[] = $block;
         return $this;
     }
 

@@ -3,6 +3,7 @@
 namespace MM\Meros\Contracts\Features\Data;
 
 use Closure;
+use Illuminate\Support\Collection;
 
 use MM\Meros\Contracts\Features\Data\DataContainer;
 
@@ -441,6 +442,27 @@ class PostMetaContainer extends DataContainer {
 
         $this->fieldGroupInstance = $fieldGroupInstance;
         return $this->fieldGroupInstance;
+    }
+
+    /**
+     * Retrieves the fieldGroup instance associated with the container, if it exists.
+     *
+     * @return FieldGroup|null
+     */
+    final public function getFieldGroup(): ?FieldGroup {
+        return $this->fieldGroupInstance;
+    }
+
+    /**
+     * Retrieves the fields inside the container's associated fieldGroup instance, if it exists.
+     * 
+     * @param bool $collect
+     *
+     * @return Collection|array|null
+     */
+    final public function getFields(bool $collect = false): Collection|array|null {
+        $group = $this->getFieldGroup();
+        return $group === null ? null : $group->getFields($collect);
     }
 
     /**

@@ -2,6 +2,8 @@
 
 namespace MM\Meros\Contracts\Features\Components;
 
+use Illuminate\Support\Str;
+
 use MM\Meros\Contracts\Features\Assets\Asset;
 use MM\Meros\App\Assets\DynamicBlock as DynamicBlockAsset;
 
@@ -41,6 +43,7 @@ class DynamicBlock extends Block {
 
     final protected function whenEnabled(): void {
         $attributes = $this->attributes;
+        $types = [];
 
         foreach ($attributes as $key => $attribute) {
             $type  = $attribute['type'] ?? null;
@@ -54,31 +57,62 @@ class DynamicBlock extends Block {
                 continue;
             }
 
-            $controlType = $type === 'boolean' ? 'toggle' : 'text';
-        
+            $controlType = $this->getControlType($type, $attribute['control']);
+
+            $controlConfig = [
+                'for'   => $key,
+                'type'  => $controlType,
+                'label' => !empty($label) ? $label : ucfirst($key)
+            ];
+
+            if (
+                is_array($attribute['control']) &&
+                array_key_exists('options', $attribute['control'])
+            ) {
+                $options = $attribute['control']['options'];
+                $normalisedOptions = [];
+
+                foreach ($options as $value => $label) {
+                    if (!is_string($label)) {
+                        continue;
+                    }
+
+                    if (is_int($value)) {
+                        $value = $label;
+                    }
+
+                    $normalisedOptions[] = ['value' => $value, 'label' => $label];
+                }
+
+                $controlConfig['options'] = $normalisedOptions;
+            }
+
+            if (is_array($attribute['control']) &&
+                array_key_exists('placeholder', $attribute['control']) &&
+                is_string($attribute['control']['placeholder'])
+            ) {
+                $controlConfig['placeholder'] = $attribute['control']['placeholder'];
+            }
+
             $this->attribute('merosControls', [
                 'type' => 'object',
-                'default' => 
+                'default' =>
                     array_merge(
-                        $this->attributes['merosControls']['default'] ?? [], [
-                            $key => [
-                                'for'   => $key, 
-                                'type'  => $controlType,
-                                'label' => !empty($label) ? $label : ucfirst($key)
-                            ]
-                        ]
+                        $this->attributes['merosControls']['default'] ?? [],
+                        [$key => $controlConfig]
                     )
-                ]
-            );
+            ]);
 
             unset($this->attributes[$key]['control']);
         }
 
+        $ajaxAction = sanitize_key('meros_dynamic_block_' . Str::replace(['-', '/'], '_', $this->getName()));
         $this->script->addAjaxData([
             'blocks' => [
                 $this->getName() => [
                     'name'       => $this->getName(),
                     'title'      => $this->title,
+                    'ajaxAction' => $ajaxAction,
                     'attributes' => $this->attributes
                 ]
             ]
@@ -88,7 +122,7 @@ class DynamicBlock extends Block {
             return;
         }
 
-        add_action("wp_ajax_meros_dynamic_block_{$this->getName()}", function () {
+        add_action("wp_ajax_{$ajaxAction}", function () {
             $rawAttributes = $_POST['attributes'] ?? '[]';
             $attributes = [];
 
@@ -107,11 +141,31 @@ class DynamicBlock extends Block {
             }
 
             wp_send_json_success([
-                'html' => $this->sanitizeHtml(call_user_func($this->renderCallback, $attributes)),
+                'html' => $this->sanitizeHtml($this->render($attributes)),
             ]);
             exit;
         });
 
         parent::whenEnabled();
+    }
+
+    /**
+     * Retrieves the control type for a given control or infers one from the given dataType.
+     *
+     * @param string     $dataType
+     * @param array|bool $control
+     *
+     * @return string
+     */
+    private function getControlType(string $dataType, array|bool $control): string {
+        if (is_array($control) && isset($control['type']) && is_string($control['type'])) {
+            return $control['type'];
+        }
+
+        return match ($dataType) {
+            'string' => 'text',
+            'boolean' => 'toggle',
+            default => 'text',
+        };
     }
 }

@@ -27,6 +27,7 @@ class Block extends Feature implements Registrable, Makeable {
      */
     private string $namespace = '';
 
+    protected string $apiVersion = '3';
 
     protected string $name = '';
 
@@ -137,7 +138,8 @@ class Block extends Feature implements Registrable, Makeable {
                 $isDynamic = $this->path === '';
                 $blockType = $isDynamic ? $this->getName() : $this->path;
 
-                register_block_type($blockType, $isDynamic ? $this->getArgs() : []);
+                $registered = register_block_type($blockType, $isDynamic ? $this->getArgs() : []) !== false;
+                $this->registered = $registered;
             });
         }
 
@@ -152,6 +154,7 @@ class Block extends Feature implements Registrable, Makeable {
     private function getArgs(): array {
         $args = [
             'title',
+            'api_version',
             'category',
             'parent',
             'ancestor',
@@ -165,7 +168,6 @@ class Block extends Feature implements Registrable, Makeable {
             'selectors',
             'supports',
             'example',
-            'render_callback',
             'variation_callback',
             'attributes',
             'uses_context',
@@ -190,7 +192,68 @@ class Block extends Feature implements Registrable, Makeable {
             } 
         }
 
+        if (is_callable($this->renderCallback)) {
+            $parsedArgs['render_callback'] = [$this, 'render'];
+        }
+
         return $parsedArgs;
+    }
+
+    /**
+     * Renders dynamic block content, providing some additional arguments for render_callbacks.
+     *
+     * @param array          $attributes
+     * @param string         $content
+     * @param \WP_Block|null $block
+     *
+     * @return void
+     */
+    final public function render(array $attributes = [], string $content = '', \WP_Block|null $block = null) {
+        $postID = $this->getPostID();
+
+        $args = apply_filters("meros_render_block_args_{$this->getName()}", [
+            'attributes' => $attributes,
+            'content'    => $content,
+            'block'      => $block,
+            'post_id'    => $postID,
+        ]);
+
+        return is_callable($this->renderCallback) 
+            ? call_user_func($this->renderCallback, $args)
+            : "This block doesn't render any output.";
+    }
+
+    /**
+     * Helper to retrieve the current post id (if possible). 
+     *
+     * @return integer
+     */
+    private function getPostID(): int {
+        // Try and get the id from the loop.
+        $postID = get_the_ID();
+
+        // If we're in admin, see if we can get the id from the query params.
+        if ($postID === false && is_admin()) {
+            $postID = $_GET['post'] ?? false;
+        }
+
+        // Lastly, try and extract the id from the referrer (used when called via AJAX requests).
+        if ($postID === false) {
+            $referrer = wp_get_referer();
+            if (Str::contains($referrer, 'post=')) {
+                $query = wp_parse_url($referrer, PHP_URL_QUERY);
+                parse_str(is_string($query) ? $query : '', $queryArgs);
+                $postID = $queryArgs['post'] ?? false;
+            }
+        }
+
+        if (is_numeric($postID)) {
+            $postID = (int) $postID; // Normalise the id as an integer.
+        } else {
+            $postID = 0; // Default to 0 if we couldn't find an id.
+        }
+
+        return $postID;
     }
 
     // =========================================================================
@@ -235,6 +298,18 @@ class Block extends Feature implements Registrable, Makeable {
      */
     final public function title(string $title): static {
         $this->title = $title;
+        return $this;
+    }
+
+    /**
+     * Sets the API version the block uses.
+     *
+     * @param string $version
+     *
+     * @return static
+     */
+    final public function apiVersion(string $version): static {
+        $this->apiVersion = $version;
         return $this;
     }
 
@@ -427,7 +502,7 @@ class Block extends Feature implements Registrable, Makeable {
      * @return static
      */
     final public function attributes(array $attributes): static {
-        $this->attributes = $attributes;
+        $this->attributes = array_merge($attributes, $this->attributes);
         return $this;
     }
 
@@ -672,6 +747,15 @@ class Block extends Feature implements Registrable, Makeable {
         }
 
         return $this->name;
+    }
+
+    /**
+     * Returns whether the block has a render callback.
+     *
+     * @return boolean
+     */
+    final public function hasRenderCallback(): bool {
+        return is_callable($this->renderCallback);
     }
 
     // =========================================================================
