@@ -14,8 +14,6 @@ use MM\Meros\App\Admin\Settings\Orchestrator as SettingsOrchestrator;
 use MM\Meros\Contracts\Providers\Concerns\IsFrameworkProvider;
 use MM\Meros\Contracts\Providers\Concerns\IsNonPackageProvider;
 
-use MM\Meros\App\Components\Blocks\TestBlock;
-
 final class Framework extends Provider {
     use IsFrameworkProvider, IsNonPackageProvider;
 
@@ -58,8 +56,6 @@ final class Framework extends Provider {
         $this->initialise(ComponentsOrchestrator::class);
         $this->initialise(SettingsOrchestrator::class);
         $this->initialise(AssetsOrchestrator::class);
-
-        // $test = $this->blocks(TestBlock::class)->make();
 
         $this->registerPostTypes();
         $this->registerTables();
