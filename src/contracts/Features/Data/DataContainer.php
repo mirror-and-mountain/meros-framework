@@ -548,7 +548,7 @@ abstract class DataContainer extends Feature implements Storable {
         $name = $this->getIdentifier($format);
         
         if ($withPrefix && $this->prefix !== '') {
-            return $name;
+            return Str::startsWith($name, $this->prefix) ? $name : $this->prefix . '_' . $name;
         }
 
         if (!$withPrefix && $this->prefix !== '') {

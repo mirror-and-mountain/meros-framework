@@ -233,11 +233,13 @@ class PostMetaContainer extends DataContainer {
             return;
         }
 
-        if (!isset($_POST[$this->name]) || !is_array($_POST[$this->name])) {
+        $containerName = $this->getName(true);
+
+        if (!isset($_POST[$containerName]) || !is_array($_POST[$containerName])) {
             return;
         }
 
-        $this->savePostMeta($postId, $_POST[$this->name]);
+        $this->savePostMeta($postId, $_POST[$containerName]);
     }
 
     /**
@@ -250,7 +252,7 @@ class PostMetaContainer extends DataContainer {
      */
     private function savePostMeta(int $postId, array $value): void {
         $sanitizedValue = $this->sanitizeValue($value);
-        update_post_meta($postId, $this->name, $sanitizedValue);
+        update_post_meta($postId, $this->getName(true), $sanitizedValue);
     }
 
     /**
@@ -524,7 +526,7 @@ class PostMetaContainer extends DataContainer {
      * @return array
      */
     final protected function getRawValue(): array {
-        $rawValue = get_post_meta($this->currentPostId, $this->name, true);
+        $rawValue = get_post_meta($this->currentPostId, $this->getName(true), true);
 
         if (!is_array($rawValue)) {
             $rawValue = [];

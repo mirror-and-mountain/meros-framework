@@ -77,6 +77,11 @@ class PostType extends Feature implements Makeable, Registrable {
         $this->identifier('handle', 'slug');
         $this->setHook('init', [$this, 'register']);
         $this->hook();
+
+        if ($this->creationMethod === 'made_from_class' && $this->handle === '') {
+            $this->handle(Str::slug(class_basename($this)));
+            $this->label(class_basename($this));
+        }
     }
 
     /**
@@ -278,6 +283,7 @@ class PostType extends Feature implements Makeable, Registrable {
      */
     private function convertFieldGroupToMeta(FieldGroup $fieldGroup): ?PostMetaContainer {
         $id     = $fieldGroup->getId();
+        $name   = $fieldGroup->getName();
         $title  = $fieldGroup->getTitle();
         $fields = $fieldGroup->getFields();
 
@@ -288,7 +294,7 @@ class PostType extends Feature implements Makeable, Registrable {
         $container = $this->makeItem(
             PostMetaContainer::class,
             [
-                'name'        => '_meros_' . Str::replace('-', '_', $id),
+                'name'        => $name !== '' ? $name : Str::replace('-', '_', $id),
                 'label'       => $title,
                 'description' => $fieldGroup->getDescription()
             ]

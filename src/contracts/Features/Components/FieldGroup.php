@@ -26,6 +26,13 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
     protected string $id = '';
 
     /**
+     * Whether the field group is using the generated default id.
+     *
+     * @var boolean
+     */
+    private bool $usingDefaultId = false;
+
+    /**
      * The field group's name.
      *
      * @var string
@@ -77,6 +84,7 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
         $defaultIdentifier = 'mforms-section-' . Str::substr(Str::uuid(), 0, 8);
         $this->id($defaultIdentifier);
         $this->name(Str::replace('-', '_', $defaultIdentifier));
+        $this->usingDefaultId = true;
     }
 
     final protected function whenConfigured(): void {
@@ -175,7 +183,18 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      * @return static Returns the current instance for method chaining.
      */
     final public function id(string $id): static {
-        return $this->setIdentifier($id, false);
+        $old = $this->id;
+        $id  = $this->setIdentifier($id);
+
+        if ($this->name === '' || (
+            $this->usingDefaultId && 
+            $this->name === Str::replace('-', '_', $old))
+        ) {
+            $this->name($id);
+        }
+
+        $this->usingDefaultId = false;
+        return $this;
     }
 
     /**
@@ -186,7 +205,10 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      * @return static
      */
     final public function name(string $name): static {
-        $this->name = Str::snake($name);
+        $name = Str::snake($name);
+        $name = Str::replace('-', '_', $name);
+        $this->name = $name;
+
         return $this;
     }
 
@@ -198,6 +220,11 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      */
     final public function title(string $title): static {
         $this->title = $title;
+
+        if ($this->usingDefaultId) {
+            $this->id($title);
+        }
+
         return $this;
     }
 
@@ -214,6 +241,15 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      */
     final public function getId(string $format = 'default'): string {
         return $this->getIdentifier($format);
+    }
+
+    /**
+     * Returns the field group's name.
+     *
+     * @return string
+     */
+    final public function getName(): string {
+        return $this->name;
     }
 
     /**
