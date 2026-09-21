@@ -139,6 +139,12 @@ class PostType extends Feature implements Makeable, Registrable {
         }
     }
 
+    /**
+     * Filters 'allowed blocks' to exclude any metaBlocks added to the 
+     * post type when the current post type is not this one.
+     *
+     * @return void
+     */
     private function configureMetaBlocks(): void {
         if ($this->metaBlocks === []) {
             return;
@@ -177,7 +183,7 @@ class PostType extends Feature implements Makeable, Registrable {
             }
 
             return $allowedBlocks;
-        }, 20, 2 );
+        }, 20, 2);
     }
 
     /**
