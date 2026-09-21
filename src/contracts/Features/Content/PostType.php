@@ -7,7 +7,6 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
 use MM\Meros\Contracts\Feature;
-use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\DynamicBlock;
 
