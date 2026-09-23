@@ -2,6 +2,7 @@
 
 namespace MM\Meros\Contracts\Features\Components;
 
+use Closure;
 use Illuminate\Support\Str;
 
 use MM\Meros\Contracts\Feature;
@@ -35,6 +36,13 @@ abstract class Field extends Feature implements FormComponent {
      * @var string
      */
     protected string $name = '';
+
+    /**
+     * The name originally given to the field before any alterations.
+     *
+     * @var string
+     */
+    private string $originalName = '';
 
     /**
      * The field's default value.
@@ -140,6 +148,20 @@ abstract class Field extends Feature implements FormComponent {
      * @var string|null
      */
     protected ?string $repeaterId = null;
+
+    /**
+     * An array of condition callbacks keyed by the influencing field name.
+     *
+     * @var array
+     */
+    private array $conditions = [];
+
+    /**
+     * An array of fields that are influenced by this field's value;
+     *
+     * @var array<Field>
+     */
+    private array $influences = [];
 
     // =========================================================================
     // Field Supports and Compatibility Properties
@@ -272,6 +294,7 @@ abstract class Field extends Feature implements FormComponent {
         $idNameSuffix = Str::substr(Str::uuid(), 0, 8);
         $this->id("mforms-field-{$idNameSuffix}");
         $this->name("mforms_field_{$idNameSuffix}");
+        $this->originalName = '';
 
         $this->ignoreProps([
             'defaultValue', 'attributes', 'classes', 'form', 'group'
@@ -723,6 +746,11 @@ abstract class Field extends Feature implements FormComponent {
     public function name(string $name): static {
         $this->name = Str::snake($name);
         $this->whenNameSet();
+
+        if ($this->originalName === '') {
+            $this->originalName = $this->getName();
+        }
+
         return $this;
     }
 
@@ -741,6 +769,15 @@ abstract class Field extends Feature implements FormComponent {
      */
     public function getName(): string {
         return $this->name;
+    }
+
+    /**
+     * Returns the original name given to the field, before any alterations.
+     *
+     * @return string
+     */
+    public function getOriginalName(): string {
+        return $this->originalName;
     }
 
     /**
@@ -842,6 +879,77 @@ abstract class Field extends Feature implements FormComponent {
      */
     public function isDisabled(): bool {
         return isset($this->attributes['disabled']);
+    }
+
+    // =========================================================================
+    // Condition Handling
+    // =========================================================================
+
+    public function when(string $fieldName, Closure $callback): static {
+        $this->conditions[$fieldName][] = $callback;
+        return $this;
+    }
+
+    /**
+     * Retrieves the array of conditions associated with the field.
+     *
+     * @return array
+     */
+    public function getConditions(): array {
+        return $this->conditions;
+    }
+
+    /**
+     * Checks whether the field has any condition set.
+     *
+     * @return boolean
+     */
+    public function hasConditions(): bool {
+        return $this->getConditions() !== [];
+    }
+
+    /**
+     * For internal use only. Sets which fields are influenced by this field in relation to conditions.
+     *
+     * @param Field $field
+     *
+     * @return void
+     */
+    public function __influences(Field $field): void {
+        if (!in_array($field, $this->influences)) {
+            $this->influences[] = $field;
+        }
+    }
+
+    /**
+     * Retrieves the array of fields influenced by this field in relation to conditions.
+     *
+     * @param boolean $collect
+     *
+     * @return array|Collection
+     */
+    public function getInfluencedFields($collect = false): array|Collection {
+        return $collect ? collect($this->influences) : $this->influences;
+    }
+
+    /**
+     * Sets the field to 'show' by default.
+     *
+     * @return static
+     */
+    public function show(): static {
+        $this->removeAttribute('data-meros-hidden-field');
+        return $this;
+    }
+
+    /**
+     * Sets the field to 'hide' by default.
+     *
+     * @return static
+     */
+    public function hide(): static {
+        $this->attribute('data-meros-hidden-field', true);
+        return $this;
     }
 
     // =========================================================================

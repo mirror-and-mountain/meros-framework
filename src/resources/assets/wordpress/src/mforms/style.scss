@@ -110,6 +110,10 @@ $mf-first-row-offset: -24px;
     }
 }
 
+.meros-field-wrapper.nice-form-group:has([data-meros-hidden-field]) {
+    display: none !important;
+}
+
 .meros-choice-field .nice-form-group label {
     margin: 0 !important;
 }

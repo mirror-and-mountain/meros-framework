@@ -114,7 +114,7 @@ trait UsesAjax {
     }
 
     /**
-     * Retrieves the AJAX URL for fetching the edit form of a repeater row.
+     * Retrieves the AJAX URL.
      *
      * @return string
      */
@@ -123,7 +123,7 @@ trait UsesAjax {
     }
 
     /**
-     * Retrieves the AJAX nonce for fetching the edit form of a repeater row.
+     * Retrieves the AJAX nonce.
      *
      * @return string
      */

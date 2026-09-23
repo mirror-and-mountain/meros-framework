@@ -1,3 +1,4 @@
+import mformSection from './section.js';
 import mformsSelect from './fields/select.js';
 import mformsRepeater from './fields/repeater.js';
 import mformsChoice from './fields/choice.js';
@@ -130,6 +131,7 @@ const mform = () => {
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('mform', mform);
+    Alpine.data('mformSection', mformSection);
     Alpine.data('mformsSelect', mformsSelect);
     Alpine.data('mformsChoice', mformsChoice);
     Alpine.data('mformsRepeater', mformsRepeater);

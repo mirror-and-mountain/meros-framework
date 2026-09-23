@@ -5,10 +5,12 @@ namespace MM\Meros\Contracts\Features\Components;
 use Closure;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 use MM\Meros\Contracts\Feature;
 use MM\Meros\Contracts\Features\Makeable;
 
+use MM\Meros\Contracts\Concerns\UsesAjax;
 use MM\Meros\Contracts\Features\Concerns\IsMakeable;
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 
@@ -63,7 +65,8 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
     use IsFormComponent,
         IsMakeable,
         InstantiatesItems,
-        MakesFieldRows;
+        MakesFieldRows,
+        UsesAjax;
 
     // =========================================================================
     // Initialisation
@@ -78,7 +81,9 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
             'title',
             'description',
             'rows',
-            'metaBox'
+            'metaBox',
+            'ajaxUrl',
+            'ajaxNonce'
         ]));
 
         $defaultIdentifier = 'mforms-section-' . Str::substr(Str::uuid(), 0, 8);
@@ -94,6 +99,108 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
             // Create an initial row if none are provided
             $this->makeNewRow();
         }
+
+        $this->initFieldConditions();
+    }
+
+    private function initFieldConditions(): void {
+        $fields = $this->getFieldsWithConditions();
+        $influencerFields = $this->getInfluencerFields($fields);
+
+        if ($influencerFields === []) {
+            return;
+        }
+
+        foreach ($influencerFields as $field) {
+            $field->attribute('data-influencer', 'group');
+        }
+
+        $this->initAjax("meros_handle_field_conditions_{$this->name}", function (array $postData) {
+            if (!array_key_exists('influencer', $postData)) {
+                wp_send_json_error(['message' => 'Receieved field change, but the influencing field could not be resolved']);
+                return;
+            }
+
+            if (!array_key_exists('value', $postData)) {
+                wp_send_json_error(['message' => 'Receieved field change, but the field value could not be resolved']);
+                return;
+            }
+
+            $influencerName  = $postData['influencer'];
+            $influencerField = $this->getFields(true)->firstWhere(function (Field $field) use ($influencerName) {
+                return $field->getName() === $influencerName;
+            });
+
+            if (!($influencerField instanceof Field)) {
+                wp_send_json_error(['message' => 'Receieved field change, but the influencing field could not be resolved']);
+                return;
+            }
+
+            $influencedFields = $influencerField->getInfluencedFields();
+            $showFields = [];
+            $hideFields = [];
+
+            foreach($influencedFields as $influencedField) {
+                $conditions = $influencedField->getConditions();
+
+                foreach ($conditions as $influencer => $callbacks) {
+                    if ($influencer !== $influencerField->getOriginalName() && $influencer !== $influencerField->getName()) {
+                        continue;
+                    }
+
+                    foreach ($callbacks as $callback) {
+                        if (!is_callable($callback)) {
+                            continue;
+                        }
+
+                        $result = call_user_func($callback, $postData['value']);
+                        $influencedFieldName = $influencedField->getName();
+
+                        if ($result === 'show' && !in_array($influencedFieldName, $showFields)) {
+                            $showFields[] = $influencedFieldName;
+                            continue;
+                        }
+
+                        if ($result === 'hide' && !in_array($influencedFieldName, $hideFields)) {
+                            $hideFields[] = $influencedFieldName;
+                        }
+                    }
+                }
+            }
+
+            wp_send_json_success([
+                'message'    => 'Receieved influencing field change.',
+                'showFields' => $showFields,
+                'hideFields' => $hideFields
+            ]);
+        });
+    }
+
+    private function getInfluencerFields(Collection $impactedFields): array {
+        $fields = [];
+
+        foreach ($impactedFields as $field) {
+            $conditions = $field->getConditions();
+
+            foreach ($conditions as $influencer => $callbacks) {
+                $influencerField = $this->getFields(true)
+                    ->firstWhere(function (Field $field) use ($influencer) {
+                        return $field->getName() === $influencer;
+                    });
+
+                if (!($influencerField instanceof Field)) {
+                    continue;
+                }
+
+                if (!in_array($influencerField, $fields)) { 
+                    $fields[] = $influencerField;
+                }
+
+                $influencerField->__influences($field);
+            }
+        }
+
+        return $fields;
     }
 
     // =========================================================================
@@ -300,6 +407,17 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
         }
 
         return $collect ? collect($fields) : $fields;
+    }
+
+    /**
+     * Retrieves fields in the group that have conditions.
+     *
+     * @return Collection
+     */
+    private function getFieldsWithConditions(): Collection {
+        return $this->getFields(true)->where(function (Field $field) {
+            return $field->hasConditions();
+        });
     }
 
     /**
