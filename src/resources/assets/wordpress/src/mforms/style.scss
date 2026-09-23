@@ -88,12 +88,16 @@ $mf-first-row-offset: -24px;
 
 .meros-field-wrapper.nice-form-group > * {
     display: block;
-    width: 100%;
-    min-width: 0;
 }
 
-.meros-field-wrapper.nice-form-group input:not[type='checkbox'] {
+.meros-field-wrapper.nice-form-group input:not([type="checkbox"], [type="radio"]) {
+    min-width: 0;
     width: 100% !important;
+}
+
+.meros-field-wrapper.nice-form-group select {
+    min-width: 0;
+    max-width: 100% !important;
 }
 
 .meros-field-wrapper.nice-form-group [readonly] {

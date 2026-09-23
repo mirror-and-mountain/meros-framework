@@ -50,7 +50,7 @@ class PostType extends Feature implements Makeable, Registrable {
      *
      * @var array
      */
-    protected array $args = [];
+    protected array $args = ['supports' => ['title', 'editor']];
 
     /**
      * An array of associated post meta containers for this post type.
@@ -829,11 +829,44 @@ class PostType extends Feature implements Makeable, Registrable {
      *
      * @param array $supports An array of features that the post type should support. 
      *                        This can include 'title', 'editor', 'thumbnail', 'excerpt', 'comments', and more.
+     * 
+     * @param bool $merge     Whether to merge the given supports with existing ones/the defaults. Defaults to true.
      *
      * @return static
      */
-    final public function supports(array $supports): static {
-        $this->args['supports'] = $supports;
+    final public function supports(array $supports, bool $merge = true): static {
+        if ($merge) {
+            $this->args['supports'] = array_merge($this->args['supports'], $supports);
+        } else {
+            $this->args['supports'] = $supports;
+        }
+        return $this;
+    }
+
+    /**
+     * Adds a single support to the post type.
+     *
+     * @param string $support
+     *
+     * @return static
+     */
+    final public function support(string $support): static {
+        $this->args['supports'][] = $support;
+        return $this;
+    }
+
+    /**
+     * Removes a support from the post type.
+     *
+     * @param string $support
+     *
+     * @return static
+     */
+    final public function removeSupport(string $support): static {
+        if (array_key_exists($support, $this->args['supports'])) {
+            unset($this->args['supports'][$support]);
+        }
+
         return $this;
     }
 

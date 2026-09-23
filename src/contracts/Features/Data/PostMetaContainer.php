@@ -192,7 +192,7 @@ class PostMetaContainer extends DataContainer {
         $this->currentPostId = $post->ID;
 
         if ($this->fieldGroupInstance !== null) {
-            $values = $this->getValue(true);
+            $values = array_merge($this->getDefault(), $this->getValue(true));
             $this->fieldGroupInstance->addContext('meta_box', true);
 
             echo '<div class="meros-meta-box">';
