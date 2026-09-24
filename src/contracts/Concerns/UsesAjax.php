@@ -50,7 +50,7 @@ trait UsesAjax {
                         exit;
                     }
 
-                    call_user_func($callback, $_POST);
+                    call_user_func($callback, $_REQUEST);
                     exit;
                 };
 

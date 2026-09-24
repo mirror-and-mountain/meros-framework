@@ -1042,7 +1042,7 @@ abstract class Field extends Feature implements FormComponent {
     protected function castValue(mixed $value, string $type): mixed {
         switch ($type) {
             case 'string':
-                return (string) $value;
+                return is_array($value) ? $value : (string) $value;
             case 'integer':
                 return (int) $value;
             case 'number':

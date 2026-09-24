@@ -165,6 +165,18 @@ class ClassInfo {
     }
 
     /**
+     * Determins whether a given interface is implemented by the current class.
+     *
+     * @param string $interface
+     *
+     * @return boolean
+     */
+    public function implements(string $interface): bool {
+        return $this->name &&
+            in_array($interface, class_implements($this->name));
+    }
+
+    /**
      * Determines whether the given class has the given method with the specified visibility.
      * 
      * @param string $method The name of the method to check for.

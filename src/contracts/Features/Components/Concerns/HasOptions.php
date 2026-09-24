@@ -38,15 +38,13 @@ trait HasOptions {
 
         $defaultValue = $this->getDefaultValue();
 
-        if (is_string($defaultValue) && !empty($defaultValue) && $allow) {
-            $defaultValue = [$defaultValue];
+        if (is_string($defaultValue) && $allow) {
+            $defaultValue = empty($defaultValue) ? [] : [$defaultValue];
         }
 
-        if (is_array($defaultValue) && !empty($defaultValue) && !$allow) {
-            $defaultValue = reset($defaultValue);
+        else if (is_array($defaultValue) && !$allow) {
+            $defaultValue = empty($defaultValue) ? '' : reset($defaultValue);
         }
-
-        $this->default($defaultValue);
 
         if ($allow) {
             $this->dataType('array.scalar');
@@ -54,6 +52,7 @@ trait HasOptions {
             $this->dataType('string');
         }
 
+        $this->default($defaultValue);
         $this->whenMultipleSet($allow);
         return $this;
     }
@@ -141,7 +140,7 @@ trait HasOptions {
      * @return void
      * @throws \InvalidArgumentException if the default value is not compatible with the allowsMultiple setting.
      */
-    protected function whenDefaultValueSet(): void {
+    protected function whenDefaultSet(): void {
         $defaultValue = $this->getDefaultValue();
         $type = $this->getType();
 
@@ -156,12 +155,12 @@ trait HasOptions {
         if (is_array($defaultValue)) {
             foreach ($defaultValue as $value) {
                 if (!array_key_exists($value, $this->options)) {
-                    $this->options = array_merge($this->options, [$value => Str::title(str_replace('_', ' ', $value))]);
+                    $this->options[$value] = Str::title(str_replace('_', ' ', $value));
                 }
             }
         } elseif (is_string($defaultValue) && !empty($defaultValue)) {
             if (!array_key_exists($defaultValue, $this->options)) {
-                $this->options = array_merge($this->options, [$defaultValue => Str::title(str_replace('_', ' ', $defaultValue))]);
+                $this->options[$defaultValue] = Str::title(str_replace('_', ' ', $defaultValue));
             }
         }
     }

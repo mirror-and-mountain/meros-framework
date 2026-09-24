@@ -13,8 +13,12 @@
     @foreach($options as $optValue => $optLabel)
         @php
             $selected = $allowsMultiple === true
-                ? (is_array($defaultValue) && in_array($optValue, $defaultValue, true))
-                : $defaultValue !== null && (string) $defaultValue === $optValue;
+                ? (is_array($defaultValue) && in_array(
+                    (string) $optValue,
+                    array_map(static fn ($value): string => (string) $value, $defaultValue),
+                    true
+                ))
+                : $defaultValue !== null && (string) $defaultValue === (string) $optValue;
         @endphp
         <option value="{{ $optValue }}" @selected($selected)>{{ $optLabel }}</option>
     @endforeach

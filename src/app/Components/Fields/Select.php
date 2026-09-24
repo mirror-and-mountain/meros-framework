@@ -8,7 +8,7 @@ use MM\Meros\Contracts\Features\Components\Concerns\HasOptions;
 class Select extends Field {
     use HasOptions;
     
-    final protected function init(): void {
+    protected function init(): void {
         parent::init();
         $this->dataType('string');
         $this->additionalDataTypes(['array.scalar']);

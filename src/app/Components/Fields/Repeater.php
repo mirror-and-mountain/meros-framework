@@ -12,8 +12,6 @@ use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Facades\Components\Forms;
 use MM\Meros\Facades\Components\Fields;
 
-use Illuminate\Support\Facades\Log;
-
 class Repeater extends Field {
     /**
      * Indicates whether the repeater allows adding new rows.

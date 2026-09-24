@@ -423,6 +423,12 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
                 }
 
                 $shortName = Str::between($field['name'], $containerName . '[', ']');
+
+                // if ($shortName === 'test_lookup') {
+                //     $instance->default($values[$shortName]);
+                //     dd($values[$shortName], $instance);
+                // }
+
                 $instance->default($values[$shortName]);
 
                 $properties['rows'][$rowIndex]['fields'][$fieldIndex] = $instance->toArray();
