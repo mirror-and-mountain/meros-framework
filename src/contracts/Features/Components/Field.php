@@ -4,6 +4,7 @@ namespace MM\Meros\Contracts\Features\Components;
 
 use Closure;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 
 use MM\Meros\Contracts\Feature;
 use MM\Meros\Contracts\Features\Admin\SettingsField;
