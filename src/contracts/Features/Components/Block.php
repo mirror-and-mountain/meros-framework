@@ -206,9 +206,9 @@ class Block extends Feature implements Registrable, Makeable {
      * @param string         $content
      * @param \WP_Block|null $block
      *
-     * @return void
+     * @return string
      */
-    final public function render(array $attributes = [], string $content = '', \WP_Block|null $block = null) {
+    final public function render(array $attributes = [], string $content = '', \WP_Block|null $block = null): string {
         $postID = $this->getPostID();
 
         $args = apply_filters("meros_render_block_args_{$this->getName()}", [
