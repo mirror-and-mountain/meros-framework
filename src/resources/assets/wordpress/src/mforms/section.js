@@ -12,7 +12,7 @@ const mformSection = () => {
             this.ajaxNonce = this.$el.dataset.ajaxNonce || null;
 
             this.$el.removeAttribute('data-ajax-url');
-            this.$el.removeAttribute('data-ajax-nonce');
+            // this.$el.removeAttribute('data-ajax-nonce');
 
             const hasConditions = this.ajaxUrl !== null && this.ajaxNonce !== null;
 
@@ -74,6 +74,10 @@ const mformSection = () => {
 
                                     if (field.hasAttribute('required')) {
                                         field.removeAttribute('required');
+                                    }
+
+                                    if (field.hasAttribute('aria-required')) {
+                                        field.removeAttribute('aria-required');
                                     }
                                 });
                             }

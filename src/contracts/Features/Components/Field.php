@@ -1050,7 +1050,7 @@ abstract class Field extends Feature implements FormComponent {
             case 'boolean':
                 return (bool) $value;
             default:
-                return $value; // No casting for array types or unsupported types
+                return in_array($type, ['array.scalar', 'array.object']) && (empty($value) || is_null($value)) ? [] : $value; // No casting for array types or unsupported types
         }
     }
 

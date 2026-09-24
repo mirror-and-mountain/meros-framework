@@ -12,9 +12,9 @@ use MM\Meros\Contracts\Features\Makeable;
 use MM\Meros\Contracts\Features\Concerns\IsMakeable;
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 
-use MM\Meros\Contracts\Concerns\UsesAjax;
 use MM\Meros\Contracts\Features\Components\Concerns\IsFormComponent;
 use MM\Meros\Contracts\Features\Components\Concerns\MakesFieldRows;
+use MM\Meros\Contracts\Features\Components\Concerns\HandlesFieldConditions;
 
 use MM\Meros\Facades\Components\Fields;
 
@@ -86,7 +86,7 @@ class Form extends Feature implements FormComponent, Makeable {
         IsMakeable,
         MakesFieldRows,
         InstantiatesItems,
-        UsesAjax;
+        HandlesFieldConditions;
 
     // =========================================================================
     // Initialisation
@@ -102,8 +102,9 @@ class Form extends Feature implements FormComponent, Makeable {
             'description',
             'attributeString',
             'rows',
+            'submitAjaxNonce',
+            'conditionsAjaxNonce',
             'ajaxUrl',
-            'ajaxNonce',
             'submitText',
             'invalidText',
             'onSubmit',
@@ -128,12 +129,22 @@ class Form extends Feature implements FormComponent, Makeable {
             return;
         }
 
-        $this->initAjax('meros_handle_form_submission_' . $this->name, function (array $postData) {
+        $this->initAjax("meros_handle_form_submission_{$this->getName()}", function (array $postData) {
             $data = json_decode(stripslashes($postData['form_data'] ?? '{}'), true);
             $this->handleFormSubmission($data);
 
             wp_send_json_success(['message' => 'Form submitted successfully.']);
         });
+
+        $this->initFieldConditions();
+    }
+
+    final protected function getConditionsAjaxNonce(): string {
+        return $this->getAjaxNonce("meros_handle_field_conditions_{$this->getName()}");
+    }
+
+    final protected function getSubmitAjaxNonce(): string {
+        return $this->getAjaxNonce("meros_handle_form_submission_{$this->getName()}");
     }
 
     /**

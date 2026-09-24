@@ -8,6 +8,7 @@ trait HasOptions {
     protected bool  $allowsMultiple = false;
     protected array $options = [];
 
+    abstract public function default(mixed $value): static;
     abstract public function getDefaultValue(): mixed;
     abstract public function getType(): string;
     abstract public function supports(string $feature): bool;
@@ -45,6 +46,8 @@ trait HasOptions {
             $defaultValue = reset($defaultValue);
         }
 
+        $this->default($defaultValue);
+
         if ($allow) {
             $this->dataType('array.scalar');
         } else {
@@ -53,6 +56,20 @@ trait HasOptions {
 
         $this->whenMultipleSet($allow);
         return $this;
+    }
+
+    protected function normaliseProperties(): void {
+        parent::normaliseProperties();
+
+        if (array_key_exists('multiple', $this->passedProps) && 
+            is_bool($this->passedProps['multiple'])
+        ) {
+            if ($this->passedProps['multiple']) {
+                $this->multiple();
+            } else {
+                $this->multiple(false);
+            }
+        }
     }
 
     /**
@@ -78,6 +95,15 @@ trait HasOptions {
      */
     public function options(array $options): static {
         $this->options = $this->sanitizeOptions($options);
+
+        $default = $this->getDefaultValue();
+
+        if ($this->allowsMultiple && empty($default)) {
+            $this->default([array_key_first($options)]);
+        } else if (empty($default)) {
+            $this->default(array_key_first($options));
+        }
+
         return $this;
     }
 

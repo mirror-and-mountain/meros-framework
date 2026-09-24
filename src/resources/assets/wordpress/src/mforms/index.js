@@ -11,7 +11,8 @@ const mform = () => {
         id: null,
         name: null,
         ajaxUrl: null,
-        ajaxNonce: null,
+        submitAjaxNonce: null,
+        conditionsAjaxNonce: null,
         onSubmit: null,
         invalidText: null,
 
@@ -23,12 +24,14 @@ const mform = () => {
             this.id = this.$el.id || null;
             this.name = this.$el.dataset.name || null;
             this.ajaxUrl = this.$el.dataset.ajaxUrl || null;
-            this.ajaxNonce = this.$el.dataset.ajaxNonce || null;
+            this.submitAjaxNonce = this.$el.dataset.submitAjaxNonce || null;
+            this.conditionsAjaxNonce = this.$el.dataset.conditionsAjaxNonce || null;
             this.onSubmit = this.$el.dataset.onsubmit || null;
             this.invalidText = this.$el.dataset.invalidText || null;
 
             this.$el.removeAttribute('data-ajax-url');
-            this.$el.removeAttribute('data-ajax-nonce');
+            this.$el.removeAttribute('data-submit-ajax-nonce');
+            this.$el.removeAttribute('data-conditions-ajax-nonce');
             this.$el.removeAttribute('data-invalid-text');
 
             if (this.onSubmit && typeof this.onSubmit === 'string') {
@@ -72,13 +75,13 @@ const mform = () => {
                 return {success: true, error: null};
             }
 
-            if (!this.ajaxUrl || !this.ajaxNonce) {
+            if (!this.ajaxUrl || !this.submitAjaxNonce) {
                 return {success: false, error: genericError};
             }
 
             const postData = new FormData();
             postData.append('action', 'meros_handle_form_submission_' + this.name);
-            postData.append('nonce', this.ajaxNonce);
+            postData.append('nonce', this.submitAjaxNonce);
 
             postData.append('form_data', JSON.stringify(formData));
 

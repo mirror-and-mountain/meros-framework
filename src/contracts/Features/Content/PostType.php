@@ -375,6 +375,14 @@ class PostType extends Feature implements Makeable, Registrable {
             $description = $field->getDescription();
 
             $container->add(function ($item) use ($type, $name, $default, $description, $field) {
+                if ($type === 'array.scalar') {
+                    $type = 'array';
+                }
+
+                if ($type === 'array.object') {
+                    $type = 'object';
+                }
+
                 $item->{$type}($name);
                 $item->description($description);
 

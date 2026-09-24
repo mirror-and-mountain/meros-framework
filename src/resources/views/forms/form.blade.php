@@ -12,7 +12,8 @@
     class="mforms-form"
     data-name="{{ $name }}"
     data-ajax-url="{{ $ajaxUrl }}"
-    data-ajax-nonce="{{ $ajaxNonce }}"
+    data-submit-ajax-nonce="{{ $submitAjaxNonce }}"
+    data-conditions-ajax-nonce="{{ $conditionsAjaxNonce }}"
     data-invalid-text="{{ $invalidText }}"
     {!! $attributeString !!}
     {{ is_string($onSubmit) ? "data-onsubmit={$onSubmit}" : '' }}

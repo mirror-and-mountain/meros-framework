@@ -12,6 +12,8 @@ use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Facades\Components\Forms;
 use MM\Meros\Facades\Components\Fields;
 
+use Illuminate\Support\Facades\Log;
+
 class Repeater extends Field {
     /**
      * Indicates whether the repeater allows adding new rows.
@@ -104,6 +106,13 @@ class Repeater extends Field {
      */
     protected array $fields  = [];
 
+    /**
+     * The closure used in the repeater's edit form callback.
+     *
+     * @var Closure|null
+     */
+    private ?Closure $intertnalEditFormCallback = null;
+
     use UsesAjax;
 
     protected function configure(): void {
@@ -134,16 +143,19 @@ class Repeater extends Field {
         parent::whenConfigured();
 
         if ($this->hasEditForm()) {
-            $this->ajaxCallback = function (array $postData) {
+            $this->intertnalEditFormCallback = function (array $postData) {
                 $rowData = $postData['row_data'] ?? [];
                 $html = $this->renderEditForm(json_decode(wp_unslash($rowData), true));
 
                 wp_send_json_success([
-                    'html' => $html,
+                    'html' => $html
                 ]);
             };
 
-            $this->initAjax('meros_repeater_edit_form_' . $this->name);
+            $this->initAjax(
+                "meros_repeater_edit_form_{$this->getName()}", 
+                $this->intertnalEditFormCallback
+            );
         }
     }
 
@@ -300,8 +312,17 @@ class Repeater extends Field {
      */
     protected function whenNameSet(): void {
         if ($this->hasEditForm()) {
-            $this->reinitAjax('meros_repeater_edit_form_' . $this->name);
-            $this->editForm->name("{$this->name}_edit_form");
+            $oldName = $this->getOriginalName();
+            $newName = $this->getName();
+
+            $this->removeAjax("meros_repeater_edit_form_{$oldName}");
+
+            $this->editForm->name("{$newName}_edit_form");
+
+            $this->initAjax(
+                "meros_repeater_edit_form_{$newName}", 
+                $this->intertnalEditFormCallback
+            );
         }
     }
 
