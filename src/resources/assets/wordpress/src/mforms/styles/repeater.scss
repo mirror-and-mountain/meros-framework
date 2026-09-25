@@ -216,13 +216,16 @@
 .meros-repeater-tooltip {
     position: absolute;
     z-index: 10;
+    box-sizing: border-box;
+    max-width: min(24rem, calc(100vw - 2rem));
     padding: 0.5rem 0.75rem;
     border-radius: 0.375rem;
     background-color: #111827;
     color: #ffffff;
     font-size: 0.75rem;
     line-height: 1rem;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 /* Handling for nested TS fields */

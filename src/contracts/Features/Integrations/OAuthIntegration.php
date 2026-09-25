@@ -302,11 +302,9 @@ abstract class OAuthIntegration extends Integration {
             $row = [
                 'connection_id'             => $connection['id'],
                 'connection_integration_id' => $connection['integration_id'],
-                'connection_label'          => $connection['label'],
                 'connection_environment'    => $connection['environment'],
                 'connection_status'         => $connection['status'] !== 'error' ? $connection['status'] : 'Error: ' . $connection['last_error'],
                 'connection_connected_by'   => $connection['user_id'] ? get_userdata($connection['user_id'])->user_login : 'Unknown',
-                'connection_last_used_at'   => $connection['last_used_at'] ? Carbon::parse($connection['last_used_at'])->toDateTimeString() : null,
                 'connection_connected_at'   => $connection['connected_at'] ? Carbon::parse($connection['connected_at'])->toDateTimeString() : null,
                 'connection_revoke_nonce'   => wp_create_nonce('meros_integration_revoke_connection_' . $connection['integration_id'])
             ];
@@ -346,12 +344,6 @@ abstract class OAuthIntegration extends Integration {
                 });
 
                 $repeater->field('text', function ($field) {
-                    $field->name('connection_label');
-                    $field->label('Connection Label');
-                    $field->readonly(true);
-                });
-
-                $repeater->field('text', function ($field) {
                     $field->name('connection_status');
                     $field->label('Status');
                     $field->readonly(true);
@@ -366,12 +358,6 @@ abstract class OAuthIntegration extends Integration {
                 $repeater->field('text', function ($field) {
                     $field->name('connection_connected_by');
                     $field->label('Connected By');
-                    $field->readonly(true);
-                });
-
-                $repeater->field('text', function ($field) {
-                    $field->name('connection_last_used_at');
-                    $field->label('Last Used At');
                     $field->readonly(true);
                 });
 
@@ -1113,7 +1099,7 @@ abstract class OAuthIntegration extends Integration {
             }
         });
     }
-    
+
     // ===================================================================================
     // Request Building
     // ===================================================================================
