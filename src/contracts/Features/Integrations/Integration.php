@@ -439,7 +439,7 @@ abstract class Integration extends Feature implements Registrable {
         return null;
     }
 
-    final protected function logError(string $title, string $message = '', ?int $code = null): void {
+    protected function logError(string $title, string $message = '', ?int $code = null): void {
         $this->lastError = [
             'title'   => $title,
             'message' => $message,

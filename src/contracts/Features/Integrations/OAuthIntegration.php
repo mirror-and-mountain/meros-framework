@@ -41,42 +41,29 @@ abstract class OAuthIntegration extends Integration {
     ];
 
     // ===================================================================================
-    // Configuration for the integration's URIs
-    // ===================================================================================
-    
-    protected string $tokenRefreshEndpoint = '{base_uri}/oauth/{api_version}/token/refresh';
-    protected string $tokenRevokeEndpoint = '{base_uri}/oauth/{api_version}/token/revoke';
-
-    // ===================================================================================
-    // Configuration for the integration's token requests
-    // ===================================================================================
-
-    /**
-     * The expected format of a token request response. Used for parsing a token request response.
-     *
-     * @var string
-     */
-    protected string $tokenResponseFormat = 'json'; // or 'form'
-
-    /**
-     * Settings for the expected token request response
-     *
-     * @var array
-     */
-    protected array $tokenRequestSettings = [
-        'response_type' => 'json', // or 'form'
-        'token_type'    => 'Bearer', // or 'MAC', 'Basic' etc.
-        'access_token'  => 'access_token', // The key that contains the access token
-        'id_token'      => 'id_token', // The response key that contains the id token (if applicable)
-        'refresh_token' => 'refresh_token', // The response key that contains the refresh token (if applicable)
-        'issued_at'     => 'issued_at', // The response key that contains when the token was issued (if applicable)
-        'expires_at'    => 'expires_at', // The response key that contains when the token will expire (if applicable)
-        'scope'         => 'scope' // The respose key that contains the tokens scopes (if applicable)
-    ];
-
-    // ===================================================================================
     // Configuration for the integration's connections
     // ===================================================================================
+
+    /**
+     * Whether the integration should use PKCE (RFC 7636).
+     *
+     * @var boolean
+     */
+    private bool $usesPKCE = false;
+
+    /**
+     * Whether the integration schedules a heartbeat to keep access tokens valid.
+     *
+     * @var boolean
+     */
+    private bool $usesRefreshHeartbeat = false;
+
+    /**
+     * The age a token should be (in hours) before a heartbeat will attempt to refresh it.
+     *
+     * @var integer
+     */
+    private int $heartbeatTokenAgeHours = 120;
 
     /**
      * An array of ExternalConnection models representing the current connections for this integration and environment.
@@ -116,6 +103,11 @@ abstract class OAuthIntegration extends Integration {
         $this->initRevokeConnectionCallback();
     }
 
+    final protected function whenConfigured(): void {
+        parent::whenConfigured();
+        $this->initHeartbeat();
+    }
+
     /**
      * Initialises the connections for this integration and environment.
      *
@@ -143,7 +135,7 @@ abstract class OAuthIntegration extends Integration {
                 exit;
             }
 
-            $authUrl = $this->getAuthorisationUrl();
+            $authUrl = $this->startAuthFlow();
             if (empty($authUrl)) {
                 wp_send_json_error(['message' => 'Could not generate authorisation URL.'], 400);
                 exit;
@@ -198,7 +190,7 @@ abstract class OAuthIntegration extends Integration {
                 exit;
             }
 
-            if ($connection->status === 'revoked') {
+            if (in_array($connection->status, ['revoked', 'expired'], true)) {
                 $connection->delete();
                 wp_send_json_success(['message' => 'Connection deleted successfully.']);
                 exit;
@@ -302,30 +294,46 @@ abstract class OAuthIntegration extends Integration {
      * @return string
      */
     private function getConnectionsRepeater(): string {
+        $heartbeat     = $this->usesRefreshHeartbeat;
+        $maxAgeHours   = $this->heartbeatTokenAgeHours;
         $repeaterValue = [];
 
         foreach ($this->connections as $connection) {
-            $repeaterValue[] = [
+            $row = [
                 'connection_id'             => $connection['id'],
                 'connection_integration_id' => $connection['integration_id'],
                 'connection_label'          => $connection['label'],
                 'connection_environment'    => $connection['environment'],
-                'connection_status'         => $connection['status'],
+                'connection_status'         => $connection['status'] !== 'error' ? $connection['status'] : 'Error: ' . $connection['last_error'],
                 'connection_connected_by'   => $connection['user_id'] ? get_userdata($connection['user_id'])->user_login : 'Unknown',
                 'connection_last_used_at'   => $connection['last_used_at'] ? Carbon::parse($connection['last_used_at'])->toDateTimeString() : null,
                 'connection_connected_at'   => $connection['connected_at'] ? Carbon::parse($connection['connected_at'])->toDateTimeString() : null,
                 'connection_revoke_nonce'   => wp_create_nonce('meros_integration_revoke_connection_' . $connection['integration_id'])
             ];
+
+            if ($heartbeat) {
+                $issuedAt = $connection['token_issued_at']
+                        ? Carbon::parse($connection['token_issued_at'])
+                        : null;
+
+                $row['connection_last_renewed_at'] = $issuedAt?->toDateTimeString();
+
+                $row['connection_next_renewal'] = ($issuedAt && $connection['status'] === 'connected')
+                        ? $issuedAt->copy()->addHours($maxAgeHours)->toDateTimeString()
+                        : 'Not scheduled';
+            }
+
+            $repeaterValue[] = $row;
         }
 
         $repeater = Fields::checkout($this->getProvider())
-            ->makeFrom('repeater', function (Repeater $repeater) use ($repeaterValue) {
+            ->makeFrom('repeater', function (Repeater $repeater) use ($repeaterValue, $heartbeat) {
                 $repeater->name($this->getName() . '_' . $this->getCurrentEnvironment() . '_connections');
                 $repeater->label('Current Connections');
 
                 $repeater->allowAdd(false);
                 $repeater->allowReorder(false);
-                $repeater->removeRowText('Revoke');
+                $repeater->removeRowText('Disconnect');
                 $repeater->onInit('__meros_integrations_init_connections_repeater');
                 $repeater->onRemove('__meros_integrations_revoke_connection');
 
@@ -377,6 +385,20 @@ abstract class OAuthIntegration extends Integration {
                     $field->name('connection_revoke_nonce');
                 });
 
+                if ($heartbeat) {
+                    $repeater->field('text', function ($field) {
+                        $field->name('connection_last_renewed_at');
+                        $field->label('Last Renewed');
+                        $field->readonly(true);
+                    });
+
+                    $repeater->field('text', function ($field) {
+                        $field->name('connection_next_renewal');
+                        $field->label('Next Renewal');
+                        $field->readonly(true);
+                    });
+                }
+
                 $repeater->default($repeaterValue);
             });
 
@@ -386,6 +408,33 @@ abstract class OAuthIntegration extends Integration {
     // ===================================================================================
     // Attribute Setters
     // ===================================================================================
+
+    /**
+     * Sets the integration to use PKCE (Proof Key for Code Exchange)
+     *
+     * @param bool $use
+     *
+     * @return void
+     */
+    final public function usePKCE($use = true): void {
+        $this->usesPKCE = $use;
+    }
+
+    /**
+     * Sets the integration to schedule a heartbeat to keep access tokens valid via the 
+     * refersh token flow.
+     *
+     * @param int|null $tokenAgeInHours
+     *
+     * @return void
+     */
+    final public function useRefreshHeartbeat(?int $tokenAgeInHours = null): void {
+        $this->usesRefreshHeartbeat = true;
+
+        if ($tokenAgeInHours !== null) {
+            $this->heartbeatTokenAgeHours = $tokenAgeInHours;
+        }
+    }
 
     /**
      * Sets whether multiple connections are allowed per environment for this integration.
@@ -428,6 +477,55 @@ abstract class OAuthIntegration extends Integration {
     }
 
     // ===================================================================================
+    // PKCE Configuration
+    // ===================================================================================
+    
+    /**
+     * Returns the transient key for storing the PKCE code verifier.
+     *
+     * @return string
+     */
+    protected function getPkceTransientKey(): string {
+        return 'meros_pkce_' . $this->getName() . '_' . get_current_user_id();
+    }
+
+    /**
+     * Generates or retrieves the PKCE code verifier for this connection attempt.
+     * Verifier survives across the authorization round-trip (start → callback).
+     *
+     * @return string
+     */
+    protected function getPkceCodeVerifier(): string {
+        $verifier = get_transient($this->getPkceTransientKey());
+
+        if (!is_string($verifier) || $verifier === '') {
+            // RFC 7636: 43-128 unreserved characters [A-Z a-z 0-9 - _ . ~]
+            $verifier = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+            set_transient($this->getPkceTransientKey(), $verifier, 10 * MINUTE_IN_SECONDS);
+        }
+
+        return $verifier;
+    }
+
+    /**
+     * Generates the PKCE code challenge from the verifier using S256 (SHA256).
+     *
+     * @return string
+     */
+    protected function getPkceCodeChallenge(): string {
+        $verifier = $this->getPkceCodeVerifier();
+        $hash     = hash('sha256', $verifier, true);
+        return rtrim(strtr(base64_encode($hash), '+/', '-_'), '=');
+    }
+
+    /**
+     * Clears the stored PKCE code verifier after successful token exchange.
+     */
+    protected function burnPkceCodeVerifier(): void {
+        delete_transient($this->getPkceTransientKey());
+    }
+
+    // ===================================================================================
     // Authorisation / Initial Token Request Flows
     // ===================================================================================
 
@@ -437,14 +535,22 @@ abstract class OAuthIntegration extends Integration {
      *
      * @return string
      */
-    final public function getAuthorisationUrl(): string {
+    final public function startAuthFlow(): string {
         if ($this->canConnect() === false) {
             return '';
         }
 
+        $params = $this->getAuthorizationParams();
+
+        // Append PKCE params if enabled
+        if ($this->usesPKCE) {
+            $params['code_challenge']        = $this->getPkceCodeChallenge();
+            $params['code_challenge_method'] = 'S256';
+        }
+
         return $this->buildRequestUrl(
             $this->getAuthorizationUrl(),
-            $this->getAuthorizationParams()
+            $params
         );
     }
 
@@ -585,10 +691,17 @@ abstract class OAuthIntegration extends Integration {
             $this->redirect('error', $error);
         }
 
+        // Build overrides — include PKCE verifier if enabled
+        $overrides = ['code' => $code];
+
+        if ($this->usesPKCE) {
+            $overrides['code_verifier'] = $this->getPkceCodeVerifier();
+            // Single-use: burn the verifier after consumption
+            $this->burnPkceCodeVerifier();
+        }
+
         // Build the request payload
-        $payload = $this->buildRequestPayload($this->getTokenRequestPayload(), [
-            'code' => $code
-        ]);
+        $payload = $this->buildRequestPayload($this->getTokenRequestPayload(), $overrides);
 
         $response = $this->httpClient->send([
             'method'  => $method,
@@ -604,7 +717,7 @@ abstract class OAuthIntegration extends Integration {
             $this->redirect('error', $error);
         }
 
-        $formatted = $this->formatResponseBody($response->body(), $this->tokenResponseFormat);
+        $formatted = $this->formatResponseBody($response->body(), $this->getTokenResponseFormat());
         return $this->parseTokenResponse($formatted);
     }
 
@@ -616,6 +729,15 @@ abstract class OAuthIntegration extends Integration {
      */
     protected function getTokenRequestEndpoint(): string {
         return '{base_url}/oauth/token';
+    }
+
+    /**
+     * Returns the HTTP method used to request a token. This method should return either 'POST' or 'GET'.
+     *
+     * @return string
+     */
+    protected function getTokenRequestMethod(): string {
+        return 'POST';
     }
 
     /**
@@ -631,12 +753,12 @@ abstract class OAuthIntegration extends Integration {
     }
 
     /**
-     * Returns the HTTP method used to request a token. This method should return either 'POST' or 'GET'.
+     * Returns the expected format of a token request response.
      *
      * @return string
      */
-    protected function getTokenRequestMethod(): string {
-        return 'POST';
+    protected function getTokenResponseFormat(): string {
+        return 'json';
     }
 
     /**
@@ -698,33 +820,40 @@ abstract class OAuthIntegration extends Integration {
         $scopes       = $response['scope'] ?? null;
 
         if ($accessToken !== null) {
-            ExternalConnection::updateOrCreate([
-                'label'            => $this->getLabel() . ' ' . now()->format('Y-m-d H:i:s'),
-                'integration_id'   => $this->getName(),
-                'environment'      => $this->getCurrentEnvironment(),
-                'user_id'          => get_current_user_id(),
-                'is_active'        => true,
-                'access_token'     => $accessToken,
-                'refresh_token'    => $refreshToken,
-                'id_token'         => $idToken,
-                'scopes'           => $scopes,
-                'token_issued_at'  => $this->resolveTimestamp($issuedAt),
-                'token_expires_at' => $this->resolveTimestamp($expiresAt),
-                'last_used_at'     => now(),
-                'connected_at'     => now(),
-                'status'           => 'connected',
-                'status_reason'    => 'Successfully connected via OAuth.',
-                'metadata'         => array_filter($response, function ($key) {
-                    return !in_array($key, [
-                        'access_token',
-                        'refresh_token',
-                        'id_token',
-                        'scope',
-                        'issued_at',
-                        'expires_at'
-                    ], true);
-                }, ARRAY_FILTER_USE_KEY),
-            ]);
+            ExternalConnection::updateOrCreate(
+                [
+                    'integration_id' => $this->getName(),
+                    'environment'    => $this->getCurrentEnvironment(),
+                    'user_id'        => get_current_user_id(),
+                ],
+                [
+                    'label'            => $this->getLabel() . ' ' . now()->format('Y-m-d H:i:s'),
+                    'is_active'        => true,
+                    'access_token'     => $accessToken,
+                    'refresh_token'    => $refreshToken,
+                    'id_token'         => $idToken,
+                    'scopes'           => $scopes,
+                    'token_issued_at'  => $this->resolveTimestamp($issuedAt),
+                    'token_expires_at' => $this->resolveTimestamp($expiresAt),
+                    'last_used_at'     => now(),
+                    'connected_at'     => $this->getConnection()['connected_at'] ?? now(), // preserve original connected_at if updating
+                    'status'           => 'connected',
+                    'status_reason'    => 'Successfully connected via OAuth.',
+                    'metadata'         => array_filter($response, function ($key) {
+                        return !in_array($key, [
+                            'access_token',
+                            'refresh_token',
+                            'id_token',
+                            'scope',
+                            'issued_at',
+                            'expires_at',
+                        ], true);
+                    }, ARRAY_FILTER_USE_KEY),
+                ]
+            );
+
+            // Invalidate local cache so subsequent requests in this cycle see the new token
+            $this->initConnections();
         } else {
             $error = 'Access token not found in the token response.';
             $this->logError($error);
@@ -737,25 +866,263 @@ abstract class OAuthIntegration extends Integration {
     // ===================================================================================
 
     /**
-     * Determines whether the access token should be refreshed based on the provided authentication response.
+     * Retrieves the refresh token from the current connection if it exists.
      *
-     * @param array $endpointResponse
+     * @return string|null
+     */
+    protected function getRefreshToken(): ?string {
+        $connection = $this->getConnection();
+        if (is_array($connection) && isset($connection['refresh_token'])) {
+            return $connection['refresh_token'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Determines whether the access token should be refreshed based on the provided error.
+     *
+     * @param string $errorTitle
+     * @param string $errorMessage
+     * @param int|null $errorCode
      *
      * @return boolean
      */
-    protected function shouldRefreshToken(array $endpointResponse): bool {
+    protected function shouldRefreshToken(string $errorTitle, string $errorMessage = '', ?int $errorCode = null): bool {
         // Should be implemented by the specific integration if token refresh is supported.
         return false;
     }
 
-    // ===================================================================================
-    // Token Revoke Flow
-    // ===================================================================================
+    /**
+     * Attempts to refresh the integration's access token using the current connection's refresh token if it exists.
+     *
+     * @return string|null
+     */
+    protected function refreshToken(): ?string {
+        $connection   = $this->getConnection();
+        $refreshToken = $this->getRefreshToken();
 
+        if (!is_array($connection) || $refreshToken === null) {
+            $this->logError('Cannot refresh access token: no refresh token is stored for this connection.');
+            return null;
+        }
+
+        // Get the refresh token endpoint url
+        $endpoint = $this->buildRequestUrl($this->getRefreshTokenEndpoint());
+
+        // Get the headers for the request
+        $headers = $this->getRefreshTokenRequestHeaders();
+
+        // Get the method
+        $method = $this->getRefreshTokenRequestMethod();
+        if (!in_array($method, ['POST', 'GET'])) {
+            $error = 'Invalid HTTP method for refresh token request';
+            $this->logError($error);
+            return null;
+        }
+
+        // Build the request payload. The refresh token comes from the connection
+        // record rather than a configurable setting, so it is passed as an override.
+        $payload = $this->buildRequestPayload($this->getRefreshTokenRequestPayload(), [
+            'refresh_token' => $refreshToken
+        ]);
+
+        $response = $this->httpClient->send([
+            'method'  => $method,
+            'url'     => $endpoint,
+            'headers' => $headers,
+            'payload' => $payload,
+            'format'  => $payload['format'] ?? 'form'
+        ]);
+
+        if (!$response->successful()) {
+            $body = $this->formatResponseBody($response->body(), $this->getRefreshTokenResponseFormat());
+            $tokenIsExpired = $this->refreshTokenIsExpired($body);
+
+            if ($tokenIsExpired) {
+                $this->logError('Refresh token is no longer valid: ' . ($body['error_description'] ?? 'unknown reason'));
+                $this->updateConnection($connection['id'], [
+                    'status'        => 'expired',
+                    'status_reason' => 'Re-authorization required (' . ($body['error_description'] ?? 'refresh token expired') . ')',
+                ]);
+                return null;
+            }
+
+            $error = 'Failed to refresh access token. HTTP Status: ' . $response->status();
+            $this->logError($error);
+            return null;
+        }
+
+        $formatted = $this->formatResponseBody($response->body(), $this->getRefreshTokenResponseFormat());
+        $parsed    = $this->parseRefreshTokenResponse($formatted, $refreshToken);
+
+        if (($parsed['access_token'] ?? null) === null) {
+            $this->logError('Access token not found in the refresh token response.');
+            return null;
+        }
+
+        // Persist the refreshed token onto the existing connection.
+        $this->updateConnection($connection['id'], [
+            'access_token'      => $parsed['access_token'],
+            'id_token'          => $parsed['id_token'] ?? null,
+            'refresh_token'     => $parsed['refresh_token'],
+            'token_issued_at'   => $this->resolveTimestamp($parsed['issued_at'] ?? null),
+            'token_expires_at'  => $this->resolveTimestamp($parsed['expires_at'] ?? null),
+            'last_used_at'      => now(),
+            'last_refreshed_at' => now(),
+            'status'            => 'connected',
+            'status_reason'     => 'Access token refreshed successfully.'
+        ]);
+
+        return $parsed['access_token'];
+    }
+
+    /**
+     * Returns the application's refresh token request endpoint. In most cases, this method needs to be
+     * overidden by implementing classes to provide the absolute URL needed to request a refresh token from their application.
+     *
+     * @return string
+     */
+    protected function getRefreshTokenEndpoint(): string {
+        return $this->getTokenRequestEndpoint();
+    }
+
+    /**
+     * Returns the HTTP method used to request a new token. This method should return either 'POST' or 'GET'.
+     *
+     * @return string
+     */
+    protected function getRefreshTokenRequestMethod(): string {
+        return $this->getTokenRequestMethod();
+    }
+
+    /**
+     * Returns the expected format of a (refresh) token request response.
+     *
+     * @return string
+     */
+    protected function getRefreshTokenResponseFormat(): string {
+        return $this->getTokenResponseFormat();
+    }
+
+    /**
+     * Returns an array of headers to be sent as part of the refresh token request.
+     *
+     * @return array
+     */
+    protected function getRefreshTokenRequestHeaders(): array {
+        return $this->getTokenRequestHeaders();
+    }
+
+    /**
+     * Returns the payload to be sent with a refresh token request. In most cases, this method needs to be overidden
+     * by implementing classes to provide the necessary key => value pairs to be sent with the request.
+     *
+     * @return array
+     */
+    protected function getRefreshTokenRequestPayload(): array {
+        $payload = [
+            'grant_type' => 'refresh_token',
+        ];
+
+        if ($this->resolveConfigurableSettingMethod('clientId') !== null) {
+            $payload['client_id'] = '{client_id}';
+        }
+
+        if ($this->resolveConfigurableSettingMethod('clientSecret') !== null) {
+            $payload['client_secret'] = '{client_secret}';
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Parses a refresh token request repsonse.
+     * This method must return an refresh token keyed by 'refresh_token' in the array.
+     *
+     * @param array $response
+     *
+     * @return array
+     */
+    protected function parseRefreshTokenResponse(array $response, string $currentRefreshToken): array {
+        $parsed = $this->parseTokenResponse($response);
+
+        if ($parsed['refresh_token'] === null) {
+            $parsed['refresh_token'] = $currentRefreshToken;
+        }
+
+        return $parsed;
+    }
+
+    /**
+     * Returns whether a refresh token has expired based on the refresh token response body.
+     *
+     * @param array $responseBody
+     *
+     * @return boolean
+     */
+    protected function refreshTokenIsExpired(array $responseBody): bool {
+        return ($responseBody['error'] ?? '') === 'invalid_grant';
+    }
+
+    /**
+     * Initialises a heartbeat to keep refresh tokens valid, if opted-into by implementing
+     * classes.
+     *
+     * @return void
+     */
+    private function initHeartbeat(): void {
+        $enabled = $this->usesRefreshHeartbeat;
+        if ($enabled === false) return;
+
+        $hook = "meros_integration_heartbeat_{$this->getName()}";
+
+        add_action($hook, function (int $maxAge = 0) {
+            $connection = $this->getConnection();
+            if (!is_array($connection) || $connection['is_active'] === false) {
+                return;
+            }
+
+            if ($connection['status'] !== 'connected') {
+                return;
+            }
+
+            // Prefer the arg the event was scheduled with, falling back to the
+            // current method value for robustness (e.g. manually fired via do_action).
+            $maxAge = $maxAge > 0 ? $maxAge : $this->heartbeatTokenAgeHours;
+            Log::info('testing heartbeat age: ' . $maxAge);
+
+            $issuedAt = $connection['token_issued_at'] ? Carbon::parse($connection['token_issued_at']) : null;
+
+            if ($issuedAt === null || $issuedAt->diffInHours(now()) >= $maxAge) {
+                $this->refreshToken();
+            }
+        });
+
+        add_action('init', function () use ($hook) {
+            $maxAge = $this->heartbeatTokenAgeHours;
+
+            // Look for an event for this hook using the CURRENT max-age.
+            $scheduled = wp_next_scheduled($hook, [$maxAge]);
+
+            if ($scheduled === false) {
+                // Either never scheduled, or scheduled with a DIFFERENT max-age —
+                // clear any stale event and (re)schedule with the current value.
+                wp_clear_scheduled_hook($hook);
+                wp_schedule_event(time() + HOUR_IN_SECONDS, 'hourly', $hook, [$maxAge]);
+            }
+        });
+    }
+    
     // ===================================================================================
     // Request Building
     // ===================================================================================
 
+    /**
+     * Retrieves the access token from the current connection if it exists.
+     *
+     * @return string|null
+     */
     protected function getAccessToken(): ?string {
         $connection = $this->getConnection();
         if (is_array($connection) && isset($connection['access_token'])) {
@@ -869,6 +1236,20 @@ abstract class OAuthIntegration extends Integration {
     // Helpers
     // ===================================================================================
 
+    protected function logError(string $title, string $message = '', ?int $code = null): void {
+        parent::logError($title, $message, $code);
+
+        $connection = $this->getConnection();
+        if (is_array($connection)) {
+            $this->updateConnection($connection['id'], [
+                'status'        => 'error',
+                'status_reason' => 'An error occured',
+                'last_error'    => $title,
+                'last_error_at' => now()->toString()
+            ]);
+        }
+    }
+
     /**
      * Parses a HTTP request response body and returns it as an array.
      *
@@ -966,7 +1347,10 @@ abstract class OAuthIntegration extends Integration {
 
         else if ($this->audience === 'all_users') {
             if ($this->multipleConnectionsPerEnvironment === false) {
-                return $this->connections === [];
+                $activeConnections = collect($this->connections)
+                    ->whereIn('status', ['connected'])
+                    ->count();
+                return $activeConnections === 0;
             }
         }
 
@@ -978,20 +1362,47 @@ abstract class OAuthIntegration extends Integration {
      *
      * @return array|null
      */
-    private function getConnection(): ?array {
+    protected function getConnection(): ?array {
         if ($this->audience === 'current_user') {
             return collect($this->connections)
                 ->where('user_id', get_current_user_id())
-                ->where('status', 'connected')
                 ->first();
         }
 
         else if ($this->audience === 'all_users') {
             return collect($this->connections)
-                ->where('status', 'connected')
                 ->first();
         }
 
         return null;
+    }
+
+    /**
+     * Updates a connection model with the given id.
+     *
+     * @param integer $id
+     * @param array   $data
+     *
+     * @return void
+     */
+    protected function updateConnection(int $id, array $data): void {
+        $connection = ExternalConnection::find($id);
+
+        if (!($connection instanceof ExternalConnection)) {
+            return;
+        }
+        
+        foreach ($data as $key => $value) {
+            $connection->{$key} = $value;
+        }
+
+        $connection->save();
+
+       foreach ($this->connections as $key => $cached) {
+            if ($cached['id'] === $connection->id) {
+                $this->connections[$key] = $connection->toArray();
+                break;
+            }
+       }
     }
 }
