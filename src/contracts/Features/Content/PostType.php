@@ -6,6 +6,9 @@ use Closure;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
+use MM\Meros\App\Models\Post;
+use Illuminate\Database\Eloquent\ModelInspector;
+
 use MM\Meros\Contracts\Feature;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\DynamicBlock;
@@ -22,6 +25,8 @@ use MM\Meros\Contracts\Features\Concerns\IsHookable;
 
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 use MM\Meros\Contracts\Features\Concerns\MakesItems;
+
+// Here - setup post type options/settings containers.
 
 class PostType extends Feature implements Makeable, Registrable {
     /**
@@ -60,11 +65,18 @@ class PostType extends Feature implements Makeable, Registrable {
     protected array $metaContainers = [];
 
     /**
-     * An array of metaBlocks created for this port type
+     * An array of metaBlocks created for this post type
      *
      * @var array<DynamicBlock>
      */
     private array $metaBlocks = [];
+
+    /**
+     * An optional render callback called by a 'content' filter if set.
+     *
+     * @var Closure|null
+     */
+    protected ?Closure $renderCallback = null;
 
     /**
      * Whether the post type is a core post type (like 'post' or 'page').
@@ -100,42 +112,57 @@ class PostType extends Feature implements Makeable, Registrable {
      * @return void
      */
     final protected function whenConfigured(): void {
-        if (!empty($this->metaContainers) && !($this->metaContainers[0] instanceof PostMetaContainer)) {
-            foreach ($this->metaContainers as $index => $properties) {
-                if (is_string($properties) && Str::contains($properties, '\\')) {
-                    $class = $properties;
-                    $this->metaContainers[$index] = $this->makeItemFrom($class, PostMetaContainer::class);
-                }
-
-                else if (is_array($properties) && !empty($properties['name']) ?? '') {
-                    $name = $properties['name'];
-                    $properties = $properties['properties'] ?? [];
-
-                    if ($this->itemIsRegistered($name, PostMetaContainer::class)) {
-                        $this->metaContainers[$index] = $this->makeItemFrom(
-                            $name,
-                            PostMetaContainer::class,
-                            $properties
-                        );
-                    }
-
-                    else {
-                        $this->metaContainers[$index] = $this->makeItem(
-                            PostMetaContainer::class,
-                            $properties
-                        );
-                    }
-
-                    if ($this->metaContainers[$index] instanceof PostMetaContainer) {
-                        $this->metaContainers[$index]->postType($this->handle);
-                    }
-                }
-            }
-        }
+        $this->initMetaContainers();
 
         if ($this->metaBlocks !== []) {
             $this->configureMetaBlocks();
         }
+
+        // Fire any actions to run once the cpt is configured.
+        do_action("meros_after_post_type_configured_{$this->getHandle()}");
+    }
+
+    /**
+     * Initialises meta containers provided as arrays.
+     *
+     * @return void
+     */
+    private function initMetaContainers(): void {
+        if (empty($this->metaContainers) || !($this->metaContainers[0] instanceof PostMetaContainer)) {
+            return;
+        }
+
+        foreach ($this->metaContainers as $index => $properties) {
+            if (is_string($properties) && Str::contains($properties, '\\')) {
+                $class = $properties;
+                $this->metaContainers[$index] = $this->makeItemFrom($class, PostMetaContainer::class);
+            }
+
+            else if (is_array($properties) && !empty($properties['name']) ?? '') {
+                $name = $properties['name'];
+                $properties = $properties['properties'] ?? [];
+
+                if ($this->itemIsRegistered($name, PostMetaContainer::class)) {
+                    $this->metaContainers[$index] = $this->makeItemFrom(
+                        $name,
+                        PostMetaContainer::class,
+                        $properties
+                    );
+                }
+
+                else {
+                    $this->metaContainers[$index] = $this->makeItem(
+                        PostMetaContainer::class,
+                        $properties
+                    );
+                }
+
+                if ($this->metaContainers[$index] instanceof PostMetaContainer) {
+                    $this->metaContainers[$index]->postType($this->handle);
+                }
+            }
+        }
+        
     }
 
     /**
@@ -186,6 +213,23 @@ class PostType extends Feature implements Makeable, Registrable {
     }
 
     /**
+     * Helper to register a meta box for this post type.
+     *
+     * @param string  $id
+     * @param string  $title
+     * @param Closure $callback
+     * @param string  $context
+     * @param string  $priority
+     *
+     * @return void
+     */
+    final public function metaBox(string $id, string $title, Closure $callback, string $context = 'advanced', string $priority = 'default'): void {
+        add_action("add_meta_boxes_{$this->handle}", function () use ($id, $title, $callback, $context, $priority) {
+            add_meta_box($id, $title, $callback, $this->handle, $context, $priority);
+        });
+    }
+
+    /**
      * Marks the post type as a core post type, which prevents it from being registered by the framework.
      *
      * @param boolean $isCore
@@ -213,8 +257,32 @@ class PostType extends Feature implements Makeable, Registrable {
         register_post_type($this->handle, array_merge($this->args, ['description' => $this->getDescription()]));
     }
 
+    /**
+     * Sets a render callback for the post type, which will be called when rendering the post content.
+     *
+     * @param Closure $callback
+     *
+     * @return static
+     */
+    final public function render(Closure $callback): static {
+        if ($this->renderCallback === null) {
+            $this->renderCallback = $callback;
+            add_filter('the_content', function (string $content) {
+                if (is_singular($this->handle) && $this->renderCallback !== null) {
+                    $id = get_the_ID();
+                    $model = Post::find($id);
+                    return call_user_func($this->renderCallback, $content, $id, $model);
+                }
+
+                return $content;
+            });
+        }
+
+        return $this;
+    }
+
     // =========================================================================
-    // Post Meta Association
+    // Post Meta Association & Data
     // =========================================================================
 
     /**
@@ -419,6 +487,143 @@ class PostType extends Feature implements Makeable, Registrable {
         }
 
         return empty($fields) ? null : ($collect ? collect($fields) : $fields);
+    }
+
+    /**
+     * Returns a post of this type's properties using the given ID. If no ID is provided,
+     * properties for the post type with their default values will be returned instead.
+     *
+     * @param integer|null $postId
+     * @param boolean      $refresh
+     *
+     * @return array
+     */
+    final public function inspect(?int $postId = null, bool $refresh = false): array {
+        $data = [];
+
+        if (is_int($postId)) {
+            $data = Post::where('post_type', $this->handle)
+                ->where('ID', $postId)
+                ->first()
+                ->toArray();
+        } else {
+            $data = $this->getDefaultProperties();
+        }
+
+        foreach ($this->metaContainers as $container) {
+            if (!($container instanceof PostMetaContainer)) {
+                continue;
+            }
+
+            $data = array_merge(
+                $data, 
+                $postId !== null 
+                    ? $container->value($postId, $refresh) 
+                    : $container->getDefault()
+            );
+        }
+
+        return $data;
+    }
+
+    /**
+     * Returns the post type's properties in a schema format.
+     *
+     * @return array
+     */
+    final public function getSchema(): array {
+        $data = $this->getDefaultProperties();
+
+        $inferSchema = function (mixed $value) use (&$inferSchema): array {
+            if ($value === null) {
+                return ['type' => 'null'];
+            }
+
+            if (is_array($value)) {
+                if ($value === []) {
+                    return [
+                        'type' => 'array',
+                        'items' => [],
+                    ];
+                }
+
+                if (array_is_list($value)) {
+                    $item = reset($value);
+
+                    return [
+                        'type' => 'array',
+                        'items' => $inferSchema($item),
+                    ];
+                }
+
+                $properties = [];
+
+                foreach ($value as $key => $item) {
+                    $properties[(string) $key] = array_merge(
+                        $inferSchema($item),
+                        ['default' => $item]
+                    );
+                }
+
+                return [
+                    'type' => 'object',
+                    'properties' => $properties,
+                ];
+            }
+
+            return [
+                'type' => match (gettype($value)) {
+                    'boolean' => 'boolean',
+                    'integer' => 'integer',
+                    'double' => 'number',
+                    'object' => 'object',
+                    default => 'string',
+                },
+            ];
+        };
+
+        $schema = [];
+
+        $schema['title'] = $this->singularLabel !== ''
+            ? $this->singularLabel
+            : $this->getHandle();
+
+        if ($this->getDescription() !== '') {
+            $schema['description'] = $this->getDescription();
+        }
+
+
+        $schema = array_merge($schema, $inferSchema($data));
+
+        foreach ($this->metaContainers as $container) {
+            if (!($container instanceof PostMetaContainer)) {
+                continue;
+            }
+
+            $schema['properties'] = array_merge(
+                $schema['properties'],
+                $container->getSchema()['schema']['properties'] ?? []
+            );
+        }
+
+        return $schema;
+    }
+
+    /**
+     * Returns the default properties for this post type.
+     *
+     * @return array
+     */
+    private function getDefaultProperties(): array {
+        $inspector  = new ModelInspector(app());
+        $attributes = $inspector->inspect(Post::class)->attributes;
+        $data       = $attributes->mapWithKeys(function ($attribute) {
+            return [$attribute['name'] => $attribute['default']];
+        })->all();
+
+        $data['post_type'] = $this->handle;
+
+        return $data;
     }
 
     // =========================================================================
@@ -976,6 +1181,15 @@ class PostType extends Feature implements Makeable, Registrable {
      */
     final public function getHandle(string $format = 'default'): string {
         return $this->getIdentifier($format);
+    }
+
+    /**
+     * Returnst he post type's singular label.
+     *
+     * @return string
+     */
+    final public function getSingularLabel(): string {
+        return $this->singularLabel;
     }
 
     /**

@@ -10,6 +10,7 @@ use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 use MM\Meros\App\Components\Orchestrator as ComponentsOrchestrator;
 use MM\Meros\App\Assets\Orchestrator as AssetsOrchestrator;
 use MM\Meros\App\Admin\Settings\Orchestrator as SettingsOrchestrator;
+use MM\Meros\App\Content\Orchestrator as ContentOrchestrator;
 
 use MM\Meros\Contracts\Providers\Concerns\IsFrameworkProvider;
 use MM\Meros\Contracts\Providers\Concerns\IsNonPackageProvider;
@@ -56,8 +57,8 @@ final class Framework extends Provider {
         $this->initialise(ComponentsOrchestrator::class);
         $this->initialise(SettingsOrchestrator::class);
         $this->initialise(AssetsOrchestrator::class);
+        $this->initialise(ContentOrchestrator::class);
 
-        $this->registerPostTypes();
         $this->registerTables();
     }
 
@@ -138,33 +139,6 @@ final class Framework extends Provider {
         }
 
         return $container->getValue($refresh);
-    }
-
-    // =========================================================================
-    // Post Types
-    // =========================================================================
-
-    private function registerPostTypes(): void {
-        $this->registerCorePostTypes();
-    }
-
-    /**
-     * Registers WordPress core post types (posts and pages) for the framework.
-     * 
-     * This is so users can add custom fields to core post types using the framework's api.
-     *
-     * @return void
-     */
-    private function registerCorePostTypes(): void {
-        $this->postTypes()->make(function ($postType) {
-            $postType->name('post');
-            $postType->core(true);
-        });
-
-        $this->postTypes()->make(function ($postType) {
-            $postType->name('page');
-            $postType->core(true);
-        });
     }
 
     // =========================================================================

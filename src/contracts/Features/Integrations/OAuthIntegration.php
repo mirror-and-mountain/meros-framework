@@ -219,6 +219,7 @@ abstract class OAuthIntegration extends Integration {
         $this->settings()->add('string', function (Setting $setting) {
             $setting->name('return_url');
             $setting->label('Return URL');
+            $setting->description('This is the url users are returned to after authorising a new connection to the service. It should usually be copied and pasted from here into your application\'s settings.');
             $setting->field('url', [
                 'readonly' => true,
                 'default'  => $this->callbackUrl
@@ -580,12 +581,12 @@ abstract class OAuthIntegration extends Integration {
         $error  = $this->getAuthorizationError($params);
 
         if (is_string($error)) {
-            $this->logError($error);
+            $this->logOauthError($error);
             $this->redirect('error', $error);
         }
 
         if (is_array($error) && !empty($error)) {
-            $this->logError($error[0], $error[1] ?? '', (string) $error[2] ?? null);
+            $this->logOauthError($error[0], $error[1] ?? '', (string) $error[2] ?? null);
             $this->redirect('error', $error[0]);
         }
 
@@ -593,7 +594,7 @@ abstract class OAuthIntegration extends Integration {
 
         if ($code === null) {
             $error = 'Authorization code not found in authorization response.';
-            $this->logError($error);
+            $this->logOauthError($error);
             $this->redirect('error', $error);
         }
 
@@ -673,7 +674,7 @@ abstract class OAuthIntegration extends Integration {
         $method = $this->getTokenRequestMethod();
         if (!in_array($method, ['POST', 'GET'])) {
             $error = 'Invalid HTTP method for token request';
-            $this->logError($error);
+            $this->logOauthError($error);
             $this->redirect('error', $error);
         }
 
@@ -699,7 +700,7 @@ abstract class OAuthIntegration extends Integration {
 
         if (!$response->successful()) {
             $error = 'Failed to exchange authorization code for token. HTTP Status: ' . $response->status();
-            $this->logError($error);
+            $this->logOauthError($error);
             $this->redirect('error', $error);
         }
 
@@ -842,7 +843,7 @@ abstract class OAuthIntegration extends Integration {
             $this->initConnections();
         } else {
             $error = 'Access token not found in the token response.';
-            $this->logError($error);
+            $this->logOauthError($error);
             $this->redirect('error', $error);
         }
     }
@@ -889,7 +890,7 @@ abstract class OAuthIntegration extends Integration {
         $refreshToken = $this->getRefreshToken();
 
         if (!is_array($connection) || $refreshToken === null) {
-            $this->logError('Cannot refresh access token: no refresh token is stored for this connection.');
+            $this->logOauthError('Cannot refresh access token: no refresh token is stored for this connection.');
             return null;
         }
 
@@ -903,7 +904,7 @@ abstract class OAuthIntegration extends Integration {
         $method = $this->getRefreshTokenRequestMethod();
         if (!in_array($method, ['POST', 'GET'])) {
             $error = 'Invalid HTTP method for refresh token request';
-            $this->logError($error);
+            $this->logOauthError($error);
             return null;
         }
 
@@ -926,7 +927,7 @@ abstract class OAuthIntegration extends Integration {
             $tokenIsExpired = $this->refreshTokenIsExpired($body);
 
             if ($tokenIsExpired) {
-                $this->logError('Refresh token is no longer valid: ' . ($body['error_description'] ?? 'unknown reason'));
+                $this->logOauthError('Refresh token is no longer valid: ' . ($body['error_description'] ?? 'unknown reason'));
                 $this->updateConnection($connection['id'], [
                     'status'        => 'expired',
                     'status_reason' => 'Re-authorization required (' . ($body['error_description'] ?? 'refresh token expired') . ')',
@@ -935,7 +936,7 @@ abstract class OAuthIntegration extends Integration {
             }
 
             $error = 'Failed to refresh access token. HTTP Status: ' . $response->status();
-            $this->logError($error);
+            $this->logOauthError($error);
             return null;
         }
 
@@ -943,7 +944,7 @@ abstract class OAuthIntegration extends Integration {
         $parsed    = $this->parseRefreshTokenResponse($formatted, $refreshToken);
 
         if (($parsed['access_token'] ?? null) === null) {
-            $this->logError('Access token not found in the refresh token response.');
+            $this->logOauthError('Access token not found in the refresh token response.');
             return null;
         }
 
@@ -1076,8 +1077,6 @@ abstract class OAuthIntegration extends Integration {
             // Prefer the arg the event was scheduled with, falling back to the
             // current method value for robustness (e.g. manually fired via do_action).
             $maxAge = $maxAge > 0 ? $maxAge : $this->heartbeatTokenAgeHours;
-            Log::info('testing heartbeat age: ' . $maxAge);
-
             $issuedAt = $connection['token_issued_at'] ? Carbon::parse($connection['token_issued_at']) : null;
 
             if ($issuedAt === null || $issuedAt->diffInHours(now()) >= $maxAge) {
@@ -1088,13 +1087,23 @@ abstract class OAuthIntegration extends Integration {
         add_action('init', function () use ($hook) {
             $maxAge = $this->heartbeatTokenAgeHours;
 
-            // Look for an event for this hook using the CURRENT max-age.
-            $scheduled = wp_next_scheduled($hook, [$maxAge]);
+            // Sweep any events for this hook carrying a stale max-age arg.
+            $crons = (array) get_option('cron', []);
 
-            if ($scheduled === false) {
-                // Either never scheduled, or scheduled with a DIFFERENT max-age —
-                // clear any stale event and (re)schedule with the current value.
-                wp_clear_scheduled_hook($hook);
+            foreach ($crons as $timestamp => $hooks) {
+                if (!isset($hooks[$hook])) {
+                    continue;
+                }
+
+                foreach ($hooks[$hook] as $signature => $event) {
+                    if (($event['args'][0] ?? null) !== $maxAge) {
+                        wp_unschedule_event((int) $timestamp, $hook, $event['args']);
+                    }
+                }
+            }
+
+            // Schedule with the current value if not already present.
+            if (wp_next_scheduled($hook, [$maxAge]) === false) {
                 wp_schedule_event(time() + HOUR_IN_SECONDS, 'hourly', $hook, [$maxAge]);
             }
         });
@@ -1222,7 +1231,16 @@ abstract class OAuthIntegration extends Integration {
     // Helpers
     // ===================================================================================
 
-    protected function logError(string $title, string $message = '', ?int $code = null): void {
+    /**
+     * Logs an oauth specific error and updates the current connection in the db
+     *
+     * @param string       $title
+     * @param string       $message
+     * @param integer|null $code
+     *
+     * @return void
+     */
+    private function logOauthError(string $title, string $message = '', ?int $code = null): void {
         parent::logError($title, $message, $code);
 
         $connection = $this->getConnection();

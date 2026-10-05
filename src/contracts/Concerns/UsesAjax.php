@@ -13,14 +13,14 @@ trait UsesAjax {
      *
      * @var string
      */
-    private string $ajaxUrl = '';
+    protected string $ajaxUrl = '';
 
     /**
      * An array of callbacks keyed by their ajax action name
      *
      * @var array<array>
      */
-    private array $ajaxActions = [];
+    protected array $ajaxActions = [];
 
     /**
      * Creates a Wordpress ajax action using the specified action and callback
@@ -82,6 +82,11 @@ trait UsesAjax {
         }
 
         unset($this->ajaxActions[$action]);
+    }
+
+    protected function resetAjaxActions(): void {
+        $this->ajaxUrl = '';
+        $this->ajaxActions = [];
     }
 
     /**

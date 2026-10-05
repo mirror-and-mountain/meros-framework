@@ -8,14 +8,6 @@ $mf-first-row-offset: -24px;
     display: grid;
     min-width: 0;
 
-    .mforms-submit-button {
-        margin-top: 1rem;
-    }
-
-    .mforms-submit-button--hidden {
-        display: none;
-    }
-
     .mforms-body {
         > .mforms-row:not(:has(> .mforms-section)) {
             margin-top: $mf-first-row-offset;
@@ -29,6 +21,14 @@ $mf-first-row-offset: -24px;
             margin-top: 0;
         }
     }
+}
+
+.mforms-submit-button {
+    margin-top: 1rem;
+}
+
+.mforms-submit-button--hidden {
+    display: none !important;
 }
 
 .mforms-section {
@@ -91,12 +91,14 @@ $mf-first-row-offset: -24px;
 }
 
 .meros-field-wrapper.nice-form-group input:not([type="checkbox"], [type="radio"]) {
-    min-width: 0;
     width: 100% !important;
 }
 
+.meros-field-wrapper.nice-form-group :is(input:not([type="checkbox"], [type="radio"]), select, textarea) {
+    box-sizing: border-box;
+}
+
 .meros-field-wrapper.nice-form-group select {
-    min-width: 0;
     max-width: 100% !important;
 }
 

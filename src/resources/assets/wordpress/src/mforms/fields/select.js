@@ -11,6 +11,7 @@ const mformsSelect = () => {
         ajaxUrl: null,
         ajaxNonce: null,
         ajaxAction: null,
+        isRepeaterField: false,
 
         init() {
             if (this.$el.tagName !== 'SELECT') return;
@@ -22,17 +23,12 @@ const mformsSelect = () => {
             this.ajaxNonce = this.$el.dataset.ajaxNonce || null;
             this.ajaxAction = this.$el.dataset.ajaxAction || null;
 
-            this.$el.removeAttribute('data-ajax-url');
-            this.$el.removeAttribute('data-ajax-nonce');
-            this.$el.removeAttribute('data-ajax-action');
+            this.isRepeaterField = this.$el.hasAttribute('data-repeater-field-name');
 
-            if (this.searchable && (!this.ajaxUrl || !this.ajaxNonce || !this.ajaxAction)) {
-                console.error('Lookup select is missing AJAX configuration.', {
-                    name: this.name,
-                    ajaxUrl: this.ajaxUrl,
-                    ajaxNonce: this.ajaxNonce,
-                    ajaxAction: this.ajaxAction,
-                });
+            if (!this.isRepeaterField) {
+                this.$el.removeAttribute('data-ajax-url');
+                this.$el.removeAttribute('data-ajax-nonce');
+                this.$el.removeAttribute('data-ajax-action');
             }
 
             const repeaterTemplateField = 
@@ -72,17 +68,32 @@ const mformsSelect = () => {
             const sortField = [{ field: '$order' }, { field: '$score' }];
             const maxItems = this.multiple ? null : 1;
 
-            const load = this.ajaxUrl && this.ajaxNonce && this.ajaxAction
+            const lookup = !this.isRepeaterField && this.ajaxUrl && this.ajaxNonce && this.ajaxAction 
+                ? true
+                : this.isRepeaterField && el.hasAttribute('data-ajax-action');
+
+            const load = lookup
                 ? (query, callback) => {
                     if (!this.name || !this.ajaxUrl || !this.ajaxNonce || !this.ajaxAction) return;
 
                     if (query.length < 3) return;
 
+                    const action = this.ajaxAction || el.dataset.ajaxAction || null;
+                    const nonce  = this.ajaxNonce || el.dataset.ajaxNonce || null;
+
+                    if (!action || !nonce) return;
+
                     const params = new URLSearchParams({
-                        action: this.ajaxAction,
-                        nonce: this.ajaxNonce,
+                        action: action,
+                        nonce: nonce,
                         search: query,
                     });
+
+                    const formId = el.dataset.formId;
+                    if (formId) {
+                        params.set('form_id', formId);
+                    }
+                    
                     const url = this.ajaxUrl + '?' + params.toString();
 
                     fetch(url)

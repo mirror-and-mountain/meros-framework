@@ -136,8 +136,12 @@ class Lookup extends Select {
 
         $this->initAjax($this->action, $this->callback);
         $this->attribute('data-ajax-url', $this->getAjaxUrl());
-        $this->attribute('data-ajax-nonce', $this->getAjaxNonce());
+        $this->attribute('data-ajax-nonce', $this->getAjaxNonce($this->action));
         $this->attribute('data-ajax-action', $this->action);
+        
+        if ($this->formId !== null && $this->formId !== '') {
+            $this->attribute('data-form-id', $this->formId);
+        }
 
         $this->initialised = true;
     }
@@ -199,6 +203,10 @@ class Lookup extends Select {
             $this->initAjaxLookup();
             return;
         }
+
+        if ($this->initialised === true && $this->isRepeaterField()) {
+            return;
+        }
         
         $oldName = $this->getOriginalName();
         $newName = $this->getName();
@@ -227,14 +235,18 @@ class Lookup extends Select {
         $defaultValues = is_array($defaultValue) ? $defaultValue : [$defaultValue];
 
         foreach ($defaultValues as $value) {
-            if ($this->object !== '') {
+            $option = null;
+
+            if ($this->object !== '' && !empty($value)) {
                 $option = $this->model::find($this->object, $value);
-            } else {
+            } else if (!empty($value)) {
                 $option = $this->model::find($value);
             }
             
             if ($option !== null) {
-                $this->options[(string) $option->{$this->key}] = $option->{$this->labelledBy};
+                if (property_exists($option, $this->key) && property_exists($option, $this->labelledBy)) {
+                    $this->options[(string) $option->{$this->key}] = $option->{$this->labelledBy};
+                }
             }
         }
     }
@@ -247,6 +259,20 @@ class Lookup extends Select {
      * @return string
      */
     private function getAjaxAction(string $name): string {
+        $name = trim($name);
+
+        // Remove indexes, e.g. [0].
+        $name = preg_replace('/\[\d+\]/', '', $name);
+
+        // Preserve nested field names, e.g. [field_name].
+        $name = preg_replace('/\[([^\]]+)\]/', '_$1', $name);
+
+        // Remove repeater template markers.
+        $name = preg_replace('/(?:^|_)-1(?=_|$)/', '_', $name);
+        $name = preg_replace('/(?:^|_)template(?=_|$)/i', '_', $name);
+
+        $name = preg_replace('/[^a-zA-Z0-9_-]+/', '_', $name);
+        $name = preg_replace('/_+/', '_', $name);
         $name = trim(sanitize_key($name), '_-');
 
         return $name === ''

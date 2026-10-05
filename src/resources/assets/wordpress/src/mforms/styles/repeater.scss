@@ -189,6 +189,11 @@
                 }
             }
 
+            .meros-repeater-table-button--add:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+
             .meros-repeater-table-button--edit,
             .meros-repeater-table-button--add {
                 padding: 0.375rem 0.875rem;
@@ -235,6 +240,14 @@
 
 .meros-repeater-field .ts-wrapper.dropdown-active .ts-dropdown {
 	position: relative !important;
+}
+
+.meros-repeater-field .ts-wrapper .ts-control {
+    display: block !important;
+
+    input {
+        min-width: 100%;
+    }
 }
 
 /* Handling for nested choice fields */

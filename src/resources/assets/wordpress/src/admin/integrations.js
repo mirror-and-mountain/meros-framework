@@ -121,9 +121,9 @@ export function __meros_integrations_init_connections_repeater(repeater) {
 
 export function __meros_integrations_revoke_connection(row) {
     const modal = new MerosModal(
-        'Revoke Connection',
-        'Are you sure you want to revoke this connection? This action cannot be undone.',
-        'Revoke'
+        'Disconnect Connection',
+        'Are you sure you want to disconnect this connection? This action cannot be undone.',
+        'Disconnect'
     );
 
     const removeButton = row.querySelector('button.meros-repeater-table-button--remove');

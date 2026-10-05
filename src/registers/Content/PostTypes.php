@@ -14,7 +14,6 @@ class PostTypes extends Register implements RegistrarMaker {
     use IsRegistrarMaker;
 
     protected function configure(): void {
-        $this->private(true);
         $this->unique(true);
         $this->contract(PostType::class);
         $this->facade(PostTypesFacade::class);

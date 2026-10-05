@@ -128,12 +128,14 @@ abstract class DataItem extends Feature implements StorableItem {
      * @param string $itemName   The name of the data item.
      * @param string $optionName The name of the option in the container that was updated.
      *
-     * @return void
+     * @return mixed
      */
-    public function whenUpdated(mixed $value, mixed $oldValue, string $itemName, string $optionName): void {
+    public function whenUpdated(mixed $value, mixed $oldValue, string $itemName, string $optionName): mixed {
         if (is_callable($this->onUpdateCallback)) {
-            call_user_func($this->onUpdateCallback, $value, $oldValue, $itemName, $optionName);
+            $value = call_user_func($this->onUpdateCallback, $value, $oldValue, $itemName, $optionName);
         }
+
+        return $value;
     }
 
     // =========================================================================

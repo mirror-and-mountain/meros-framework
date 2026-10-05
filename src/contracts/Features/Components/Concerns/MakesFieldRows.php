@@ -39,12 +39,13 @@ trait MakesFieldRows {
     /**
      * Adds a row to the item.
      *
-     * @param FieldRow|Closure|array $row      The row to add, which can be a FieldRow instance, an array of properties, or a closure that configures the row.
-     * @param Closure|null           $callback An optional callback to configure the row if it is provided as a closure.
+     * @param FieldRow|Closure|array $row       The row to add, which can be a FieldRow instance, an array of properties, or a closure that configures the row.
+     * @param Closure|null           $callback  An optional callback to configure the row if it is provided as a closure.
+     * @param bool                   $returnRow Whether to return the created FieldRow instance instead of the current instance. Defaults to false.
      *
      * @return static Returns the current instance for method chaining.
      */
-    final public function row(FieldRow|Closure|array $row, ?Closure $callback = null): static {
+    final public function row(FieldRow|Closure|array $row, ?Closure $callback = null, bool $returnRow = false): static|FieldRow {
         if ($row instanceof FieldRow) {
             $rowInstance = $row;
             $this->rows[] = $rowInstance;
@@ -61,6 +62,10 @@ trait MakesFieldRows {
 
         if ($callback) {
             $callback($rowInstance);
+        }
+
+        if ($returnRow) {
+            return $rowInstance;
         }
 
         return $this;

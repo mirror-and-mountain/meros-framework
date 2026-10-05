@@ -19,7 +19,9 @@
                     true
                 ))
                 : $defaultValue !== null && (string) $defaultValue === (string) $optValue;
+
+            $disabled = $optValue === '';
         @endphp
-        <option value="{{ $optValue }}" @selected($selected)>{{ $optLabel }}</option>
+        <option value="{{ $optValue }}" @disabled($disabled) @selected($selected)>{{ $optLabel }}</option>
     @endforeach
 </select>

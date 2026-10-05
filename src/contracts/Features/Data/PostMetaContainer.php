@@ -492,16 +492,16 @@ class PostMetaContainer extends DataContainer {
     // =========================================================================
 
     /**
-     * Retrieves the value of the post meta for the current post ID.
+     * Retrieves the value of the post meta for the current post ID. 
+     * If the current post ID is not set, the container's default value will be returned instead.
      *
      * @param boolean $refresh
      *
      * @return array
-     * @throws \RuntimeException if the current post ID is not set.
      */
     public function getValue(bool $refresh = false): array {
         if ($this->currentPostId === null) {
-            throw new \RuntimeException("Current post ID is not set. Use the 'currentPostId' method to set it before retrieving the value.");
+            return $this->getDefault();
         }
 
         return parent::getValue($refresh);

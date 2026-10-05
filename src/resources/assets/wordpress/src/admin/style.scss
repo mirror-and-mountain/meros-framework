@@ -1,47 +1,7 @@
-// Meros Modal Styles
-body:has(.meros-modal-overlay:not(.meros-modal-hidden)) {
-    overflow: hidden !important;
-}
-
-.meros-modal-overlay {
-    position: fixed;
-    inset: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 99999;
-
-    &.meros-modal-hidden {
-        display: none;
-    }
-
-    .meros-modal {
-        background-color: #fff;
-        padding: 2rem;
-        border-radius: 8px;
-        max-width: 800px;
-        width: 100%;
-        max-height: calc(100vh - 5rem);
-        margin-top: 5rem;
-        margin-bottom: 5rem;
-        overflow-y: auto;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        z-index: 99999;
-
-        .meros-modal-buttons {
-            margin-top: 1.5rem;
-            display: flex;
-            justify-content: flex-end;
-            gap: 0.5rem;
-        }
-    }
-}
-
+@use '../styles/modal.scss';
 
 // Button Styles
-.meros-admin-button,
-.meros-modal-button {
+.meros-admin-button {
     transition: opacity 0.3s ease;
 }
 
@@ -51,15 +11,13 @@ body:has(.meros-modal-overlay:not(.meros-modal-hidden)) {
     padding: 0 10px;
 }
 
-.meros-admin-button.meros-working,
-.meros-modal-button.meros-working {
+.meros-admin-button.meros-working {
     position: relative;
     overflow: hidden;
     pointer-events: none;
 }
 
-.meros-admin-button.meros-working::before,
-.meros-modal-button.meros-working::before {
+.meros-admin-button.meros-working::before {
     content: "";
     position: absolute;
     inset: 0;
@@ -71,6 +29,26 @@ body:has(.meros-modal-overlay:not(.meros-modal-hidden)) {
         transparent
     );
     animation: meros-shimmer 1.2s infinite;
+}
+
+.meros-form-component-wrapper {
+    display: grid;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    padding: 12px;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    background: #fff;
+
+    > .meros-form-component-remove {
+        justify-self: end;
+        margin: 0;
+    }
+
+    > .meros-repeater-field {
+        min-width: 0;
+        margin: 0;
+    }
 }
 
 @keyframes meros-shimmer {

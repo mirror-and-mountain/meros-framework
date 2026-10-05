@@ -105,11 +105,47 @@ class Repeater extends Field {
     protected array $fields  = [];
 
     /**
+     * The maximum number of rows allowed in the repeater.
+     * 0 indicates no limit.
+     *
+     * @var int
+     */
+    protected int $maxRows = 0;
+
+    /**
      * The closure used in the repeater's edit form callback.
      *
      * @var Closure|null
      */
     private ?Closure $intertnalEditFormCallback = null;
+
+    /**
+     * The action name for the registered edit form ajax callback.
+     *
+     * @var string
+     */
+    private string $registeredEditFormAction = '';
+
+    /**
+     * Indicates whether the edit form ajax has been configured.
+     *
+     * @var bool
+     */
+    private bool $editFormAjaxConfigured = false;
+
+    /**
+     * The action name for the edit form ajax callback.
+     *
+     * @var string|null
+     */
+    private ?string $editFormAjaxAction = null;
+
+    /**
+     * The ajax action name for the repeater's edit form.
+     *
+     * @var string
+     */
+    protected string $ajaxAction = '';
 
     use UsesAjax;
 
@@ -132,6 +168,7 @@ class Repeater extends Field {
             'onInit',
             'onRemove',
             'fields',
+            'ajaxAction',
             'ajaxUrl',
             'ajaxNonce',
         ]);
@@ -141,20 +178,61 @@ class Repeater extends Field {
         parent::whenConfigured();
 
         if ($this->hasEditForm()) {
-            $this->intertnalEditFormCallback = function (array $postData) {
-                $rowData = $postData['row_data'] ?? [];
-                $html = $this->renderEditForm(json_decode(wp_unslash($rowData), true));
-
-                wp_send_json_success([
-                    'html' => $html
-                ]);
-            };
-
-            $this->initAjax(
-                "meros_repeater_edit_form_{$this->getName()}", 
-                $this->intertnalEditFormCallback
-            );
+            $this->editFormAjaxConfigured = true;
+            $this->registerEditFormAjax();
         }
+    }
+
+    public function __clone(): void {
+        $this->resetAjaxActions();
+        $this->registeredEditFormAction = '';
+        $this->intertnalEditFormCallback = null;
+
+        if ($this->editForm instanceof Form) {
+            $this->editForm = clone $this->editForm;
+        }
+    }
+
+    private function registerEditFormAjax(): void {
+        $this->intertnalEditFormCallback = function (array $postData) {
+            $repeaterName = $postData['repeater_name'] ?? null;
+            if ($this->editFormAjaxAction !== null && is_string($repeaterName) && $repeaterName !== '') {
+                $this->name($repeaterName);
+            }
+
+            $rowData = $postData['row_data'] ?? [];
+            $html = $this->renderEditForm(json_decode(wp_unslash($rowData), true));
+
+            wp_send_json_success([
+                'html' => $html
+            ]);
+        };
+
+        $this->registeredEditFormAction = $this->getEditFormAjaxAction();
+        $this->ajaxAction = $this->registeredEditFormAction;
+        $this->initAjax(
+            $this->registeredEditFormAction,
+            $this->intertnalEditFormCallback
+        );
+    }
+
+    private function getEditFormAjaxAction(): string {
+        return $this->editFormAjaxAction ?? "meros_repeater_edit_form_{$this->getName()}";
+    }
+
+    public function ajaxEditFormAction(string $action): static {
+        if ($this->registeredEditFormAction !== '') {
+            $this->removeAjax($this->registeredEditFormAction);
+            $this->registeredEditFormAction = '';
+        }
+
+        $this->editFormAjaxAction = $action;
+
+        if ($this->hasEditForm() && $this->editFormAjaxConfigured) {
+            $this->registerEditFormAjax();
+        }
+
+        return $this;
     }
 
     // =========================================================================
@@ -248,6 +326,19 @@ class Repeater extends Field {
     }
 
     /**
+     * Sets the maximum number of rows allowed in the repeater.
+     *
+     * @param integer $max
+     *
+     * @return static
+     */
+    public function maxRows(int $max): static {
+        $this->maxRows = $max;
+        $this->attribute('data-max-rows', $max);
+        return $this;
+    }
+
+    /**
      * Sets the text to display when the repeater has no rows.
      *
      * @param string $text
@@ -280,7 +371,6 @@ class Repeater extends Field {
             $form->onSubmit('meros_repeater_form_submit');
             $form->hideSubmitButton(true);
             $form->attribute('data-repeater-edit-form', 'true');
-            $form->invalidText('Stupid! The form is wrong...');
         });
 
         $this->field('hidden', function ($field) {
@@ -310,17 +400,23 @@ class Repeater extends Field {
      */
     protected function whenNameSet(): void {
         if ($this->hasEditForm()) {
-            $oldName = $this->getOriginalName();
             $newName = $this->getName();
-
-            $this->removeAjax("meros_repeater_edit_form_{$oldName}");
+            $newAction = $this->getEditFormAjaxAction();
 
             $this->editForm->name("{$newName}_edit_form");
 
-            $this->initAjax(
-                "meros_repeater_edit_form_{$newName}", 
-                $this->intertnalEditFormCallback
-            );
+            if ($this->registeredEditFormAction === $newAction) {
+                return;
+            }
+
+            if ($this->registeredEditFormAction !== '') {
+                $this->removeAjax($this->registeredEditFormAction);
+                $this->registeredEditFormAction = '';
+            }
+
+            if ($this->editFormAjaxConfigured) {
+                $this->registerEditFormAjax();
+            }
         }
     }
 
@@ -462,7 +558,6 @@ class Repeater extends Field {
     private function buildTableRows(): array {
         $value = $this->getDefaultValue();
         $items = is_array($value) ? $value : [];
-
         $rows = [];
 
         // Add a template row
@@ -488,6 +583,12 @@ class Repeater extends Field {
             $name  = $clone->getName();
             $id    = $clone->getId();
             $value = $templateRow ? $clone->getDefaultValue() : $rowData->get($name);
+
+            // Hydrates lookups
+            if ($field->handle === 'lookup' && !$templateRow) {
+                $field->default($value);
+                $value = $field->getDefaultValue();
+            }
 
             if ($templateRow) {
                 $clone->attribute('data-repeater-template-row', 'true');

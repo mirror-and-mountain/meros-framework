@@ -1,0 +1,70 @@
+// Meros Modal Styles
+body:has(.meros-modal-overlay:not(.meros-modal-hidden)) {
+    overflow: hidden !important;
+}
+
+.meros-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 99999;
+
+    &.meros-modal-hidden {
+        display: none;
+    }
+
+    .meros-modal {
+        background-color: #fff;
+        padding: 2rem;
+        border-radius: 8px;
+        max-width: 800px;
+        width: 100%;
+        max-height: calc(100vh - 5rem);
+        margin-top: 5rem;
+        margin-bottom: 5rem;
+        overflow-y: auto;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        z-index: 99999;
+
+        .meros-modal-buttons {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+    }
+}
+
+// Meros Modal Button Styles
+.meros-modal-button {
+    transition: opacity 0.3s ease;
+}
+
+.meros-modal-button.meros-working {
+    position: relative;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.meros-modal-button.meros-working::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,0.25),
+        transparent
+    );
+    animation: meros-shimmer 1.2s infinite;
+}
+
+@keyframes meros-shimmer {
+    100% {
+        transform: translateX(100%);
+    }
+}

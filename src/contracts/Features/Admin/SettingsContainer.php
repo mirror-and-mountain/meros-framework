@@ -276,7 +276,15 @@ class SettingsContainer extends DataContainer {
         update_option($this->name, $value);
     }
     
-    final public function getIemValue(string $key, bool $refresh = false): mixed {
+    /**
+     * Retrieves the value of a specific item in the settings container.
+     *
+     * @param string  $key
+     * @param boolean $refresh
+     *
+     * @return mixed
+     */
+    final public function getItemValue(string $key, bool $refresh = false): mixed {
         $value = parent::getItemValue($key, $refresh);
 
         if (is_string($value) && !empty($value)) {

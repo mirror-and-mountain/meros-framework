@@ -7,12 +7,15 @@ const mformsRepeater = () => {
         numRows: 0,
         id: null,
         name: null,
+        ajaxAction: null,
         ajaxurl: null,
         ajaxNonce: null,
         editingRowIndex: null,
         onFormSubmit: null,
         onInit: null,
         onRemove: null,
+        maxRows: 0,
+        addRowButton: null,
 
         // =========================================================================
         // Initialisation
@@ -27,8 +30,12 @@ const mformsRepeater = () => {
                 this.id = this.container.id || null;
                 this.name = this.container.dataset.name || null;
 
+                this.ajaxAction = this.container.dataset.ajaxAction || null;
                 this.ajaxurl = this.container.dataset.ajaxUrl || null;
                 this.ajaxNonce = this.container.dataset.ajaxNonce || null;
+
+                this.maxRows = this.container.dataset.maxRows ? parseInt(this.container.dataset.maxRows) : 0;
+                this.addRowButton = this.container.querySelector('.meros-repeater-table-button--add');
 
                 this.onInit = this.container.dataset.onInit && this.container.dataset.onInit !== 'false'
                     ? this.container.dataset.onInit
@@ -81,6 +88,8 @@ const mformsRepeater = () => {
 
             const templateRow = tableBody.querySelector('tr.meros-repeater-table-row--template');
             if (!templateRow) return;
+
+            if (!this.canAddRow()) return;
 
             const newRow = templateRow.cloneNode(true);
             newRow.classList.remove('meros-repeater-table-row--template');
@@ -153,6 +162,10 @@ const mformsRepeater = () => {
             if (window.Alpine && typeof window.Alpine.initTree === 'function') {
                 window.Alpine.initTree(tableBody);
             }
+
+            if (!this.canAddRow() && this.addRowButton) {
+                this.addRowButton.disabled = true;
+            }
         },
 
         handleEditRow(event) {
@@ -164,8 +177,9 @@ const mformsRepeater = () => {
             const rowData = this.getRowData(row);
 
             const formData = new FormData();
-            formData.append('action', 'meros_repeater_edit_form_' + this.name);
+            formData.append('action', this.ajaxAction || 'meros_repeater_edit_form_' + this.name);
             formData.append('nonce', this.ajaxNonce);
+            formData.append('repeater_name', this.name);
             formData.append('row_data', JSON.stringify(rowData));
 
             fetch(this.ajaxurl, {
@@ -265,13 +279,20 @@ const mformsRepeater = () => {
             row.remove();
             this.reindexTableFields();
             this.numRows = this.resolveRows().length;
+            
+            if (this.addRowButton) {
+                this.addRowButton.disabled = false;
+            }
         },
 
         reindexTableFields() {
             const rows = this.resolveRows();
 
-            const updateName = (index, name) => {
-                return name.replace(/\[\d+\]/, `[${index}]`);
+            const updateName = (currentIndex, index, name) => {
+                const rowPrefix = `${this.name}[${currentIndex}]`;
+                if (!name.startsWith(rowPrefix)) return name;
+
+                return `${this.name}[${index}]${name.slice(rowPrefix.length)}`;
             };
 
             const updateId = (currentIndex, index, id) => {
@@ -292,7 +313,7 @@ const mformsRepeater = () => {
                     const fieldName = hasNameAttr ? field.getAttribute('name') : field.getAttribute('data-name');
                     const fieldId = field.getAttribute('id');
 
-                    const newFieldName = updateName(index, fieldName);
+                    const newFieldName = updateName(currentIndex, index, fieldName);
                     const newFieldId = updateId(currentIndex, index, fieldId);
 
                     if (hasNameAttr) {
@@ -306,7 +327,7 @@ const mformsRepeater = () => {
                                 const inputName = input.getAttribute('name');
                                 const inputId = input.getAttribute('id');
 
-                                input.setAttribute('name', updateName(index, inputName));
+                                input.setAttribute('name', updateName(currentIndex, index, inputName));
                                 input.setAttribute('id', updateId(currentIndex, index, inputId));
 
                                 const newInputId = input.getAttribute('id');
@@ -395,6 +416,16 @@ const mformsRepeater = () => {
             const rows = this.resolveRows();
             if (!rows || rows.length <= rowIndex) return null;
             return rows[rowIndex];
+        },
+
+        canAddRow() {
+            if (this.maxRows === 0) return true; // No limit
+            return this.numRows < this.maxRows;
+        },
+
+        isAtCapacity() {
+            if (this.maxRows === 0) return false; // No limit
+            return this.numRows >= this.maxRows;
         },
 
         resolveRows() {

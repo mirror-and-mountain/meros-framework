@@ -285,6 +285,7 @@ abstract class Integration extends Feature implements Registrable {
         $this->initConfigurableSettings();
         $this->afterInitConfigurableSettings();
         $this->initCustomSettings();
+        $this->afterInitCustomSettings();
     }
 
     // =========================================================================
@@ -320,6 +321,15 @@ abstract class Integration extends Feature implements Registrable {
      * @return void
      */
     protected function initCustomSettings(): void {
+        // Intended to be overriden by implementing classes.
+    }
+
+    /**
+     * Can be used by implementing classes to perform actions after any custom settings have been initialised.
+     *
+     * @return void
+     */
+    protected function afterInitCustomSettings(): void {
         // Intended to be overriden by implementing classes.
     }
 

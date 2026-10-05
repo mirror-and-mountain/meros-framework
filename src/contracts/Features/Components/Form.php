@@ -276,11 +276,11 @@ class Form extends Feature implements FormComponent, Makeable {
      * Event names are prefixed with 'mforms::' to avoid conflicts with other events. Example:
      * mforms::myCustomEvent.
      *
-     * @param Closure|string $callback
+     * @param Closure|string|null $callback
      *
      * @return static
      */
-    final public function onSubmit(Closure|string $callback): static {
+    final public function onSubmit(Closure|string|null $callback): static {
         $this->onSubmit = $callback;
         return $this;
     }

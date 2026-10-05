@@ -157,8 +157,7 @@ abstract class DataContainer extends Feature implements Storable {
     private function afterRegister(): void {
         if (!empty($this->updatedHook)) {
             add_filter($this->updatedHook, function (mixed $value, mixed $oldValue, string $optionName) {
-                $this->__whenUpdated($value, $oldValue, $optionName);
-                return $value;
+                return $this->__whenUpdated($value, $oldValue, $optionName);
             }, 10, 3);
         }
     }
@@ -170,22 +169,22 @@ abstract class DataContainer extends Feature implements Storable {
      * @param mixed  $oldValue
      * @param string $optionName
      *
-     * @return void
+     * @return mixed
      */
-    private function __whenUpdated(mixed $value, mixed $oldValue, string $optionName): void {
+    private function __whenUpdated(mixed $value, mixed $oldValue, string $optionName): mixed {
         // This method can be overridden in subclasses to perform actions when the settings container is updated.
-        $this->getItems(true)->each(function (StorableItem $item) use ($value, $oldValue, $optionName) {
+        $this->getItems(true)->each(function (StorableItem $item) use (&$value, $oldValue, $optionName) {
             if (method_exists($item, 'whenUpdated')) {
-                $name       = $item->getName();
-                $optionName = $optionName . '[' . $name . ']';
-                $value      = $value[$name] ?? null;
-                $oldValue   = $oldValue[$name] ?? null;
+                $name           = $item->getName();
+                $itemOptionName = $optionName . '[' . $name . ']';
+                $itemValue      = $value[$name] ?? null;
+                $itemOldValue   = $oldValue[$name] ?? null;
 
-                $item->whenUpdated($value, $oldValue, $name, $optionName);
+                $value[$name] = $item->whenUpdated($itemValue, $itemOldValue, $name, $itemOptionName);
             }
         });
 
-        $this->whenUpdated($value, $oldValue, $optionName);
+        return $this->whenUpdated($value, $oldValue, $optionName);
     }
 
     /**
@@ -195,12 +194,14 @@ abstract class DataContainer extends Feature implements Storable {
      * @param mixed  $oldValue
      * @param string $optionName
      *
-     * @return void
+     * @return mixed
      */
-    protected function whenUpdated(mixed $value, mixed $oldValue, string $optionName): void {
+    protected function whenUpdated(mixed $value, mixed $oldValue, string $optionName): mixed {
         if (is_callable($this->onUpdateCallback)) {
-            call_user_func($this->onUpdateCallback, $value, $oldValue, $optionName);
+            $value = call_user_func($this->onUpdateCallback, $value, $oldValue, $optionName);
         }
+
+        return $value;
     }
 
     // =========================================================================

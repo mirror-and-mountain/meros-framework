@@ -8,6 +8,7 @@
     class="meros-field-wrapper meros-repeater-field nice-form-group" 
     {!! $attributeString !!} 
     data-name="{{ $name }}"
+    data-ajax-action="{{ $ajaxAction }}"
     data-ajax-url="{{ $ajaxUrl }}"
     data-ajax-nonce="{{ $ajaxNonce }}"
     @if($onInit !== '')
@@ -106,7 +107,7 @@
                                                 class="meros-repeater-table-button meros-repeater-table-button--edit" 
                                                 @click.prevent="handleEditRow($event)"
                                             >
-                                                Edit
+                                                {{ $formText }}
                                             </button>
                                         @endif
                                         @if($allowsRemove)

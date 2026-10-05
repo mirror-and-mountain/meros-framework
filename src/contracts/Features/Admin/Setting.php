@@ -79,7 +79,7 @@ class Setting extends DataItem {
         });
     }
 
-    public function whenUpdated(mixed $value, mixed $oldValue, string $itemName, string $optionName): void {
+    public function whenUpdated(mixed $value, mixed $oldValue, string $itemName, string $optionName): mixed {
         if ($this->isEncrypted()) {
             add_filter('pre_update_option_' . $this->container->getName(true), function (mixed $value, mixed $oldValue, string $optionName) {
                 $name = $this->getName();
@@ -99,7 +99,7 @@ class Setting extends DataItem {
             }, 100, 3);
         }
 
-        parent::whenUpdated($value, $oldValue, $itemName, $optionName);
+        return parent::whenUpdated($value, $oldValue, $itemName, $optionName);
     }
 
     // =========================================================================

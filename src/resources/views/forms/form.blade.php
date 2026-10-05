@@ -23,7 +23,7 @@
         <h2 class="mforms-form-title">{{ $title }}</h2>
     @endif
     @if($description !== '')
-        <p class="mforms-form-description">{{ $description }}</p>
+        <p class="mforms-form-description">{!! $description !!}</p>
     @endif
     <div class="mforms-body">
         @foreach($rows as $row)

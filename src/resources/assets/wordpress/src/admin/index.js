@@ -10,6 +10,7 @@ import {
     __meros_integrations_revoke_connection
 } from './integrations.js';
 
+import '../mforms/admin.js';
 import './style.scss';
 
 document.addEventListener('DOMContentLoaded', () => {

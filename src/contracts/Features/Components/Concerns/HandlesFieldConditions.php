@@ -3,6 +3,8 @@
 namespace MM\Meros\Contracts\Features\Components\Concerns;
 
 use Illuminate\Support\Collection;
+use MM\Meros\Contracts\Features\Components\FieldGroup;
+
 use MM\Meros\Contracts\Features\Components\Field;
 
 use MM\Meros\Contracts\Concerns\UsesAjax;
@@ -26,8 +28,8 @@ trait HandlesFieldConditions {
      * @return void
      */
     private function initFieldConditions(): void {
-        if ($this->form !== null) {
-            return;
+        if ($this instanceof FieldGroup && $this->form !== null) {
+            return; 
         }
 
         $conditionalFields = $this->getFieldsWithConditions();
