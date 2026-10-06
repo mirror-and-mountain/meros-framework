@@ -2,7 +2,11 @@
     $inRepeater = $repeaterId !== null;
 @endphp
 
-<div class="meros-field-wrapper nice-form-group">
+<div 
+    class="meros-field-wrapper mforms-field-wrapper nice-form-group" 
+    data-field-conditions="{{ $conditionsString }}"
+    data-field-origin-name="{{ $originalName }}"
+> 
     @if(!$inRepeater)
         <label for="{{ $id }}" class="meros-field-label">{{ $label }}</label>
     @endif

@@ -46,9 +46,9 @@ final class FieldRow implements Serializable {
     /**
      * The row's child FieldGroup instance, if any.
      *
-     * @var FieldGroup|null
+     * @var FieldGroup|array|null
      */
-    private ?FieldGroup $childGroup = null;
+    private FieldGroup|array|null $childGroup = null;
 
     /**
      * The row's fields.
@@ -73,15 +73,17 @@ final class FieldRow implements Serializable {
     /**
      * Constructs a new instance of FieldRow.
      *
-     * @param FeatureProvider $provider The feature provider that is creating the row.
-     * @param string          $id       The row's id.
-     * @param array           $fields   An array of fields to include in the row.
+     * @param FeatureProvider $provider    The feature provider that is creating the row.
+     * @param string          $id          The row's id.
+     * @param array           $fields      An array of fields to include in the row.
+     * @param array           $childGroup  A child group defined as an array to include in the row.
      * @param FieldGroup|null $parentGroup The parent FieldGroup instance, if any.
      */
     private function __construct(
         FeatureProvider $provider, 
         string          $id,
         array           $fields = [],
+        array           $childGroup = [],
         ?Form           $form = null,
         ?FieldGroup     $parentGroup = null
     ) {
@@ -89,6 +91,7 @@ final class FieldRow implements Serializable {
         $this->id($id); // Ensures the id is slugged and set correctly
 
         $this->fields      = $fields;
+        $this->childGroup  = empty($childGroup) ? null : $childGroup;
         $this->form        = $form;
         $this->parentGroup = $parentGroup;
 
@@ -100,6 +103,7 @@ final class FieldRow implements Serializable {
      *
      * @param FeatureProvider  $provider The feature provider that is creating the row.
      * @param array            $fields An array of fields to include in the row.
+     * @param array            $childGroup A field group defined as an array.
      * @param Form|null        $form The parent Form instance, if any.
      * @param FieldGroup|null  $parentGroup The parent FieldGroup instance, if any.
      * @param string           $id The row's id.
@@ -109,6 +113,7 @@ final class FieldRow implements Serializable {
     public static function make(
         FeatureProvider $provider,
         array           $fields = [],
+        array           $childGroup = [],
         ?Form           $form = null,
         ?FieldGroup     $parentGroup = null,
         string          $id = '',
@@ -117,7 +122,7 @@ final class FieldRow implements Serializable {
             ? 'mforms-row-' . Str::substr(Str::uuid(), 0, 8) 
             : $id;
 
-        return new static($provider, $id, $fields, $form, $parentGroup);
+        return new static($provider, $id, $fields, $childGroup, $form, $parentGroup);
     }
 
     /**
@@ -135,6 +140,10 @@ final class FieldRow implements Serializable {
 
         if (!empty($this->fields)) {
             $this->instantiateFields();
+        }
+
+        if (is_array($this->childGroup)) {
+            $this->instantiateChildGroup();
         }
     }
 
@@ -176,6 +185,19 @@ final class FieldRow implements Serializable {
                 throw new \RuntimeException("Failed to create a Field instance of type '{$field}'.");
             }
         }, $this->fields);
+    }
+
+    /**
+     * Instantiates a child group that was defined as an array in the row's constructor.
+     *
+     * @return void
+     */
+    private function instantiateChildGroup(): void {
+        if (!is_array($this->childGroup) || empty($this->childGroup)) {
+            return;
+        }
+
+        $this->group($this->childGroup);
     }
 
     // =========================================================================
@@ -235,6 +257,7 @@ final class FieldRow implements Serializable {
                     'properties' => $callbackOrProps
                 ]
             ],
+            [],
             $this->form, 
             $this->parentGroup
         );

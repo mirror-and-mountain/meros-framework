@@ -14,7 +14,6 @@ use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 
 use MM\Meros\Contracts\Features\Components\Concerns\IsFormComponent;
 use MM\Meros\Contracts\Features\Components\Concerns\MakesFieldRows;
-use MM\Meros\Contracts\Features\Components\Concerns\HandlesFieldConditions;
 
 use MM\Meros\Facades\Components\Fields;
 
@@ -64,8 +63,7 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
     use IsFormComponent,
         IsMakeable,
         InstantiatesItems,
-        MakesFieldRows,
-        HandlesFieldConditions;
+        MakesFieldRows;
 
     // =========================================================================
     // Initialisation
@@ -85,6 +83,11 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
             'ajaxNonce'
         ]));
 
+        $this->setNonPersistableProperties([
+            'ajaxUrl',
+            'ajaxNonce',
+        ]);
+
         $defaultIdentifier = 'mforms-section-' . Str::substr(Str::uuid(), 0, 8);
         $this->id($defaultIdentifier);
         $this->name(Str::replace('-', '_', $defaultIdentifier));
@@ -97,10 +100,6 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
         } else {
             // Create an initial row if none are provided
             $this->makeNewRow();
-        }
-
-        if ($this->form === null) {
-            $this->initFieldConditions();
         }
     }
 
@@ -311,21 +310,6 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
     }
 
     /**
-     * Retrieves fields in the group that have conditions.
-     * 
-     * @param bool $collect
-     *
-     * @return Collection|array
-     */
-    private function getFieldsWithConditions(bool $collect = false): Collection|array {
-        $fields = $this->getFields(true)->where(function (Field $field) {
-            return $field->hasConditions();
-        });
-
-        return $collect ? $fields : $fields->toArray();
-    }
-
-    /**
      * Returns whether the group is being rendered as a meta box.
      *
      * @return boolean
@@ -416,10 +400,6 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
 
                 if (!($instance instanceof Field)) {
                     continue;
-                }
-
-                if ($instance->hasConditions()) {
-                    $this->evalFieldConditions($instance);
                 }
 
                 $shortName = Str::between($field['name'], $containerName . '[', ']');

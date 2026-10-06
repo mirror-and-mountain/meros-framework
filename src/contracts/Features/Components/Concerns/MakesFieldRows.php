@@ -32,7 +32,7 @@ trait MakesFieldRows {
                 return $row;
             }
 
-            return $this->makeNewRow($row['fields'] ?? [], false);
+            return $this->makeNewRow($row['fields'] ?? [], $row['childGroup'] ?? [], false);
         }, $this->rows);
     }
 
@@ -52,7 +52,7 @@ trait MakesFieldRows {
         }
 
         else if (is_array($row)) {
-            $rowInstance  = $this->makeNewRow($row['fields'] ?? []);
+            $rowInstance  = $this->makeNewRow($row['fields'] ?? [], $row['childGroup'] ?? []);
         }
 
         else {
@@ -75,14 +75,16 @@ trait MakesFieldRows {
      * Creates and returns a new FieldRow instance, optionally with specified fields.
      * 
      * @param array $fields An optional array of fields to initialise the new FieldRow instance with.
+     * @param array $group  A field group defined with an array to initialise the new FieldRow instance with.
      * @param bool  $add    Whether to add the new FieldRow instance to the rows array. Defaults to true.
      *
      * @return FieldRow A new FieldRow instance.
      */
-    private function makeNewRow(array $fields = [], bool $add = true): FieldRow {
+    private function makeNewRow(array $fields = [], array $group = [], bool $add = true): FieldRow {
         $row = FieldRow::make(
             $this->getProvider(), 
-            $fields, 
+            $fields,
+            $group,
             $this->resolveForm(), 
             $this instanceof FieldGroup ? $this : null
         );

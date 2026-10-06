@@ -3,6 +3,7 @@ import mformsSelect from './fields/select.js';
 import mformsRepeater from './fields/repeater.js';
 import mformsChoice from './fields/choice.js';
 import MerosFormProcessor from './form-processor.js';
+import MerosFieldsProcessor from './fields-processor.js';
 
 import './style.scss';
 
@@ -15,6 +16,7 @@ const mform = () => {
         conditionsAjaxNonce: null,
         onSubmit: null,
         invalidText: null,
+        fieldsProcessor: null,
 
         // =========================================================================
         // Initialisation
@@ -33,6 +35,11 @@ const mform = () => {
             this.$el.removeAttribute('data-submit-ajax-nonce');
             this.$el.removeAttribute('data-conditions-ajax-nonce');
             this.$el.removeAttribute('data-invalid-text');
+
+            // Nested Alpine components are initialized after this component's init hook.
+            this.$nextTick(() => {
+                this.fieldsProcessor = new MerosFieldsProcessor(this.$el);
+            });
 
             if (this.onSubmit && typeof this.onSubmit === 'string') {
                 this.$el.removeAttribute('data-onsubmit');

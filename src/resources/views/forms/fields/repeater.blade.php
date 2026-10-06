@@ -5,9 +5,10 @@
 <fieldset 
     x-data="mformsRepeater" 
     id="{{ $id }}" 
-    class="meros-field-wrapper meros-repeater-field nice-form-group" 
+    class="meros-field-wrapper mforms-field-wrapper mforms-repeater-field meros-repeater-field nice-form-group" 
     {!! $attributeString !!} 
     data-name="{{ $name }}"
+    data-origin-name="{{ $originalName }}"
     data-ajax-action="{{ $ajaxAction }}"
     data-ajax-url="{{ $ajaxUrl }}"
     data-ajax-nonce="{{ $ajaxNonce }}"

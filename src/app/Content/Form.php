@@ -10,6 +10,7 @@ use MM\Meros\Contracts\Features\Data\PostMetaContainer;
 use MM\Meros\Contracts\Features\Data\PostMeta;
 
 use MM\Meros\Contracts\Features\Components\Form as FormComponent;
+use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\FieldRow;
 use MM\Meros\Contracts\Features\Components\Field;
 
@@ -235,7 +236,7 @@ class Form extends PostType {
             }
 
             $formInstance = $this->makeFormInstance(Post::find($postId), $cleanRows);
-            $serializedStructure = $formInstance->serialize();
+            $serializedStructure = $formInstance->serialize('storage');
 
             update_post_meta($postId, '_meros_form_meta', $serializedStructure);
         });
@@ -304,35 +305,46 @@ class Form extends PostType {
 
             foreach ($rows as $rowData) {
                 $rowFields = $rowData['fields'] ?? [];
+                $rowGroup  = $rowData['childGroup'] ?? [];
 
                 // Just gets the row instance
                 $row = $form->row(function (FieldRow $row) {
                     // No config, just gets the row instance
                 }, null, true);
 
-                foreach ($rowFields as $fieldData) {
-                    $fieldType        = $fieldData['type'] ?? '';
-                    $fieldName        = $fieldData['name'] ?? '';
-                    $fieldLabel       = $fieldData['label'] ?? '';
-                    $fieldDescription = $fieldData['description'] ?? '';
+                if (!($row instanceof FieldRow)) {
+                    continue;
+                }
 
-                    if ($fieldType === '' || $fieldName === '') {
-                        continue;
-                    }
+                if (!empty($rowFields)) {
+                    foreach ($rowFields as $fieldData) {
+                        $fieldType        = $fieldData['type'] ?? '';
+                        $fieldName        = $fieldData['name'] ?? '';
+                        $fieldLabel       = $fieldData['label'] ?? '';
+                        $fieldDescription = $fieldData['description'] ?? '';
 
-                    if (!in_array($fieldType, array_keys($availableFields))) {
-                        $fieldType = Str::replace('_', '-', $fieldType);
-                        
-                        if (!in_array($fieldType, array_keys($availableFields))) {
+                        if ($fieldType === '' || $fieldName === '') {
                             continue;
                         }
-                    }
 
-                    $row->field($fieldType, function (Field $field) use ($fieldName, $fieldLabel, $fieldDescription) {
-                        $field->name($fieldName);
-                        $field->label($fieldLabel);
-                        $field->description($fieldDescription);
-                    });
+                        if (!in_array($fieldType, array_keys($availableFields))) {
+                            $fieldType = Str::replace('_', '-', $fieldType);
+                            
+                            if (!in_array($fieldType, array_keys($availableFields))) {
+                                continue;
+                            }
+                        }
+
+                        $row->field($fieldType, function (Field $field) use ($fieldName, $fieldLabel, $fieldDescription) {
+                            $field->name($fieldName);
+                            $field->label($fieldLabel);
+                            $field->description($fieldDescription);
+                        });
+                    }
+                }
+
+                else if (!empty($rowGroup)) {
+                    $row->group($rowGroup);
                 }
             }
         });

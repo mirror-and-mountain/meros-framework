@@ -7,8 +7,10 @@
 <fieldset
     x-data="mformsChoice"
     id="{{ $id }}"
-    class="meros-choice-field nice-form-group"
+    class="meros-choice-field nice-form-group mforms-field-wrapper"
     data-name="{{ $name }}"
+    data-field-conditions="{{ $conditionsString }}"
+    data-field-origin-name="{{ $originalName }}"
     {!! $attributeString !!}
 >
     @if(!$inRepeater && $renderContext !== 'settings')

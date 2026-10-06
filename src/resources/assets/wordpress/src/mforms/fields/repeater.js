@@ -1,4 +1,5 @@
 import MerosFormProcessor from '../form-processor.js';
+import MerosFieldsProcessor from '../fields-processor.js';
 import MerosModal from '../../classes/modal.js';
 
 const mformsRepeater = () => {
@@ -16,6 +17,7 @@ const mformsRepeater = () => {
         onRemove: null,
         maxRows: 0,
         addRowButton: null,
+        fieldsProcessor: null,
 
         // =========================================================================
         // Initialisation
@@ -49,6 +51,10 @@ const mformsRepeater = () => {
                 this.container.removeAttribute('data-ajax-nonce');
                 this.container.removeAttribute('data-on-remove');
                 this.numRows = this.resolveRows().length;
+
+                this.$nextTick(() => {
+                    this.fieldsProcessor = new MerosFieldsProcessor(this.container);
+                });
 
                 if (this.onInit && typeof window[this.onInit] === 'function') {
                     const onInitFunc = window[this.onInit];
@@ -148,6 +154,7 @@ const mformsRepeater = () => {
                     const newBaseName = baseName.replace('__template', '');
                     field.setAttribute('data-repeater-field-name', newBaseName);
                 }
+
             });
 
             newRow.setAttribute('data-row-index', newRowIndex);
@@ -160,8 +167,10 @@ const mformsRepeater = () => {
 
             // Ensure Alpine components inside the row are initialised.
             if (window.Alpine && typeof window.Alpine.initTree === 'function') {
-                window.Alpine.initTree(tableBody);
+                window.Alpine.initTree(newRow);
             }
+
+            this.fieldsProcessor?.configureRepeaterRow(newRow);
 
             if (!this.canAddRow() && this.addRowButton) {
                 this.addRowButton.disabled = true;

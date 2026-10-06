@@ -42,10 +42,69 @@ const mformsSelect = () => {
 
         getValue() {
             if (!this.ts) {
-                return this.resolveElement()?.value || null;
+                const select = this.resolveElement();
+                if (!select) return null;
+
+                if (select.multiple) {
+                    const values = Array.from(select.selectedOptions, option => option.value);
+                    return values.length > 0 ? values : null;
+                }
+
+                return select.value || null;
             }
 
             return this.ts.getValue();
+        },
+
+        setValue(value) {
+            if (this.ts) {
+                this.ts.setValue(value ?? '', true);
+                return;
+            }
+
+            const select = this.resolveElement();
+            if (!select) return;
+
+            if (select.multiple) {
+                const values = new Set((Array.isArray(value) ? value : [value]).map(item => String(item ?? '')));
+                Array.from(select.options).forEach(option => {
+                    option.selected = values.has(option.value);
+                });
+            } else {
+                select.value = value ?? '';
+            }
+        },
+
+        setOptions(options) {
+            const select = this.resolveElement();
+            if (!select) return;
+
+            const currentValue = this.getValue();
+            const normalizedOptions = Array.isArray(options) ? options : [];
+            const values = new Set(normalizedOptions.map(option => String(option.value)));
+            const nextValue = Array.isArray(currentValue)
+                ? currentValue.filter(value => values.has(String(value)))
+                : values.has(String(currentValue ?? '')) ? currentValue : null;
+
+            if (this.ts) {
+                this.ts.clear(true);
+                this.ts.clearOptions();
+                this.ts.addOptions(normalizedOptions.map(option => ({
+                    value: String(option.value),
+                    text: String(option.label ?? option.value),
+                    disabled: Boolean(option.disabled)
+                })));
+                this.setValue(nextValue);
+                this.ts.refreshOptions(false);
+                return;
+            }
+
+            select.replaceChildren(...normalizedOptions.map(option => {
+                const element = new Option(String(option.label ?? option.value), String(option.value));
+                element.disabled = Boolean(option.disabled);
+                return element;
+            }));
+            this.setValue(nextValue);
         },
 
         destroy() {

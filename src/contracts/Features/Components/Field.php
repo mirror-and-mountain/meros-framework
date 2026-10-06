@@ -4,7 +4,6 @@ namespace MM\Meros\Contracts\Features\Components;
 
 use Closure;
 use Illuminate\Support\Str;
-use Illuminate\Support\Collection;
 
 use MM\Meros\Contracts\Feature;
 use MM\Meros\Contracts\Features\Admin\SettingsField;
@@ -157,13 +156,6 @@ abstract class Field extends Feature implements FormComponent {
      */
     private array $conditions = [];
 
-    /**
-     * An array of fields that are influenced by this field's value;
-     *
-     * @var array<Field>
-     */
-    private array $influences = [];
-
     // =========================================================================
     // Field Supports and Compatibility Properties
     // =========================================================================
@@ -305,6 +297,7 @@ abstract class Field extends Feature implements FormComponent {
             'type',
             'id',
             'name',
+            'originalName',
             'label',
             'placeholder',
             'description',
@@ -316,13 +309,13 @@ abstract class Field extends Feature implements FormComponent {
             'classString',
             'attributes',
             'attributeString',
+            'conditions',
+            'conditionsString',
             'formId',
             'rowIndex',
             'rowPosition',
             'groupId',
             'repeaterId',
-            'hiddenInRepeaterTable',
-            'hiddenInRepeaterForm',
             'wrapper',
             'view',
             'renderContext',
@@ -887,8 +880,113 @@ abstract class Field extends Feature implements FormComponent {
     // =========================================================================
 
     public function when(string $fieldName, Closure $callback): static {
-        $this->conditions[$fieldName][] = $callback;
+        // $this->conditions[$fieldName][] = $callback;
         return $this;
+    }
+
+    public function showWhen(array $rules, string $logic = 'AND'): static {
+        $this->processRules('show', $rules, true, $logic);
+        return $this;
+    }
+
+    public function hideWhen(array $rules, string $logic = 'AND'): static {
+        $this->processRules('hide', $rules, true, $logic);
+        return $this;
+    }
+
+    public function requireWhen(array $rules, string $logic = 'AND'): static {
+        $this->processRules('require', $rules, true, $logic);
+        return $this;
+    }
+
+    public function makeOptionalWhen(array $rules, string $logic = 'AND'): static {
+        $this->processRules('optional', $rules, true, $logic);
+        return $this;
+    }
+
+    public function disableWhen(array $rules, string $logic = 'AND'): static {
+        $this->processRules('disable', $rules, true, $logic);
+        return $this;
+    }
+
+    public function enableWhen(array $rules, string $logic = 'AND'): static {
+        $this->processRules('enable', $rules, true, $logic);
+        return $this;
+    }
+
+    public function setValueWhen(array $rules, string $logic = 'AND'): static {
+        $this->processRules('set_value', $rules, false, $logic);
+        return $this;
+    }
+
+    final protected function processRules(string $ruleset, array $rules, bool $boolean, string $logic): void {
+        $operators = [
+            '=',
+            '!=',
+            'LIKE',
+            'CONTAINS',
+            'NOT CONTAINS',
+            '<',
+            '>',
+            '=>',
+            '=<'
+        ];
+
+        foreach ($rules as $rule) {
+            if (!is_array($rule)) {
+                continue;
+            }
+
+            $requiredKeys = [0, 1, 2];
+            if (!$boolean) {
+                $requiredKeys[] = 3;
+            }
+
+            foreach ($requiredKeys as $key) {
+                if (!array_key_exists($key, $rule)) {
+                    continue 2;
+                }
+            }
+
+            if (!is_string($rule[0])) {
+                continue;
+            }
+
+            if (!is_string($rule[0]) || !in_array($rule[1], $operators)) {
+                continue;
+            }
+
+            $this->condition($ruleset, $rule[0], $rule[1], $rule[2], $rule[3] ?? null);
+        }
+
+        $this->conditions[$ruleset]['logic'] = in_array($logic, ['AND', 'OR'])
+            ? $logic
+            : 'AND';
+    }
+
+    /**
+     * Adds a field condition to the given ruleset.
+     *
+     * @param string $ruleset
+     * @param string $fieldName
+     * @param string $operator
+     * @param mixed  $sourceValue
+     * @param mixed  $destValue
+     *
+     * @return void
+     */
+    private function condition(string $ruleset, string $fieldName, string $operator, mixed $sourceValue, mixed $destValue = null): void {
+        $condition = [
+            'field'        => $fieldName, 
+            'operator'     => $operator, 
+            'source_value' => $sourceValue
+        ];
+
+        if ($destValue !== null) {
+            $condition['dest_value'] = $destValue;
+        }
+    
+        $this->conditions[$ruleset]['rules'][] = $condition;
     }
 
     /**
@@ -901,36 +999,26 @@ abstract class Field extends Feature implements FormComponent {
     }
 
     /**
+     * Returns the fields conditions array as a json encoded string, or 'false'
+     * if none exist.
+     *
+     * @return string
+     */
+    public function getConditionsString(): string {
+        if (empty($this->conditions)) {
+            return 'false';
+        }
+
+        return json_encode($this->conditions);
+    }
+
+    /**
      * Checks whether the field has any condition set.
      *
      * @return boolean
      */
     public function hasConditions(): bool {
         return $this->getConditions() !== [];
-    }
-
-    /**
-     * For internal use only. Sets which fields are influenced by this field in relation to conditions.
-     *
-     * @param Field $field
-     *
-     * @return void
-     */
-    public function __influences(Field $field): void {
-        if (!in_array($field, $this->influences)) {
-            $this->influences[] = $field;
-        }
-    }
-
-    /**
-     * Retrieves the array of fields influenced by this field in relation to conditions.
-     *
-     * @param boolean $collect
-     *
-     * @return array|Collection
-     */
-    public function getInfluencedFields($collect = false): array|Collection {
-        return $collect ? collect($this->influences) : $this->influences;
     }
 
     /**

@@ -100,9 +100,16 @@ class Repeater extends Field {
     /**
      * An array of field definitions available in the repeater's row form view.
      *
-     * @var array<Field>
+     * @var array
      */
     protected array $fields  = [];
+
+    /**
+     * An array of field definitions available in a row's configuration form.
+     *
+     * @var array
+     */
+    protected array $formFields = [];
 
     /**
      * The maximum number of rows allowed in the repeater.
@@ -172,16 +179,43 @@ class Repeater extends Field {
             'ajaxUrl',
             'ajaxNonce',
         ]);
+        $this->setNonPersistableProperties([
+            'ajaxAction',
+            'ajaxUrl',
+            'ajaxNonce',
+        ]);
     }
 
     protected function whenConfigured(): void {
         parent::whenConfigured();
+        $this->instantiateFields();
 
         if ($this->hasEditForm()) {
             $this->editFormAjaxConfigured = true;
             $this->registerEditFormAjax();
         }
     }
+
+    /**
+     * Instantiates any repeater fields added as an array definition.
+     *
+     * @return void
+     */
+    private function instantiateFields(): void {
+        $this->fields = array_map(function ($field) {
+            if ($field instanceof Field) {
+                return $field;
+            }
+
+            if (is_array($field) && array_key_exists('type', $field)) {
+                return $this->field($field['type'], $field, false);
+            }
+        }, $this->fields);
+    }
+
+    // =========================================================================
+    // Ajax Handling
+    // =========================================================================
 
     public function __clone(): void {
         $this->resetAjaxActions();
@@ -446,18 +480,19 @@ class Repeater extends Field {
     /**
      * Adds a field to the repeater's table view.
      *
-     * @param string                  $type
-     * @param Closure|array|null|null $callbackOrProps
+     * @param string             $type
+     * @param Closure|array|null $callbackOrProps
+     * @param bool               $add Whether to add the field to the repeater's fields array.
      *
      * @return Field
      * @throws \InvalidArgumentException if the field type is 'repeater', as nested repeaters are not supported in this context.
      */
-    public function field(string $type, Closure|array|null $callbackOrProps = null): Field {
+    public function field(string $type, Closure|array|null $callbackOrProps = null, bool $add = true): Field {
         if ($type === 'repeater') {
             throw new \InvalidArgumentException("Nested repeaters are not supported in this context.");
         }
 
-        return $this->addField($type, $callbackOrProps, $this->fields);
+        return $this->addField($type, $callbackOrProps, $this->fields, $add);
     }
 
     /**
@@ -487,13 +522,18 @@ class Repeater extends Field {
      * @param string                  $type
      * @param Closure|array|null|null $callbackOrProps
      * @param array                   $fieldCollection Reference to the field collection to which the new field will be added.
+     * @param bool                    $add             Whether to add the field to the repeater's fields array.
      *
      * @return Field
      */
-    private function addField(string $type, Closure|array|null $callbackOrProps, array &$fieldCollection): Field {
+    private function addField(string $type, Closure|array|null $callbackOrProps, array &$fieldCollection, bool $add = true): Field {
         $field = Fields::checkout($this->getProvider())->makeFrom($type, $callbackOrProps);
         $field->repeater($this, $this->id);
-        $fieldCollection[] = $field;
+
+        if ($add) {
+            $fieldCollection[] = $field;
+        }
+
         return $field;
     }
 
@@ -553,6 +593,11 @@ class Repeater extends Field {
     protected function filterSerializedProperties(array $properties): array {
         $properties['tableRows'] = $this->buildTableRows();
         return $properties;
+    }
+
+    protected function filterStorageProperties(array $properties): array {
+        unset($properties['tableRows']);
+        return parent::filterStorageProperties($properties);
     }
 
     private function buildTableRows(): array {

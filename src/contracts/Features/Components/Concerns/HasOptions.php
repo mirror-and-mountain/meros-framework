@@ -13,6 +13,12 @@ trait HasOptions {
     abstract public function getType(): string;
     abstract public function supports(string $feature): bool;
     abstract protected function dataType(string $type): void;
+    abstract protected function processRules(string $ruleset, array $rules, bool $boolean, string $logic): void;
+
+    public function setOptionsWhen(array $rules, string $logic = 'AND'): static {
+        $this->processRules('set_options', $rules, false, $logic);
+        return $this;
+    }
 
     /**
      * Sets the field to allow multiple selections, if supported.

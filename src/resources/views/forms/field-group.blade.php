@@ -3,8 +3,6 @@
     id="{{ $id }}"
     class="mforms-field-group mforms-section nice-form-group"
     data-name="{{ $name }}"
-    data-ajax-url="{{ $ajaxUrl }}"
-    data-ajax-nonce="{{ $ajaxNonce }}"
 >
     @if($metaBox === false && $title !== '')
         <legend class="mforms-section-title">{{ $title }}</legend>

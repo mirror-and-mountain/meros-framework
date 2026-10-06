@@ -22,6 +22,13 @@ trait IsSerializable {
     protected array $serializableProperties = [];
 
     /**
+     * Properties generated for runtime use and excluded from storage serialization.
+     *
+     * @var array
+     */
+    protected array $nonPersistableProperties = [];
+
+    /**
      * Specifies which properties of the object should be serialised.
      *
      * @param array $properties An array of property names to be serialised.
@@ -38,9 +45,25 @@ trait IsSerializable {
     }
 
     /**
-     * Serializes the feature instance into the specified format, which can be 'array', 'json', or 'php' (for PHP's serialize() function).
+     * Specifies properties to omit from storage serialization.
      *
-     * @param string $format The format to serialize the feature instance into.
+     * @param array $properties
+     * @param bool  $merge
+     *
+     * @return void
+     */
+    protected function setNonPersistableProperties(array $properties, bool $merge = true): void {
+        if ($merge) {
+            $this->nonPersistableProperties = array_unique(array_merge($this->nonPersistableProperties, $properties));
+        } else {
+            $this->nonPersistableProperties = $properties;
+        }
+    }
+
+    /**
+    * Serializes the feature instance into the specified format. The 'storage' format returns an array without runtime-only properties.
+     *
+    * @param string $format The format to serialize the feature instance into: 'array', 'json', 'php', or 'storage'.
      * @param string ...$flags Optional flags to pass to the serialization function, depending on the chosen format.
      *
      * @return array|string The serialized representation of the feature instance.
@@ -50,7 +73,8 @@ trait IsSerializable {
             'array' => $this->toArray(),
             'json'  => $this->toJson(...$flags),
             'php'   => serialize($this->toArray()),
-            default => throw new \InvalidArgumentException("Unsupported serialization format: {$format}. Supported formats are 'array', 'json', and 'php'."),
+            'storage' => $this->toStorageArray(),
+            default => throw new \InvalidArgumentException("Unsupported serialization format: {$format}. Supported formats are 'array', 'json', 'php', and 'storage'."),
         };
     }
 
@@ -72,6 +96,19 @@ trait IsSerializable {
      * @return array
      */
     final public function toArray(): array {
+        return $this->resolveArray();
+    }
+
+    /**
+     * Returns a recursive array representation suitable for persistence.
+     *
+     * @return array
+     */
+    final public function toStorageArray(): array {
+        return $this->resolveArray(true);
+    }
+
+    private function resolveArray(bool $forStorage = false): array {
         static $stack = [];
 
         $objectId = spl_object_id($this);
@@ -86,10 +123,18 @@ trait IsSerializable {
             $properties = [];
 
             foreach ($this->serializableProperties as $property) {
-                $properties[$property] = $this->resolveSerializableProperty($property);
+                if ($forStorage && in_array($property, $this->nonPersistableProperties, true)) {
+                    continue;
+                }
+
+                $properties[$property] = $this->resolveSerializableProperty($property, $forStorage);
             }
 
-            return $this->filterSerializedProperties($properties);
+            $properties = $this->filterSerializedProperties($properties);
+
+            return $forStorage
+                ? $this->filterStorageProperties($properties)
+                : $properties;
         } finally {
             unset($stack[$objectId]);
         }
@@ -101,25 +146,25 @@ trait IsSerializable {
      * @param string $property
      * @return mixed
      */
-    private function resolveSerializableProperty(string $property): mixed {
+    private function resolveSerializableProperty(string $property, bool $forStorage = false): mixed {
         $getter = 'get' . ucfirst($property);
         $isser  = 'is' . ucfirst($property);
         $hasser = 'has' . ucfirst($property);
 
         if (method_exists($this, $getter)) {
-            return $this->serializeValue($this->{$getter}());
+            return $this->serializeValue($this->{$getter}(), $forStorage);
         }
 
         if (method_exists($this, $isser)) {
-            return $this->serializeValue($this->{$isser}());
+            return $this->serializeValue($this->{$isser}(), $forStorage);
         }
 
         if (method_exists($this, $hasser)) {
-            return $this->serializeValue($this->{$hasser}());
+            return $this->serializeValue($this->{$hasser}(), $forStorage);
         }
 
         if (property_exists($this, $property)) {
-            return $this->serializeValue($this->{$property});
+            return $this->serializeValue($this->{$property}, $forStorage);
         }
 
         return null;
@@ -131,13 +176,15 @@ trait IsSerializable {
      * @param mixed $value
      * @return mixed
      */
-    private function serializeValue(mixed $value): mixed {
+    private function serializeValue(mixed $value, bool $forStorage = false): mixed {
         if ($value instanceof Serializable) {
-            return $value->toArray();
+            return $forStorage && method_exists($value, 'toStorageArray')
+                ? $value->toStorageArray()
+                : $value->toArray();
         }
 
         if (is_array($value)) {
-            return array_map(fn ($item) => $this->serializeValue($item), $value);
+            return array_map(fn ($item) => $this->serializeValue($item, $forStorage), $value);
         }
 
         return $value;
@@ -151,6 +198,17 @@ trait IsSerializable {
      * @return array
      */
     protected function filterSerializedProperties(array $properties): array {
+        return $properties;
+    }
+
+    /**
+     * Filters runtime-only data from a storage representation.
+     *
+     * @param array $properties
+     *
+     * @return array
+     */
+    protected function filterStorageProperties(array $properties): array {
         return $properties;
     }
 }

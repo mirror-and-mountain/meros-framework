@@ -107,10 +107,10 @@ trait IsFormComponent {
      *
      * @return string
      */
-    protected function attributesToString(): string {
+    protected function attributesToString(?array $sourceAttributes = null): string {
         $attributes = [];
 
-        foreach ($this->attributes as $key => $value) {
+        foreach ($sourceAttributes ?? $this->attributes as $key => $value) {
             if (is_bool($value)) {
                 if ($value) {
                     $attributes[] = $key;
@@ -121,6 +121,26 @@ trait IsFormComponent {
         }
 
         return implode(' ', $attributes);
+    }
+
+    protected function filterStorageProperties(array $properties): array {
+        if (!isset($properties['attributes']) || !is_array($properties['attributes'])) {
+            return $properties;
+        }
+
+        $attributes = $properties['attributes'];
+        foreach (array_keys($attributes) as $name) {
+            if (str_starts_with($name, 'data-ajax-') || $name === 'data-form-id') {
+                unset($attributes[$name]);
+            }
+        }
+
+        $properties['attributes'] = $attributes;
+        if (array_key_exists('attributeString', $properties)) {
+            $properties['attributeString'] = $this->attributesToString($attributes);
+        }
+
+        return $properties;
     }
 
     /**

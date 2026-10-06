@@ -13,7 +13,6 @@
     data-name="{{ $name }}"
     data-ajax-url="{{ $ajaxUrl }}"
     data-submit-ajax-nonce="{{ $submitAjaxNonce }}"
-    data-conditions-ajax-nonce="{{ $conditionsAjaxNonce }}"
     data-invalid-text="{{ $invalidText }}"
     {!! $attributeString !!}
     {{ is_string($onSubmit) ? "data-onsubmit={$onSubmit}" : '' }}

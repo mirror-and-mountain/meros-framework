@@ -29,6 +29,58 @@ const mformsChoice = () => {
             }
 
             return null;
+        },
+
+        setValue(value) {
+            if (!this.inputs) return;
+
+            const values = new Set((Array.isArray(value) ? value : [value]).map(item => String(item ?? '')));
+            this.inputs.forEach(input => {
+                input.checked = values.has(input.value);
+            });
+        },
+
+        setOptions(options) {
+            if (this.$el.tagName !== 'FIELDSET') return;
+
+            const currentValue = this.getValue();
+            const currentInput = this.inputs?.[0];
+            const inputType = currentInput?.type || (this.type === 'checkboxes' ? 'checkbox' : 'radio');
+            const inputName = currentInput?.name || '';
+            const values = new Set((Array.isArray(options) ? options : []).map(option => String(option.value)));
+            const nextValue = Array.isArray(currentValue)
+                ? currentValue.filter(value => values.has(String(value)))
+                : values.has(String(currentValue ?? '')) ? currentValue : null;
+
+            this.inputs?.forEach(input => {
+                input.closest('.nice-form-group')?.remove();
+            });
+
+            this.inputs = (Array.isArray(options) ? options : []).map((option, index) => {
+                const value = String(option.value);
+                const inputId = `${this.$el.id}-${value || index}`;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'nice-form-group';
+
+                const input = document.createElement('input');
+                input.id = inputId;
+                input.className = 'meros-choice-field-input';
+                input.type = inputType;
+                input.name = inputName;
+                input.value = value;
+                input.disabled = Boolean(option.disabled);
+
+                const label = document.createElement('label');
+                label.htmlFor = inputId;
+                label.textContent = String(option.label ?? value);
+
+                wrapper.append(input, label);
+                this.$el.append(wrapper);
+
+                return input;
+            });
+
+            this.setValue(nextValue);
         }
     }
 };

@@ -4,10 +4,10 @@ namespace MM\Meros\Contracts\Features;
 
 interface Serializable {
     /**
-     * Serializes the feature instance into the specified format, which can be 'array', 'json', or 'php' (for PHP's serialize() function). 
+    * Serializes the feature instance into the specified format, which can be 'array', 'json', 'php', or 'storage'.
      * The method returns the serialized representation of the feature instance.
      * 
-     * @param string $format The format to serialize the feature instance into. May be 'array', 'json', or 'php' (for PHP's serialize() function). Defaults to 'array'.
+    * @param string $format The format to serialize the feature instance into. The 'storage' format returns an array without runtime-only properties. Defaults to 'array'.
      * @param string ...$flags Optional flags to pass to the serialization function, depending on the chosen format.
      *
      * @return array|string The serialized representation of the feature instance.
