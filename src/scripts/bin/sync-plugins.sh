@@ -80,6 +80,44 @@ if [ $SOURCE_ENV = 'local_dev' ]; then
     fi
 
 # ---------------------------------------------------------------------
+# Sync Operation - From Remote to Local
+# ---------------------------------------------------------------------
+elif [ "$DEST_ENV" = 'local_dev' ]; then
+    mkdir -p "${DEST_PATH}/wp-content/plugins"
+
+    if [ "$PLUGINS" = "all" ]; then
+        rsync -avz \
+            -e "ssh -i ${SOURCE_SSH_KEY} -p ${SOURCE_SSH_PORT} -o StrictHostKeyChecking=no" \
+            "${SOURCE_SSH_HOST}:${SOURCE_PATH}/wp-content/plugins/" \
+            "${DEST_PATH}/wp-content/plugins/" \
+            --delete
+    else
+        IFS=',' read -ra PLUGINS_ARRAY <<< "$PLUGINS"
+        for plugin in "${PLUGINS_ARRAY[@]}"; do
+            plugin=$(echo "$plugin" | xargs)  # trim whitespace
+            mkdir -p "${DEST_PATH}/wp-content/plugins/${plugin}"
+            rsync -avz \
+                -e "ssh -i ${SOURCE_SSH_KEY} -p ${SOURCE_SSH_PORT} -o StrictHostKeyChecking=no" \
+                "${SOURCE_SSH_HOST}:${SOURCE_PATH}/wp-content/plugins/${plugin}/" \
+                "${DEST_PATH}/wp-content/plugins/${plugin}/" \
+                --delete
+        done
+    fi
+
+    echo "Activating plugins on destination..."
+    if [ "$ACTIVATE_PLUGINS" = "true" ]; then
+        if [ "$PLUGINS" = "all" ]; then
+            wp plugin activate --all --path="${DEST_PATH}"
+        else
+            IFS=',' read -ra PLUGINS_ARRAY <<< "$PLUGINS"
+            for plugin in "${PLUGINS_ARRAY[@]}"; do
+                plugin=$(echo "$plugin" | xargs)  # trim whitespace
+                wp plugin activate "$plugin" --path="${DEST_PATH}"
+            done
+        fi
+    fi
+
+# ---------------------------------------------------------------------
 # Sync Operation - From Remote to Remote (Staged)
 # ---------------------------------------------------------------------
 else 

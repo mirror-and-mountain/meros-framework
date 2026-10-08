@@ -357,7 +357,7 @@ class EnvironmentManager {
         $command .= escapeshellarg($this->name) . ' ';
         $command .= escapeshellarg($this->config['url']) . ' ';
         $command .= $this->getSSHCommand();
-        $command .= escapeshellarg($composerUpdate ? 'TRUE' : 'FALSE');
+        $command .= ' ' . escapeshellarg($composerUpdate ? 'TRUE' : 'FALSE');
 
         passthru($command, $return_var);
 

@@ -50,6 +50,18 @@ if [ $SOURCE_ENV = 'local_dev' ]; then
             --delete
 
 # ---------------------------------------------------------------------
+# Sync Operation - From Remote to Local
+# ---------------------------------------------------------------------
+elif [ "$DEST_ENV" = 'local_dev' ]; then
+    mkdir -p "${DEST_PATH}/wp-content/uploads"
+
+    rsync -avz \
+        -e "ssh -i ${SOURCE_SSH_KEY} -p ${SOURCE_SSH_PORT} -o StrictHostKeyChecking=no" \
+        "${SOURCE_SSH_HOST}:${SOURCE_PATH}/wp-content/uploads/" \
+        "${DEST_PATH}/wp-content/uploads/" \
+        --delete
+
+# ---------------------------------------------------------------------
 # Sync Operation - From Remote to Remote (Staged)
 # ---------------------------------------------------------------------
 else 
