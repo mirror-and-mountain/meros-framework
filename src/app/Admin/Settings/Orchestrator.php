@@ -123,7 +123,7 @@ class Orchestrator extends SettingsOrchestrator {
                 $setting->field();
                 $setting->onUpdate(function ($value, $oldValue, $itemName, $optionName) use ($package) {
                     if ($value === $oldValue) {
-                        return;
+                        return $value;
                     }
 
                     if ($value === true) {
@@ -131,6 +131,8 @@ class Orchestrator extends SettingsOrchestrator {
                     } else {
                         $package->__whenDisabled();
                     }
+
+                    return $value;
                 });
             });
 

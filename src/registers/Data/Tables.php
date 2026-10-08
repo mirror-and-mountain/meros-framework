@@ -45,7 +45,11 @@ class Tables extends Register implements Maker {
         $this->ensureCheckout('init');
 
         $provider = $this->getProvider();
-        $path     = $this->resolvePath($path);
+        $path     = $this->resolvePath($path, false);
+
+        if ($path === '') {
+            return collect([]);
+        }
 
         if (!$this->hasRegisteredTables()) {
             $this->registeredPaths[$provider->getHandle()] = $path;
@@ -133,10 +137,13 @@ class Tables extends Register implements Maker {
     /**
      * Resolves the registered tables path for the current provider, checking that the directory looks like a valid migrations directory.
      *
+     * @param string|null $path
+     * @param bool        $error
+     * 
      * @return string
      * @throws \InvalidArgumentException if the provided path is not a valid migrations directory or if no valid path is registered for the provider.
      */
-    private function resolvePath(?string $path = null): string {
+    private function resolvePath(?string $path = null, bool $error = true): string {
         $provider    = $this->getProvider();
         $handle      = $provider->getHandle();
 
@@ -161,6 +168,10 @@ class Tables extends Register implements Maker {
             }
         }
 
-        throw new \InvalidArgumentException("No valid tables path registered for provider '{$handle}'.");
+        if ($error) {
+            throw new \InvalidArgumentException("No valid tables path registered for provider '{$handle}'.");
+        }
+
+        return '';
     }
 }
