@@ -27,6 +27,8 @@ SOURCE_SSH_HOST="${11:-""}"
 SOURCE_SSH_PORT="${12:-""}"
 SOURCE_SSH_KEY="${13:-""}"
 
+COMPOSER_UPDATE="${14:-"FALSE"}"
+
 # ---------------------------------------------------------------------
 # Sync Operation - From Local to Remote
 # ---------------------------------------------------------------------
@@ -78,6 +80,14 @@ if [ $SOURCE_ENV = 'local_dev' ]; then
             --exclude='/vendor/mirror-and-mountain/meros-framework/src/scripts/bin/' \
             --delete \
             --delete-excluded
+
+    if [ "$COMPOSER_UPDATE" = 'TRUE' ]; then
+        echo "Updating Composer dependencies for theme '${THEME_SLUG}' on destination..."
+        ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \
+            "rm -rf '${DEST_PATH}/wp-content/themes/${THEME_SLUG}/vendor' && \
+            cd '${DEST_PATH}/wp-content/themes/${THEME_SLUG}' && \
+            composer update"
+    fi
 
     echo "Activating theme '${THEME_SLUG}' on destination..."
     ssh -i "${DEST_SSH_KEY}" -p "${DEST_SSH_PORT}" "${DEST_SSH_HOST}" -o StrictHostKeyChecking=no \

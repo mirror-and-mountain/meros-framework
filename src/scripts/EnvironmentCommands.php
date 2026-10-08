@@ -56,6 +56,9 @@ class EnvironmentCommands {
      *
      * [--activate-plugins]
      * : Whether to activate the plugins after syncing. (default: true)
+     * 
+     * [--composer-update]
+     * : Whether to run composer update on the destination server after the theme has been syncronised. (default: false)
      *
      *
      * ## EXAMPLES
@@ -79,12 +82,18 @@ class EnvironmentCommands {
         $addDropTable    = isset($assoc_args['drop-table']) && $assoc_args['drop-table'] === true ? true : false;
         $activatePlugins = isset($assoc_args['activate-plugins']) && $assoc_args['activate-plugins'] === false ? false : true;
         $searchReplace   = isset($assoc_args['search-replace']) && $assoc_args['search-replace'] === false ? false : true;
+        $composerUpdate  = false;
 
         // Get environments config
         $environmentsConfig = Config::get('environments');
 
         // Validate environments
         $isLocal = $from === 'local' || $to === 'local';
+
+        if ($isLocal) {
+            $composerUpdate = isset($assoc_args['composer-update']) && $assoc_args['composer-update'] === true ? true : false; 
+        }
+
         if (! isset($environmentsConfig['remote_environments'][$from]) && $from !== 'local') {
             \WP_CLI::error(sprintf('Source environment "%s" is not defined in the configuration.', $from));
             return;
@@ -147,6 +156,7 @@ class EnvironmentCommands {
         \WP_CLI::line('Add DROP TABLE statements: ' . ($addDropTable ? 'Yes' : 'No'));
         \WP_CLI::line('Perform search and replace: ' . ($searchReplace ? 'Yes' : 'No'));
         \WP_CLI::line('Activate plugins after sync: ' . ($activatePlugins ? 'Yes' : 'No'));
+        \WP_CLI::line('Run composer update on destination server: ' . ($composerUpdate ? 'Yes' : 'No'));
         \WP_CLI::line(' ');
         \WP_CLI::line('It is highly recommended to back up your theme files and database on the destination environment before proceeding. This action cannot be undone.');
         
@@ -157,7 +167,7 @@ class EnvironmentCommands {
 
         // Sync theme - not to local environment
         if ($to !== 'local') {
-            $themeResult = $manager->syncTheme($to);
+            $themeResult = $manager->syncTheme($to, $composerUpdate);
             if ($themeResult === false) {
                 $error = $manager->getError();
                 \WP_CLI::error($error);

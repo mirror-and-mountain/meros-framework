@@ -316,10 +316,11 @@ class EnvironmentManager {
      * destination environment.
      * 
      * @param string $destName The destination environment name.
+     * @param bool   $composerUpdate Whether to run composer update on the destination server post-sync.
 
      * @return bool  True on success, false on failure.
      */
-    public function syncTheme(string $destName): bool {
+    public function syncTheme(string $destName, bool $composerUpdate = false): bool {
         if ($this->error !== '') {
             return false;
         }
@@ -356,6 +357,7 @@ class EnvironmentManager {
         $command .= escapeshellarg($this->name) . ' ';
         $command .= escapeshellarg($this->config['url']) . ' ';
         $command .= $this->getSSHCommand();
+        $command .= escapeshellarg($composerUpdate ? 'TRUE' : 'FALSE');
 
         passthru($command, $return_var);
 
