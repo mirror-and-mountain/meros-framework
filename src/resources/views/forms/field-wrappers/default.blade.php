@@ -7,7 +7,7 @@
     data-field-conditions="{{ $conditionsString }}"
     data-field-origin-name="{{ $originalName }}"
 > 
-    @if(!$inRepeater)
+    @if(!$inRepeater && $type !== 'hidden')
         <label for="{{ $id }}" class="meros-field-label">{{ $label }}</label>
     @endif
     @include($view)

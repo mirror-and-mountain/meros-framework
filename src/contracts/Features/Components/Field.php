@@ -42,7 +42,7 @@ abstract class Field extends Feature implements FormComponent {
      *
      * @var string
      */
-    private string $originalName = '';
+    protected string $originalName = '';
 
     /**
      * The field's default value.
@@ -290,7 +290,7 @@ abstract class Field extends Feature implements FormComponent {
         $this->originalName = '';
 
         $this->ignoreProps([
-            'defaultValue', 'attributes', 'classes', 'form', 'group'
+            'defaultValue', 'attributes', 'classes', 'form', 'group', 'wrapper'
         ]);
 
         $this->setSerializableProperties([
@@ -738,7 +738,13 @@ abstract class Field extends Feature implements FormComponent {
      * @return static
      */
     public function name(string $name): static {
-        $this->name = Str::snake($name);
+        $nameParts = explode('[', $name, 2);
+        $this->name = Str::snake($nameParts[0]);
+
+        if (isset($nameParts[1])) {
+            $this->name .= '[' . $nameParts[1];
+        }
+
         $this->whenNameSet();
 
         if ($this->originalName === '') {
@@ -762,7 +768,7 @@ abstract class Field extends Feature implements FormComponent {
      * @return string
      */
     public function getName(): string {
-        return $this->name;
+        return wp_unslash($this->name);
     }
 
     /**
@@ -1219,10 +1225,10 @@ abstract class Field extends Feature implements FormComponent {
     /**
      * Sets the position of the field within its associated row.
      *
-     * @param int $position The position to set.
+     * @param int|null $position The position to set.
      * @return static
      */
-    final public function rowPosition(int $position): static {
+    final public function rowPosition(?int $position): static {
         $this->rowPosition = $position;
         return $this;
     }

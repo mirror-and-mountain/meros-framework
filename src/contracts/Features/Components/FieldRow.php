@@ -154,8 +154,12 @@ final class FieldRow implements Serializable {
      * @throws \RuntimeException If a field cannot be instantiated.
      */
     private function instantiateFields(): void {
-        $this->fields = array_map(function ($field) {
+        $fields = array_values($this->fields);
+
+        $this->fields = array_map(function ($field, $position) {
             if ($field instanceof Field) {
+                $field->row($this);
+                $field->rowPosition($position);
                 return $field;
             }
 
@@ -164,10 +168,29 @@ final class FieldRow implements Serializable {
                     throw new \InvalidArgumentException("Field array must contain a 'type' key.");
                 }
 
-                $fieldInstance = $this->makeItemFrom($field['type'], Field::class, $field['properties'] ?? []);
+                $properties = $field;
+                unset($properties['type']);
+                $wrappers = $properties['wrapper'] ?? [];
+
+                $fieldInstance = $this->makeItemFrom($field['type'], Field::class, $properties);
 
                 if ($fieldInstance instanceof Field) {
+                    if (is_string($wrappers)) {
+                        $wrappers = [
+                            'default' => $wrappers
+                        ];
+                    }
+
+                    foreach ($wrappers as $context => $wrapper) {
+                        if (!is_string($context) || !is_string($wrapper)) {
+                            throw new \InvalidArgumentException("Field wrapper contexts and views must be strings.");
+                        }
+
+                        $fieldInstance->wrapper($context, $wrapper);
+                    }
+
                     $fieldInstance->row($this);
+                    $fieldInstance->rowPosition($position);
                     return $fieldInstance;
                 }
 
@@ -179,12 +202,13 @@ final class FieldRow implements Serializable {
                 
                 if ($fieldInstance instanceof Field) {
                     $fieldInstance->row($this);
+                    $fieldInstance->rowPosition($position);
                     return $fieldInstance;
                 }
 
                 throw new \RuntimeException("Failed to create a Field instance of type '{$field}'.");
             }
-        }, $this->fields);
+        }, $fields, array_keys($fields));
     }
 
     /**
@@ -249,24 +273,15 @@ final class FieldRow implements Serializable {
      * @return FieldRow The newly created FieldRow instance.
      */
     private function makeNewRowForField(string $type, Closure|array $callbackOrProps = []): FieldRow {    
-        $newRow = FieldRow::make(
-            $this->provider, 
-            [
-                [
-                    'type'       => $type,
-                    'properties' => $callbackOrProps
-                ]
-            ],
-            [],
-            $this->form, 
-            $this->parentGroup
-        );
+        $newRow = FieldRow::make($this->provider, [], [], $this->form, $this->parentGroup);
 
         if ($this->parentGroup) {
             $this->parentGroup->row($newRow);
         } else if ($this->form) {
             $this->form->row($newRow);
         }
+
+        $newRow->field($type, $callbackOrProps);
 
         return $newRow;
     }
@@ -442,6 +457,14 @@ final class FieldRow implements Serializable {
         }
 
         return $this->childGroup->getFields($collect);
+    }
+
+    protected function filterSerializedProperties(array $properties): array {
+        if ($this->childGroup !== null) {
+            $properties['fields'] = [];
+        }
+
+        return $properties;
     }
 
     // =========================================================================

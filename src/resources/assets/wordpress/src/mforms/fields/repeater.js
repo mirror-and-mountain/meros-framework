@@ -8,6 +8,7 @@ const mformsRepeater = () => {
         numRows: 0,
         id: null,
         name: null,
+        originalName: null,
         ajaxAction: null,
         ajaxurl: null,
         ajaxNonce: null,
@@ -31,8 +32,9 @@ const mformsRepeater = () => {
             if (this.container) {
                 this.id = this.container.id || null;
                 this.name = this.container.dataset.name || null;
+                this.originalName = this.container.dataset.originName || null;
 
-                this.ajaxAction = this.container.dataset.ajaxAction || null;
+                this.ajaxAction = 'meros_open_repeater_edit_form';
                 this.ajaxurl = this.container.dataset.ajaxUrl || null;
                 this.ajaxNonce = this.container.dataset.ajaxNonce || null;
 
@@ -88,6 +90,65 @@ const mformsRepeater = () => {
         // Operations
         // =========================================================================
 
+        replaceIdPrefix(root, oldId, newId) {
+            if (!oldId || !newId || oldId === newId) return;
+
+            const referenceAttributes = [
+                'for',
+                'aria-labelledby',
+                'aria-describedby',
+                'aria-controls',
+                'aria-owns',
+                'aria-activedescendant',
+                'list',
+                'form',
+                'headers',
+            ];
+            const elements = [root, ...root.querySelectorAll('*')];
+
+            elements.forEach((element) => {
+                if (element.id === oldId || element.id.startsWith(`${oldId}-`)) {
+                    element.id = `${newId}${element.id.slice(oldId.length)}`;
+                }
+
+                referenceAttributes.forEach((attribute) => {
+                    const value = element.getAttribute(attribute);
+                    if (!value) return;
+
+                    const updatedValue = value.split(/\s+/).map((reference) => {
+                        return reference === oldId || reference.startsWith(`${oldId}-`)
+                            ? `${newId}${reference.slice(oldId.length)}`
+                            : reference;
+                    }).join(' ');
+
+                    element.setAttribute(attribute, updatedValue);
+                });
+            });
+        },
+
+        updateFieldIdForRow(id, index) {
+            if (!id) return null;
+
+            const withoutTemplate = id.replace(/-template-row-template$/, '');
+            if (withoutTemplate !== id) return `${withoutTemplate}-row-${index}`;
+
+            const rowSuffix = withoutTemplate.match(/-row--?\d+$/)?.[0];
+
+            return rowSuffix
+                ? `${withoutTemplate.slice(0, -rowSuffix.length)}-row-${index}`
+                : withoutTemplate;
+        },
+
+        updateFieldIdForReindex(id, currentIndex, index) {
+            if (!id) return null;
+
+            const rowSuffix = `-row-${currentIndex}`;
+
+            return id.endsWith(rowSuffix)
+                ? `${id.slice(0, -rowSuffix.length)}-row-${index}`
+                : id;
+        },
+
         handleAddRow() {
             const tableBody = this.resolveTableBody();
             if (!tableBody) return;
@@ -105,49 +166,22 @@ const mformsRepeater = () => {
             const fields = this.resolveRowFields(newRow);
 
             const updateName = (index, name) => {
-                return name.replace('[-1]', `[${index}]`).replace('__template', '');
-            };
-
-            const updateId = (index, id) => {
-                return id.replace(/-row-\d+/, `-row-${index}`).replace('-template', '');
+                return name?.replace('[-1]', `[${index}]`).replace('__template', '');
             }
 
+            newRow.querySelectorAll('[name], [data-name]').forEach((element) => {
+                ['name', 'data-name'].forEach((attribute) => {
+                    const value = element.getAttribute(attribute);
+                    if (value) element.setAttribute(attribute, updateName(newRowIndex, value));
+                });
+            });
+
             fields.forEach((field) => {
-                const hasNameAttr = field.hasAttribute('name');
-                const fieldName = hasNameAttr ? field.getAttribute('name') : field.getAttribute('data-name');
                 const fieldId = field.getAttribute('id');
+                const newFieldId = this.updateFieldIdForRow(fieldId, newRowIndex);
 
-                // Replace the template index with the new row index
-                const newFieldName = updateName(newRowIndex, fieldName);
-                const newFieldId = updateId(newRowIndex, fieldId);
-
-                if (hasNameAttr) {
-                    field.setAttribute('name', newFieldName);
-                } else {
-                    field.setAttribute('data-name', newFieldName);
-                    if (field.classList.contains('meros-choice-field')) {
-                        const choiceInputs = field.querySelectorAll('input.meros-choice-field-input');
-
-                        choiceInputs.forEach((input) => {
-                            const inputName = input.getAttribute('name');
-                            const inputId = input.getAttribute('id');
-
-                            const newInputName = updateName(newRowIndex, inputName);
-                            const newInputId = updateId(newRowIndex, inputId);
-
-                            input.setAttribute('name', newInputName);
-                            input.setAttribute('id', newInputId);
-
-                            const label = input.nextElementSibling;
-
-                            if (label && label.tagName === 'LABEL') {
-                                label.setAttribute('for', newInputId);
-                            }
-                        });
-                    }
-                }
+                this.replaceIdPrefix(newRow, fieldId, newFieldId);
                 field.setAttribute('data-repeater-row-index', newRowIndex);
-                field.setAttribute('id', newFieldId);
 
                 const baseName = field.getAttribute('data-repeater-field-name');
                 if (baseName) {
@@ -178,7 +212,7 @@ const mformsRepeater = () => {
         },
 
         handleEditRow(event) {
-            if (!this.name || !this.ajaxurl || !this.ajaxNonce) return;
+            if (!this.name || !this.originalName || !this.ajaxAction || !this.ajaxurl || !this.ajaxNonce) return;
 
             const row = event.target.closest('tr.meros-repeater-table-row');
             if (!row) return;
@@ -186,9 +220,10 @@ const mformsRepeater = () => {
             const rowData = this.getRowData(row);
 
             const formData = new FormData();
-            formData.append('action', this.ajaxAction || 'meros_repeater_edit_form_' + this.name);
+            formData.append('action', this.ajaxAction);
             formData.append('nonce', this.ajaxNonce);
             formData.append('repeater_name', this.name);
+            formData.append('repeater_original_name', this.originalName);
             formData.append('row_data', JSON.stringify(rowData));
 
             fetch(this.ajaxurl, {
@@ -213,6 +248,8 @@ const mformsRepeater = () => {
                             const component = this.getComponent(form);
                             if (component && typeof component.submitForm === 'function') {
                                 const { success, invalid, error } = component.submitForm();
+
+                                console.log(success, invalid, error);
 
                                 if (success) {
                                     modal.hide();
@@ -299,57 +336,30 @@ const mformsRepeater = () => {
 
             const updateName = (currentIndex, index, name) => {
                 const rowPrefix = `${this.name}[${currentIndex}]`;
-                if (!name.startsWith(rowPrefix)) return name;
+                if (!name?.startsWith(rowPrefix)) return name;
 
                 return `${this.name}[${index}]${name.slice(rowPrefix.length)}`;
             };
 
-            const updateId = (currentIndex, index, id) => {
-                return id.replace(`-row-${currentIndex}`, `-row-${index}`);
-            }
-
             rows.forEach((row, index) => {
-                // Update the row's data-row-index attribute
+                const currentIndex = row.getAttribute('data-row-index');
                 row.setAttribute('data-row-index', index);
 
-                // Collect all the field cells in the row
+                row.querySelectorAll('[name], [data-name]').forEach((element) => {
+                    ['name', 'data-name'].forEach((attribute) => {
+                        const value = element.getAttribute(attribute);
+                        if (value) element.setAttribute(attribute, updateName(currentIndex, index, value));
+                    });
+                });
+
                 const fields = this.resolveRowFields(row);
 
                 fields.forEach((field) => {
-                    const currentIndex = field.getAttribute('data-repeater-row-index');
-
-                    const hasNameAttr = field.hasAttribute('name');
-                    const fieldName = hasNameAttr ? field.getAttribute('name') : field.getAttribute('data-name');
                     const fieldId = field.getAttribute('id');
+                    const newFieldId = this.updateFieldIdForReindex(fieldId, currentIndex, index);
 
-                    const newFieldName = updateName(currentIndex, index, fieldName);
-                    const newFieldId = updateId(currentIndex, index, fieldId);
-
-                    if (hasNameAttr) {
-                        field.setAttribute('name', newFieldName);
-                    } else {
-                        field.setAttribute('data-name', newFieldName);
-                        if (field.classList.contains('meros-choice-field')) {
-                            const choiceInputs = field.querySelectorAll('input.meros-choice-field-input');
-
-                            choiceInputs.forEach((input) => {
-                                const inputName = input.getAttribute('name');
-                                const inputId = input.getAttribute('id');
-
-                                input.setAttribute('name', updateName(currentIndex, index, inputName));
-                                input.setAttribute('id', updateId(currentIndex, index, inputId));
-
-                                const newInputId = input.getAttribute('id');
-                                const label = input.nextElementSibling;
-
-                                if (label && label.tagName === 'LABEL') {
-                                    label.setAttribute('for', newInputId);
-                                }
-                            });
-                        }
-                    }
+                    this.replaceIdPrefix(row, fieldId, newFieldId);
                     field.setAttribute('data-repeater-row-index', index);
-                    field.setAttribute('id', newFieldId);
                 })
             })
         },
@@ -450,7 +460,8 @@ const mformsRepeater = () => {
 
         resolveRowFields(row) {
             if (!row) return [];
-            return row.querySelectorAll('.meros-repeater-table-cell--field [data-field-type]');
+            return Array.from(row.querySelectorAll('.meros-repeater-table-cell--field [data-field-type]'))
+                .filter((field) => field.closest('tr.meros-repeater-table-row') === row);
         },
 
         getRowData(row) {

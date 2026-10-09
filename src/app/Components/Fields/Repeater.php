@@ -5,12 +5,13 @@ namespace MM\Meros\App\Components\Fields;
 use Closure;
 use Illuminate\Support\Collection;
 
-use MM\Meros\Contracts\Concerns\UsesAjax;
 use MM\Meros\Contracts\Features\Components\Form;
 use MM\Meros\Contracts\Features\Components\Field;
 
 use MM\Meros\Facades\Components\Forms;
 use MM\Meros\Facades\Components\Fields;
+
+use MM\Meros\Facades\Support\Ajax;
 
 class Repeater extends Field {
     /**
@@ -120,32 +121,18 @@ class Repeater extends Field {
     protected int $maxRows = 0;
 
     /**
-     * The closure used in the repeater's edit form callback.
-     *
-     * @var Closure|null
-     */
-    private ?Closure $intertnalEditFormCallback = null;
-
-    /**
-     * The action name for the registered edit form ajax callback.
-     *
-     * @var string
-     */
-    private string $registeredEditFormAction = '';
-
-    /**
-     * Indicates whether the edit form ajax has been configured.
-     *
-     * @var bool
-     */
-    private bool $editFormAjaxConfigured = false;
-
-    /**
      * The action name for the edit form ajax callback.
      *
      * @var string|null
      */
-    private ?string $editFormAjaxAction = null;
+    private ?string $ajaxUrl = null;
+
+    /**
+     * The ajax nonce used for opening the repeater's edit form if applicable.
+     *
+     * @var string|null
+     */
+    private ?string $ajaxNonce = null;
 
     /**
      * The ajax action name for the repeater's edit form.
@@ -154,7 +141,12 @@ class Repeater extends Field {
      */
     protected string $ajaxAction = '';
 
-    use UsesAjax;
+    /**
+     * Whether to hide the repeater field's label.
+     *
+     * @var boolean
+     */
+    protected bool $hideLabel = false;
 
     protected function configure(): void {
         $this->view('meros::forms.fields.repeater');
@@ -175,12 +167,12 @@ class Repeater extends Field {
             'onInit',
             'onRemove',
             'fields',
-            'ajaxAction',
             'ajaxUrl',
             'ajaxNonce',
+            'hideLabel'
         ]);
+
         $this->setNonPersistableProperties([
-            'ajaxAction',
             'ajaxUrl',
             'ajaxNonce',
         ]);
@@ -191,7 +183,6 @@ class Repeater extends Field {
         $this->instantiateFields();
 
         if ($this->hasEditForm()) {
-            $this->editFormAjaxConfigured = true;
             $this->registerEditFormAjax();
         }
     }
@@ -218,60 +209,39 @@ class Repeater extends Field {
     // =========================================================================
 
     public function __clone(): void {
-        $this->resetAjaxActions();
-        $this->registeredEditFormAction = '';
-        $this->intertnalEditFormCallback = null;
-
         if ($this->editForm instanceof Form) {
             $this->editForm = clone $this->editForm;
         }
     }
 
+    public function getAjaxUrl(): ?string {
+        return $this->ajaxUrl;
+    }
+
+    public function getAjaxNonce(): ?string {
+        return $this->ajaxNonce;
+    }
+
     private function registerEditFormAjax(): void {
-        $this->intertnalEditFormCallback = function (array $postData) {
-            $repeaterName = $postData['repeater_name'] ?? null;
-            if ($this->editFormAjaxAction !== null && is_string($repeaterName) && $repeaterName !== '') {
-                $this->name($repeaterName);
-            }
-
-            $rowData = $postData['row_data'] ?? [];
-            $html = $this->renderEditForm(json_decode(wp_unslash($rowData), true));
-
-            wp_send_json_success([
-                'html' => $html
-            ]);
-        };
-
-        $this->registeredEditFormAction = $this->getEditFormAjaxAction();
-        $this->ajaxAction = $this->registeredEditFormAction;
-        $this->initAjax(
-            $this->registeredEditFormAction,
-            $this->intertnalEditFormCallback
-        );
-    }
-
-    private function getEditFormAjaxAction(): string {
-        return $this->editFormAjaxAction ?? "meros_repeater_edit_form_{$this->getName()}";
-    }
-
-    public function ajaxEditFormAction(string $action): static {
-        if ($this->registeredEditFormAction !== '') {
-            $this->removeAjax($this->registeredEditFormAction);
-            $this->registeredEditFormAction = '';
-        }
-
-        $this->editFormAjaxAction = $action;
-
-        if ($this->hasEditForm() && $this->editFormAjaxConfigured) {
-            $this->registerEditFormAjax();
-        }
-
-        return $this;
+        $this->ajaxUrl = Ajax::getUrl();
+        $this->ajaxNonce = Ajax::getActionNonce('meros_open_repeater_edit_form');
     }
 
     // =========================================================================
     // Attribute Methods
     // =========================================================================
+
+    /**
+     * Sets the field to hide it's label.
+     *
+     * @param boolean $hide
+     *
+     * @return static
+     */
+    public function hideLabel(bool $hide = true): static {
+        $this->hideLabel = $hide;
+        return $this;
+    }
 
     /**
      * Sets whether the repeater allows adding new rows.
@@ -435,22 +405,22 @@ class Repeater extends Field {
     protected function whenNameSet(): void {
         if ($this->hasEditForm()) {
             $newName = $this->getName();
-            $newAction = $this->getEditFormAjaxAction();
+            // $newAction = $this->getEditFormAjaxAction();
 
             $this->editForm->name("{$newName}_edit_form");
 
-            if ($this->registeredEditFormAction === $newAction) {
-                return;
-            }
+            // if ($this->registeredEditFormAction === $newAction) {
+            //     return;
+            // }
 
-            if ($this->registeredEditFormAction !== '') {
-                $this->removeAjax($this->registeredEditFormAction);
-                $this->registeredEditFormAction = '';
-            }
+            // if ($this->registeredEditFormAction !== '') {
+            //     $this->removeAjax($this->registeredEditFormAction);
+            //     $this->registeredEditFormAction = '';
+            // }
 
-            if ($this->editFormAjaxConfigured) {
-                $this->registerEditFormAjax();
-            }
+            // if ($this->editFormAjaxConfigured) {
+            //     $this->registerEditFormAjax();
+            // }
         }
     }
 
@@ -626,7 +596,7 @@ class Repeater extends Field {
             $clone = clone $field;
 
             $name  = $clone->getName();
-            $id    = $clone->getId();
+            $id    = "{$this->id}-{$clone->getId()}";
             $value = $templateRow ? $clone->getDefaultValue() : $rowData->get($name);
 
             // Hydrates lookups
@@ -642,7 +612,7 @@ class Repeater extends Field {
             }
 
             $clone->name("{$this->name}[{$index}][{$name}]");
-            $clone->id($id . '-row-' . $index);
+            $clone->id($templateRow ? "{$id}-row-template" : "{$id}-row-{$index}");
             $clone->default($value);
             $clone->attribute('data-repeater-row-index', $index);
             $clone->attribute('data-repeater-field-name', $name);

@@ -251,7 +251,13 @@ class Form extends Feature implements FormComponent, Makeable {
      * @return static
      */
     final public function name(string $name): static {
-        $this->name = Str::snake($name);
+        $nameParts = explode('[', $name, 2);
+        $this->name = Str::snake($nameParts[0]);
+
+        if (isset($nameParts[1])) {
+            $this->name .= '[' . $nameParts[1];
+        }
+
         return $this;
     }
 

@@ -1,5 +1,315 @@
 @use '../styles/modal.scss';
 
+.meros-form-builder {
+    --mforms-builder-border: #d0d7de;
+    --mforms-builder-muted: #6b7280;
+    --mforms-builder-surface: #ffffff;
+    --mforms-builder-surface-subtle: #f8fafc;
+    --mforms-builder-accent: #2271b1;
+
+    .mforms-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 0.25rem 0;
+    }
+
+    .mforms-row {
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        gap: 0.75rem;
+        min-width: 0;
+    }
+
+    &.mforms-form .mforms-body > .mforms-row {
+        margin: 0;
+    }
+
+    .mforms-builder-field-card,
+    .mforms-builder-group-card {
+        box-sizing: border-box;
+        min-width: 0;
+        border: 1px solid var(--mforms-builder-border);
+        border-radius: 0.5rem;
+        background: var(--mforms-builder-surface);
+        box-shadow: 0 1px 2px rgb(16 24 40 / 5%);
+        transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+    }
+
+    .mforms-builder-field-card {
+        display: flex;
+        flex: 1 1 0;
+        align-items: stretch;
+        gap: 0.75rem;
+        padding: 0.75rem;
+
+        &:hover {
+            border-color: #aebbc8;
+            box-shadow: 0 2px 5px rgb(16 24 40 / 8%);
+        }
+
+        > .mforms-field-drag-handle {
+            display: flex;
+            flex: 0 0 1.75rem;
+            align-items: center;
+            justify-content: center;
+            align-self: stretch;
+            border: 1px solid transparent;
+            border-radius: 0.375rem;
+            color: var(--mforms-builder-muted);
+            font-size: 1.125rem;
+            line-height: 1;
+            cursor: grab;
+            user-select: none;
+            transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+
+            &:hover {
+                border-color: #dbe3ec;
+                background: var(--mforms-builder-surface-subtle);
+                color: var(--mforms-builder-accent);
+            }
+
+            &:active {
+                cursor: grabbing;
+            }
+        }
+    }
+
+    .mforms-builder-field-content {
+        flex: 1 1 0;
+        min-width: 0;
+
+        > .meros-repeater-field {
+            box-sizing: border-box;
+            width: 100%;
+            min-width: 0;
+            margin: 0;
+        }
+
+        .meros-repeater-scroll {
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+            overflow: visible;
+        }
+
+        .meros-repeater-table {
+            width: 100%;
+            min-width: 0;
+
+            .meros-repeater-table-header {
+                background: transparent;
+            }
+
+            th.meros-repeater-table-header-cell {
+                padding: 0.25rem 0.5rem 0.5rem;
+                border-bottom-color: #eef1f4;
+                color: #475569;
+            }
+
+            td.meros-repeater-table-cell {
+                padding: 0.5rem;
+            }
+
+            .meros-repeater-table-footer {
+                background: transparent;
+
+                td.meros-repeater-table-cell--add {
+                    padding: 0.5rem 0 0;
+                    border-top: 0;
+                }
+            }
+        }
+
+        .meros-repeater-table-button {
+            border-radius: 0.375rem;
+        }
+    }
+
+    .mforms-builder-group-card {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 100%;
+        align-items: stretch;
+        min-height: 3.25rem;
+        padding: 0.75rem;
+        color: #344054;
+        font-weight: 600;
+
+        &:hover {
+            border-color: #aebbc8;
+            background: var(--mforms-builder-surface-subtle);
+        }
+    }
+
+    .mforms-builder-remove {
+        align-self: flex-start;
+        padding: 0.375rem 0.625rem;
+        border: 1px solid #f0b4b4;
+        border-radius: 0.375rem;
+        background: #fff;
+        color: #b42318;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        cursor: pointer;
+
+        &:hover {
+            border-color: #b42318;
+            background: #fef3f2;
+        }
+
+        &:focus-visible {
+            outline: 2px solid #b42318;
+            outline-offset: 2px;
+        }
+    }
+
+    .mforms-group-builder-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0 0.25rem 0.75rem;
+        border-bottom: 1px solid #eef1f4;
+        cursor: grab;
+
+        &:active {
+            cursor: grabbing;
+        }
+
+        .mforms-field-drag-handle {
+            color: var(--mforms-builder-muted);
+            font-size: 1.125rem;
+            user-select: none;
+        }
+
+        label {
+            display: flex;
+            flex: 1 1 auto;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 0;
+
+            > span {
+                color: #475569;
+                font-size: 0.8125rem;
+                white-space: nowrap;
+            }
+
+            input {
+                flex: 1 1 auto;
+                max-width: 32rem;
+                margin: 0;
+            }
+        }
+    }
+
+    .meros-group-form-builder {
+        width: 100%;
+        padding: 0.75rem 0.25rem 0;
+        background: transparent;
+
+        .mforms-body {
+            gap: 0.5rem;
+        }
+
+        .mforms-builder-actions {
+            padding-bottom: 0;
+        }
+    }
+
+    .mforms-field-drop-zone {
+        box-sizing: border-box;
+        flex: 0 0 0;
+        width: 0;
+        min-width: 0;
+        align-self: stretch;
+        border: 1px dashed transparent;
+        border-radius: 9999px;
+        opacity: 0;
+        pointer-events: none;
+        transition: width 150ms ease, flex-basis 150ms ease, opacity 150ms ease, background-color 150ms ease, border-color 150ms ease;
+    }
+
+    .mforms-row-drop-zone {
+        box-sizing: border-box;
+        height: 0;
+        margin: 0;
+        border: 1px dashed transparent;
+        border-radius: 9999px;
+        opacity: 0;
+        pointer-events: none;
+        transition: height 150ms ease, margin 150ms ease, opacity 150ms ease, background-color 150ms ease, border-color 150ms ease;
+    }
+
+    .mforms-builder-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        justify-content: center;
+        padding: 0.25rem 0;
+    }
+
+    .mforms-builder-add-field {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.5rem;
+        padding: 0.5rem 1rem;
+        border: 1px solid #b8c4d0;
+        border-radius: 0.5rem;
+        background: var(--mforms-builder-surface);
+        color: #344054;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+
+        > span {
+            color: var(--mforms-builder-accent);
+            font-size: 1.125rem;
+            line-height: 1;
+        }
+
+        &:hover {
+            border-color: var(--mforms-builder-accent);
+            background: #f0f6fc;
+            color: #135e96;
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--mforms-builder-accent);
+            outline-offset: 2px;
+        }
+
+        &:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+    }
+
+    @media (max-width: 782px) {
+        .mforms-row {
+            flex-wrap: wrap;
+        }
+
+        .mforms-builder-field-card {
+            flex-basis: 100%;
+        }
+
+        .mforms-group-builder-header {
+            align-items: flex-start;
+
+            label {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+        }
+    }
+}
+
 // Button Styles
 .meros-admin-button {
     transition: opacity 0.3s ease;

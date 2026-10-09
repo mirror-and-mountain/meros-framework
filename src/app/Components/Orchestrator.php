@@ -16,6 +16,7 @@ use MM\Meros\App\Components\Fields\Repeater;
 use MM\Meros\App\Components\Fields\Select;
 use MM\Meros\App\Components\Fields\Tel;
 use MM\Meros\App\Components\Fields\Text;
+use MM\Meros\App\Components\Fields\TextArea;
 use MM\Meros\App\Components\Fields\Time;
 use MM\Meros\App\Components\Fields\Url;
 use MM\Meros\App\Components\Fields\UsersLookup;
@@ -23,6 +24,11 @@ use MM\Meros\App\Components\Fields\UsersLookup;
 use MM\Meros\App\Components\FieldGroups\SimpleContact;
 
 use MM\Meros\Contracts\Orchestrators\ComponentsOrchestrator;
+
+use MM\Meros\Facades\Support\Ajax;
+use MM\Meros\Facades\Components\Fields;
+
+use Illuminate\Support\Facades\Log;
 
 class Orchestrator extends ComponentsOrchestrator {
     private array $fields = [
@@ -40,6 +46,7 @@ class Orchestrator extends ComponentsOrchestrator {
         'select'       => Select::class,
         'tel'          => Tel::class,
         'text'         => Text::class,
+        'textarea'     => TextArea::class,
         'time'         => Time::class,
         'url'          => Url::class,
         'users-lookup' => UsersLookup::class,
@@ -57,5 +64,38 @@ class Orchestrator extends ComponentsOrchestrator {
         foreach ($this->fieldGroups as $alias => $groupClass) {
             $this->fieldGroups()->register($groupClass, $alias);
         }
+
+        $this->initRepeaterAjax();
+    }
+
+    private function initRepeaterAjax(): void {
+        Ajax::addAction('meros_open_repeater_edit_form', function (array $args) {
+            $name = $args['repeater_name'] ?? '';
+            $originalName = $args['repeater_original_name'] ?? '';
+
+            $repeater = Fields::all()->firstWhere(function ($field) use ($name, $originalName) {
+                return $field->getName() === $name || $field->getName() === $originalName;
+            });
+
+            if ($repeater === null) {
+                wp_send_json_error(['message' => 'Unable to get repeater edit form.']);
+                exit;
+            }
+
+            if ($name !== $originalName && $repeater->getName() === $originalName) {
+                $repeater = Fields::cloneField($repeater, $name);
+            }
+
+            $rowData = $args['row_data'] ?? '';
+            $rowData = json_decode(wp_unslash($rowData), true);
+
+            $html = $repeater->renderEditForm($rowData);
+
+            wp_send_json_success([
+                'html' => $html
+            ]);
+
+            exit;
+        });
     }
 }

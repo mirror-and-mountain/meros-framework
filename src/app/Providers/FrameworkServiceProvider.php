@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Blade;
 
+use MM\Meros\Support\Ajax;
 use MM\Meros\Support\ClassInfo;
 use MM\Meros\Support\Registers;
 use MM\Meros\Support\Context;
@@ -56,6 +57,7 @@ class FrameworkServiceProvider extends MerosServiceProvider {
      * @var array
      */
     private array $helpers = [
+        Ajax::class,
         Context::class,
         Registers::class
     ];

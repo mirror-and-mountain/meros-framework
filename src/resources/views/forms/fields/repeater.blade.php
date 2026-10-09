@@ -9,7 +9,6 @@
     {!! $attributeString !!} 
     data-name="{{ $name }}"
     data-origin-name="{{ $originalName }}"
-    data-ajax-action="{{ $ajaxAction }}"
     data-ajax-url="{{ $ajaxUrl }}"
     data-ajax-nonce="{{ $ajaxNonce }}"
     @if($onInit !== '')
@@ -20,7 +19,9 @@
     @endif
 >
     @if($renderContext !== 'settings')
-        <legend class="meros-repeater-field-legend" style="margin-bottom: 0.5rem;">{{ $label }}</legend>
+        @if ($hideLabel !== true)
+            <legend class="meros-repeater-field-legend" style="margin-bottom: 0.5rem;">{{ $label }}</legend>
+        @endif
         @if($description !== '')
             <div style="margin-bottom: 0.5rem;">
                 <small class="meros-field-description">{!! $description !!}</small>
