@@ -11,8 +11,9 @@ const mform = () => {
     return {
         id: null,
         name: null,
+        ajaxAction: null,
         ajaxUrl: null,
-        submitAjaxNonce: null,
+        ajaxNonce: null,
         conditionsAjaxNonce: null,
         onSubmit: null,
         invalidText: null,
@@ -25,15 +26,16 @@ const mform = () => {
         init() {
             this.id = this.$el.id || null;
             this.name = this.$el.dataset.name || null;
+
+            this.ajaxAction = 'meros_submit_form';
             this.ajaxUrl = this.$el.dataset.ajaxUrl || null;
-            this.submitAjaxNonce = this.$el.dataset.submitAjaxNonce || null;
-            this.conditionsAjaxNonce = this.$el.dataset.conditionsAjaxNonce || null;
+            this.ajaxNonce = this.$el.dataset.ajaxNonce || null;
+
             this.onSubmit = this.$el.dataset.onsubmit || null;
             this.invalidText = this.$el.dataset.invalidText || null;
 
             this.$el.removeAttribute('data-ajax-url');
-            this.$el.removeAttribute('data-submit-ajax-nonce');
-            this.$el.removeAttribute('data-conditions-ajax-nonce');
+            this.$el.removeAttribute('data-ajax-nonce');
             this.$el.removeAttribute('data-invalid-text');
 
             // Nested Alpine components are initialized after this component's init hook.
@@ -50,7 +52,7 @@ const mform = () => {
         // Operations
         // =========================================================================
 
-        submitForm() {
+        submitForm(log = false) {
             const genericError = 'An error occured while submitting the form.'
             const invalidError = this.invalidText || "The form is invalid. Please check the information you've entered."
 
@@ -82,14 +84,16 @@ const mform = () => {
                 return {success: true, error: null};
             }
 
-            if (!this.ajaxUrl || !this.submitAjaxNonce) {
+            if (!this.ajaxUrl || !this.ajaxNonce || !this.ajaxAction) {
                 return {success: false, error: genericError};
             }
 
             const postData = new FormData();
-            postData.append('action', 'meros_handle_form_submission_' + this.name);
-            postData.append('nonce', this.submitAjaxNonce);
 
+            postData.append('action', this.ajaxAction);
+            postData.append('nonce', this.ajaxNonce);
+            postData.append('form_name', this.name);
+            postData.append('form_id', this.id);
             postData.append('form_data', JSON.stringify(formData));
 
             fetch(this.ajaxUrl, {
@@ -98,19 +102,23 @@ const mform = () => {
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
+                if (data.success && data.data) {
+                    console.log(data.data);
                     return {success: true, error: null};
                 }
 
                 else if (data.data && data.data.message) {
+                    console.log(data.data.message);
                     return {success: false, error: data.data.message};
                 }
 
                 else {
+                    console.log('error');
                     return {success: false, error: genericError};
                 }
             })
             .catch((error) => {
+                console.log('error');
                 return {success: false, error: error};
             });
 

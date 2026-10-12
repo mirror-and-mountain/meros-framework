@@ -10,7 +10,6 @@ use MM\Meros\Contracts\Features\Content\PostType;
 use MM\Meros\Contracts\Features\Components\Form as FormComponent;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\FieldRow;
-use MM\Meros\Contracts\Features\Components\Field;
 
 use MM\Meros\App\Components\Fields\Repeater;
 use MM\Meros\App\Components\Fields\Select;
@@ -21,12 +20,12 @@ use MM\Meros\Facades\Components\Fields;
 use MM\Meros\App\Models\Post;
 
 class Form extends PostType {
+
     protected function configure(): void {
         $this->public(true);
         $this->menuIcon('dashicons-feedback');
 
         $this->configureBuilderMetabox();
-        // $this->configurePreviewMetabox();
 
         $this->render(function (string $content, int $postId, Post $post): string {
             $structure = $this->getFormStructure($postId);
@@ -48,19 +47,6 @@ class Form extends PostType {
             }
 
             return $form->html();
-        });
-    }
-
-    private function configurePreviewMetabox(): void {
-        $this->metaBox('form_preview', 'Form Preview', function (\WP_Post $post): void {
-            $unavailable = '<p>This form is not available for preview.</p>';
-            if ($this->renderCallback === null) {
-                echo $unavailable;
-                return;
-            }
-
-            $model = Post::find($post->ID);
-            echo call_user_func($this->renderCallback, '', $post->ID, $model);
         });
     }
 
@@ -112,32 +98,27 @@ class Form extends PostType {
                     'name' => 'field_description'
                 ]);
 
-                $repeater->editForm(function (FormComponent $form) {
-                    $form->field('text', [
-                        'name'     => 'field_type',
-                        'label'    => 'Field Type',
-                        'readonly' => true,
-                    ]);
+                $repeater->editForm(function (FormComponent $form, array $rowData): FormComponent {
+                    $fieldType = $rowData['field_type'] ?? '';
+                    
+                    if (empty($fieldType)) {
+                        return $form;
+                    }
 
-                    $form->field('text', [
-                        'name'  => 'field_name', 
-                        'label' => 'Field Name'
-                    ]);
+                    $fieldClass = Fields::getRegisteredFeatureClass($fieldType);
 
-                    $form->field('text', [
-                        'name'        => 'field_label',
-                        'label'       => 'Field Label',
-                        'description' => 'The label for the field.',
-                    ]);
+                    if (!is_string($fieldClass) || !class_exists($fieldClass)) {
+                        return $form;
+                    }
 
-                    $form->field('text', [
-                        'name'        => 'field_description',
-                        'label'       => 'Field Description',
-                        'description' => 'A description for the field.',
-                    ]);
+                    $controls = $fieldClass::getBuilderControls();
+
+                    if ($controls instanceof FieldGroup) {
+                        $form->section($controls);
+                    }
 
                     return $form;
-                });
+                }, 'Configure', 'Edit Field');
             });
     }
 
@@ -161,8 +142,8 @@ class Form extends PostType {
             }
 
             $formStructure = wp_unslash($_POST['form_components']);
-            $cleanRows = [];
-            $groupIds = [];
+            $cleanRows  = [];
+            $groupIds   = [];
             $fieldNames = [];
             $groupNames = [];
 
@@ -172,8 +153,8 @@ class Form extends PostType {
                 }
 
                 $cleanRow = [];
-                $fields = $this->getSubmittedBuilderValue($rowData, 'fields', []);
-                $group = $this->getSubmittedBuilderValue($rowData, 'childGroup');
+                $fields   = $this->getSubmittedBuilderValue($rowData, 'fields', []);
+                $group    = $this->getSubmittedBuilderValue($rowData, 'childGroup');
 
                 if (is_array($group) && $group !== []) {
                     $cleanRow['childGroup'] = $this->parseSubmittedFieldGroup($group, $groupIds, $fieldNames, $groupNames);
@@ -185,6 +166,8 @@ class Form extends PostType {
                     $cleanRows[] = $cleanRow;
                 }
             }
+
+            // dd($cleanRows);
 
             $formInstance = $this->makeFormInstance(Post::find($postId), $cleanRows);
             $serializedStructure = $formInstance->serialize('storage');
@@ -224,11 +207,26 @@ class Form extends PostType {
                     $fieldNames[$name] = true;
                 }
 
+                $fieldSpecificSettings = $data['__form_data'] ?? '';
+                $decodedSettings = [];
+
+                if (is_string($fieldSpecificSettings) && !empty($fieldSpecificSettings)) {
+                    $settings = json_decode($fieldSpecificSettings, true);
+                    $decodedSettings = is_array($settings) ? $settings : [];
+                    unset(
+                        $decodedSettings['type'],
+                        $decodedSettings['name'],
+                        $decodedSettings['label'],
+                        $decodedSettings['description']
+                    );
+                }
+
                 $fields[] = [
                     'type'        => $data['field_type'],
                     'name'        => $name,
                     'label'       => is_string($data['field_label'] ?? null) ? $data['field_label'] : '',
                     'description' => is_string($data['field_description'] ?? null) ? $data['field_description'] : '',
+                    ...$decodedSettings
                 ];
 
                 return;
@@ -272,12 +270,8 @@ class Form extends PostType {
                             continue;
                         }
 
-                        $definitions[] = [
-                            'type'        => $type,
-                            'name'        => $field['name'],
-                            'label'       => $field['label'],
-                            'description' => $field['description'],
-                        ];
+                        $field['type'] = $type;
+                        $definitions[] = $field;
                     }
                 }
 
@@ -359,10 +353,8 @@ class Form extends PostType {
 
                 if (!empty($rowFields)) {
                     foreach ($rowFields as $fieldData) {
-                        $fieldType        = $fieldData['type'] ?? '';
-                        $fieldName        = $fieldData['name'] ?? '';
-                        $fieldLabel       = $fieldData['label'] ?? '';
-                        $fieldDescription = $fieldData['description'] ?? '';
+                        $fieldType = $fieldData['type'] ?? '';
+                        $fieldName = $fieldData['name'] ?? '';
 
                         if ($fieldType === '' || $fieldName === '') {
                             continue;
@@ -376,11 +368,9 @@ class Form extends PostType {
                             }
                         }
 
-                        $row->field($fieldType, function (Field $field) use ($fieldName, $fieldLabel, $fieldDescription) {
-                            $field->name($fieldName);
-                            $field->label($fieldLabel);
-                            $field->description($fieldDescription);
-                        });
+                        $fieldProperties = $fieldData;
+                        unset($fieldProperties['type']);
+                        $row->field($fieldType, $fieldProperties);
                     }
                 }
 

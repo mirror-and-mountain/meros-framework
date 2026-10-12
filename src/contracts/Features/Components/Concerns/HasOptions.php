@@ -103,13 +103,35 @@ trait HasOptions {
 
         $default = $this->getDefaultValue();
 
-        if ($this->allowsMultiple && empty($default)) {
-            $this->default([array_key_first($options)]);
-        } else if (empty($default)) {
-            $this->default(array_key_first($options));
+        if ($this->allowsMultiple === false && empty($default)) {
+            $this->default(array_key_first($this->options));
         }
 
         return $this;
+    }
+
+    /**
+     * Internal helper for the form builder to retrieve a list of the field's options for configuration
+     * in the form builder.
+     *
+     * @param array $rawOptions
+     *
+     * @return array
+     */
+    public static function getConfigurableOptions(array $rawOptions): array {
+        $options = [];
+        foreach ($rawOptions as $value => $label) {
+            if (!is_string($value) || !is_string($label)) {
+                continue;
+            }
+
+            $options[] = [
+                'value' => $value,
+                'label' => $label
+            ];
+        }
+
+        return $options;
     }
 
     /**
@@ -121,14 +143,21 @@ trait HasOptions {
      */
     private function sanitizeOptions(array $options): array {
         $checkedOptions = [];
-        foreach ($options as $value => $label) {
+        foreach ($options as $key => $config) {
+            if (is_array($config)) {
+                $value = $config['value'] ?? '';
+                $label = $config['label'] ?? '';
+            } else {
+                $value = $key;
+                $label = $config;
+            }
+
             if (!is_string($label) || empty($label)) {
                 continue;
             }
 
             if (is_int($value)) {
-                $value = Str::title(Str::replace(['-', '_'], ' ', $value));
-                $checkedOptions[$value] = $label;
+                $value = Str::snake($label);
             }
 
             $checkedOptions[$value] = $label;

@@ -21,14 +21,10 @@ use MM\Meros\App\Components\Fields\Time;
 use MM\Meros\App\Components\Fields\Url;
 use MM\Meros\App\Components\Fields\UsersLookup;
 
-use MM\Meros\App\Components\FieldGroups\SimpleContact;
-
 use MM\Meros\Contracts\Orchestrators\ComponentsOrchestrator;
 
 use MM\Meros\Facades\Support\Ajax;
 use MM\Meros\Facades\Components\Fields;
-
-use Illuminate\Support\Facades\Log;
 
 class Orchestrator extends ComponentsOrchestrator {
     private array $fields = [
@@ -52,20 +48,26 @@ class Orchestrator extends ComponentsOrchestrator {
         'users-lookup' => UsersLookup::class,
     ];
 
-    private array $fieldGroups = [
-        'simple-contact-fields' => SimpleContact::class,
-    ];
-
     protected function configure(): void {
         foreach ($this->fields as $alias => $fieldClass) {
             $this->fields()->register($fieldClass, $alias);
         }
 
-        foreach ($this->fieldGroups as $alias => $groupClass) {
-            $this->fieldGroups()->register($groupClass, $alias);
-        }
-
+        $this->initFormAjax();
         $this->initRepeaterAjax();
+    }
+
+    private function initFormAjax(): void {
+        Ajax::addAction('meros_submit_form', function (array $args) {
+            $data = json_decode(stripslashes($args['form_data'] ?? '{}'), true);
+
+            wp_send_json_success([
+                'message' => 'Form submitted successfully.',
+                'data'    => $data
+            ]);
+            exit;
+
+        });
     }
 
     private function initRepeaterAjax(): void {

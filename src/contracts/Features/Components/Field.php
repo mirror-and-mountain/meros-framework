@@ -11,6 +11,9 @@ use MM\Meros\Contracts\Features\Components\Concerns\IsFormComponent;
 
 use MM\Meros\App\Components\Fields\Repeater;
 
+use MM\Meros\Facades\Framework;
+use MM\Meros\Facades\Components\FieldGroups;
+
 abstract class Field extends Feature implements FormComponent {
     /**
      * The field's unique handle.
@@ -262,6 +265,61 @@ abstract class Field extends Feature implements FormComponent {
      */
     public static function getRowPositions(): int {
         return static::$occupiesRowPositions > 3 ? 3 : static::$occupiesRowPositions;
+    }
+
+    /**
+     * Returns a FieldGroup instance providing additional controls for this field type
+     * in the form builder.
+     *
+     * @return FieldGroup
+     */
+    public static function getBuilderControls(): ?FieldGroup {
+        return self::getBuilderControlsGroup(function (FieldGroup $group) {
+            $group->field('text', [
+                'name'        => 'field_type',
+                'label'       => 'Field Type',
+                'readonly'    => true,
+                'description' => "The field's type."
+            ]);
+
+            $group->field('text', [
+                'name'        => 'field_name', 
+                'label'       => 'Field Name',
+                'description' => "The field's unique name."
+            ]);
+
+            $group->field('text', [
+                'name'        => 'field_label',
+                'label'       => 'Field Label',
+                'description' => "The field's label.",
+            ]);
+
+            $group->field('text', [
+                'name'        => 'field_description',
+                'label'       => 'Field Description',
+                'description' => "The field's description.",
+            ]);
+
+            $group->field('checkbox', [
+                'name'  => 'required',
+                'label' => 'Required'
+            ]);
+        });
+    }
+
+    /**
+     * Internal helper to create a FieldGroup instance for rendering the field's controls
+     * in the form builder.
+     *
+     * @param Closure $callback
+     *
+     * @return FieldGroup
+     */
+    final protected static function getBuilderControlsGroup(Closure $callback): FieldGroup { 
+        return FieldGroups::checkout(Framework::get())
+            ->make(function (FieldGroup $group) use ($callback) {
+                call_user_func($callback, $group);
+            });
     }
 
     // =========================================================================

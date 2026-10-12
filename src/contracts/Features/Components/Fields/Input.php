@@ -2,7 +2,10 @@
 
 namespace MM\Meros\Contracts\Features\Components\Fields;
 
+use Illuminate\Support\Str;
+
 use MM\Meros\Contracts\Features\Components\Field;
+use MM\Meros\Contracts\Features\Components\FieldGroup;
 
 abstract class Input extends Field {
     protected bool   $showsIcon = false;
@@ -55,6 +58,22 @@ abstract class Input extends Field {
         }
 
         return $this;
+    }
+
+    public static function getBuilderControls(): ?FieldGroup {
+        $group = parent::getBuilderControls();
+
+        $group->field('text', [
+            'name'  => 'placeholder',
+            'label' => 'Placeholder'
+        ]);
+
+        $group->field(Str::lower(class_basename(static::class)), [
+            'name'  => 'defaultValue',
+            'label' => 'Default Value'
+        ]);
+
+        return $group;
     }
 
     // =========================================================================

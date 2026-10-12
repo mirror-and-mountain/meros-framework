@@ -12,11 +12,11 @@
     class="mforms-form"
     data-name="{{ $name }}"
     data-ajax-url="{{ $ajaxUrl }}"
-    data-submit-ajax-nonce="{{ $submitAjaxNonce }}"
+    data-ajax-nonce="{{ $ajaxNonce }}"
     data-invalid-text="{{ $invalidText }}"
     {!! $attributeString !!}
     {{ is_string($onSubmit) ? "data-onsubmit={$onSubmit}" : '' }}
-    @submit.prevent="submitForm()"
+    @submit.prevent="submitForm(true)"
 >
     @if($title !== '')
         <h2 class="mforms-form-title">{{ $title }}</h2>

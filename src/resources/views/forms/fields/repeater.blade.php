@@ -9,6 +9,7 @@
     {!! $attributeString !!} 
     data-name="{{ $name }}"
     data-origin-name="{{ $originalName }}"
+    data-form-title="{{ $formTitle }}"
     data-ajax-url="{{ $ajaxUrl }}"
     data-ajax-nonce="{{ $ajaxNonce }}"
     @if($onInit !== '')
@@ -109,7 +110,7 @@
                                                 class="meros-repeater-table-button meros-repeater-table-button--edit" 
                                                 @click.prevent="handleEditRow($event)"
                                             >
-                                                {{ $formText }}
+                                                {{ $editText }}
                                             </button>
                                         @endif
                                         @if($allowsRemove)

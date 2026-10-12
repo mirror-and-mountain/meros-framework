@@ -54,7 +54,14 @@ class Repeater extends Field {
      *
      * @var string
      */
-    protected string $formText = 'Edit';
+    protected string $editText = 'Edit';
+
+    /**
+     * The title of the repeater's edit form.
+     *
+     * @var string
+     */
+    protected string $formTitle = 'Edit Row';
 
     /**
      * The text to display when the repeater has no rows.
@@ -121,7 +128,7 @@ class Repeater extends Field {
     protected int $maxRows = 0;
 
     /**
-     * The action name for the edit form ajax callback.
+     * WP's ajax url.
      *
      * @var string|null
      */
@@ -133,13 +140,6 @@ class Repeater extends Field {
      * @var string|null
      */
     private ?string $ajaxNonce = null;
-
-    /**
-     * The ajax action name for the repeater's edit form.
-     *
-     * @var string
-     */
-    protected string $ajaxAction = '';
 
     /**
      * Whether to hide the repeater field's label.
@@ -157,7 +157,8 @@ class Repeater extends Field {
         $this->dataType('array.object');
         $this->setSerializableProperties([
             'emptyText',
-            'formText',
+            'editText',
+            'formTitle',
             'allowsAdd',
             'addText',
             'allowsRemove',
@@ -214,17 +215,17 @@ class Repeater extends Field {
         }
     }
 
+    private function registerEditFormAjax(): void {
+        $this->ajaxUrl = Ajax::getUrl();
+        $this->ajaxNonce = Ajax::getActionNonce('meros_open_repeater_edit_form');
+    }
+
     public function getAjaxUrl(): ?string {
         return $this->ajaxUrl;
     }
 
     public function getAjaxNonce(): ?string {
         return $this->ajaxNonce;
-    }
-
-    private function registerEditFormAjax(): void {
-        $this->ajaxUrl = Ajax::getUrl();
-        $this->ajaxNonce = Ajax::getActionNonce('meros_open_repeater_edit_form');
     }
 
     // =========================================================================
@@ -362,25 +363,32 @@ class Repeater extends Field {
      *
      * @return static
      */
-    public function editForm(Closure $callback, string $buttonText = ''): static {
+    public function editForm(Closure $callback, string $buttonText = '', string $formTitle = ''): static {
         $this->editFormCallback = $callback;
 
         if (!empty($buttonText)) {
-            $this->formText = $buttonText;
+            $this->editText = $buttonText;
         }
 
-        $this->editForm = Forms::checkout($this->getProvider())->make(function (Form $form) {
-            $form->id("{$this->id}-edit-form");
-            $form->name("{$this->name}_edit_form");
-            $form->onSubmit('meros_repeater_form_submit');
-            $form->hideSubmitButton(true);
-            $form->attribute('data-repeater-edit-form', 'true');
-        });
+        if (!empty($formTitle)) {
+            $this->formTitle = $formTitle;
+        }
 
-        $this->field('hidden', function ($field) {
-            $field->name('__form_data');
-            $field->label('Form Data');
-        });
+        if ($this->editForm === null) {
+            $this->editForm = Forms::checkout($this->getProvider())
+                ->make(function (Form $form) {
+                    $form->id("{$this->id}-edit-form");
+                    $form->name("{$this->name}_edit_form");
+                    $form->onSubmit('meros_repeater_form_submit');
+                    $form->hideSubmitButton(true);
+                    $form->attribute('data-repeater-edit-form', 'true');
+                });
+
+            $this->field('hidden', function ($field) {
+                $field->name('__form_data');
+                $field->label('Form Data');
+            });
+        }
 
         return $this;
     }
@@ -393,7 +401,19 @@ class Repeater extends Field {
      * @return static
      */
     public function editRowText(string $text): static {
-        $this->formText = $text;
+        $this->editText = $text;
+        return $this;
+    }
+
+    /**
+     * Sets the title of the field's row edit form.
+     *
+     * @param string $text
+     *
+     * @return static
+     */
+    public function editFormTitle(string $text): static {
+        $this->formTitle = $text;
         return $this;
     }
 
@@ -405,22 +425,7 @@ class Repeater extends Field {
     protected function whenNameSet(): void {
         if ($this->hasEditForm()) {
             $newName = $this->getName();
-            // $newAction = $this->getEditFormAjaxAction();
-
             $this->editForm->name("{$newName}_edit_form");
-
-            // if ($this->registeredEditFormAction === $newAction) {
-            //     return;
-            // }
-
-            // if ($this->registeredEditFormAction !== '') {
-            //     $this->removeAjax($this->registeredEditFormAction);
-            //     $this->registeredEditFormAction = '';
-            // }
-
-            // if ($this->editFormAjaxConfigured) {
-            //     $this->registerEditFormAjax();
-            // }
         }
     }
 
@@ -441,6 +446,19 @@ class Repeater extends Field {
         }
 
         return $this->editFormCallback !== null && $this->editForm instanceof Form;
+    }
+
+    /**
+     * Returns the repeater's existing edit form if it exists.
+     *
+     * @return Form|null
+     */
+    public function getEditForm(): ?Form {
+        return $this->editForm;
+    }
+
+    public function getEditFormCallback(): ?Closure {
+        return $this->editFormCallback;
     }
 
     // =========================================================================

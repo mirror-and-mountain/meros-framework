@@ -4,7 +4,12 @@ namespace MM\Meros\App\Livewire;
 
 use Livewire\Component;
 
+use MM\Meros\Contracts\Features\Components\Form;
+use MM\Meros\Contracts\Features\Components\FieldGroup;
+
 use MM\Meros\App\Components\Fields\Repeater;
+use MM\Meros\App\Components\Fields\Select;
+
 use MM\Meros\Facades\Components\Fields;
 
 class FormBuilder extends Component {
@@ -61,13 +66,18 @@ class FormBuilder extends Component {
             return null;
         }
 
+        if (array_key_exists('options', $field)) {
+            $field['options'] = Select::getConfigurableOptions($field['options']);
+        }
+
         $component->label('Field Component');
         $component->default([
             [
                 'field_type'        => $field['type'] ?? $field['field_type'] ?? '',
                 'field_name'        => $field['name'] ?? '',
                 'field_label'       => $field['label'] ?? '',
-                'field_description' => $field['description'] ?? ''
+                'field_description' => $field['description'] ?? '',
+                '__form_data'       => json_encode($field)
             ]
         ]);
 

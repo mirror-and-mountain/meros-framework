@@ -12,11 +12,11 @@ use MM\Meros\Contracts\Features\Makeable;
 use MM\Meros\Contracts\Features\Concerns\IsMakeable;
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 
-use MM\Meros\Contracts\Concerns\UsesAjax;
 use MM\Meros\Contracts\Features\Components\Concerns\IsFormComponent;
 use MM\Meros\Contracts\Features\Components\Concerns\MakesFieldRows;
 
 use MM\Meros\Facades\Components\Fields;
+use MM\Meros\Facades\Support\Ajax;
 
 class Form extends Feature implements FormComponent, Makeable {
     /**
@@ -82,11 +82,24 @@ class Form extends Feature implements FormComponent, Makeable {
      */
     protected bool $hideSubmitButton = false;
 
+    /**
+     * WP's ajax url.
+     *
+     * @var string|null
+     */
+    private ?string $ajaxUrl = null;
+
+    /**
+     * The ajax nonce used for submitting the form.
+     *
+     * @var string|null
+     */
+    private ?string $ajaxNonce = null;
+
     use IsFormComponent,
         IsMakeable,
         MakesFieldRows,
-        InstantiatesItems,
-        UsesAjax;
+        InstantiatesItems;
 
     // =========================================================================
     // Initialisation
@@ -102,8 +115,8 @@ class Form extends Feature implements FormComponent, Makeable {
             'description',
             'attributeString',
             'rows',
-            'submitAjaxNonce',
             'ajaxUrl',
+            'ajaxNonce',
             'submitText',
             'invalidText',
             'onSubmit',
@@ -111,8 +124,8 @@ class Form extends Feature implements FormComponent, Makeable {
         ]));
 
         $this->setNonPersistableProperties([
-            'submitAjaxNonce',
             'ajaxUrl',
+            'ajaxNonce',
         ]);
 
         // Need to update this bit...
@@ -133,18 +146,25 @@ class Form extends Feature implements FormComponent, Makeable {
             return;
         }
 
-        $this->initAjax("meros_handle_form_submission_{$this->getName()}", function (array $postData) {
-            $data = json_decode(stripslashes($postData['form_data'] ?? '{}'), true);
-            $this->handleFormSubmission($data);
-
-            wp_send_json_success(['message' => 'Form submitted successfully.']);
-        });
+        $this->initFormAjax();
     }
 
-    final protected function getSubmitAjaxNonce(): string {
-        return $this->getAjaxNonce("meros_handle_form_submission_{$this->getName()}");
+    // =========================================================================
+    // Ajax Handling
+    // =========================================================================
+
+    private function initFormAjax(): void {
+        $this->ajaxUrl = Ajax::getUrl();
+        $this->ajaxNonce = Ajax::getActionNonce('meros_submit_form');
     }
 
+    public function getAjaxUrl(): ?string {
+        return $this->ajaxUrl;
+    }
+
+    public function getAjaxNonce(): ?string {
+        return $this->ajaxNonce;
+    }
     /**
      * Handles the form submission by executing the onSubmit callback if it exists and is a Closure.
      * May be overridden in subclasses to provide custom form submission handling logic.
@@ -153,10 +173,15 @@ class Form extends Feature implements FormComponent, Makeable {
      *
      * @return void
      */
-    protected function handleFormSubmission(array $data): void {
+    public function handleFormSubmission(array $data): void {
         if ($this->onSubmit instanceof Closure) {
             call_user_func($this->onSubmit, $data);
         }
+
+        wp_send_json_success([
+            'message' => 'Form submitted successfully.',
+            'data'    => $data
+        ]);
     }
 
     // =========================================================================

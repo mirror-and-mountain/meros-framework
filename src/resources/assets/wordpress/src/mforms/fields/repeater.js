@@ -19,6 +19,7 @@ const mformsRepeater = () => {
         maxRows: 0,
         addRowButton: null,
         fieldsProcessor: null,
+        formTitle: 'Edit Row',
 
         // =========================================================================
         // Initialisation
@@ -37,6 +38,7 @@ const mformsRepeater = () => {
                 this.ajaxAction = 'meros_open_repeater_edit_form';
                 this.ajaxurl = this.container.dataset.ajaxUrl || null;
                 this.ajaxNonce = this.container.dataset.ajaxNonce || null;
+                this.formTitle = this.container.dataset.formTitle || 'Edit Row';
 
                 this.maxRows = this.container.dataset.maxRows ? parseInt(this.container.dataset.maxRows) : 0;
                 this.addRowButton = this.container.querySelector('.meros-repeater-table-button--add');
@@ -226,6 +228,16 @@ const mformsRepeater = () => {
             formData.append('repeater_original_name', this.originalName);
             formData.append('row_data', JSON.stringify(rowData));
 
+            const modal = new MerosModal(
+                this.formTitle,
+                'Loading...',
+                'Save',
+                'Cancel',
+                false
+            );
+
+            modal.show();
+
             fetch(this.ajaxurl, {
                 method: 'POST',
                 body: formData,
@@ -233,14 +245,9 @@ const mformsRepeater = () => {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success && data.data && data.data.html) {
-                        const modal = new MerosModal(
-                            'Edit Row',
-                            data.data.html,
-                            'Save',
-                            'Cancel',
-                            false
-                        );
+                        const html = data.data.html;
 
+                        modal.setContent(html);
                         modal.onConfirm((modalElement) => {
                             const form = modalElement.querySelector('form')
                             if (!form) return;
@@ -248,8 +255,6 @@ const mformsRepeater = () => {
                             const component = this.getComponent(form);
                             if (component && typeof component.submitForm === 'function') {
                                 const { success, invalid, error } = component.submitForm();
-
-                                console.log(success, invalid, error);
 
                                 if (success) {
                                     modal.hide();
@@ -266,23 +271,26 @@ const mformsRepeater = () => {
                         });
 
                         this.editingRowIndex = row.getAttribute('data-row-index');
-                        modal.show();
                     }
 
                     else if (data.data && data.data.message) {
+                        modal.destroy();
                         console.error('Error fetching edit form:', data.data.message);
                     }
 
                     else {
+                        modal.destroy();
                         console.error('Unexpected response:', data);
                     }
                 })
                 .catch((error) => {
+                    modal.destroy();
                     console.error('Error fetching edit form:', error);
                 });
         },
 
         handleRowFormSubmit(formData) {
+            console.log(formData);
             const rowIndex = this.editingRowIndex;
             if (rowIndex === null) return;
 
