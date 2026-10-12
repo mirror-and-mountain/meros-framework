@@ -412,9 +412,16 @@ export default class MerosFieldsProcessor {
      * @returns {object|null} Matching field, or null when it cannot be resolved.
      */
     getFieldByConditionName(name, relativeField = null) {
+        const normalizeFieldName = fieldName => String(fieldName)
+            .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+            .replace(/[-\s]+/g, '_')
+            .toLowerCase();
+        const normalizedName = normalizeFieldName(name);
         const matches = Object.values(this.fields).filter(
             field => field.baseName === name ||
+                normalizeFieldName(field.baseName) === normalizedName ||
                 field.name === name ||
+                normalizeFieldName(field.name) === normalizedName ||
                 field.id === name ||
                 field.baseId === name
         );
@@ -465,6 +472,10 @@ export default class MerosFieldsProcessor {
     getControlValue(control, component) {
         if (component && typeof component.getValue === 'function') {
             return component.getValue();
+        }
+
+        if (control.matches('input[type="checkbox"]')) {
+            return control.checked;
         }
 
         const checkedInputs = control.querySelectorAll('input[type="checkbox"]:checked');
@@ -675,18 +686,23 @@ export default class MerosFieldsProcessor {
             component.setValue(value);
         }
 
-        const controls = field.control.querySelectorAll('input, select, textarea');
-        if (controls.length > 0 && (controls[0].type === 'checkbox' || controls[0].type === 'radio')) {
-            const values = new Set((Array.isArray(value) ? value : [value]).map(item => String(item ?? '')));
-            controls.forEach(control => {
-                control.checked = values.has(control.value);
-            });
-        } else if (field.control.multiple && Array.isArray(value)) {
-            Array.from(field.control.options).forEach(option => {
-                option.selected = value.map(String).includes(option.value);
-            });
-        } else if ('value' in field.control) {
-            field.control.value = value ?? '';
+        if (field.control.matches('input[type="checkbox"]')) {
+            field.control.checked = value === true || value === 1 || value === '1' ||
+                (typeof value === 'string' && value.toLowerCase() === 'true');
+        } else {
+            const controls = field.control.querySelectorAll('input, select, textarea');
+            if (controls.length > 0 && (controls[0].type === 'checkbox' || controls[0].type === 'radio')) {
+                const values = new Set((Array.isArray(value) ? value : [value]).map(item => String(item ?? '')));
+                controls.forEach(control => {
+                    control.checked = values.has(control.value);
+                });
+            } else if (field.control.multiple && Array.isArray(value)) {
+                Array.from(field.control.options).forEach(option => {
+                    option.selected = value.map(String).includes(option.value);
+                });
+            } else if ('value' in field.control) {
+                field.control.value = value ?? '';
+            }
         }
 
         if (component?.ts && typeof component.ts.setValue === 'function') {

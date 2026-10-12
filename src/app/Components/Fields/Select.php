@@ -3,10 +3,11 @@
 namespace MM\Meros\App\Components\Fields;
 
 use MM\Meros\Contracts\Features\Components\Field;
+use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\Concerns\HasOptions;
 
+use MM\Meros\App\Components\Fields\Checkbox;
 use MM\Meros\App\Components\Fields\Repeater;
-use MM\Meros\Contracts\Features\Components\FieldGroup;
 
 class Select extends Field {
     use HasOptions;
@@ -29,10 +30,21 @@ class Select extends Field {
             ]);
         });
 
-        $group->field('checkbox', [
-            'name'  => 'allowsMultiple',
-            'label' => 'Allow Multiple Values'
-        ]);
+        $group->field('checkbox', function (Checkbox $field) {
+            $field->name('allowsMultiple');
+            $field->label('Allow Multiple Values');
+        });
+
+        $group->field('checkbox', function (Checkbox $field) {
+            $field->name('searchable');
+            $field->label('Searchable');
+            $field->setValueWhen([
+                ['allowsMultiple', '=', true, true]
+            ]);
+            $field->disableWhen([
+                ['allowsMultiple', '=', true]
+            ]);
+        });
 
         return $group;
     }
@@ -43,7 +55,7 @@ class Select extends Field {
         $this->additionalDataTypes(['array.scalar']);
         $this->view('meros::forms.fields.select');
         
-        $this->setSerializableProperties(['allowsMultiple', 'options']);
+        $this->setSerializableProperties(['allowsMultiple', 'options', 'searchable']);
         $this->addSupports(['multiple']);
     }
 
@@ -62,6 +74,15 @@ class Select extends Field {
         }
 
         return $this;
+    }
+
+    /**
+     * Returns whether the field is searchable.
+     *
+     * @return boolean
+     */
+    public function isSearchable(): bool {
+        return $this->hasAttribute('ts-searchable');
     }
 
     protected function whenMultipleSet(bool $allow): void {
@@ -83,6 +104,10 @@ class Select extends Field {
 
         if (array_key_exists('allowsMultiple', $this->passedProps)) {
             $this->multiple((bool) $this->passedProps['allowsMultiple']);
+        }
+
+        if (array_key_exists('searchable', $this->passedProps)) {
+            $this->searchable((bool) $this->passedProps['searchable']);
         }
     }
 }

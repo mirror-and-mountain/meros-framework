@@ -248,6 +248,10 @@ const mformsRepeater = () => {
                         const html = data.data.html;
 
                         modal.setContent(html);
+                        if (window.Alpine && typeof window.Alpine.initTree === 'function') {
+                            window.Alpine.initTree(modal.content);
+                        }
+
                         modal.onConfirm((modalElement) => {
                             const form = modalElement.querySelector('form')
                             if (!form) return;
