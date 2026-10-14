@@ -875,6 +875,26 @@ class PostType extends Feature implements Makeable, Registrable {
     }
 
     /**
+     * Disables the block editor for specific posts of this type, but maintains the ability to create a block template
+     * for the CPT in the site editor.
+     *
+     * @return static
+     */
+    final public function useBlockTemplate(): static {
+        $this->useBlocks();
+
+        add_filter('use_block_editor_for_post', function (bool $useBlockEditor, \WP_Post $post){
+            if ($post->post_type === $this->handle) {
+                return false;
+            }
+
+            return $useBlockEditor;
+        }, 10, 2);
+
+        return $this;
+    }
+
+    /**
      * Sets an array of allowed blocks for the post type when using the block editor.
      *
      * @param array $blocks

@@ -8,6 +8,7 @@ const mformsRepeater = () => {
         numRows: 0,
         id: null,
         name: null,
+        formId: null,
         originalName: null,
         ajaxAction: null,
         ajaxurl: null,
@@ -39,6 +40,11 @@ const mformsRepeater = () => {
                 this.ajaxurl = this.container.dataset.ajaxUrl || null;
                 this.ajaxNonce = this.container.dataset.ajaxNonce || null;
                 this.formTitle = this.container.dataset.formTitle || 'Edit Row';
+
+                const form = this.container.closest('.mforms-form');
+                if (form) {
+                    this.formId = form.id;
+                }
 
                 this.maxRows = this.container.dataset.maxRows ? parseInt(this.container.dataset.maxRows) : 0;
                 this.addRowButton = this.container.querySelector('.meros-repeater-table-button--add');
@@ -220,6 +226,7 @@ const mformsRepeater = () => {
             if (!row) return;
 
             const rowData = this.getRowData(row);
+            const currentValue = this.getValue();
 
             const formData = new FormData();
             formData.append('action', this.ajaxAction);
@@ -227,6 +234,13 @@ const mformsRepeater = () => {
             formData.append('repeater_name', this.name);
             formData.append('repeater_original_name', this.originalName);
             formData.append('row_data', JSON.stringify(rowData));
+            formData.append('current_value', JSON.stringify(currentValue));
+            formData.append('form_id', this.formId);
+
+            const formId = this.container.dataset.formId;
+            if (formId) {
+                formData.append('form_id', formId);
+            }
 
             const modal = new MerosModal(
                 this.formTitle,

@@ -47,6 +47,13 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
     protected string $title = '';
 
     /**
+     * The field group's description.
+     *
+     * @var string
+     */
+    protected string $description = '';
+
+    /**
      * The field group's parent Form instance, if any.
      *
      * @var Form|null
@@ -59,6 +66,13 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      * @var string
      */
     private string $view = 'meros::forms.field-group';
+
+    /**
+     * The field group's visibility conditions.
+     *
+     * @var array
+     */
+    protected array $conditions = [];
 
     use IsFormComponent,
         IsMakeable,
@@ -79,6 +93,8 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
             'description',
             'rows',
             'metaBox',
+            'conditions',
+            'conditionsString',
             'ajaxUrl',
             'ajaxNonce'
         ]));
@@ -217,6 +233,82 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
         $this->name = $name;
 
         return $this;
+    }
+
+    /**
+     * Shows the field group when the given field rules match.
+     *
+     * @param array $rules
+     * @param string $logic
+     *
+     * @return static
+     */
+    final public function showWhen(array $rules, string $logic = 'AND'): static {
+        $this->processVisibilityRules('show', $rules, $logic);
+        return $this;
+    }
+
+    /**
+     * Hides the field group when the given field rules match.
+     *
+     * @param array $rules
+     * @param string $logic
+     *
+     * @return static
+     */
+    final public function hideWhen(array $rules, string $logic = 'AND'): static {
+        $this->processVisibilityRules('hide', $rules, $logic);
+        return $this;
+    }
+
+    /**
+     * Stores visibility rules in the format consumed by form condition handling.
+     *
+     * @param string $type
+     * @param array $rules
+     * @param string $logic
+     *
+     * @return void
+     */
+    private function processVisibilityRules(string $type, array $rules, string $logic): void {
+        $operators = ['=', '!=', 'LIKE', 'CONTAINS', 'NOT CONTAINS', '<', '>', '=>', '=<'];
+        $processedRules = [];
+
+        foreach ($rules as $rule) {
+            if (
+                !is_array($rule) ||
+                !isset($rule[0], $rule[1]) ||
+                !is_string($rule[0]) ||
+                !in_array($rule[1], $operators, true) ||
+                !array_key_exists(2, $rule)
+            ) {
+                continue;
+            }
+
+            $processedRules[] = [
+                'field' => $rule[0],
+                'operator' => $rule[1],
+                'source_value' => $rule[2],
+            ];
+        }
+
+        $this->conditions[$type] = [
+            'rules' => $processedRules,
+            'logic' => in_array($logic, ['AND', 'OR'], true) ? $logic : 'AND',
+        ];
+    }
+
+    /**
+     * Returns this group's visibility conditions as JSON.
+     *
+     * @return string
+     */
+    final public function getConditionsString(): string {
+        return empty($this->conditions) ? 'false' : json_encode($this->conditions);
+    }
+
+    final public function getConditions(): array {
+        return $this->conditions;
     }
 
     /**

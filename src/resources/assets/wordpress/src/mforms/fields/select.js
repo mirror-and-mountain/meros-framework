@@ -3,6 +3,8 @@ import TomSelect from 'tom-select';
 const mformsSelect = () => {
     return {
         name: null,
+        originalName: null,
+        formId: null,
         multiple: false,
         searchable: false,
         ts: null,
@@ -16,19 +18,26 @@ const mformsSelect = () => {
         init() {
             if (this.$el.tagName !== 'SELECT') return;
 
-            this.name = this.$el.name || null;
-            this.multiple = this.$el.hasAttribute('multiple');
+            this.name         = this.$el.name || null;
+            this.originalName = this.$el.dataset.originName || null;
+
+            this.multiple   = this.$el.hasAttribute('multiple');
             this.searchable = this.$el.hasAttribute('ts-searchable');
-            this.ajaxUrl = this.$el.dataset.ajaxUrl || null;
-            this.ajaxNonce = this.$el.dataset.ajaxNonce || null;
-            this.ajaxAction = this.$el.dataset.ajaxAction || null;
+
+            this.ajaxUrl    = this.$el.dataset.ajaxUrl || null;
+            this.ajaxNonce  = this.$el.dataset.ajaxNonce || null;
+            this.ajaxAction = 'meros_handle_lookup_query';
+            
+            const form = this.$el.closest('.mforms-form');
+            if (form) {
+                this.formId = form.id;
+            }
 
             this.isRepeaterField = this.$el.hasAttribute('data-repeater-field-name');
 
             if (!this.isRepeaterField) {
                 this.$el.removeAttribute('data-ajax-url');
                 this.$el.removeAttribute('data-ajax-nonce');
-                this.$el.removeAttribute('data-ajax-action');
             }
 
             const repeaterTemplateField = 
@@ -127,30 +136,27 @@ const mformsSelect = () => {
             const sortField = [{ field: '$order' }, { field: '$score' }];
             const maxItems = this.multiple ? null : 1;
 
-            const lookup = !this.isRepeaterField && this.ajaxUrl && this.ajaxNonce && this.ajaxAction 
-                ? true
-                : this.isRepeaterField && el.hasAttribute('data-ajax-action');
+            const lookup = this.ajaxUrl && this.ajaxNonce && this.ajaxAction;
 
             const load = lookup
                 ? (query, callback) => {
-                    if (!this.name || !this.ajaxUrl || !this.ajaxNonce || !this.ajaxAction) return;
+                    if (!this.name || !this.originalName || !this.ajaxUrl || !this.ajaxNonce) return;
 
-                    if (query.length < 3) return;
-
-                    const action = this.ajaxAction || el.dataset.ajaxAction || null;
-                    const nonce  = this.ajaxNonce || el.dataset.ajaxNonce || null;
-
-                    if (!action || !nonce) return;
+                    if (query.length < 3) {
+                        callback();
+                        return;
+                    }
 
                     const params = new URLSearchParams({
-                        action: action,
-                        nonce: nonce,
+                        action: this.ajaxAction,
+                        nonce: this.ajaxNonce,
+                        lookup_name: this.name,
+                        lookup_original_name: this.originalName,
                         search: query,
                     });
 
-                    const formId = el.dataset.formId;
-                    if (formId) {
-                        params.set('form_id', formId);
+                    if (this.formId) {
+                        params.set('form_id', this.formId);
                     }
                     
                     const url = this.ajaxUrl + '?' + params.toString();

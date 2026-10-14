@@ -12,28 +12,35 @@ class Ajax {
         // Do nothing...
     }
 
-    public function addAction(string $action, Closure $callback, array $callbackArgs = []): string {
+    public function addAction(string $action, Closure $callback, array $callbackArgs = [], bool $allowGuests = false): string {
         $hook = Context::getAjaxHook($action);
         $nonce = wp_create_nonce($action);
 
-        add_action($hook, function () use ($action, $callback, $callbackArgs) {
+        $handler = function () use ($action, $callback, $callbackArgs) {
             if (!check_ajax_referer($action, 'nonce', false)) {
                 wp_send_json_error(['message' => 'Invalid request.'], 403);
                 exit;
             }
 
+            $request = array_merge($_GET, $_POST);
             $args = [];
 
             foreach ($callbackArgs as $arg => $default) {
-                if (isset($_POST[$arg])) {
-                    $args[$arg] = $_POST[$arg];
+                if (isset($request[$arg])) {
+                    $args[$arg] = $request[$arg];
                 } else {
                     $args[$arg] = $default;
                 }
             }
 
-            call_user_func($callback, empty($args) ? $_POST : $args);
-        });
+            call_user_func($callback, empty($args) ? $request : $args);
+        };
+
+        add_action($hook, $handler);
+
+        if ($allowGuests) {
+            add_action('wp_ajax_nopriv_' . $action, $handler);
+        }
 
         $this->actions[$action] = [
             'hook'     => $hook,

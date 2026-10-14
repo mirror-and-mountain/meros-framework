@@ -32,10 +32,6 @@ $mf-first-row-offset: -24px;
 }
 
 .mforms-section {
-    .mforms-section-title {
-        padding: 0 !important;
-    }
-    
     .mforms-section-description {
         margin-bottom: 1rem;
     }
@@ -54,6 +50,25 @@ $mf-first-row-offset: -24px;
 
     > .mforms-row ~ .mforms-row {
         margin-top: 0;
+    }
+}
+
+form.mforms-form .mforms-section {
+    border: 0;
+    padding: 0;
+    line-height: normal;
+    white-space: normal;
+
+    &[data-meros-hidden-field] {
+        display: none !important;
+    }
+
+    .mforms-section-title {
+        padding: 0 !important;
+        font-size: 1.17em;
+        font-weight: bold;
+        line-height: normal;
+        margin-bottom: 1em;
     }
 }
 

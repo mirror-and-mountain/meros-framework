@@ -3,6 +3,7 @@ export default class MerosFieldsProcessor {
     parentType = null;
     fieldWrappers = null;
     fields = {};
+    groups = {};
 
     /**
      * Collects and configures fields within a form, group, or repeater.
@@ -65,10 +66,16 @@ export default class MerosFieldsProcessor {
             this.configureFieldObject(wrapperElement);
         });
 
+        this.configureGroupObjects();
+
         Object.values(this.fields).forEach(field => {
             if (this.fieldHasConditions(field.name)) {
                 this.initFieldConditions(field);
             }
+        });
+
+        Object.values(this.groups).forEach(group => {
+            this.initGroupConditions(group);
         });
 
         const actionFields = this.getFieldsWithActions();
@@ -80,6 +87,10 @@ export default class MerosFieldsProcessor {
             if (this.fieldHasConditions(field.name)) {
                 this.applyFieldConditions(field.name);
             }
+        });
+
+        Object.values(this.groups).forEach(group => {
+            this.applyGroupConditions(group.name);
         });
     }
 
@@ -170,13 +181,62 @@ export default class MerosFieldsProcessor {
     }
 
     /**
+     * Registers condition-enabled field groups contained by the configured parent.
+     *
+     * @returns {void}
+     */
+    configureGroupObjects() {
+        if (this.parentType === 'repeater') return;
+
+        this.parent.querySelectorAll('.mforms-field-group[data-field-conditions]').forEach(groupElement => {
+            if (groupElement.closest('.mforms-repeater-field')) return;
+
+            const conditions = JSON.parse(groupElement.dataset.fieldConditions);
+            if (!conditions || typeof conditions !== 'object') return;
+
+            const name = groupElement.dataset.name || groupElement.id;
+            if (!name) return;
+
+            this.groups[name] = {
+                name,
+                control: groupElement,
+                conditions,
+                actions: []
+            };
+
+            groupElement.removeAttribute('data-field-conditions');
+        });
+    }
+
+    /**
      * Links fields referenced by a conditional field's rules to that field's actions.
      *
      * @param {object} conditionalField Field whose condition rules are being registered.
      * @returns {void}
      */
     initFieldConditions(conditionalField) {
-        Object.entries(conditionalField.conditions).forEach(([type, config]) => {
+        this.initConditionActions(conditionalField);
+    }
+
+    /**
+     * Links fields referenced by a conditional group's rules to that group's visibility.
+     *
+     * @param {object} conditionalGroup Group whose condition rules are being registered.
+     * @returns {void}
+     */
+    initGroupConditions(conditionalGroup) {
+        this.initConditionActions(conditionalGroup, `group:${conditionalGroup.name}`);
+    }
+
+    /**
+     * Links source fields to a conditional field or group.
+     *
+     * @param {object} conditionalTarget Condition target.
+     * @param {string} targetName Action name for the target.
+     * @returns {void}
+     */
+    initConditionActions(conditionalTarget, targetName = conditionalTarget.name) {
+        Object.entries(conditionalTarget.conditions).forEach(([type, config]) => {
             if (!this.shouldProcessConditionType(type)) return;
             if (typeof config !== 'object') return;
             if (typeof config.rules !== 'object') return;
@@ -190,12 +250,12 @@ export default class MerosFieldsProcessor {
                     !Object.prototype.hasOwnProperty.call(rule, 'value')
                 ) return;
 
-                const actionField = this.getFieldByConditionName(rule.field, conditionalField);
+                const actionField = this.getFieldByConditionName(rule.field, conditionalTarget);
 
                 if (!actionField) return;
 
-                if (!actionField.actions.includes(conditionalField.name)) {
-                    actionField.actions.push(conditionalField.name);
+                if (!actionField.actions.includes(targetName)) {
+                    actionField.actions.push(targetName);
                 }
             });
         });
@@ -215,8 +275,13 @@ export default class MerosFieldsProcessor {
         actionField.actionListenerInitialized = true;
         const control = actionField.control;
         const updateDependentFields = () => {
-            actionField.actions.forEach(fieldName => {
-                const affectedField = this.fields[fieldName];
+            actionField.actions.forEach(targetName => {
+                if (targetName.startsWith('group:')) {
+                    this.applyGroupConditions(targetName.slice('group:'.length));
+                    return;
+                }
+
+                const affectedField = this.fields[targetName];
                 if (!affectedField) return;
 
                 if (
@@ -226,12 +291,33 @@ export default class MerosFieldsProcessor {
                     return;
                 }
 
-                this.applyFieldConditions(fieldName);
+                this.applyFieldConditions(targetName);
             });
         };
 
         control.addEventListener('input', updateDependentFields);
         control.addEventListener('change', updateDependentFields);
+    }
+
+    /**
+     * Evaluates a group's visibility rules and toggles its hidden state.
+     *
+     * @param {string} groupName Group name to update.
+     * @returns {void}
+     */
+    applyGroupConditions(groupName) {
+        const group = this.groups[groupName];
+        if (!group) return;
+
+        const hasShowRules = this.conditionTypeHasRules(group.conditions, 'show');
+        const shouldShow = !hasShowRules || this.evaluateConditionType(group, 'show');
+        const shouldHide = this.evaluateConditionType(group, 'hide');
+
+        if (shouldShow && !shouldHide) {
+            group.control.removeAttribute('data-meros-hidden-field');
+        } else {
+            group.control.setAttribute('data-meros-hidden-field', '');
+        }
     }
 
     /**

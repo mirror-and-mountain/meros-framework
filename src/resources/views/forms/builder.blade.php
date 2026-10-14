@@ -329,7 +329,13 @@
             }
 
             const root = field.closest('.meros-form-builder');
+            const row = field.closest('.mforms-row');
             field.remove();
+
+            if (row && this.getFields(row).length === 0) {
+                row.remove();
+            }
+
             this.refreshLayout(root);
         },
 
@@ -612,12 +618,6 @@
                                 @dragstart.stop="startGroupDrag($event, $el.closest('.mforms-row'))"
                                 @dragend="endDrag($el.closest('.meros-form-builder'))"
                             >⠿</span>
-                            <button
-                                type="button"
-                                class="mforms-builder-remove"
-                                aria-label="Remove group"
-                                @click.stop.prevent="removeGroup($el.closest('[data-form-group-component]'))"
-                            >Remove</button>
                             <label>
                                 <span>Group title</span>
                                 <input
@@ -626,6 +626,12 @@
                                     value="{{ $groupTitle }}"
                                 >
                             </label>
+                            <button
+                                type="button"
+                                class="mforms-builder-remove"
+                                aria-label="Remove group"
+                                @click.stop.prevent="removeGroup($el.closest('[data-form-group-component]'))"
+                            >Remove</button>
                             <input
                                 type="hidden"
                                 name="form_components[{{ $index }}]['childGroup']['name']"
@@ -636,12 +642,13 @@
                                 name="form_components[{{ $index }}]['childGroup']['id']"
                                 value="{{ $groupId }}"
                             >
-                            <input
-                                type="hidden"
-                                name="form_components[{{ $index }}]['childGroup']['description']"
-                                value="{{ $groupDescription }}"
-                            >
                         </div>
+                        <label class="mforms-group-description-control">
+                            <span>Group description</span>
+                            <textarea
+                                name="form_components[{{ $index }}]['childGroup']['description']"
+                            >{{ $groupDescription }}</textarea>
+                        </label>
 
                         <div
                             id="{{ $groupId }}-builder"
@@ -813,20 +820,23 @@
                             @dragstart.stop="startGroupDrag($event, $el.closest('.mforms-row'))"
                             @dragend="endDrag($el.closest('.meros-form-builder'))"
                         >⠿</span>
+                        <label>
+                            <span>Group title</span>
+                            <input type="text" name="form_components[0]['childGroup']['title']" value="New Group">
+                        </label>
                         <button
                             type="button"
                             class="mforms-builder-remove"
                             aria-label="Remove group"
                             @click.stop.prevent="removeGroup($el.closest('[data-form-group-component]'))"
                         >Remove</button>
-                        <label>
-                            <span>Group title</span>
-                            <input type="text" name="form_components[0]['childGroup']['title']" value="New Group">
-                        </label>
                         <input type="hidden" name="form_components[0]['childGroup']['name']" value="new_group">
                         <input type="hidden" name="form_components[0]['childGroup']['id']" value="mforms-section-template">
-                        <input type="hidden" name="form_components[0]['childGroup']['description']" value="">
                     </div>
+                    <label class="mforms-group-description-control">
+                        <span>Group description</span>
+                        <textarea name="form_components[0]['childGroup']['description']"></textarea>
+                    </label>
                     <div
                         id="mforms-group-builder-template"
                         class="meros-form-builder mforms-form meros-group-form-builder"

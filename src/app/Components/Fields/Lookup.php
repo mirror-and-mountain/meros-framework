@@ -2,13 +2,7 @@
 
 namespace MM\Meros\App\Components\Fields;
 
-use Closure;
-use Illuminate\Database\Eloquent\Model;
-
-use MM\Meros\Contracts\Features\Integrations\ResolvesLookupOptions;
-
-use MM\Meros\Contracts\Concerns\UsesAjax;
-use MM\Meros\Support\ClassInfo;
+use MM\Meros\Facades\Support\Ajax;
 
 class Lookup extends Select {
     /**
@@ -54,27 +48,18 @@ class Lookup extends Select {
     protected int $limit = 10;
 
     /**
-     * The ajax action used to perform the lookup.
+     * WP's ajax url.
      *
-     * @var string
+     * @var string|null
      */
-    private string $action = '';
+    private ?string $ajaxUrl = null;
 
     /**
-     * Whether the field's ajax action has been initialised.
-     *
-     * @var boolean
+     * The ajax nonce used for handling the lookup's query.
+     * 
+     * @var string|null
      */
-    private bool $initialised = false;
-
-    /**
-     * The callback for the ajax action.
-     *
-     * @var Closure|null
-     */
-    private ?Closure $callback = null;
-
-    use UsesAjax;
+    private ?string $ajaxNonce = null;
 
     final protected function init(): void {
         parent::init();     
@@ -82,7 +67,14 @@ class Lookup extends Select {
             'object',
             'key',
             'filters',
-            'limit'
+            'limit',
+            'ajaxUrl',
+            'ajaxNonce'
+        ]);
+
+        $this->setNonPersistableProperties([
+            'ajaxUrl',
+            'ajaxNonce',
         ]);
     }
 
@@ -98,52 +90,20 @@ class Lookup extends Select {
      * @return void
      */
     private function initAjaxLookup(): void {
-        if (empty($this->model)) {
-            return;
-        }
+        $this->ajaxUrl = Ajax::getUrl();
+        $this->ajaxNonce = Ajax::getActionNonce('meros_handle_lookup_query');
 
-        $modelClass  = ClassInfo::get($this->model);
-        $isModel     = $modelClass->extends(Model::class);
-        $hasContract = false;
+        $this->attribute('data-ajax-url', $this->ajaxUrl);
+        $this->attribute('data-ajax-nonce', $this->ajaxNonce);
+        $this->attribute('data-origin-name', $this->getOriginalName());
+    }
 
-        if (!$isModel) {
-            $instance = null;
+    public function getAjaxUrl(): ?string {
+        return $this->ajaxUrl;
+    }
 
-            try {
-                $instance = $this->model::getInstance();
-            } catch (\Exception $e) {
-                return;
-            }
-            
-            if ($instance !== null && $instance instanceof ResolvesLookupOptions) {
-                $hasContract = true;
-            }
-        }
-
-        if (!$isModel && !$hasContract) {
-            return;
-        }
-
-        $this->action = $this->getAjaxAction($this->getName());
-
-        $this->callback = function (array $postData) {
-            $search = $postData['search'] ?? '';
-
-            wp_send_json_success([
-                'results' => $this->resolve($search)
-            ]);
-        };
-
-        $this->initAjax($this->action, $this->callback);
-        $this->attribute('data-ajax-url', $this->getAjaxUrl());
-        $this->attribute('data-ajax-nonce', $this->getAjaxNonce($this->action));
-        $this->attribute('data-ajax-action', $this->action);
-        
-        if ($this->formId !== null && $this->formId !== '') {
-            $this->attribute('data-form-id', $this->formId);
-        }
-
-        $this->initialised = true;
+    public function getAjaxNonce(): ?string {
+        return $this->ajaxNonce;
     }
 
     /**
@@ -153,7 +113,7 @@ class Lookup extends Select {
      *
      * @return array
      */
-    protected function resolve(string $search): array {
+    public function resolve(string $search): array {
         if ($search === '') {
             return [];
         }
@@ -194,36 +154,6 @@ class Lookup extends Select {
     }
 
     /**
-     * Updates the ajax lookup action when the name changes.
-     *
-     * @return void
-     */
-    protected function whenNameSet(): void {
-        if ($this->initialised === false) {
-            $this->initAjaxLookup();
-            return;
-        }
-
-        if ($this->initialised === true && $this->isRepeaterField()) {
-            return;
-        }
-        
-        $oldName = $this->getOriginalName();
-        $newName = $this->getName();
-
-        $this->removeAjax($this->getAjaxAction($oldName));
-        $this->action = $this->getAjaxAction($newName);
-
-        $this->initAjax(
-            $this->action, 
-            $this->callback
-        );
-
-        $this->attribute('data-ajax-action', $this->action);
-        $this->attribute('data-ajax-nonce', $this->getAjaxNonce($this->action));
-    }
-
-    /**
      * Overridden to ensure default values are resolved before rendering the lookup field.
      *
      * @return void
@@ -249,35 +179,6 @@ class Lookup extends Select {
                 }
             }
         }
-    }
-
-    /**
-     * Retrieves the sanitized wp ajax action for the lookup.
-     *
-     * @param string $name
-     *
-     * @return string
-     */
-    private function getAjaxAction(string $name): string {
-        $name = trim($name);
-
-        // Remove indexes, e.g. [0].
-        $name = preg_replace('/\[\d+\]/', '', $name);
-
-        // Preserve nested field names, e.g. [field_name].
-        $name = preg_replace('/\[([^\]]+)\]/', '_$1', $name);
-
-        // Remove repeater template markers.
-        $name = preg_replace('/(?:^|_)-1(?=_|$)/', '_', $name);
-        $name = preg_replace('/(?:^|_)template(?=_|$)/i', '_', $name);
-
-        $name = preg_replace('/[^a-zA-Z0-9_-]+/', '_', $name);
-        $name = preg_replace('/_+/', '_', $name);
-        $name = trim(sanitize_key($name), '_-');
-
-        return $name === ''
-            ? 'meros_handle_lookup_query'
-            : "meros_handle_lookup_query_{$name}";
     }
 
     /**

@@ -518,6 +518,12 @@ class Repeater extends Field {
         $field = Fields::checkout($this->getProvider())->makeFrom($type, $callbackOrProps);
         $field->repeater($this, $this->id);
 
+        $form = $this->getForm();
+        if ($form instanceof Form) {
+            $field->form($form);
+            $field->attribute('data-form-id', $form->getId());
+        }
+
         if ($add) {
             $fieldCollection[] = $field;
         }
@@ -529,7 +535,7 @@ class Repeater extends Field {
     // Edit Form Rendering
     // =========================================================================
 
-    public function renderEditForm(array $rowData = []): string {
+    public function renderEditForm(array $rowData = [], array $repeaterValue = []): string {
         if ($this->hasEditForm() === false) {
             return 'Sorry, no edit form is defined for this repeater.';
         }
@@ -540,7 +546,7 @@ class Repeater extends Field {
             $this->editFormCallback, 
             $this->editForm, 
             $rowData,
-            $formData
+            $repeaterValue
         );
 
         if ($form instanceof Form) {

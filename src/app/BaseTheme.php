@@ -6,6 +6,7 @@ use Illuminate\Support\Str;
 use MM\Meros\Contracts\Provider;
 
 use MM\Meros\Registers\Admin\SettingsContainers;
+use MM\Meros\Contracts\Features\Admin\Setting;
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 
 use MM\Meros\Contracts\Providers\Concerns\IsNonFrameworkProvider;
@@ -16,6 +17,8 @@ use MM\Meros\Support\SchemaManager;
 
 use MM\Meros\App\Models\Migration as TrackedMigration;
 use MM\Meros\App\Models\Option;
+
+use MM\Meros\Facades\Framework;
 
 abstract class BaseTheme extends Provider {
     use IsNonFrameworkProvider, IsNonPackageProvider;
@@ -66,17 +69,25 @@ abstract class BaseTheme extends Provider {
      */
     private function addMerosSettings(): void {
         // Features
-        $this->settings()->add('boolean', function ($setting) {
+        $this->settings()->add('boolean', function (Setting $setting) {
             $setting->name('meros_forms_enabled');
             $setting->label('Enable Meros Forms');
             $setting->description($this->getMerosSettingDescription('meros_forms_enabled'));
             $setting->default(false);
             $setting->field();
             $setting->section('meros-theme-settings-section');
+            $setting->onUpdate(function ($value, $oldValue, $itemName, $optionName) {
+                if ($value === true) {
+                   if (Framework::installFormTables() === false) {
+                        $value = false;
+                   }
+                }
+                return $value;
+            });
         });
 
         // Deactivation preferences
-        $this->settings()->add('boolean', function ($setting) {
+        $this->settings()->add('boolean', function (Setting $setting) {
             $setting->name('meros_reset_settings_on_deactivate');
             $setting->label('Reset All Settings On Theme Deactivation');
             $setting->description($this->getMerosSettingDescription('meros_reset_settings_on_deactivate', 'deactivation'));
@@ -85,7 +96,7 @@ abstract class BaseTheme extends Provider {
             $setting->section('meros-theme-settings-section');
         });
 
-        $this->settings()->add('boolean', function ($setting) {
+        $this->settings()->add('boolean', function (Setting $setting) {
             $setting->name('meros_uninstall_all_tables_on_deactivate');
             $setting->label('Reset All Customisations On Theme Deactivation');
             $setting->description($this->getMerosSettingDescription('meros_uninstall_all_tables_on_deactivate', 'deactivation'));

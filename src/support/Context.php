@@ -156,7 +156,7 @@ final class Context {
     public function getAjaxHook(string $hook, bool $private = false): string {
         return $this->isAdmin() 
             ? 'wp_ajax_' . $hook 
-            : ($private ? 'wp_ajax_nopriv_' . $hook : 'wp_ajax_' . $hook);
+            : ($private === false ? 'wp_ajax_nopriv_' . $hook : 'wp_ajax_' . $hook);
     }
 
     /**

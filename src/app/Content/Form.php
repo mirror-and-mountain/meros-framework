@@ -8,25 +8,54 @@ use Livewire\Livewire;
 use MM\Meros\Contracts\Features\Content\PostType;
 
 use MM\Meros\Contracts\Features\Components\Form as FormComponent;
+
+use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\FieldRow;
 
 use MM\Meros\App\Components\Fields\Repeater;
-use MM\Meros\App\Components\Fields\Select;
 
 use MM\Meros\Facades\Components\Forms;
 use MM\Meros\Facades\Components\Fields;
+use MM\Meros\Facades\Components\FieldGroups;
+use MM\Meros\Facades\Components\FormActions;
 
 use MM\Meros\App\Models\Post;
 
 class Form extends PostType {
 
     protected function configure(): void {
-        $this->public(true);
+        $this->public();
+        $this->useBlockTemplate();
         $this->menuIcon('dashicons-feedback');
 
         $this->configureBuilderMetabox();
+        $this->configureFormActionsFields();
 
+        add_filter("meros_render_form_1255", function (FormComponent $form) {
+            $form->field('repeater', function (Repeater $repeater) {
+                $repeater->name('test_repeater');
+                $repeater->label('Test Repeater');
+                $repeater->field('text', [
+                    'name' => 'test_repeater_field',
+                    'label' => 'Test'
+                ]);
+
+                $repeater->editForm(function (FormComponent $form) {
+                    $form->field('text', [
+                        'name' => 'test_repeater_form_field',
+                        'label' => 'Test'
+                    ]);
+
+                    return $form;
+                });
+            });
+
+            return $form;
+        });
+
+        // Sets the render callback for form post types, filtering 'the content'
+        // to render the form using its stored strucure/
         $this->render(function (string $content, int $postId, Post $post): string {
             $structure = $this->getFormStructure($postId);
 
@@ -46,10 +75,17 @@ class Form extends PostType {
                 return $content;
             }
 
+
+            $form = apply_filters("meros_render_form_{$postId}", $form);
             return $form->html();
         });
     }
 
+    /**
+     * Configures the form builder meta box on the form edit screen.
+     *
+     * @return void
+     */
     private function configureBuilderMetabox(): void {
         $componentTemplate = $this->makeComponentTemplate();
         $this->addSaveAction();
@@ -68,6 +104,78 @@ class Form extends PostType {
         });
     }
 
+    private function configureFormActionsFields(): void {
+        add_action('meros_framework_booted', function () {
+            $this->fields(function (FieldGroup $group) {
+                $group->title('Form Actions');
+                
+                $group->field('repeater', function (Repeater $repeater) {
+                    $repeater->name('form_actions');
+                    $repeater->label('Form Actions');
+
+                    $actions = $this->getAvailableFormActions();
+
+                    $repeater->field('select', [
+                        'name'    => 'action',
+                        'label'   => 'Action',
+                        'options' => $actions
+                    ]);
+
+                    $repeater->field('hidden', [
+                        'name'    => 'post_id',
+                        'default' => $_GET['post'] ?? ''
+                    ]);
+
+                    $repeater->editForm(function(FormComponent $form, array $rowData, array $repeaterValue) use($actions): FormComponent {
+                        $action = $rowData['action'] ?? '';
+                        $postId = $rowData['post_id'] ?? '';
+
+                        if ($postId === '') {
+                            return $form;
+                        }
+
+                        if ($action === '' || !in_array($action, array_keys($actions))) {
+                            return $form;
+                        }
+
+                        $actionClass = FormActions::getRegisteredFeatureClass($action);
+
+                        if (!is_string($actionClass) || !class_exists($actionClass)) {
+                            return $form;
+                        }
+
+                        $controlGroup = FieldGroups::checkout($this->getProvider())
+                            ->make(function(FieldGroup $group) use($action) {
+                                $group->name($action . '_configuration_controls');
+                                $group->id(Str::replace('_', '-', $action) . '-configuration-controls');
+                            });
+
+                        
+                        $formFields   = $this->getStoredFields((int) $postId) ?? [];
+                        $controlGroup = $actionClass::getFormBuilderControls(
+                            $controlGroup, 
+                            $rowData, 
+                            $repeaterValue, 
+                            $formFields
+                        );
+
+                        if ($controlGroup instanceof FieldGroup) {
+                            $form->section($controlGroup);
+                        }
+
+                        return $form;
+                    });
+                });
+            });
+        });
+    }
+
+    /**
+     * Creates a field or fieldgroup component editor template for the form builder.
+     * These take the form of a repeater field.
+     *
+     * @return Repeater
+     */
     private function makeComponentTemplate(): Repeater {
         return Fields::checkout($this->getProvider())
             ->makeFrom('repeater', function (Repeater $repeater) {
@@ -122,6 +230,11 @@ class Form extends PostType {
             });
     }
 
+    /**
+     * Configures the save action for the form cpt to save the form's structural data as post meta.
+     *
+     * @return void
+     */
     private function addSaveAction(): void {
         add_action('save_post_' . $this->handle, function (int $postId) {
             // if (!isset($_POST['_meros_form_builder_nonce']) || 
@@ -167,8 +280,6 @@ class Form extends PostType {
                 }
             }
 
-            // dd($cleanRows);
-
             $formInstance = $this->makeFormInstance(Post::find($postId), $cleanRows);
             $serializedStructure = $formInstance->serialize('storage');
 
@@ -176,6 +287,15 @@ class Form extends PostType {
         });
     }
 
+    /**
+     * Helper to retrieve a value from the form's submitted save data.
+     *
+     * @param array  $data
+     * @param string $key
+     * @param mixed  $default
+     *
+     * @return mixed
+     */
     private function getSubmittedBuilderValue(array $data, string $key, mixed $default = null): mixed {
         foreach ([$key, "'{$key}'"] as $candidate) {
             if (array_key_exists($candidate, $data)) {
@@ -186,6 +306,14 @@ class Form extends PostType {
         return $default;
     }
 
+    /**
+     * Parses the form's field components for storage.
+     *
+     * @param array $components
+     * @param array $fieldNames
+     *
+     * @return array
+     */
     private function parseSubmittedFieldComponents(array $components, array &$fieldNames): array {
         $fields = [];
         $collectFields = function (array $data, int|string|null $rowIndex = null) use (&$collectFields, &$fields, &$fieldNames): void {
@@ -244,6 +372,16 @@ class Form extends PostType {
         return $fields;
     }
 
+    /**
+     * Parses the form's group/section components for storage.
+     *
+     * @param array $group
+     * @param array $groupIds
+     * @param array $fieldNames
+     * @param array $groupNames
+     *
+     * @return array
+     */
     private function parseSubmittedFieldGroup(array $group, array &$groupIds, array &$fieldNames, array &$groupNames): array {
         $rows = $this->getSubmittedBuilderValue($group, 'rows', []);
         $groupRows = [];
@@ -315,6 +453,14 @@ class Form extends PostType {
         return $definition;
     }
 
+    /**
+     * Helper to generate unique names for fields.
+     *
+     * @param string $prefix
+     * @param array  $usedNames
+     *
+     * @return string
+     */
     private function makeUniqueGeneratedName(string $prefix, array &$usedNames): string {
         do {
             $name = $prefix . '_' . Str::substr(Str::uuid(), 0, 8);
@@ -325,6 +471,16 @@ class Form extends PostType {
         return $name;
     }
 
+    /**
+     * Creates a Form instance using the form's structure.
+     *
+     * @param Post    $post
+     * @param array   $rows
+     * @param array   $availableFields
+     * @param boolean $hideSubmitButton
+     *
+     * @return FormComponent
+     */
     private function makeFormInstance(Post $post, array $rows, array $availableFields = [], bool $hideSubmitButton = false): FormComponent {
         $availableFields = empty($availableFields) ? $this->getAvailableFieldTypes() : $availableFields;
 
@@ -383,6 +539,126 @@ class Form extends PostType {
         return $form;
     }
 
+    /**
+     * Helper to retrieve a form's stored fields array.
+     *
+     * @param integer $postId
+     * @param boolean $simpleList
+     *
+     * @return array|null
+     */
+    private function getStoredFields(int $postId, bool $simpleList = true): ?array {
+        $form = Post::find($postId);
+
+        if ($form === null) {
+            return null;
+        }
+
+        $structure = $this->getFormStructure($postId);
+
+        if ($structure === null) {
+            return null;
+        }
+
+        $rows = $structure['rows'] ?? [];
+
+        if ($rows === []) {
+            return null;
+        }
+
+        $instance = $this->makeFormInstance($form, $rows);
+
+        if ($instance instanceof FormComponent) {
+            $fields = $instance->getFields(true);
+
+            if ($simpleList) {
+                $arr = [];
+                
+                foreach ($fields as $field) {
+                    if (!($field instanceof Field)) {
+                        continue;
+                    }
+
+                    $arr[$field->getName()] = $field->getLabel();
+                }
+
+                return $arr;
+            } else {
+                return $fields->toArray();
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Helper to locate a particular field from a form using its ID. Used by frontend ajax requests.
+     *
+     * @param integer     $postId
+     * @param string      $name
+     * @param string      $originalName
+     * @param string|null $fieldClass
+     *
+     * @return Field|null
+     */
+    public function findField(
+        int $postId,
+        string $name,
+        string $originalName = '',
+        ?string $fieldClass = null
+    ): ?Field {
+        $post = Post::find($postId);
+        $structure = $this->getFormStructure($postId);
+
+        if (!($post instanceof Post) || $structure === null) {
+            return null;
+        }
+
+        $form = $this->makeFormInstance($post, $structure['rows'] ?? []);
+        $form = apply_filters("meros_render_form_{$postId}", $form);
+
+        if (!($form instanceof FormComponent)) {
+            return null;
+        }
+
+        $fields = [];
+        foreach ($form->getFields(true) as $field) {
+            if (!($field instanceof Field)) {
+                continue;
+            }
+
+            $fields[] = $field;
+
+            if ($field instanceof Repeater) {
+                foreach ($field->getFields(true) as $repeaterField) {
+                    if ($repeaterField instanceof Field) {
+                        $fields[] = $repeaterField;
+                    }
+                }
+            }
+        }
+
+        foreach (array_unique(array_filter([$name, $originalName])) as $candidateName) {
+            foreach ($fields as $field) {
+                if (
+                    $field->getName() === $candidateName &&
+                    ($fieldClass === null || $field instanceof $fieldClass)
+                ) {
+                    return $field;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Retrieves the form's structure from the post meta table.
+     *
+     * @param integer $postId
+     *
+     * @return array|null
+     */
     private function getFormStructure(int $postId): ?array {
         $model = Post::find($postId);
 
@@ -404,10 +680,27 @@ class Form extends PostType {
         return $unserialized;
     }
 
+    /**
+     * Helper to retrieve available field types for the form builder.
+     *
+     * @return array
+     */
     private function getAvailableFieldTypes(): array {
         return collect(Fields::getRegisteredFeatures())
             ->keyBy('alias')
             ->mapWithKeys(fn ($field, $alias) => [$alias => ucfirst($alias)])
             ->all(); 
+    }
+
+    /**
+     * Helper to retrieve available form actions for the form.
+     *
+     * @return array
+     */
+    private function getAvailableFormActions(): array {
+        return collect(FormActions::getRegisteredFeatures())
+            ->keyBy('alias')
+            ->mapWithKeys(fn ($action, $alias) => [$alias => Str::title(Str::replace('_', ' ', $alias))])
+            ->all();
     }
 }

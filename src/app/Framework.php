@@ -15,6 +15,8 @@ use MM\Meros\App\Content\Orchestrator as ContentOrchestrator;
 use MM\Meros\Contracts\Providers\Concerns\IsFrameworkProvider;
 use MM\Meros\Contracts\Providers\Concerns\IsNonPackageProvider;
 
+use MM\Meros\Contracts\Features\Data\Table;
+
 final class Framework extends Provider {
     use IsFrameworkProvider, IsNonPackageProvider;
 
@@ -145,8 +147,34 @@ final class Framework extends Provider {
     // Tables & Migrations
     // =========================================================================
 
+    /**
+     * Registers the framework's custom database tables.
+     *
+     * @return void
+     */
     private function registerTables(): void {
         $this->tables()->register();
+    }
+
+    /**
+     * Installs the meros_form_responses table when Meros Forms is enabled in WP Admin.
+     *
+     * @return boolean
+     */
+    public function installFormTables(): bool {
+        $responsesTable = $this->tables()->init()->firstWhere(function (Table $table) {
+            return $table->getName() === 'meros_form_responses';
+        });
+
+        if (!($responsesTable instanceof Table)) {
+            return false;
+        }
+
+        if ($responsesTable->isInstalled() === false) {
+            $responsesTable->install();
+        }
+
+        return true;
     }
 
     // =========================================================================

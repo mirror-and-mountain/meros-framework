@@ -3,6 +3,7 @@
     id="{{ $id }}"
     class="mforms-field-group mforms-section nice-form-group"
     data-name="{{ $name }}"
+    data-field-conditions="{{ $conditionsString }}"
 >
     @if($metaBox === false && $title !== '')
         <legend class="mforms-section-title">{{ $title }}</legend>
@@ -14,7 +15,7 @@
                 $class .= ' mforms-section-description-metabox';
             }
         @endphp
-        <small class="{{ $class }}">{{ $description }}</small>
+        <small class="{{ $class }}">{!! $description !!}</small>
     @endif
     @foreach($rows as $row)
         @include('meros::forms.field-row', $row)

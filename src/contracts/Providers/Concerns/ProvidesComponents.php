@@ -6,11 +6,13 @@ use MM\Meros\Contracts\Features\Components\Block;
 use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\Form;
+use MM\Meros\Contracts\Features\Components\FormAction;
 
 use MM\Meros\Registers\Components\Blocks;
 use MM\Meros\Registers\Components\Fields;
 use MM\Meros\Registers\Components\FieldGroups;
 use MM\Meros\Registers\Components\Forms;
+use MM\Meros\Registers\Components\FormActions;
 
 trait ProvidesComponents {
     use Abstracts;
@@ -46,6 +48,17 @@ trait ProvidesComponents {
      */
     final protected function forms(string $id = ''): Form|Forms|null {
         return $this->resolveFeatureRequestFor(Form::class, $id);
+    }
+
+    /**
+     * Retrieves a specific form action by its name or returns the form actions register.
+     *
+     * @param string $name Optional. The name of the registered form action to retrieve.
+     *
+     * @return FormAction|FormActions|null The requested form action or the form actions register.
+     */
+    final protected function formActions(string $name = ''): FormAction|FormActions|null {
+        return $this->resolveFeatureRequestFor(FormAction::class, $name);
     }
 
     /**
