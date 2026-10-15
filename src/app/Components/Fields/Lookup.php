@@ -2,6 +2,8 @@
 
 namespace MM\Meros\App\Components\Fields;
 
+use MM\Meros\Contracts\Features\Components\Field;
+use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Facades\Support\Ajax;
 
 class Lookup extends Select {
@@ -61,11 +63,23 @@ class Lookup extends Select {
      */
     private ?string $ajaxNonce = null;
 
+    /**
+     * Hide the lookup contract in the form builder.
+     *
+     * @var boolean
+     */
+    protected static bool $showInFormBuilder = false;
+
+    public static function getBuilderControls(): ?FieldGroup {
+        return Field::getBuilderControls();
+    }
+
     final protected function init(): void {
         parent::init();     
         $this->setSerializableProperties([
             'object',
             'key',
+            'labelledBy',
             'filters',
             'limit',
             'ajaxUrl',
@@ -124,12 +138,14 @@ class Lookup extends Select {
             $query = $this->model::query();
         }
 
-        foreach ($this->filters as $filter) {
-            $query->where(
-                $filter['field'],
-                $filter['operator'],
-                $filter['value']
-            );
+        if ($this->filters !== []) {
+            foreach ($this->filters as $filter) {
+                $query->where(
+                    $filter['field'],
+                    $filter['operator'],
+                    $filter['value']
+                );
+            }
         }
 
         $options = $query
@@ -232,9 +248,9 @@ class Lookup extends Select {
      * @param string $operator
      * @param mixed  $value
      *
-     * @return void
+     * @return static
      */
-    final public function filter(string $field, string $operator, mixed $value = null): void {
+    final public function filter(string $field, string $operator, mixed $value = null): static {
         $args = func_get_args();
 
         if (count($args) === 2) {
@@ -243,6 +259,52 @@ class Lookup extends Select {
         }
 
         $this->filters[] = compact('field', 'operator', 'value');
+        return $this;
+    }
+
+    /**
+     * Adds an array of 'where' type filters to the lookup query.
+     *
+     * @param array $filters
+     *
+     * @return static
+     */
+    final public function filters(array $filters): static {
+        foreach ($filters as $filter) {
+            if (!is_array($filter)) {
+                continue;
+            }
+
+            if (!array_key_exists('field', $filter) || !is_string($filter['field'])) {
+                continue;
+            } 
+
+            if (!array_key_exists('operator', $filter) || !is_string($filter['operator'])) {
+                continue;
+            } 
+
+            if (!array_key_exists('value', $filter) || !is_string($filter['value'])) {
+                continue;
+            }
+
+            $this->filter($filter['field'], $filter['operator'], $filter['value']);
+        }
+
+        return $this;
+    }
+
+    final public function getFilters(): array {
+        return $this->filters;
+    }
+
+    /**
+     * Clears the current instances filters array.
+     *
+     * @return static
+     */
+    final public function clearFilters(): static {
+        $this->filters = [];
+        return $this;
     }
 
     /**

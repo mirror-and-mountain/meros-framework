@@ -3,7 +3,11 @@
 namespace MM\Meros\App\Components\FormActions;
 
 use MM\Meros\Contracts\Features\Components\FormAction;
+use MM\Meros\Contracts\Features\Components\FormActionResponse;
+
 use MM\Meros\Contracts\Features\Components\FieldGroup;
+
+use MM\Meros\App\Models\FormResponse;
 
 final class StoreResponse extends FormAction {
     protected function configure(): void {
@@ -25,7 +29,13 @@ final class StoreResponse extends FormAction {
         return $controlGroup;
     }
 
-    public function handle(int $formId, array $configuration, array $submittedData): bool {
-        return true;
+    public function handle(int $formId, array $configuration, array $payload): FormActionResponse {
+        FormResponse::create([
+            'form_id'  => $formId,
+            'response' => $payload['data'] ?? [],
+            'status'   => 'complete'
+        ]);
+
+        return new FormActionResponse(true);
     }
 }

@@ -308,7 +308,6 @@ const mformsRepeater = () => {
         },
 
         handleRowFormSubmit(formData) {
-            console.log(formData);
             const rowIndex = this.editingRowIndex;
             if (rowIndex === null) return;
 

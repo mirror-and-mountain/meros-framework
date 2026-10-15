@@ -5,9 +5,11 @@ namespace MM\Meros\App\Content;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
-use MM\Meros\Contracts\Features\Content\PostType;
+use MM\Meros\App\Models\Post;
 
+use MM\Meros\Contracts\Features\Content\PostType;
 use MM\Meros\Contracts\Features\Components\Form as FormComponent;
+use MM\Meros\Contracts\Features\Components\FormAction;
 
 use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
@@ -20,17 +22,23 @@ use MM\Meros\Facades\Components\Fields;
 use MM\Meros\Facades\Components\FieldGroups;
 use MM\Meros\Facades\Components\FormActions;
 
-use MM\Meros\App\Models\Post;
+use Illuminate\Support\Facades\Log;
 
 class Form extends PostType {
+
+    // =========================================================================
+    // Configuration
+    // =========================================================================
 
     protected function configure(): void {
         $this->public();
         $this->useBlockTemplate();
         $this->menuIcon('dashicons-feedback');
 
-        $this->configureBuilderMetabox();
-        $this->configureFormActionsFields();
+        add_action('meros_framework_booted', function () {
+            $this->configureBuilderMetabox();
+            $this->configureFormActionsFields();
+        });
 
         add_filter("meros_render_form_1255", function (FormComponent $form) {
             $form->field('repeater', function (Repeater $repeater) {
@@ -75,11 +83,24 @@ class Form extends PostType {
                 return $content;
             }
 
-
             $form = apply_filters("meros_render_form_{$postId}", $form);
             return $form->html();
         });
     }
+
+    public function inspect(?int $postId = null, bool $refresh = false): array {
+        $data = parent::inspect($postId, $refresh);
+
+        if (array_key_exists('_meros_form_structure', $data) && is_string($data['_meros_form_structure'])) {
+            $data['_meros_form_structure'] = unserialize($data['_meros_form_structure']);
+        }
+
+        return $data;
+    }
+
+    // =========================================================================
+    // Form Builder
+    // =========================================================================
 
     /**
      * Configures the form builder meta box on the form edit screen.
@@ -104,67 +125,70 @@ class Form extends PostType {
         });
     }
 
+    /**
+     * Configures the meta box used to create form actions.
+     *
+     * @return void
+     */
     private function configureFormActionsFields(): void {
-        add_action('meros_framework_booted', function () {
-            $this->fields(function (FieldGroup $group) {
-                $group->title('Form Actions');
-                
-                $group->field('repeater', function (Repeater $repeater) {
-                    $repeater->name('form_actions');
-                    $repeater->label('Form Actions');
+        $this->fields(function (FieldGroup $group) {
+            $group->title('Form Actions');
+            
+            $group->field('repeater', function (Repeater $repeater) {
+                $repeater->name('form_actions');
+                $repeater->label('Form Actions');
 
-                    $actions = $this->getAvailableFormActions();
+                $actions = $this->getAvailableFormActions();
 
-                    $repeater->field('select', [
-                        'name'    => 'action',
-                        'label'   => 'Action',
-                        'options' => $actions
-                    ]);
+                $repeater->field('select', [
+                    'name'    => 'action',
+                    'label'   => 'Action',
+                    'options' => $actions
+                ]);
 
-                    $repeater->field('hidden', [
-                        'name'    => 'post_id',
-                        'default' => $_GET['post'] ?? ''
-                    ]);
+                $repeater->field('hidden', [
+                    'name'    => 'post_id',
+                    'default' => $_GET['post'] ?? ''
+                ]);
 
-                    $repeater->editForm(function(FormComponent $form, array $rowData, array $repeaterValue) use($actions): FormComponent {
-                        $action = $rowData['action'] ?? '';
-                        $postId = $rowData['post_id'] ?? '';
+                $repeater->editForm(function(FormComponent $form, array $rowData, array $repeaterValue) use($actions): FormComponent {
+                    $action = $rowData['action'] ?? '';
+                    $postId = $rowData['post_id'] ?? '';
 
-                        if ($postId === '') {
-                            return $form;
-                        }
-
-                        if ($action === '' || !in_array($action, array_keys($actions))) {
-                            return $form;
-                        }
-
-                        $actionClass = FormActions::getRegisteredFeatureClass($action);
-
-                        if (!is_string($actionClass) || !class_exists($actionClass)) {
-                            return $form;
-                        }
-
-                        $controlGroup = FieldGroups::checkout($this->getProvider())
-                            ->make(function(FieldGroup $group) use($action) {
-                                $group->name($action . '_configuration_controls');
-                                $group->id(Str::replace('_', '-', $action) . '-configuration-controls');
-                            });
-
-                        
-                        $formFields   = $this->getStoredFields((int) $postId) ?? [];
-                        $controlGroup = $actionClass::getFormBuilderControls(
-                            $controlGroup, 
-                            $rowData, 
-                            $repeaterValue, 
-                            $formFields
-                        );
-
-                        if ($controlGroup instanceof FieldGroup) {
-                            $form->section($controlGroup);
-                        }
-
+                    if ($postId === '') {
                         return $form;
-                    });
+                    }
+
+                    if ($action === '' || !in_array($action, array_keys($actions))) {
+                        return $form;
+                    }
+
+                    $actionClass = FormActions::getRegisteredFeatureClass($action);
+
+                    if (!is_string($actionClass) || !class_exists($actionClass)) {
+                        return $form;
+                    }
+
+                    $controlGroup = FieldGroups::checkout($this->getProvider())
+                        ->make(function(FieldGroup $group) use($action) {
+                            $group->name($action . '_configuration_controls');
+                            $group->id(Str::replace('_', '-', $action) . '-configuration-controls');
+                        });
+
+                    
+                    $formFields   = $this->getStoredFields((int) $postId) ?? [];
+                    $controlGroup = $actionClass::getFormBuilderControls(
+                        $controlGroup, 
+                        $rowData, 
+                        $repeaterValue, 
+                        $formFields
+                    );
+
+                    if ($controlGroup instanceof FieldGroup) {
+                        $form->section($controlGroup);
+                    }
+
+                    return $form;
                 });
             });
         });
@@ -230,6 +254,10 @@ class Form extends PostType {
             });
     }
 
+    // =========================================================================
+    // Form Builder - Config Persistance
+    // =========================================================================
+
     /**
      * Configures the save action for the form cpt to save the form's structural data as post meta.
      *
@@ -283,7 +311,7 @@ class Form extends PostType {
             $formInstance = $this->makeFormInstance(Post::find($postId), $cleanRows);
             $serializedStructure = $formInstance->serialize('storage');
 
-            update_post_meta($postId, '_meros_form_meta', $serializedStructure);
+            update_post_meta($postId, '_meros_form_structure', $serializedStructure);
         });
     }
 
@@ -471,6 +499,96 @@ class Form extends PostType {
         return $name;
     }
 
+    // =========================================================================
+    // Submission Handling
+    // =========================================================================
+
+    public function handleSubmission(int $formId, array|string $data): string|array {
+        $form = Post::find($formId);
+
+        if ($form === null) {
+            return 'Unable to locate form: Null Form Model.';
+        }
+
+        $instance = $this->makeFormInstance($form);
+        if (!($instance instanceof FormComponent)) {
+            return 'Unable to parse form.';
+        }
+
+        if (is_string($data)) {
+            $data = json_decode(stripslashes($data), true);
+        }
+
+        $actions = $this->getFormActions($formId);
+        $payload = $instance->buildSubmissionPayload($data);
+
+        $result = $this->processFormActions($formId, $payload, $actions);
+
+        if (is_string($result)) {
+            return 'Error running form actions.';
+        }
+
+        return [
+            'payload' => $payload,
+            'actions' => $actions
+        ];
+    }
+
+    private function processFormActions(int $formId, array $payload, array $actions): string|true {
+        $previousActions = [];
+
+        foreach ($actions as $action) {
+            if (!is_array($action)) {
+                return 'Action is not configured correctly.';
+            }
+            
+            $name          = $action['action'] ?? '';
+            $configuration = $action['__form_data'] ?? '';
+            $class         = FormActions::getRegisteredFeatureClass($name);
+
+            if (!is_string($class) || !class_exists($class)) {
+                return 'Action ' . $name . ' is not configured correctly.';
+            }
+
+            if (is_string($configuration) && $configuration !== '') {
+                $configuration = json_decode($configuration, true);
+            } else {
+                $configuration = [];
+            }
+
+            if (!empty($previousActions)) {
+                $configuration = array_merge($configuration, $previousActions);
+            }
+
+            $result = $this->runFormAction($formId, $class, $configuration, $payload);
+
+            if (is_string($result)) {
+                return $result;
+            }
+
+            if (is_array($result)) {
+                $previousActions[$name] = $result;
+            }
+        }
+
+        return true;
+    }
+
+    private function runFormAction(int $formId, string $class, array $configuration, array $payload): array|true|string {
+        $action = FormActions::checkout($this->getProvider())
+            ->makeFrom($class);
+
+        if (!($action instanceof FormAction)) {
+            return false;
+        }
+
+        return $action->handle($formId, $configuration, $payload)->response();
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
     /**
      * Creates a Form instance using the form's structure.
      *
@@ -481,7 +599,8 @@ class Form extends PostType {
      *
      * @return FormComponent
      */
-    private function makeFormInstance(Post $post, array $rows, array $availableFields = [], bool $hideSubmitButton = false): FormComponent {
+    public function makeFormInstance(Post $post, array $rows = [], array $availableFields = [], bool $hideSubmitButton = false): FormComponent {
+        $rows = empty($rows) ? $this->getFormStructure($post->ID)['rows'] ?? [] : $rows;
         $availableFields = empty($availableFields) ? $this->getAvailableFieldTypes() : $availableFields;
 
         $form = Forms::checkout($this->getProvider())->make(function (FormComponent $form) use ($post, $rows, $availableFields, $hideSubmitButton) {
@@ -547,7 +666,7 @@ class Form extends PostType {
      *
      * @return array|null
      */
-    private function getStoredFields(int $postId, bool $simpleList = true): ?array {
+    public function getStoredFields(int $postId, bool $simpleList = true): ?array {
         $form = Post::find($postId);
 
         if ($form === null) {
@@ -653,7 +772,7 @@ class Form extends PostType {
     }
 
     /**
-     * Retrieves the form's structure from the post meta table.
+     * Retrieves a form's stored structure from the post meta table with the given id.
      *
      * @param integer $postId
      *
@@ -666,7 +785,7 @@ class Form extends PostType {
             return null;
         }
 
-        $meta = $model->meta->where('meta_key', '_meros_form_meta')->first();
+        $meta = $model->meta->where('meta_key', '_meros_form_structure')->first();
 
         if ($meta === null) {
             return null;
@@ -681,14 +800,49 @@ class Form extends PostType {
     }
 
     /**
+     * Retrieves a form's stored actions from the post meta table with the given id.
+     *
+     * @param integer $postId
+     *
+     * @return array
+     */
+    public function getFormActions(int $postId): array {
+        $data = $this->inspect($postId);
+
+        if (array_key_exists('form_actions', $data)) {
+            $actions = $data['form_actions'];
+
+            if (is_string($actions)) {
+                return unserialize($actions);
+            }
+
+            if (is_array($actions)) {
+                return $actions;
+            }
+
+            return [];
+        }
+        
+        return [];
+    }
+
+    /**
      * Helper to retrieve available field types for the form builder.
      *
      * @return array
      */
     private function getAvailableFieldTypes(): array {
         return collect(Fields::getRegisteredFeatures())
+            ->where(function ($field) {
+                $class = $field['class'] ?? null;
+                if (!is_string($class) || !class_exists($class)) {
+                    return false;
+                }
+
+                return $class::useInFormBuilder();
+            })
             ->keyBy('alias')
-            ->mapWithKeys(fn ($field, $alias) => [$alias => ucfirst($alias)])
+            ->mapWithKeys(fn ($field, $alias) => [$alias => Str::title(Str::replace('_', ' ', $alias))])
             ->all(); 
     }
 

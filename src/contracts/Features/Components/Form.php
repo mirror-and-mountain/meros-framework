@@ -150,7 +150,7 @@ class Form extends Feature implements FormComponent, Makeable {
     }
 
     // =========================================================================
-    // Ajax Handling
+    // Submission Handling
     // =========================================================================
 
     private function initFormAjax(): void {
@@ -182,6 +182,67 @@ class Form extends Feature implements FormComponent, Makeable {
             'message' => 'Form submitted successfully.',
             'data'    => $data
         ]);
+    }
+
+    /**
+     * Creates a payload array using submitted form data for passing to form actions.
+     *
+     * @param array $fieldValues
+     *
+     * @return array
+     */
+    public function buildSubmissionPayload(array $fieldValues): array {
+        $payload = [
+            'form_id'         => $this->getId(),
+            'form_title'      => $this->getTitle(),
+            'submission_time' => now(),
+            'user_id'         => get_current_user_id(),
+            'data'            => []
+        ];
+
+        if ($fieldValues === []) {
+            return $payload;
+        }
+
+        $fields = $this->getFields(true);
+
+        foreach ($fieldValues as $name => $value) {
+            $payload['data'][$name] = [
+                'field_name'           => $name,
+                'user_value'           => $value,
+                'user_value_data_type' => gettype($value)
+            ];
+
+            $field = $fields->firstWhere(function (Field $field) use($name) {
+                return $field->getName() === $name;
+            });
+
+            if (!($field instanceof Field)) {
+                continue;
+            }
+
+            $group    = $field->getGroup();
+            $row      = $field->getRow();
+            $rowIndex = null;
+
+            if ($row instanceof FieldRow) {
+                $rowIndex = $group instanceof FieldGroup
+                    ? $group->getRowIndex($row)
+                    : $this->getRowIndex($row);
+            }
+
+            $payload['data'][$name] = array_merge($payload['data'][$name], [
+                'field_type'      => $field->getType(),
+                'field_data_type' => $field->getDataType(),
+                'field_metadata'  => $field->getMetadata(),
+                'field_group'     => $group !== null ? $group->getTitle() : null,
+                'group_index'     => $group !== null ? $this->getGroupIndex($group) : null,
+                'row_index'       => $rowIndex,
+                'field_index'     => $field->getRowPosition()
+            ]);
+        }
+
+        return $payload;
     }
 
     // =========================================================================
@@ -401,6 +462,18 @@ class Form extends Feature implements FormComponent, Makeable {
     final public function getRowIndex(FieldRow $row): ?int {
         $index = array_search($row, $this->rows, true);
         return $index !== false ? $index : null;
+    }
+
+    final public function getGroupIndex(FieldGroup $group): ?int {
+        $groupRow = collect($this->rows)->firstWhere(function (FieldRow $row) use($group) {
+            return $row->getGroup() === $group;
+        });
+
+        if ($groupRow instanceof FieldRow) {
+            return $this->getRowIndex($groupRow);
+        }
+
+        return null;
     }
 
     /**

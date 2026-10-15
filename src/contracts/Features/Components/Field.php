@@ -78,6 +78,8 @@ abstract class Field extends Feature implements FormComponent {
      */
     protected bool $isFieldSet = false;
 
+    protected array $metadata = [];
+
     // =========================================================================
     // Field Context Properties
     // =========================================================================
@@ -304,6 +306,21 @@ abstract class Field extends Feature implements FormComponent {
                 'name'  => 'required',
                 'label' => 'Required'
             ]);
+
+            $group->field('repeater', function (Repeater $repeater) {
+                $repeater->name('metadata');
+                $repeater->label('Meta Data');
+
+                $repeater->field('text', [
+                    'name'  => 'key',
+                    'label' => 'Key'
+                ]);
+
+                $repeater->field('text', [
+                    'name'  => 'value',
+                    'label' => 'Value'
+                ]);
+            });
         });
     }
 
@@ -378,6 +395,7 @@ abstract class Field extends Feature implements FormComponent {
             'view',
             'renderContext',
             'isFieldSet',
+            'metadata'
         ], false);
     }
 
@@ -939,6 +957,28 @@ abstract class Field extends Feature implements FormComponent {
         return isset($this->attributes['disabled']);
     }
 
+    /**
+     * Adds an arbitrary key => value to the field's metadata array.
+     *
+     * @param string $key
+     * @param string $value
+     *
+     * @return static
+     */
+    public function meta(string $key, string $value): static {
+        $this->metadata[$key] = $value;
+        return $this;
+    }
+
+    /**
+     * Returns the field's metadata array.
+     *
+     * @return array
+     */
+    public function getMetadata(): array {
+        return $this->metadata;
+    }
+
     // =========================================================================
     // Condition Handling
     // =========================================================================
@@ -1273,10 +1313,12 @@ abstract class Field extends Feature implements FormComponent {
      * Sets the field's associated FieldRow instance and its index and position.
      *
      * @param FieldRow $row The FieldRow instance to associate with the field definition.
+     * @param int|null $rowIndex The index of the FieldRow in its form or field group
      * @return static
      */
-    final public function row(FieldRow $row): static {
+    final public function row(FieldRow $row, ?int $rowIndex = null): static {
         $this->row = $row;
+        $this->rowIndex = $rowIndex;
         return $this;
     }
 
@@ -1289,6 +1331,24 @@ abstract class Field extends Feature implements FormComponent {
     final public function rowPosition(?int $position): static {
         $this->rowPosition = $position;
         return $this;
+    }
+
+    /**
+     * Gets the field's row position if set.
+     *
+     * @return integer|null
+     */
+    final public function getRowPosition(): ?int {
+        return $this->rowPosition;
+    }
+
+    /**
+     * Returns the index of the row the field belongs to if set.
+     *
+     * @return integer|null
+     */
+    final public function getRowIndex(): ?int {
+        return $this->rowIndex;
     }
 
     /**

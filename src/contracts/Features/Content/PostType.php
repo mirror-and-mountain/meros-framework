@@ -7,6 +7,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
 use MM\Meros\App\Models\Post;
+use MM\Meros\App\Models\PostMeta as PostMetaModel;
 use Illuminate\Database\Eloquent\ModelInspector;
 
 use MM\Meros\Contracts\Feature;
@@ -498,7 +499,7 @@ class PostType extends Feature implements Makeable, Registrable {
      *
      * @return array
      */
-    final public function inspect(?int $postId = null, bool $refresh = false): array {
+    public function inspect(?int $postId = null, bool $refresh = false): array {
         $data = [];
 
         if (is_int($postId)) {
@@ -510,6 +511,7 @@ class PostType extends Feature implements Makeable, Registrable {
             $data = $this->getDefaultProperties();
         }
 
+        $metaContainerNames = [];
         foreach ($this->metaContainers as $container) {
             if (!($container instanceof PostMetaContainer)) {
                 continue;
@@ -521,6 +523,24 @@ class PostType extends Feature implements Makeable, Registrable {
                     ? $container->value($postId, $refresh) 
                     : $container->getDefault()
             );
+
+            $metaContainerNames[] = $container->getName(true);
+        }
+
+        if ($postId !== null) {
+            $otherMeta = PostMetaModel::where('post_id', $postId)
+                ->whereNotIn('meta_key', $metaContainerNames)
+                ->get();
+
+            if ($otherMeta !== null && $otherMeta->isNotEmpty()) {
+                $formatted = collect($otherMeta->toArray())
+                    ->pluck('meta_value', 'meta_key')
+                    ->all();
+
+                if (is_array($formatted) && !empty($formatted)) {
+                    $data = array_merge($data, $formatted);
+                }
+            } 
         }
 
         return $data;

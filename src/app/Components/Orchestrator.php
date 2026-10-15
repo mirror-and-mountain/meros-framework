@@ -2,6 +2,9 @@
 
 namespace MM\Meros\App\Components;
 
+use MM\Meros\Contracts\Orchestrators\ComponentsOrchestrator;
+use MM\Meros\Contracts\Features\Components\Field;
+
 use MM\Meros\App\Components\Fields\Checkbox;
 use MM\Meros\App\Components\Fields\Checkboxes;
 use MM\Meros\App\Components\Fields\Date;
@@ -23,20 +26,11 @@ use MM\Meros\App\Components\Fields\UsersLookup;
 
 use MM\Meros\App\Components\FormActions\StoreResponse;
 
-use MM\Meros\Contracts\Orchestrators\ComponentsOrchestrator;
-
 use MM\Meros\Facades\Support\Ajax;
-
 use MM\Meros\Facades\Components\Fields;
-use MM\Meros\Facades\Components\FormActions;
-
-use MM\Meros\App\Models\Post;
+use MM\Meros\Facades\Content\PostTypes;
 
 use MM\Meros\App\Content\Form as FormPostType;
-use MM\Meros\Facades\Content\PostTypes;
-use MM\Meros\Contracts\Features\Components\Field;
-
-use Illuminate\Support\Facades\Log;
 
 class Orchestrator extends ComponentsOrchestrator {
     private array $fields = [
@@ -48,7 +42,7 @@ class Orchestrator extends ComponentsOrchestrator {
         'lookup'       => Lookup::class,
         'number'       => Number::class,
         'password'     => Password::class,
-        'posts-lookup' => PostsLookup::class,
+        'posts_lookup' => PostsLookup::class,
         'radio'        => Radio::class,
         'repeater'     => Repeater::class,
         'select'       => Select::class,
@@ -57,8 +51,12 @@ class Orchestrator extends ComponentsOrchestrator {
         'textarea'     => TextArea::class,
         'time'         => Time::class,
         'url'          => Url::class,
-        'users-lookup' => UsersLookup::class,
+        'users_lookup' => UsersLookup::class,
     ];
+
+    // =========================================================================
+    // Registrations
+    // =========================================================================
 
     protected function configure(): void {
         foreach ($this->fields as $alias => $fieldClass) {
@@ -75,6 +73,40 @@ class Orchestrator extends ComponentsOrchestrator {
         $this->formActions()->register(StoreResponse::class, 'store_response');
     }
 
+    // =========================================================================
+    // Ajax Handlers
+    // =========================================================================
+
+    /**
+     * Sends an ajax error with the given message.
+     *
+     * @param string $message
+     *
+     * @return void
+     */
+    private function sendAjaxError(string $message = ''): void {
+        wp_send_json_error([
+            'message' => $message !== '' ? $message : 'An error occurred during the operation.'
+        ]);
+        exit;
+    }
+
+    /**
+     * Sends an ajax success payload with the given payload array and optional message.
+     *
+     * @param array  $payload
+     * @param string $message
+     *
+     * @return void
+     */
+    private function sendAjaxSuccess(array $payload, string $message = ''): void {
+        wp_send_json_success([
+            'message' => $message !== '' ? $message : 'Operation completed successfully.',
+            ...$payload
+        ]);
+        exit;
+    }
+
     /**
      * Initialises ajax requests for form submissions.
      *
@@ -83,34 +115,24 @@ class Orchestrator extends ComponentsOrchestrator {
     private function initFormAjax(): void {
         Ajax::addAction('meros_submit_form', function (array $args) {
             $id = $args['form_id'] ?? null;
-
             if ($id === null) {
-                wp_send_json_error([
-                    'message' => 'Unable to locate form: Null ID.'
-                ]);
-                exit;
+                $this->sendAjaxError('Unable to locate form: Null ID.');
             }
 
-            $data = json_decode(stripslashes($args['form_data'] ?? '{}'), true);
-
-            $form = Post::find($id);
-
-            if ($form === null) {
-                wp_send_json_error([
-                    'message' => 'Unable to locate form: Null Form Model.'
-                ]);
-                exit;
+            $controller = PostTypes::get('form');
+            if (!($controller instanceof FormPostType)) {
+                $this->sendAjaxError('Unable to resolve form controller.');
             }
 
-            Log::info('Actions', FormActions::getRegisteredFeatures());
+            $data   = json_decode(stripslashes($args['form_data'] ?? '{}'), true);
+            $result = $controller->handleSubmission($id, $data);
 
-            wp_send_json_success([
-                'message' => 'Form submitted successfully.',
-                'data'    => $data
-            ]);
-            exit;
+            if (is_string($result)) {
+                $this->sendAjaxError($result);
+            }
 
-        });
+            $this->sendAjaxSuccess($result, 'Form submitted successfully.');
+        }, [], true);
     }
 
     /**
@@ -160,11 +182,6 @@ class Orchestrator extends ComponentsOrchestrator {
             $name = is_string($args['lookup_name'] ?? null) ? $args['lookup_name'] : '';
             $originalName = is_string($args['lookup_original_name'] ?? null) ? $args['lookup_original_name'] : '';
 
-            Log::info('Lookup', [
-                'name' => $name,
-                'originName' => $originalName
-            ]);
-
             $lookup = $this->findFormField($args, $name, $originalName, Lookup::class);
 
             if (!($lookup instanceof Lookup)) {
@@ -184,6 +201,10 @@ class Orchestrator extends ComponentsOrchestrator {
             exit;
         }, [], true);
     }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
 
     /**
      * Helper to resolve a form field for ajax requests at ajax runtime.
@@ -205,7 +226,7 @@ class Orchestrator extends ComponentsOrchestrator {
 
         if ($formId !== '') {
             $formPostId = filter_var($formId, FILTER_VALIDATE_INT);
-            $formType = PostTypes::get('form');
+            $formType   = PostTypes::get('form');
 
             if ($formPostId !== false && $formPostId > 0 && $formType instanceof FormPostType) {
                 $field = $formType->findField($formPostId, $name, $originalName, $fieldClass);

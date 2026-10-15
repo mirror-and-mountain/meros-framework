@@ -52,7 +52,7 @@ const mform = () => {
         // Operations
         // =========================================================================
 
-        submitForm(log = false) {
+        submitForm() {
             const genericError = 'An error occured while submitting the form.'
             const invalidError = this.invalidText || "The form is invalid. Please check the information you've entered."
 

@@ -18,6 +18,8 @@ abstract class FormAction extends Feature implements Registrable {
      */
     protected string $name = '';
 
+    protected static array $responseSchema = [];
+
     use IsRegistrable;
 
     // =========================================================================
@@ -38,12 +40,26 @@ abstract class FormAction extends Feature implements Registrable {
         }
     }
 
-
     // =========================================================================
     // Form Builder Controls
     // =========================================================================
 
-    abstract public static function getFormBuilderControls(FieldGroup $controlGroup, array $rowData, array $repeaterData, array $formFields): FieldGroup;
+    /**
+     * Retrieves the controls needed to configure the action in the form builder.
+     *
+     * @param FieldGroup $controlGroup
+     * @param array      $rowData
+     * @param array      $repeaterData
+     * @param array      $formFields
+     *
+     * @return FieldGroup
+     */
+    abstract public static function getFormBuilderControls(
+        FieldGroup $controlGroup, 
+        array $rowData, 
+        array $repeaterData, 
+        array $formFields
+    ): FieldGroup;
 
     // =========================================================================
     // Handling
@@ -51,15 +67,19 @@ abstract class FormAction extends Feature implements Registrable {
 
     /**
      * The action handler which receives the submitted form's ID, the action's 
-     * configuration and the submitted data array.
+     * configuration and the submission payload.
      *
      * @param integer $formId
      * @param array   $configuration
-     * @param array   $submittedData
+     * @param array   $payload
      *
-     * @return boolean
+     * @return FormActionResponse
      */
-    abstract public function handle(int $formId, array $configuration, array $submittedData): bool;
+    abstract public function handle(
+        int $formId, 
+        array $configuration, 
+        array $payload
+    ): FormActionResponse;
 
     // =========================================================================
     // Attribute setters/getters

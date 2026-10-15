@@ -116,13 +116,20 @@ final class FieldRow implements Serializable {
         array           $childGroup = [],
         ?Form           $form = null,
         ?FieldGroup     $parentGroup = null,
-        string          $id = '',
+        string          $id = ''
     ): static {
         $id = empty($id) 
             ? 'mforms-row-' . Str::substr(Str::uuid(), 0, 8) 
             : $id;
 
-        return new static($provider, $id, $fields, $childGroup, $form, $parentGroup);
+        return new static(
+            $provider, 
+            $id, 
+            $fields, 
+            $childGroup, 
+            $form, 
+            $parentGroup
+        );
     }
 
     /**
@@ -191,6 +198,7 @@ final class FieldRow implements Serializable {
 
                     $fieldInstance->row($this);
                     $fieldInstance->rowPosition($position);
+
                     return $fieldInstance;
                 }
 
@@ -250,13 +258,13 @@ final class FieldRow implements Serializable {
                 $props, [
                     'form'     => $this->form, 
                     'row'      => $this,
-                    'rowIndex' => $this->parentGroup ? $this->parentGroup->getRowIndex($this) : $this->form?->getRowIndex($this),
                     'group'    => $this->parentGroup,
                 ]
             ));
 
         if ($field instanceof Field) {
             $this->fields[] = $field;
+            $field->row($this);
             $field->rowPosition($this->getFieldPosition($field));
             return $this;
         }
@@ -318,6 +326,15 @@ final class FieldRow implements Serializable {
                 $callbackOrProps, ['form' => $this->form]
             );
             $this->childGroup = $this->makeItem(FieldGroup::class, $group, $props);
+        }
+
+        if ($this->childGroup instanceof FieldGroup) {
+            $fields = $this->childGroup->getFields();
+            foreach ($fields as $field) {
+                if ($field instanceof Field) {
+                    $field->group($this->childGroup);
+                }
+            }
         }
 
         return $this;
@@ -457,6 +474,15 @@ final class FieldRow implements Serializable {
         }
 
         return $this->childGroup->getFields($collect);
+    }
+
+    /**
+     * Returns the row's parent form if it exists.
+     *
+     * @return Form|null
+     */
+    public function getForm(): ?Form {
+        return $this->form;
     }
 
     protected function filterSerializedProperties(array $properties): array {
