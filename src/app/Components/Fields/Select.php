@@ -30,10 +30,10 @@ class Select extends Field {
             ]);
         });
 
-        $group->field('checkbox', function (Checkbox $field) {
-            $field->name('allowsMultiple');
-            $field->label('Allow Multiple Values');
-        });
+        $group->field('checkbox', [
+            'name'  => 'allowsMultiple',
+            'label' => 'Allow Multiple Values'
+        ]);
 
         $group->field('checkbox', function (Checkbox $field) {
             $field->name('searchable');
@@ -59,6 +59,12 @@ class Select extends Field {
         $this->addSupports(['multiple']);
     }
 
+    public function getDataType(): string {
+        return $this->allowsMultiple() 
+            ? 'array.scalar'
+            : 'string';
+    }
+
     /**
      * Makes the select field searchable using TomSelect.
      *
@@ -71,6 +77,23 @@ class Select extends Field {
             $this->attribute('ts-searchable', true);
         } else {
             $this->removeAttribute('ts-searchable');
+        }
+
+        return $this;
+    }
+
+    /**
+     * Sets a searchable select field to allow users to add custom values.
+     *
+     * @param boolean $allowAdd
+     *
+     * @return static
+     */
+    public function allowAdd(bool $allowAdd = true): static {
+        if ($allowAdd) {
+            $this->attribute('ts-allow-add', true);
+        } else {
+            $this->removeAttribute('ts-allow-add');
         }
 
         return $this;

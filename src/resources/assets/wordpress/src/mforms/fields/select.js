@@ -7,6 +7,7 @@ const mformsSelect = () => {
         formId: null,
         multiple: false,
         searchable: false,
+        allowsAdd: false,
         ts: null,
         tsDataItem: null,
         tsDataItemValue: null,
@@ -23,6 +24,7 @@ const mformsSelect = () => {
 
             this.multiple   = this.$el.hasAttribute('multiple');
             this.searchable = this.$el.hasAttribute('ts-searchable');
+            this.allowsAdd  = this.$el.hasAttribute('ts-allow-add');
 
             this.ajaxUrl    = this.$el.dataset.ajaxUrl || null;
             this.ajaxNonce  = this.$el.dataset.ajaxNonce || null;
@@ -199,6 +201,7 @@ const mformsSelect = () => {
                 valueField: 'value',
                 labelField: 'text',
                 searchField: ['text'],
+                create: this.allowsAdd,
                 load: load,
                 onChange: (value) => {
                     el.tomselect.blur();

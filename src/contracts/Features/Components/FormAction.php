@@ -3,10 +3,10 @@
 namespace MM\Meros\Contracts\Features\Components;
 
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 use MM\Meros\Contracts\Feature;
 use MM\Meros\Contracts\Features\Registrable;
-use MM\Meros\Contracts\Features\Components\FieldGroup;
 
 use MM\Meros\Contracts\Features\Concerns\IsRegistrable;
 
@@ -18,7 +18,50 @@ abstract class FormAction extends Feature implements Registrable {
      */
     protected string $name = '';
 
-    protected static array $responseSchema = [];
+    /**
+     * Optional input schema that defines the structure of the payload
+     * passed to the action's run method.
+     *
+     * @var array
+     */
+    protected static array $inputSchema = [];
+
+    /**
+     * Optional output schema used to validate the action's output
+     * via the run method's returned FormActionResponse.
+     *
+     * @var array
+     */
+    protected static array $outputSchema = [];
+
+    /**
+     * Internal rules for validating the action's inputSchema if it is set.
+     *
+     * @var array
+     */
+    private static array $inputSchemaRules = [
+        'type' => [
+            'type'           => 'string',
+            'required'       => true,
+            'allowed_values' => ['string', 'text', 'integer', 'boolean']
+        ],
+        'options' => [
+            'type'     => 'array',
+            'required' => false
+        ],
+        'required' => [
+            'type'     => 'boolean',
+            'required' => false
+        ],
+        'allow_dynamic_value' => [
+            'type'     => 'boolean',
+            'required' => false
+        ],
+        'default' => [
+            'type'     => 'mixed',
+            'required' => false
+        ]
+    ];
 
     use IsRegistrable;
 
@@ -41,49 +84,46 @@ abstract class FormAction extends Feature implements Registrable {
     }
 
     // =========================================================================
-    // Form Builder Controls
-    // =========================================================================
-
-    /**
-     * Retrieves the controls needed to configure the action in the form builder.
-     *
-     * @param FieldGroup $controlGroup
-     * @param array      $rowData
-     * @param array      $repeaterData
-     * @param array      $formFields
-     *
-     * @return FieldGroup
-     */
-    abstract public static function getFormBuilderControls(
-        FieldGroup $controlGroup, 
-        array $rowData, 
-        array $repeaterData, 
-        array $formFields
-    ): FieldGroup;
-
-    // =========================================================================
     // Handling
     // =========================================================================
 
     /**
-     * The action handler which receives the submitted form's ID, the action's 
+     * Runs the action which receives the submitted form's ID, the action's 
      * configuration and the submission payload.
      *
      * @param integer $formId
      * @param array   $configuration
-     * @param array   $payload
+     * @param array   $input
      *
      * @return FormActionResponse
      */
-    abstract public function handle(
+    abstract public function run(
         int $formId, 
         array $configuration, 
-        array $payload
+        array $input
     ): FormActionResponse;
 
     // =========================================================================
     // Attribute setters/getters
     // =========================================================================
+    
+    /**
+     * Validates and returns the action's input schema.
+     *
+     * @return array
+     */
+    public static function getInputSchema(): array {
+        return static::$inputSchema;
+    }
+
+    /**
+     * Returns the action's output schema.
+     *
+     * @return array
+     */
+    public static function getOutputSchema(): array {
+        return static::$outputSchema;
+    }
 
     /**
      * Sets the name of the FormAction.

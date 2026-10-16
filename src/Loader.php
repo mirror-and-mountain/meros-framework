@@ -6,7 +6,7 @@ use Roots\Acorn\Application as RootsApplication;
 use MM\Meros\App\Providers\FrameworkServiceProvider;
 
 final class Loader {    
-    final public static function boot(
+    public static function boot(
         array  $providers = []
     ): void {
         if (class_exists(RootsApplication::class)) {

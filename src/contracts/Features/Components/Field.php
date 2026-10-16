@@ -674,7 +674,7 @@ abstract class Field extends Feature implements FormComponent {
      *
      * @return string
      */
-    final public function getDataType(): string {
+    public function getDataType(): string {
         return $this->dataType;
     }
 

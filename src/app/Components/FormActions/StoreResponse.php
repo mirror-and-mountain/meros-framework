@@ -8,6 +8,7 @@ use MM\Meros\Contracts\Features\Components\FormActionResponse;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 
 use MM\Meros\App\Models\FormResponse;
+use MM\Meros\Contracts\Features\Components\FormActionInputSchema;
 
 final class StoreResponse extends FormAction {
     protected function configure(): void {
@@ -29,13 +30,13 @@ final class StoreResponse extends FormAction {
         return $controlGroup;
     }
 
-    public function handle(int $formId, array $configuration, array $payload): FormActionResponse {
+    public function run(int $formId, array $configuration, array $input): FormActionResponse {
         FormResponse::create([
             'form_id'  => $formId,
-            'response' => $payload['data'] ?? [],
+            'response' => $input['data'] ?? [],
             'status'   => 'complete'
         ]);
 
-        return new FormActionResponse(true);
+        return new FormActionResponse($this, true);
     }
 }
