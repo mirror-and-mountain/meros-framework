@@ -31,6 +31,29 @@ $mf-first-row-offset: -24px;
     display: none !important;
 }
 
+.mforms-form [x-cloak] {
+    display: none !important;
+}
+
+.mforms-feedback {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid;
+    border-radius: 0.25rem;
+}
+
+.mforms-feedback--success {
+    color: #166534;
+    border-color: #86efac;
+    background-color: #f0fdf4;
+}
+
+.mforms-feedback--error {
+    color: #991b1b;
+    border-color: #fca5a5;
+    background-color: #fef2f2;
+}
+
 .mforms-section {
     .mforms-section-description {
         margin-bottom: 1rem;

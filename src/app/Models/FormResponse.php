@@ -11,10 +11,12 @@ class FormResponse extends Model {
     protected $fillable = [
         'form_id',
         'response',
+        'completed_actions',
         'status'
     ];
 
     protected $casts = [
-        'response' => 'array'
+        'response'          => 'encrypted:array',
+        'completed_actions' => 'encrypted:array'
     ];
 }

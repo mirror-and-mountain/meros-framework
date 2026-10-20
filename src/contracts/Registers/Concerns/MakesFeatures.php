@@ -42,6 +42,7 @@ trait MakesFeatures {
             $identifier = $featureInstance->getIdentifier();
 
             if (!$this->hasRegisteredFeature($identifier, null, false)) {
+                $this->checkout($provider);
                 $this->register(get_class($featureInstance), $identifier);
             }
         }

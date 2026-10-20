@@ -272,7 +272,7 @@ const mformsRepeater = () => {
 
                             const component = this.getComponent(form);
                             if (component && typeof component.submitForm === 'function') {
-                                const { success, invalid, error } = component.submitForm();
+                                const { success, invalid, error } = component.submitForm(true);
 
                                 if (success) {
                                     modal.hide();
@@ -387,6 +387,8 @@ const mformsRepeater = () => {
                     field.setAttribute('data-repeater-row-index', index);
                 })
             })
+
+            this.fieldsProcessor?.refreshRepeaterRowValues();
         },
 
         getValue() {

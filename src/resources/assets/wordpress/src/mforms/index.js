@@ -18,6 +18,8 @@ const mform = () => {
         onSubmit: null,
         invalidText: null,
         fieldsProcessor: null,
+        feedbackMessage: '',
+        feedbackType: '',
 
         // =========================================================================
         // Initialisation
@@ -52,24 +54,30 @@ const mform = () => {
         // Operations
         // =========================================================================
 
-        submitForm() {
+        submitForm(returnOutcome = false) {
             const genericError = 'An error occured while submitting the form.'
             const invalidError = this.invalidText || "The form is invalid. Please check the information you've entered."
 
+            this.feedbackMessage = '';
+            this.feedbackType = '';
+
             if (!this.name) {
-                return {success: false, error: genericError};
+                return this.completeSubmission({success: false, error: genericError}, returnOutcome);
             }
 
             const form = this.$el.tagName === 'FORM' ? this.$el : this.$el.closest('form');
             if (!form) {
-                return {success: false, error: genericError};
+                return this.completeSubmission({success: false, error: genericError}, returnOutcome);
             }
 
             const valid = form.checkValidity();
 
             if (valid === false) {
                 form.reportValidity();
-                return {success: false, invalid: true, error: invalidError};
+                return this.completeSubmission(
+                    {success: false, invalid: true, error: invalidError},
+                    returnOutcome
+                );
             }
 
             const formData = this.processFormData(new FormData(form));
@@ -81,11 +89,14 @@ const mform = () => {
                     formData,
                 });
 
-                return {success: true, error: null};
+                return this.completeSubmission(
+                    {success: true, error: null, message: 'Form submitted successfully.'},
+                    returnOutcome
+                );
             }
 
             if (!this.ajaxUrl || !this.ajaxNonce || !this.ajaxAction) {
-                return {success: false, error: genericError};
+                return this.completeSubmission({success: false, error: genericError}, returnOutcome);
             }
 
             const postData = new FormData();
@@ -96,33 +107,54 @@ const mform = () => {
             postData.append('form_id', this.id);
             postData.append('form_data', JSON.stringify(formData));
 
-            fetch(this.ajaxUrl, {
+            const request = fetch(this.ajaxUrl, {
                 method: 'POST',
                 body: postData,
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(genericError);
+                }
+
+                return response.json();
+            })
             .then(data => {
                 if (data.success && data.data) {
-                    console.log(data.data);
-                    return {success: true, error: null};
+                    return {
+                        success: true,
+                        error: null,
+                        message: data.data.message || 'Form submitted successfully.'
+                    };
                 }
 
-                else if (data.data && data.data.message) {
-                    console.log(data.data.message);
-                    return {success: false, error: data.data.message};
-                }
-
-                else {
-                    console.log('error');
-                    return {success: false, error: genericError};
-                }
+                return {
+                    success: false,
+                    error: data.data?.message || genericError
+                };
             })
             .catch((error) => {
-                console.log('error');
-                return {success: false, error: error};
+                return {
+                    success: false,
+                    error: error instanceof Error ? error.message : genericError
+                };
             });
 
-            return {success: true, error: null};
+            if (returnOutcome) {
+                return request;
+            }
+
+            return request.then(outcome => this.completeSubmission(outcome, false));
+        },
+
+        completeSubmission(outcome, returnOutcome) {
+            if (returnOutcome) {
+                return outcome;
+            }
+
+            this.feedbackMessage = outcome.success
+                ? outcome.message || 'Form submitted successfully.'
+                : outcome.error || 'An error occured while submitting the form.';
+            this.feedbackType = outcome.success ? 'success' : 'error';
         },
 
         // =========================================================================

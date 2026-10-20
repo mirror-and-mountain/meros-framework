@@ -1018,6 +1018,16 @@ abstract class Field extends Feature implements FormComponent {
         return $this;
     }
 
+    /**
+     * Sets the field to a fixed value, or dynamically from the triggering field when
+     * the fourth rule element is omitted or contains {value}/{unique_id} placeholders.
+     * The {row_index} placeholder is available for fields inside a repeater.
+     *
+     * @param array  $rules
+     * @param string $logic
+     *
+     * @return static
+     */
     public function setValueWhen(array $rules, string $logic = 'AND'): static {
         $this->processRules('set_value', $rules, false, $logic);
         return $this;
@@ -1030,6 +1040,8 @@ abstract class Field extends Feature implements FormComponent {
             'LIKE',
             'CONTAINS',
             'NOT CONTAINS',
+            'EMPTY',
+            'NOT EMPTY',
             '<',
             '>',
             '=>',
@@ -1042,7 +1054,7 @@ abstract class Field extends Feature implements FormComponent {
             }
 
             $requiredKeys = [0, 1, 2];
-            if (!$boolean) {
+            if (!$boolean && $ruleset !== 'set_value') {
                 $requiredKeys[] = 3;
             }
 
@@ -1060,7 +1072,14 @@ abstract class Field extends Feature implements FormComponent {
                 continue;
             }
 
-            $this->condition($ruleset, $rule[0], $rule[1], $rule[2], $rule[3] ?? null);
+            $this->condition(
+                $ruleset,
+                $rule[0],
+                $rule[1],
+                $rule[2],
+                $rule[3] ?? null,
+                $ruleset === 'set_value' && !array_key_exists(3, $rule)
+            );
         }
 
         $this->conditions[$ruleset]['logic'] = in_array($logic, ['AND', 'OR'])
@@ -1076,17 +1095,20 @@ abstract class Field extends Feature implements FormComponent {
      * @param string $operator
      * @param mixed  $sourceValue
      * @param mixed  $destValue
+     * @param bool   $destValueFromSource
      *
      * @return void
      */
-    private function condition(string $ruleset, string $fieldName, string $operator, mixed $sourceValue, mixed $destValue = null): void {
+    private function condition(string $ruleset, string $fieldName, string $operator, mixed $sourceValue, mixed $destValue = null, bool $destValueFromSource = false): void {
         $condition = [
             'field'        => $fieldName, 
             'operator'     => $operator, 
             'source_value' => $sourceValue
         ];
 
-        if ($destValue !== null) {
+        if ($destValueFromSource) {
+            $condition['dest_value_from_source'] = true;
+        } elseif ($destValue !== null) {
             $condition['dest_value'] = $destValue;
         }
     

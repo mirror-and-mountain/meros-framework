@@ -32,7 +32,8 @@ use MM\Meros\Registers\Components\DynamicBlocks;
 use MM\Meros\Registers\Components\Forms;
 use MM\Meros\Registers\Components\Fields;
 use MM\Meros\Registers\Components\FieldGroups;
-use MM\Meros\Registers\Components\FormActions;
+
+use MM\Meros\Registers\Automation\FlowActions;
 
 use MM\Meros\Registers\Content\PostTypes;
 
@@ -80,7 +81,8 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         Forms::class,
         Fields::class,
         FieldGroups::class,
-        FormActions::class,
+
+        FlowActions::class,
 
         PostTypes::class,
 

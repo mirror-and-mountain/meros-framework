@@ -1,6 +1,6 @@
 <?php
 
-namespace MM\Meros\Support\Integrations;
+namespace MM\Meros\Support;
 
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;

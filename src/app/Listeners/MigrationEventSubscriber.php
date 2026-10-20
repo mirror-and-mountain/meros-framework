@@ -183,10 +183,6 @@ class MigrationEventSubscriber {
         } else {
             Log::warning("Failed to create migration record for table: " . $table->getHandle() . ". Missing required data ($handle, $label, $path, $trimmedPath).");
         }
-
-        // if ($type === 'update' && $isRollback) {
-        //     $updateMigration = ;
-        // }
     }
 
     /**

@@ -16,7 +16,7 @@
     data-invalid-text="{{ $invalidText }}"
     {!! $attributeString !!}
     {{ is_string($onSubmit) ? "data-onsubmit={$onSubmit}" : '' }}
-    @submit.prevent="submitForm(true)"
+    @submit.prevent="submitForm()"
 >
     @if($title !== '')
         <h2 class="mforms-form-title">{{ $title }}</h2>
@@ -36,5 +36,14 @@
         >
             {{ $submitText }}
         </button>
+        <div
+            class="mforms-feedback"
+            x-cloak
+            x-show="feedbackMessage"
+            :class="`mforms-feedback--${feedbackType}`"
+            :role="feedbackType === 'error' ? 'alert' : 'status'"
+            aria-live="polite"
+            x-text="feedbackMessage"
+        ></div>
     </div>
 </form>

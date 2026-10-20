@@ -20,9 +20,9 @@ body:has(.meros-modal-overlay:not(.meros-modal-hidden)) {
         background-color: #fff;
         padding: 2rem;
         border-radius: 8px;
-        max-width: 800px;
+        max-width: 80vw;
         width: 100%;
-        max-height: calc(100vh - 5rem);
+        max-height: calc(100vh - 10rem);
         margin-top: 5rem;
         margin-bottom: 5rem;
         overflow-y: auto;

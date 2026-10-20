@@ -126,6 +126,21 @@ export default class MerosFieldsProcessor {
     }
 
     /**
+     * Reapplies row-index templates after repeater rows are reordered or removed.
+     *
+     * @returns {void}
+     */
+    refreshRepeaterRowValues() {
+        if (this.parentType !== 'repeater') return;
+
+        Object.values(this.fields).forEach(field => {
+            if (field.row && field.conditions?.set_value) {
+                this.applyFieldConditions(field.name);
+            }
+        });
+    }
+
+    /**
      * Resolves a wrapper's field control and stores its metadata and conditions.
      *
      * @param {HTMLElement} wrapperElement Field wrapper to configure.
@@ -172,6 +187,8 @@ export default class MerosFieldsProcessor {
             initialOptions: this.getControlOptions(control),
             conditionalValueState: null,
             conditionalValueActive: false,
+            conditionalValueFromSource: false,
+            conditionalValueUniqueId: null,
             conditionalOptionsActive: false,
             actionListenerInitialized: false,
             actions: []
@@ -464,6 +481,11 @@ export default class MerosFieldsProcessor {
                 return !this.evaluateRule(actual, 'CONTAINS', expected);
             case 'LIKE':
                 return actualString.includes(expectedString.replace(/%/g, ''));
+            case 'EMPTY':
+                return actual == null || actualString.trim() === '' ||
+                    (Array.isArray(actual) && actual.length === 0);
+            case 'NOT EMPTY':
+                return !this.evaluateRule(actual, 'EMPTY', expected);
             case '>':
                 return Number(actual) > Number(expected);
             case '<':
@@ -634,7 +656,10 @@ export default class MerosFieldsProcessor {
      */
     applyConditionalValue(field) {
         const matches = this.getMatchingConditionRules(field, 'set_value')
-            .filter(rule => Object.prototype.hasOwnProperty.call(rule, 'dest_value'));
+            .filter(rule =>
+                Object.prototype.hasOwnProperty.call(rule, 'dest_value') ||
+                rule.dest_value_from_source === true
+            );
 
         if (matches.length > 0) {
             if (!field.conditionalValueActive) {
@@ -643,15 +668,59 @@ export default class MerosFieldsProcessor {
             }
 
             const rule = matches[0];
-            this.setFieldValue(field, rule.dest_value);
+            const isValueTemplate = typeof rule.dest_value === 'string' &&
+                /\{(?:value|unique_id|row_index)\}/.test(rule.dest_value);
+
+            if (rule.dest_value_from_source === true || isValueTemplate) {
+                const sourceField = this.getFieldByConditionName(rule.field, field);
+                const sourceValue = sourceField ? this.getFieldValue(sourceField) : null;
+                let value = sourceValue;
+
+                if (isValueTemplate) {
+                    if (rule.dest_value.includes('{unique_id}')) {
+                        field.conditionalValueUniqueId ||= this.createUniqueId();
+                    }
+
+                    const rowIndex = field.row?.dataset.rowIndex ??
+                        field.control.dataset.repeaterRowIndex ??
+                        '';
+                    value = rule.dest_value
+                        .replaceAll('{value}', sourceValue == null ? '' : String(sourceValue))
+                        .replaceAll('{unique_id}', field.conditionalValueUniqueId ?? '')
+                        .replaceAll('{row_index}', String(rowIndex));
+                }
+
+                this.setFieldValue(field, value);
+                field.conditionalValueFromSource = true;
+            } else {
+                this.setFieldValue(field, rule.dest_value);
+                field.conditionalValueFromSource = false;
+            }
             return;
         }
 
         if (field.conditionalValueActive) {
-            this.setFieldValue(field, field.conditionalValueState);
+            this.setFieldValue(
+                field,
+                field.conditionalValueFromSource ? null : field.conditionalValueState
+            );
             field.conditionalValueState = null;
             field.conditionalValueActive = false;
+            field.conditionalValueFromSource = false;
         }
+    }
+
+    /**
+     * Creates an identifier that remains stable for the lifetime of a field instance.
+     *
+     * @returns {string} Unique identifier.
+     */
+    createUniqueId() {
+        if (typeof globalThis.crypto?.randomUUID === 'function') {
+            return globalThis.crypto.randomUUID().replaceAll('-', '');
+        }
+
+        return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
     }
 
     /**

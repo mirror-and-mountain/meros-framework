@@ -6,23 +6,22 @@ use Illuminate\Support\Str;
 use Livewire\Livewire;
 
 use MM\Meros\App\Models\Post;
+use MM\Meros\App\Models\FormResponse;
 
 use MM\Meros\Contracts\Features\Content\PostType;
 use MM\Meros\Contracts\Features\Components\Form as FormComponent;
-use MM\Meros\Contracts\Features\Components\FormAction;
 
 use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\FieldRow;
 
-use MM\Meros\App\Components\Fields\Select;
 use MM\Meros\App\Components\Fields\Repeater;
 
 use MM\Meros\Facades\Components\Forms;
 use MM\Meros\Facades\Components\Fields;
-use MM\Meros\Facades\Components\FormActions;
+use MM\Meros\Facades\Automation\FlowActions;
 
-use Illuminate\Support\Facades\Log;
+use MM\Meros\Support\FormActionsRunner;
 
 class Form extends PostType {
 
@@ -39,6 +38,8 @@ class Form extends PostType {
             $this->configureBuilderMetabox();
             $this->configureFormActionsFields();
         });
+
+        // dd(FormResponse::find(1)?->completed_actions, FormResponse::find(1)?->status);
 
         // Sets the render callback for form post types, filtering 'the content'
         // to render the form using its stored strucure/
@@ -109,223 +110,8 @@ class Form extends PostType {
      * @return void
      */
     private function configureFormActionsFields(): void {
-        $this->fields(function (FieldGroup $group) {
-            $group->title('Form Actions');
-            
-            $group->field('repeater', function (Repeater $repeater) {
-                $repeater->name('form_actions');
-                $repeater->label('Form Actions');
-
-                $actions = $this->getAvailableFormActions();
-
-                $repeater->field('select', [
-                    'name'    => 'action',
-                    'label'   => 'Action',
-                    'options' => $actions
-                ]);
-
-                $repeater->field('hidden', [
-                    'name'    => 'post_id',
-                    'default' => $_GET['post'] ?? ''
-                ]);
-
-                $repeater->editForm(function(FormComponent $form, array $rowData, array $repeaterValue) use($actions): FormComponent {
-                    $action = $rowData['action'] ?? '';
-                    $postId = $rowData['post_id'] ?? '';
-
-                    if ($postId === '') {
-                        return $form;
-                    }
-
-                    if ($action === '' || !in_array($action, array_keys($actions))) {
-                        return $form;
-                    }
-
-                    $actionClass = FormActions::getRegisteredFeatureClass($action);
-
-                    if (!is_string($actionClass) || !class_exists($actionClass)) {
-                        return $form;
-                    }
-
-                    $form->field('text', [
-                        'name'     => 'action_label',
-                        'label'    => 'Action Label',
-                        'required' => true
-                    ]);
-
-                    $inputSchema = $actionClass::getInputSchema();
-
-                    if ($inputSchema !== []) {
-                        $dynamicOptions = [
-                            ''                  => 'Select...',
-                            'user_id'           => 'User: ID',
-                            'user_display_name' => 'User: Display Name',
-                            'user_first_name'   => 'User: First Name',
-                            'user_last_name'    => 'User: Last Name',
-                            'user_email'        => 'User: Email'
-                        ];
-
-                        $formFields = $this->getStoredFields((int) $postId, [
-                            'list_type'     => 'with_type',
-                            'prepend_label' => 'Field: '
-                        ]) ?? [];
-
-                        if ($repeaterValue !== []) {
-                            foreach ($repeaterValue as $row => $rowValue) {
-                                $prevAction = $rowValue['action'] ?? '';
-                                
-                                if ($prevAction === '') {
-                                    continue;
-                                }
-
-                                if ($prevAction === $action) {
-                                    break;
-                                }
-
-                                $prevActionClass = FormActions::getRegisteredFeatureClass($prevAction);
-
-                                if (!is_string($prevActionClass) || !class_exists($prevActionClass)) {
-                                    continue;
-                                }
-
-                                $prevActionOutputSchema = $prevActionClass::getOutputSchema();
-
-                                if ($prevActionOutputSchema !== []) {
-                                    foreach ($prevActionOutputSchema as $outputName => $config) {
-                                        $dynamicOptions[$outputName] = ('Action Output: ' . $rowValue['form_data']['action_label'] ?? $prevAction) . ' - ' . $outputName;
-                                    }
-                                }
-                            }
-                        }
-
-                        foreach ($inputSchema as $name => $properties) {
-                            $type = $properties['type'] ?? null;
-
-                            if ($type === null || !is_string($type)) {
-                                continue;
-                            }
-
-                            $getInputProp = function (string $prop, string $type, mixed $default) use($properties): mixed {
-                                $prop = array_key_exists($prop, $properties) && gettype($properties[$prop] === $type)
-                                    ? $properties[$prop]
-                                    : $default;
-
-                                return $prop;
-                            };
-
-                            $fieldType      = $getInputProp('field_type', 'string', null);
-                            $required       = $getInputProp('required', 'boolean', false);
-                            $dynamicAllowed = $getInputProp('allow_dynamic_value', 'boolean', true);
-                            $label          = $getInputProp('label', 'string', null);
-                            $description    = $getInputProp('description', 'string', null);
-                            $options        = $getInputProp('options', 'array', []);
-
-                            if ($fieldType === null) {
-                                switch($type) {
-                                    case 'string':
-                                        $fieldType = 'text';
-                                        break;
-                                    case 'integer':
-                                        $fieldType = 'number';
-                                        break;
-                                    case 'boolean':
-                                        $fieldType = 'checkbox';
-                                        break;
-                                    case 'array':
-                                        $fieldType = 'select';
-                                        $type = 'array.scalar';
-                                        break;
-                                }
-                            }
-
-                            $form->section(function(FieldGroup $section) use(
-                                $name, 
-                                $type,
-                                $fieldType,
-                                $required, 
-                                $dynamicAllowed, 
-                                $dynamicOptions, 
-                                $options, 
-                                $label, 
-                                $description,
-                                $formFields
-                            ) {
-                                if ($label !== null) {
-                                    $section->title($label);
-                                }
-
-                                if ($description !== null) {
-                                    $section->description($description);
-                                }
-
-                                $section->row(function(FieldRow $row) use($name, $dynamicAllowed) {
-                                    $row->field('text', [
-                                        'name'     => $name . '_label',
-                                        'label'    => 'Input API Name',
-                                        'default'  => $name,
-                                        'readonly' => true,
-                                    ]);
-
-                                    $row->field('checkbox', function ($field) use ($name, $dynamicAllowed) {
-                                        $field->name('use_dynamic_value_' . $name);
-                                        $field->label('Use Dynamic Value');
-                                        $field->default($dynamicAllowed);
-
-                                        if ($dynamicAllowed === false) {
-                                            $field->disabled();
-                                        }
-                                    });
-                                });
-
-                                $section->row(function(FieldRow $row) use($type, $fieldType, $name, $dynamicOptions, $formFields, $options, $required) {
-                                    $row->field($fieldType, function($field) use($type, $fieldType, $name, $options, $required) {
-                                        $field->name($name . '_value');
-                                        $field->label('Value');
-                                        $field->showWhen([
-                                            ['use_dynamic_value_' . $name, '=', false]
-                                        ]);
-
-                                        if ($required) {
-                                            $field->required();
-                                        }
-
-                                        if ($fieldType === 'select' && $options !== []) {
-                                            $field->options($options);
-                                        }
-
-                                        if ($fieldType === 'select' && $type === 'array.scalar') {
-                                            $field->multiple(true);
-                                        }
-                                    });
-
-                                    $row->field('select', function(Select $field) use($type, $name, $dynamicOptions, $formFields, $required) {
-                                        $field->name($name . '_dynamic_value');
-                                        $field->label('Value');
-
-                                        $dynamicOptions = array_merge($dynamicOptions, 
-                                            collect($formFields)->where('data_type', $type)
-                                                ->pluck('label', 'name')
-                                                ->toArray()
-                                        );
-
-                                        $field->options($dynamicOptions);
-                                        $field->showWhen([
-                                            ['use_dynamic_value_' . $name, '=', true]
-                                        ]);
-
-                                        if ($required) {
-                                            $field->required();
-                                        }
-                                    });
-                                });
-                            });
-                        }
-                    }
-
-                    return $form;
-                }, 'Configure', 'Action Inputs');
-            });
-        });
+        $group = new FormActionsGroup($this)->getGroup();
+        $this->fields($group);
     }
 
     /**
@@ -637,16 +423,30 @@ class Form extends PostType {
     // Submission Handling
     // =========================================================================
 
-    public function handleSubmission(int $formId, array|string $data): string|array {
+    /**
+     * Handles the submission of a form, storing the response and executing associated actions.
+     *
+     * @param integer      $formId
+     * @param array|string $data
+     *
+     * @return array
+     */
+    public function handleSubmission(int $formId, array|string $data): array {
         $form = Post::find($formId);
 
         if ($form === null) {
-            return 'Unable to locate form: Null Form Model.';
+            return [
+                'message' => 'Unable to locate form: Null Form Model.',
+                'type'    => 'error'
+            ];
         }
 
         $instance = $this->makeFormInstance($form);
         if (!($instance instanceof FormComponent)) {
-            return 'Unable to parse form.';
+            return [
+                'message' => 'An error occurred while processing the form.',
+                'type'    => 'error'
+            ];
         }
 
         if (is_string($data)) {
@@ -656,67 +456,80 @@ class Form extends PostType {
         $actions = $this->getFormActions($formId);
         $payload = $instance->buildSubmissionPayload($data);
 
-        $result = $this->processFormActions($formId, $payload, $actions);
-
-        if (is_string($result)) {
-            return 'Error running form actions.';
+        $storedResponseId = $this->storeFormResponse($formId, $payload);
+        if ($storedResponseId === false) {
+            return [
+                'message' => 'Failed to store form response.',
+                'type'    => 'error'
+            ];
         }
 
+        $flowRunner = new FormActionsRunner($formId, $storedResponseId, $actions, $payload);
+        $result = $flowRunner->run();
+        $completedActions = $flowRunner->getCompletedActions();
+
+        $this->updateFormResponse(
+            $storedResponseId, 
+            $completedActions, 
+            $result === false ? 'error' : 'success'
+        );
+    
+        if ($result === false) {
+            $errorType = $flowRunner->getErrorAsSuccess() ? 'success' : 'error'; 
+            return [
+                'message' => $errorType === 'success' ? $flowRunner->getSuccessMessage() : $flowRunner->getLastError(),
+                'type'    => $errorType
+            ];
+        }
+
+        $message = $flowRunner->getSuccessMessage() ?: 'Form submitted successfully.';
+
         return [
-            'payload' => $payload,
-            'actions' => $actions
+            'message' => $message,
+            'type'    => 'success'
         ];
     }
 
-    private function processFormActions(int $formId, array $payload, array $actions): string|true {
-        $previousActionOutputs = [];
+    /**
+     * Stores a form response in the database.
+     *
+     * @param integer $formId
+     * @param array   $responseData
+     *
+     * @return integer|false
+     */
+    private function storeFormResponse(int $formId, array $responseData): int|false {
+        $response = FormResponse::create([
+            'form_id'  => $formId,
+            'response' => $responseData,
+            'status'   => 'processing'
+        ]);
 
-        foreach ($actions as $action) {
-            if (!is_array($action)) {
-                return 'Action is not configured correctly.';
-            }
-            
-            $name          = $action['action'] ?? '';
-            $configuration = $action['__form_data'] ?? '';
-            $class         = FormActions::getRegisteredFeatureClass($name);
-
-            if (!is_string($class) || !class_exists($class)) {
-                return 'Action ' . $name . ' is not configured correctly.';
-            }
-
-            if (is_string($configuration) && $configuration !== '') {
-                $configuration = json_decode($configuration, true);
-            } else {
-                $configuration = [];
-            }
-
-            if ($previousActionOutputs !== []) {
-                $payload['prev_action_outputs'] = $previousActionOutputs;
-            }
-
-            $result = $this->runFormAction($formId, $class, $configuration, $payload);
-
-            Log::info($name, [
-                'result' => $result
-            ]);
-
-            if (is_array($result)) {
-                $previousActionOutputs[$name] = $result;
-            }
-        }
-
-        return true;
-    }
-
-    private function runFormAction(int $formId, string $class, array $configuration, array $payload): mixed {
-        $action = FormActions::checkout($this->getProvider())
-            ->makeFrom($class);
-
-        if (!($action instanceof FormAction)) {
+        if (!($response instanceof FormResponse)) {
             return false;
         }
 
-        return $action->run($formId, $configuration, $payload)->output();
+        return $response->id;
+    }
+
+    /**
+     * Updates a form response in the database.
+     *
+     * @param integer $responseId
+     * @param array   $completedActions
+     * @param string  $status
+     *
+     * @return boolean
+     */
+    private function updateFormResponse(int $responseId, array $completedActions, string $status): bool {
+        $response = FormResponse::find($responseId);
+        if (!($response instanceof FormResponse)) {
+            return false;
+        }
+
+        $response->status = $status;
+        $response->completed_actions = $completedActions;
+        return $response->save();
     }
 
     // =========================================================================
@@ -1015,9 +828,21 @@ class Form extends PostType {
      * @return array
      */
     private function getAvailableFormActions(): array {
-        return collect(FormActions::getRegisteredFeatures())
+        return collect(FlowActions::getRegisteredFeatures())
             ->keyBy('alias')
-            ->mapWithKeys(fn ($action, $alias) => [$alias => Str::title(Str::replace('_', ' ', $alias))])
+            ->mapWithKeys(function ($action, $alias) {
+                $label = Str::title(Str::replace('_', ' ', $alias));
+
+                if ($action['initialised'] ?? false) {
+                    $instance = FlowActions::get($alias);
+
+                    if ($instance !== null) {
+                        $label = $instance->getLabel();
+                    }
+                }
+
+                return [$alias => $label];
+            })
             ->all();
     }
 }

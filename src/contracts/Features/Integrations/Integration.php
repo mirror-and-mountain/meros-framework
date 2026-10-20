@@ -20,7 +20,7 @@ use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 
 use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Admin\SettingsContainers;
-use MM\Meros\Support\Integrations\HttpClient;
+use MM\Meros\Support\HttpClient;
 
 abstract class Integration extends Feature implements Registrable {
     /**

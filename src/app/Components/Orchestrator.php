@@ -5,6 +5,7 @@ namespace MM\Meros\App\Components;
 use MM\Meros\Contracts\Orchestrators\ComponentsOrchestrator;
 use MM\Meros\Contracts\Features\Components\Field;
 
+// Field Components
 use MM\Meros\App\Components\Fields\Checkbox;
 use MM\Meros\App\Components\Fields\Checkboxes;
 use MM\Meros\App\Components\Fields\Date;
@@ -24,7 +25,8 @@ use MM\Meros\App\Components\Fields\Time;
 use MM\Meros\App\Components\Fields\Url;
 use MM\Meros\App\Components\Fields\UsersLookup;
 
-use MM\Meros\App\Components\FormActions\StoreResponse;
+// Form Action Components
+use MM\Meros\App\Components\FormActions\DeleteFormResponse;
 
 use MM\Meros\Facades\Support\Ajax;
 use MM\Meros\Facades\Components\Fields;
@@ -70,7 +72,7 @@ class Orchestrator extends ComponentsOrchestrator {
     }
 
     private function registerFormActions(): void {
-        $this->formActions()->register(StoreResponse::class, 'store_response');
+        $this->formActions()->register(DeleteFormResponse::class, 'delete_form_response');
     }
 
     // =========================================================================
@@ -127,8 +129,8 @@ class Orchestrator extends ComponentsOrchestrator {
             $data   = json_decode(stripslashes($args['form_data'] ?? '{}'), true);
             $result = $controller->handleSubmission($id, $data);
 
-            if (is_string($result)) {
-                $this->sendAjaxError($result);
+            if (isset($result['type']) && $result['type'] === 'error') {
+                $this->sendAjaxError($result['message'] ?? 'An error occurred during the operation.');
             }
 
             $this->sendAjaxSuccess($result, 'Form submitted successfully.');

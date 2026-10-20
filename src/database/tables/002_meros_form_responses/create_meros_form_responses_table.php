@@ -11,7 +11,8 @@ return new class extends TableCreator {
         $this->define(function (Blueprint $table) {
             $table->id();
             $table->foreignId('form_id')->references('id')->on('posts')->cascadeOnDelete();
-            $table->json('response')->nullable();
+            $table->text('response')->nullable();
+            $table->text('completed_actions')->nullable();
             $table->string('status')->default('draft');
             $table->timestamps();
         });

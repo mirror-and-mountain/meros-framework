@@ -358,13 +358,15 @@ class Repeater extends Field {
     /**
      * Sets the callback function to generate the edit form for a repeater row.
      *
-     * @param Closure $callback
-     * @param string  $buttonText
+     * @param Closure|callable $callback
+     * @param string           $buttonText
      *
      * @return static
      */
-    public function editForm(Closure $callback, string $buttonText = '', string $formTitle = ''): static {
-        $this->editFormCallback = $callback;
+    public function editForm(Closure|callable $callback, string $buttonText = '', string $formTitle = ''): static {
+        $this->editFormCallback = $callback instanceof Closure
+            ? $callback
+            : Closure::fromCallable($callback);
 
         if (!empty($buttonText)) {
             $this->editText = $buttonText;

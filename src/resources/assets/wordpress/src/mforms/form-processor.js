@@ -26,6 +26,14 @@ export default class MerosFormProcessor {
     process(data) {
         this.payload = { ...data };
 
+        this.form.querySelectorAll('input[type="checkbox"][data-field-type="checkbox"][name]').forEach((checkbox) => {
+            if (Object.prototype.hasOwnProperty.call(this.payload, checkbox.name)) {
+                return;
+            }
+
+            this.payload[checkbox.name] = checkbox.checked;
+        });
+
         Object.keys(this.payload).forEach((key) => {
             let normalisedKey = key;
 
@@ -115,6 +123,16 @@ export default class MerosFormProcessor {
 
         if (component && typeof component.getValue === 'function') {
             return component.getValue();
+        }
+
+        if (field.hasAttribute('data-field-type')) {
+            const fieldType = field.dataset.fieldType;
+
+            if (fieldType === 'checkbox') {
+                return field.checked ? true : false;
+            }
+
+            return field.value || null;
         }
 
         return field.value || null;

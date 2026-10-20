@@ -4,7 +4,7 @@ namespace MM\Meros\Registers\Components;
 
 use MM\Meros\Contracts\Register;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
-
+use MM\Meros\Contracts\Features\FeatureDefinition;
 use MM\Meros\Contracts\Registers\RegistrarMaker;
 use MM\Meros\Contracts\Registers\Concerns\IsRegistrarMaker;
 
@@ -18,5 +18,15 @@ class FieldGroups extends Register implements RegistrarMaker {
         $this->unique(true);
         $this->facade(FieldGroupsFacade::class);
         $this->identifierFormat('slug');
+    }
+
+    protected function allowAttach(FeatureDefinition $newFeature, FeatureDefinition $existingFeature): bool {
+        if ($newFeature instanceof FieldGroup && $existingFeature instanceof FieldGroup) {
+            if ($newFeature->getId() !== $existingFeature->getId()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

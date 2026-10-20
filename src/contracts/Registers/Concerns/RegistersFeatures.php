@@ -124,13 +124,22 @@ trait RegistersFeatures {
             throw new \InvalidArgumentException("Feature class '{$featureClass}' is not a valid subclass of '{$this->getContract()}'.");
         }
 
+        $instance = $this->get($alias, null, false);
+        if ($instance !== null) {
+            $identifier = $instance->getIdentifier();
+            $initialised = true;
+        } else {
+            $identifier = '';
+            $initialised = false;
+        }
+
         $this->registeredFeatures[] = [
             'class'       => $featureClass,
             'alias'       => $this->getAlias($featureClass, $alias),
             'provider'    => $provider,
             'onBehalfOf'  => $onBehalfOf !== $provider::class ? $onBehalfOf : null,
-            'identifier'  => '',
-            'initialised' => false,
+            'identifier'  => $identifier,
+            'initialised' => $initialised,
         ];
 
         $this->unload(); // Unload any preloaded item after registering.
