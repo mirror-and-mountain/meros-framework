@@ -39,7 +39,7 @@ trait ResolvesPaths {
      * 
      * @return string|null The resolved path if it exists and is a directory, or null if not found.
      */
-    final protected function resolveDirectoryPath(?string $path = null, string $defaultPath): ?string {
+    final protected function resolveDirectoryPath(?string $path, string $defaultPath): ?string {
         if ($path === null) {
             $path = $defaultPath;
         }
