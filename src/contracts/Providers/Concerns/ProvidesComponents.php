@@ -3,11 +3,15 @@
 namespace MM\Meros\Contracts\Providers\Concerns;
 
 use MM\Meros\Contracts\Features\Components\Block;
+use MM\Meros\Contracts\Features\Components\DynamicBlock;
+
 use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\Form;
 
 use MM\Meros\Registers\Components\Blocks;
+use MM\Meros\Registers\Components\DynamicBlocks;
+
 use MM\Meros\Registers\Components\Fields;
 use MM\Meros\Registers\Components\FieldGroups;
 use MM\Meros\Registers\Components\Forms;
@@ -57,5 +61,16 @@ trait ProvidesComponents {
      */
     final protected function blocks(string $name = ''): Block|Blocks|null {
         return $this->resolveFeatureRequestFor(Block::class, $name);
+    }
+
+    /**
+     * Retrieves a specific dynamic block by its name or returns the dynamic blocks register.
+     *
+     * @param string $name Optional. The name of the dynamic block to retrieve.
+     *
+     * @return DynamicBlock|DynamicBlocks|null The requested dynamic block or the dynamic blocks register.
+     */
+    final protected function dynamicBlocks(string $name = ''): DynamicBlock|DynamicBlocks|null {
+        return $this->resolveFeatureRequestFor(DynamicBlock::class, $name);
     }
 }
