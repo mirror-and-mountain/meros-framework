@@ -166,6 +166,8 @@ final class Table extends Feature implements Makeable {
             } else {
                 $this->installWithDependencies = $migration->installWithDependencies();
             }
+        } else {
+            $this->installWithDependencies = false;
         }
 
         $this->migration = $migration;
