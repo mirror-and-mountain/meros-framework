@@ -221,7 +221,7 @@ trait IsSwitchable {
      *
      * @return void
      */
-    final protected function isSwitchable(bool $switchable = true): void {
+    final public function isSwitchable(bool $switchable = true): void {
         $this->isSwitchable = $switchable;
     }
 }
