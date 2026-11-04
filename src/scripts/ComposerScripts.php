@@ -46,7 +46,7 @@ class ComposerScripts {
 
         $io->write('<info>Welcome to Meros!</info>');
         $customise = $io->askConfirmation('<question>Would you like to customise configuration for this theme\'s devcontainer? [no]: </question>', false);
-        
+
         if ($customise === true) {
             self::initialise($composer, $io);
 
@@ -175,10 +175,10 @@ class ComposerScripts {
                 }
             }
 
-            $io->write('<info>Devcontainer configuration created. Happy coding!</info>');
+            $io->write('<info>Devcontainer configuration created. You can modify it using the .env file located in the .devcontainer directory. Happy coding!</info>');
+        } else {
+            $io->write('<info>You can modify the theme\'s devcontainer using the .env file located in the .devcontainer directory. Happy coding!</info>');
         }
-
-        $io->write('<info>You can modify the theme\'s devcontainer using the .env file located in the .devcontainer directory. Happy coding!</info>');
     }
 
     /**
