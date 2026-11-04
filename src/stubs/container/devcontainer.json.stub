@@ -1,0 +1,17 @@
+{
+  "name": "{{SITE_TITLE}}",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "wordpress",
+  "workspaceFolder": "/var/www/html/wp-content/themes/${localWorkspaceFolderBasename}",
+  "remoteUser": "www-data",
+  "remoteEnv": {
+    "VSCODE_SERVER_HOME": "/home/www-data/.vscode-server"
+  },
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/var/www/html/wp-content/themes/${localWorkspaceFolderBasename},type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/.devcontainer/keys,target=/home/www-data/keys,type=bind,consistency=cached"
+  ],
+  "postCreateCommand": "set -x && cd /var/www/html/wp-content/themes/${localWorkspaceFolderBasename} && sleep 5 && composer install",
+  "forwardPorts": {{FORWARD_PORTS}},
+  "features": {}
+}
