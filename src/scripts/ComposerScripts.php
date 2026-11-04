@@ -43,47 +43,48 @@ class ComposerScripts {
     public static function postCreateProjectCmd(Event $event): void {
         $composer = $event->getComposer();
         $io = $event->getIO();
-        self::initialise($composer, $io);
-
-        $containerStubsDir = self::$stubsDir . DIRECTORY_SEPARATOR . 'container';
-        $envStub = $containerStubsDir . DIRECTORY_SEPARATOR . '.env.stub';
-        $devContainerJsonStub = $containerStubsDir . DIRECTORY_SEPARATOR . 'devcontainer.json.stub';
-
-        $themeStubsDir = self::$stubsDir . DIRECTORY_SEPARATOR . 'theme';
-        $styleStub = $themeStubsDir . DIRECTORY_SEPARATOR . 'style.css.stub';
-
-        if (!file_exists($envStub) || !file_exists($devContainerJsonStub) || !file_exists($styleStub)) {
-            $io->write('<error>Required stub files are missing. Aborting.</error>');
-            exit(1);
-        }
-
-        $themeSlug = strtolower(str_replace(' ', '-', pathinfo(self::$projectRoot, PATHINFO_BASENAME)));
-        $defaultSiteTitle = ucwords(str_replace('-', ' ', $themeSlug));
-
-        $config = [
-            'theme_slug'        => $themeSlug,
-            'site_title'        => $defaultSiteTitle,
-            'admin_user'        => 'admin',
-            'admin_password'    => 'password',
-            'admin_email'       => 'admin@example.com',
-            'db_name'           => 'wordpress',
-            'db_host'           => 'db',
-            'db_user'           => 'dbuser',
-            'db_password'       => 'dbpassword',
-            'db_root_password'  => 'rootpassword',
-            'db_prefix'         => 'wp_',
-            'db_charset'        => 'utf8mb4',
-            'db_collate'        => 'utf8mb4_unicode_ci',
-            'wp_port'           => '8000',
-            'phpmyadmin_port'   => '9000',
-            'mailpit_smtp_port' => '1025',
-            'mailpit_ui_port'   => '8025',
-        ];
 
         $io->write('<info>Welcome to Meros!</info>');
         $customise = $io->askConfirmation('<question>Would you like to customise configuration for this theme\'s devcontainer? [no]: </question>', false);
         
         if ($customise === true) {
+            self::initialise($composer, $io);
+
+            $containerStubsDir = self::$stubsDir . DIRECTORY_SEPARATOR . 'container';
+            $envStub = $containerStubsDir . DIRECTORY_SEPARATOR . '.env.stub';
+            $devContainerJsonStub = $containerStubsDir . DIRECTORY_SEPARATOR . 'devcontainer.json.stub';
+
+            $themeStubsDir = self::$stubsDir . DIRECTORY_SEPARATOR . 'theme';
+            $styleStub = $themeStubsDir . DIRECTORY_SEPARATOR . 'style.css.stub';
+
+            if (!file_exists($envStub) || !file_exists($devContainerJsonStub) || !file_exists($styleStub)) {
+                $io->write('<error>Required stub files are missing. Aborting.</error>');
+                exit(1);
+            }
+
+            $themeSlug = strtolower(str_replace(' ', '-', pathinfo(self::$projectRoot, PATHINFO_BASENAME)));
+            $defaultSiteTitle = ucwords(str_replace('-', ' ', $themeSlug));
+
+            $config = [
+                'theme_slug'        => $themeSlug,
+                'site_title'        => $defaultSiteTitle,
+                'admin_user'        => 'admin',
+                'admin_password'    => 'password',
+                'admin_email'       => 'admin@example.com',
+                'db_name'           => 'wordpress',
+                'db_host'           => 'db',
+                'db_user'           => 'dbuser',
+                'db_password'       => 'dbpassword',
+                'db_root_password'  => 'rootpassword',
+                'db_prefix'         => 'wp_',
+                'db_charset'        => 'utf8mb4',
+                'db_collate'        => 'utf8mb4_unicode_ci',
+                'wp_port'           => '8000',
+                'phpmyadmin_port'   => '9000',
+                'mailpit_smtp_port' => '1025',
+                'mailpit_ui_port'   => '8025',
+            ];
+        
             $config['site_title'] = $io->ask('<question>Enter the site title for the devcontainer: </question>', $defaultSiteTitle);
 
             $configureAdminUser = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s site\'s admin user? [yes]: </question>', true);
