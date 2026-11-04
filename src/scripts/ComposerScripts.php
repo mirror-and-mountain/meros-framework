@@ -85,32 +85,32 @@ class ComposerScripts {
                 'mailpit_ui_port'   => '8025',
             ];
         
-            $config['site_title'] = $io->ask('<question>Enter the site title for the devcontainer: </question>', $defaultSiteTitle);
+            $config['site_title'] = $io->ask('<question>Enter the site title for the devcontainer: [' . $defaultSiteTitle . ']: </question>', $defaultSiteTitle);
 
             $configureAdminUser = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s site\'s admin user? [yes]: </question>', true);
             if ($configureAdminUser) {
-                $config['admin_user']     = $io->ask('<question>Enter the admin username: </question>', $config['admin_user']);
-                $config['admin_password'] = $io->ask('<question>Enter the admin password: </question>', $config['admin_password']);
-                $config['admin_email']    = $io->ask('<question>Enter the admin email: </question>', $config['admin_email']);
+                $config['admin_user']     = $io->ask('<question>Enter the admin username: [' . $config['admin_user'] . ']: </question>', $config['admin_user']);
+                $config['admin_password'] = $io->ask('<question>Enter the admin password: [' . $config['admin_password'] . ']: </question>', $config['admin_password']);
+                $config['admin_email']    = $io->ask('<question>Enter the admin email: [' . $config['admin_email'] . ']: </question>', $config['admin_email']);
             }
 
             $configureDatabase = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s database settings? [yes]: </question>', true);
             if ($configureDatabase) {
-                $config['db_host']          = $io->ask('<question>Enter the database host: </question>', $config['db_host']);
-                $config['db_user']          = $io->ask('<question>Enter the database user: </question>', $config['db_user']);
-                $config['db_password']      = $io->ask('<question>Enter the database password: </question>', $config['db_password']);
-                $config['db_root_password'] = $io->ask('<question>Enter the database root password: </question>', $config['db_root_password']);
-                $config['db_prefix']        = $io->ask('<question>Enter the database prefix: </question>', $config['db_prefix']);
-                $config['db_charset']       = $io->ask('<question>Enter the database charset: </question>', $config['db_charset']);
-                $config['db_collate']       = $io->ask('<question>Enter the database collate: </question>', $config['db_collate']);
+                $config['db_host']          = $io->ask('<question>Enter the database host: [' . $config['db_host'] . ']: </question>', $config['db_host']);
+                $config['db_user']          = $io->ask('<question>Enter the database user: [' . $config['db_user'] . ']: </question>', $config['db_user']);
+                $config['db_password']      = $io->ask('<question>Enter the database password: [' . $config['db_password'] . ']: </question>', $config['db_password']);
+                $config['db_root_password'] = $io->ask('<question>Enter the database root password: [' . $config['db_root_password'] . ']: </question>', $config['db_root_password']);
+                $config['db_prefix']        = $io->ask('<question>Enter the database prefix: [' . $config['db_prefix'] . ']: </question>', $config['db_prefix']);
+                $config['db_charset']       = $io->ask('<question>Enter the database charset: [' . $config['db_charset'] . ']: </question>', $config['db_charset']);
+                $config['db_collate']       = $io->ask('<question>Enter the database collate: [' . $config['db_collate'] . ']: </question>', $config['db_collate']);
             }
 
             $configurePorts = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s port settings? [yes]: </question>', true);
             if ($configurePorts) {
-                $config['wp_port'] = $io->ask('<question>Enter the WordPress port: </question>', $config['wp_port']);
-                $config['phpmyadmin_port'] = $io->ask('<question>Enter the phpMyAdmin port: </question>', $config['phpmyadmin_port']);
-                $config['mailpit_ui_port'] = $io->ask('<question>Enter the Mailpit UI port: </question>', $config['mailpit_ui_port']);
-                $config['mailpit_smtp_port'] = $io->ask('<question>Enter the Mailpit SMTP port: </question>', $config['mailpit_smtp_port']);
+                $config['wp_port'] = $io->ask('<question>Enter the WordPress port: [' . $config['wp_port'] . ']: </question>', $config['wp_port']);
+                $config['phpmyadmin_port'] = $io->ask('<question>Enter the phpMyAdmin port: [' . $config['phpmyadmin_port'] . ']: </question>', $config['phpmyadmin_port']);
+                $config['mailpit_ui_port'] = $io->ask('<question>Enter the Mailpit UI port: [' . $config['mailpit_ui_port'] . ']: </question>', $config['mailpit_ui_port']);
+                $config['mailpit_smtp_port'] = $io->ask('<question>Enter the Mailpit SMTP port: [' . $config['mailpit_smtp_port'] . ']: </question>', $config['mailpit_smtp_port']);
             }
         
             $io->write('');
