@@ -1,9 +1,9 @@
 /*
-Theme Name: {{SITE_TITLE}}
-Theme URI: https://github.com/mirror-and-mountain/meros
-Author: MIRROR AND MOUNTAIN
-Author URI: https://mirrorandmountain.com
-Description: A theme built using the Meros Framework.
+Theme Name: {{THEME_NAME}}
+Theme URI: {{THEME_URI}}
+Author: {{THEME_AUTHOR}}
+Author URI: {{THEME_AUTHOR_URI}}
+Description: {{THEME_DESCRIPTION}}
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 8.0

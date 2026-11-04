@@ -156,27 +156,6 @@ final class Framework extends Provider {
         $this->tables()->register();
     }
 
-    /**
-     * Installs the meros_form_responses table when Meros Forms is enabled in WP Admin.
-     *
-     * @return boolean
-     */
-    public function installFormTables(): bool {
-        $responsesTable = $this->tables()->init()->firstWhere(function (Table $table) {
-            return $table->getName() === 'meros_form_responses';
-        });
-
-        if (!($responsesTable instanceof Table)) {
-            return false;
-        }
-
-        if ($responsesTable->isInstalled() === false) {
-            $responsesTable->install();
-        }
-
-        return true;
-    }
-
     // =========================================================================
     // Local Environment Configuration
     // =========================================================================

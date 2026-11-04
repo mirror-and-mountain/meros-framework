@@ -2,30 +2,78 @@
 
 namespace MM\Meros\Scripts;
 
-use MM\Meros\App\Facades\Theme;
-use MM\Meros\App\Facades\Registry;
-use MM\Meros\Scripts\Concerns\HasInstallableActions;
+use MM\Meros\Facades\Framework;
+use MM\Meros\Facades\Theme;
+use MM\Meros\Facades\Packages;
+
+use MM\Meros\App\Package;
 
 class InstallCommands {
-
-    use HasInstallableActions;
-
     /**
-     * Installs the theme's migrations, or a specific migration for the theme, with the option to refresh them.
+     * Installs the framework tables.
      *
      * ## OPTIONS
-     *
-     * [<installable>]
-     * : The handle of the migration to run. If not provided, all migrations for the theme will be run.
      * 
-     * [--refresh]
-     * : Whether to rollback migrations before running them again. (default: false)
+     * [--table-name=<table>]
+     * : The name of the table to install.
+     *
+     * [--required-only]
+     * : Only install required tables.
      *
      * ## EXAMPLES
      *
-     * wp meros:install theme --user=admin
-     * wp meros:install theme my_migration_slug --user=admin
-     * wp meros:install theme my_migration_slug --refresh --user=admin
+     * wp meros:install framework
+     * wp meros:install framework --required-only
+     * wp meros:install framework --table-name=<table>
+     *
+     * @subcommand framework
+     *
+     * @when after_wp_load
+     *
+     * @param  array  $args  Positional arguments.
+     * @param  array  $assoc_args  Associative arguments.
+     */
+    public function framework($args, $assoc_args) {
+        if (isset($assoc_args['table-name'])) {
+            $tableName = $assoc_args['table-name'];
+            $requiredOnly = false;
+        } else {
+            $tableName = null;
+            $requiredOnly = isset($assoc_args['required-only']) && $assoc_args['required-only'] === true;
+        }
+
+        if ($tableName !== null) {
+            \WP_CLI::line('Installing framework table ' . $tableName);
+        } else {
+            \WP_CLI::line('Installing all framework tables' . ($requiredOnly ? ' (required only)' : ''));
+        }
+
+        try {
+            Framework::install($tableName, $requiredOnly);
+        } catch (\Exception $e) {
+            \WP_CLI::error($e->getMessage());
+        }
+
+        \WP_CLI::success('Framework operation completed successfully.');
+
+    }
+
+    /**
+     * Installs the theme tables.
+     *
+     * ## OPTIONS
+     * 
+     * [--table-name=<table>]
+     * : The name of the table to install.
+     *
+     * [--required-only]
+     * : Only install required tables.
+     *
+     * ## EXAMPLES
+     *
+     * wp meros:install theme
+     * wp meros:install theme --required-only
+     * wp meros:install theme --table-name=<table>
      *
      * @subcommand theme
      *
@@ -35,43 +83,48 @@ class InstallCommands {
      * @param  array  $assoc_args  Associative arguments.
      */
     public function theme($args, $assoc_args) {
-        // Check user is set
-        if (!current_user_can('manage_options')) {
-            \WP_CLI::error("You must be logged in as a user with the 'manage_options' capability to run this command. Remember to include the --user argument when running the command, e.g. --user=admin");
-            return;
+        if (isset($assoc_args['table-name'])) {
+            $tableName = $assoc_args['table-name'];
+            $requiredOnly = false;
+        } else {
+            $tableName = null;
+            $requiredOnly = isset($assoc_args['required-only']) && $assoc_args['required-only'] === true;
         }
 
-        // Parse arguments
-        $installableHandle = $args[0] ?? null;
-        $refresh           = isset($assoc_args['refresh']) && $assoc_args['refresh'] === true ? true : false;
-
-        // Prep the install action
-        $installable = $this->prep('install', Theme::instance(), $installableHandle, $refresh);
-
-        // Run the install action
-        if ($installable !== false) {
-            $this->runAction('install', $installable, $refresh);
+        if ($tableName !== null) {
+            \WP_CLI::line('Installing theme table ' . $tableName);
+        } else {
+            \WP_CLI::line('Installing all theme tables' . ($requiredOnly ? ' (required only)' : ''));
         }
+
+        try {
+            Theme::install($tableName, $requiredOnly);
+        } catch (\Exception $e) {
+            \WP_CLI::error($e->getMessage());
+        }
+
+        \WP_CLI::success('Theme operation completed successfully.');
     }
-    
+
     /**
-     * Installs a package's migrations, or a specific migration for the package, with the option to refresh them.
+     * Installs a package's tables.
      *
      * ## OPTIONS
-     *
-     * <package>
-     * : The package handle to run migrations for.
-     * [<installable>]
-     * : The handle of the migration to run. If not provided, all migrations for the package will be run.
      * 
-     * [--refresh]
-     * : Whether to rollback migrations before running them again. (default: false)
+     * <package>
+     * : The package to install tables for.
+     * 
+     * [--table-name=<table>]
+     * : The name of the table to install.
+     *
+     * [--required-only]
+     * : Only install required tables.
      *
      * ## EXAMPLES
      *
-     * wp meros:install package my_package_handle --user=admin
-     * wp meros:install package my_package_handle my_migration_slug --user=admin
-     * wp meros:install package my_package_handle my_migration_slug --refresh --user=admin
+     * wp meros:install package my-package
+     * wp meros:install package my-package --required-only
+     * wp meros:install package my-package --table-name=<table>
      *
      * @subcommand package
      *
@@ -81,30 +134,37 @@ class InstallCommands {
      * @param  array  $assoc_args  Associative arguments.
      */
     public function package($args, $assoc_args) {
-        // Check user is set
-        if (!current_user_can('manage_options')) {
-            \WP_CLI::error("You must be logged in as a user with the 'manage_options' capability to run this command. Remember to include the --user argument when running the command, e.g. --user=admin");
-            return;
-        }
-        
-        // Parse arguments
-        $packageHandle     = $args[0] ?? null;
-        $installableHandle = $args[1] ?? null;
-        $refresh           = isset($assoc_args['refresh']) && $assoc_args['refresh'] === true ? true : false;
-
-        // Get the package to run on
-        $package = Registry::getPackages()->firstWhere('handle', $packageHandle);
-        if (!$package) {
-            \WP_CLI::error("No package found with handle: " . $packageHandle);
-            return;
+        if (isset($assoc_args['table-name'])) {
+            $tableName = $assoc_args['table-name'];
+            $requiredOnly = false;
+        } else {
+            $tableName = null;
+            $requiredOnly = isset($assoc_args['required-only']) && $assoc_args['required-only'] === true;
         }
 
-        // Prep the install action
-        $installable = $this->prep('install', $package, $installableHandle, $refresh);
-        
-        // Run the install action
-        if ($installable !== false) {
-            $this->runAction('install', $installable, $refresh);
+        if (empty($args[0])) {
+            \WP_CLI::error('Please specify a package.');
         }
+
+        $packageName = $args[0];
+        $package = Packages::get($packageName);
+
+        if ($package instanceof Package === false) {
+            \WP_CLI::error('Package not found.');
+        }
+
+        if ($tableName !== null) {
+            \WP_CLI::line('Installing package table ' . $tableName . ' for ' . $packageName);
+        } else {
+            \WP_CLI::line('Installing all package tables for ' . $packageName . ($requiredOnly ? ' (required only)' : ''));
+        }
+
+        try {
+            $package->install($tableName, $requiredOnly);
+        } catch (\Exception $e) {
+            \WP_CLI::error($e->getMessage());
+        }
+
+        \WP_CLI::success('Package operation completed successfully.');
     }
 }

@@ -36,12 +36,13 @@ class Tables extends Register implements Maker {
      * Instantiates tables from migration files at the provided path, or by using a previously 
      * registered path for the current provider if available.
      *
-     * @param string $path
+     * @param string|null $path The path to the table migration files. If null, the provider's default path will be used.
+     * @param boolean $error Whether to throw an exception if no valid path is found. Defaults to true.
      *
      * @return Collection
      * @throws \InvalidArgumentException if no valid migrations path is provided or registered for the current provider.
      */
-    final public function init(?string $path = null): Collection {
+    final public function init(?string $path = null, bool $error = true): Collection {
         $this->ensureCheckout('init');
 
         $provider = $this->getProvider();
@@ -58,7 +59,10 @@ class Tables extends Register implements Maker {
         $tableDirectoryCandidates = $this->getSubdirectories($path);
 
         if (empty($tableDirectoryCandidates)) {
-            throw new \InvalidArgumentException("No table directories found in the provided path: {$path}");
+            if ($error) {
+                throw new \InvalidArgumentException("No table directories found in the provided path: {$path}");
+            }
+            return collect([]);
         }
 
         $tableDependencies = [];
@@ -144,8 +148,8 @@ class Tables extends Register implements Maker {
      * @throws \InvalidArgumentException if the provided path is not a valid migrations directory or if no valid path is registered for the provider.
      */
     private function resolvePath(?string $path = null, bool $error = true): string {
-        $provider    = $this->getProvider();
-        $handle      = $provider->getHandle();
+        $provider = $this->getProvider();
+        $handle   = $provider->getHandle();
 
         if ($this->registeredPaths[$handle] ?? null) {
             return $this->registeredPaths[$handle];

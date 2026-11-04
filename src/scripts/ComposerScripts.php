@@ -45,7 +45,7 @@ class ComposerScripts {
         $io = $event->getIO();
 
         $io->write('<info>Welcome to Meros!</info>');
-        $customise = $io->askConfirmation('<question>Would you like to customise configuration for this theme\'s devcontainer? [no]: </question>', false);
+        $customise = $io->askConfirmation('<question>Would you like to customise the configuration for this theme\'s devcontainer? [no]: </question>', false);
 
         if ($customise === true) {
             self::initialise($composer, $io);
@@ -63,10 +63,16 @@ class ComposerScripts {
             }
 
             $themeSlug = strtolower(str_replace(' ', '-', pathinfo(self::$projectRoot, PATHINFO_BASENAME)));
-            $defaultSiteTitle = ucwords(str_replace('-', ' ', $themeSlug));
+            $defaultThemeName = ucwords(str_replace('-', ' ', $themeSlug));
+            $defaultSiteTitle = $defaultThemeName;
 
             $config = [
                 'theme_slug'        => $themeSlug,
+                'theme_name'        => $defaultThemeName,
+                'theme_uri'         => 'https://github.com/mirror-and-mountain/meros',
+                'theme_author'      => 'MIRROR AND MOUNTAIN',
+                'theme_author_uri'  => 'https://mirrorandmountain.com',
+                'theme_description' => 'A theme built using Meros by MIRROR AND MOUNTAIN.',
                 'site_title'        => $defaultSiteTitle,
                 'admin_user'        => 'admin',
                 'admin_password'    => 'password',
@@ -84,33 +90,41 @@ class ComposerScripts {
                 'mailpit_smtp_port' => '1025',
                 'mailpit_ui_port'   => '8025',
             ];
-        
-            $config['site_title'] = $io->ask('<question>Enter the site title for the devcontainer: [' . $defaultSiteTitle . ']: </question>', $defaultSiteTitle);
 
-            $configureAdminUser = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s site\'s admin user? [yes]: </question>', true);
-            if ($configureAdminUser) {
-                $config['admin_user']     = $io->ask('<question>Enter the admin username: [' . $config['admin_user'] . ']: </question>', $config['admin_user']);
-                $config['admin_password'] = $io->ask('<question>Enter the admin password: [' . $config['admin_password'] . ']: </question>', $config['admin_password']);
-                $config['admin_email']    = $io->ask('<question>Enter the admin email: [' . $config['admin_email'] . ']: </question>', $config['admin_email']);
+            $configureThemeSettings = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s theme settings? [yes]: </question>', true);
+            if ($configureThemeSettings) {
+                $config['theme_name']        = $io->ask('<question>Set the theme name: [' . $config['theme_name'] . ']: </question>', $config['theme_name']);
+                $config['theme_uri']         = $io->ask('<question>Set the theme URI: [' . $config['theme_uri'] . ']: </question>', $config['theme_uri']);
+                $config['theme_author']      = $io->ask('<question>Set the theme author: [' . $config['theme_author'] . ']: </question>', $config['theme_author']);
+                $config['theme_author_uri']  = $io->ask('<question>Set the theme author URI: [' . $config['theme_author_uri'] . ']: </question>', $config['theme_author_uri']);
+                $config['theme_description'] = $io->ask('<question>Set the theme description: [' . $config['theme_description'] . ']: </question>', $config['theme_description']);
+            }
+
+            $configureSiteSettings = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s site settings? [yes]: </question>', true);
+            if ($configureSiteSettings) {
+                $config['site_title']     = $io->ask('<question>Set the site title for the devcontainer: [' . $defaultSiteTitle . ']: </question>', $defaultSiteTitle);
+                $config['admin_user']     = $io->ask('<question>Set the admin username: [' . $config['admin_user'] . ']: </question>', $config['admin_user']);
+                $config['admin_password'] = $io->ask('<question>Set the admin password: [' . $config['admin_password'] . ']: </question>', $config['admin_password']);
+                $config['admin_email']    = $io->ask('<question>Set the admin email: [' . $config['admin_email'] . ']: </question>', $config['admin_email']);
             }
 
             $configureDatabase = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s database settings? [yes]: </question>', true);
             if ($configureDatabase) {
-                $config['db_host']          = $io->ask('<question>Enter the database host: [' . $config['db_host'] . ']: </question>', $config['db_host']);
-                $config['db_user']          = $io->ask('<question>Enter the database user: [' . $config['db_user'] . ']: </question>', $config['db_user']);
-                $config['db_password']      = $io->ask('<question>Enter the database password: [' . $config['db_password'] . ']: </question>', $config['db_password']);
-                $config['db_root_password'] = $io->ask('<question>Enter the database root password: [' . $config['db_root_password'] . ']: </question>', $config['db_root_password']);
-                $config['db_prefix']        = $io->ask('<question>Enter the database prefix: [' . $config['db_prefix'] . ']: </question>', $config['db_prefix']);
-                $config['db_charset']       = $io->ask('<question>Enter the database charset: [' . $config['db_charset'] . ']: </question>', $config['db_charset']);
-                $config['db_collate']       = $io->ask('<question>Enter the database collate: [' . $config['db_collate'] . ']: </question>', $config['db_collate']);
+                $config['db_host']          = $io->ask('<question>Set the database host: [' . $config['db_host'] . ']: </question>', $config['db_host']);
+                $config['db_user']          = $io->ask('<question>Set the database user: [' . $config['db_user'] . ']: </question>', $config['db_user']);
+                $config['db_password']      = $io->ask('<question>Set the database password: [' . $config['db_password'] . ']: </question>', $config['db_password']);
+                $config['db_root_password'] = $io->ask('<question>Set the database root password: [' . $config['db_root_password'] . ']: </question>', $config['db_root_password']);
+                $config['db_prefix']        = $io->ask('<question>Set the database prefix: [' . $config['db_prefix'] . ']: </question>', $config['db_prefix']);
+                $config['db_charset']       = $io->ask('<question>Set the database charset: [' . $config['db_charset'] . ']: </question>', $config['db_charset']);
+                $config['db_collate']       = $io->ask('<question>Set the database collate: [' . $config['db_collate'] . ']: </question>', $config['db_collate']);
             }
 
-            $configurePorts = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s port settings? [yes]: </question>', true);
+            $configurePorts = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s ports? [yes]: </question>', true);
             if ($configurePorts) {
-                $config['wp_port'] = $io->ask('<question>Enter the WordPress port: [' . $config['wp_port'] . ']: </question>', $config['wp_port']);
-                $config['phpmyadmin_port'] = $io->ask('<question>Enter the phpMyAdmin port: [' . $config['phpmyadmin_port'] . ']: </question>', $config['phpmyadmin_port']);
-                $config['mailpit_ui_port'] = $io->ask('<question>Enter the Mailpit UI port: [' . $config['mailpit_ui_port'] . ']: </question>', $config['mailpit_ui_port']);
-                $config['mailpit_smtp_port'] = $io->ask('<question>Enter the Mailpit SMTP port: [' . $config['mailpit_smtp_port'] . ']: </question>', $config['mailpit_smtp_port']);
+                $config['wp_port'] = $io->ask('<question>Set the WordPress port: [' . $config['wp_port'] . ']: </question>', $config['wp_port']);
+                $config['phpmyadmin_port'] = $io->ask('<question>Set the phpMyAdmin port: [' . $config['phpmyadmin_port'] . ']: </question>', $config['phpmyadmin_port']);
+                $config['mailpit_ui_port'] = $io->ask('<question>Set the Mailpit UI port: [' . $config['mailpit_ui_port'] . ']: </question>', $config['mailpit_ui_port']);
+                $config['mailpit_smtp_port'] = $io->ask('<question>Set the Mailpit SMTP port: [' . $config['mailpit_smtp_port'] . ']: </question>', $config['mailpit_smtp_port']);
             }
         
             $io->write('');
@@ -120,8 +134,8 @@ class ComposerScripts {
             }
             $io->write('');
 
-            if (!$io->askConfirmation('<question>Create the devcontainer files with this configuration? [yes]: </question>', true)) {
-                $io->write('<comment>Cancelled. No devcontainer files were created.</comment>');
+            if (!$io->askConfirmation('<question>Setup the devcontainer with this configuration? [yes]: </question>', true)) {
+                $io->write('<comment>Cancelled. No files were created.</comment>');
                 return;
             }
 
@@ -175,10 +189,14 @@ class ComposerScripts {
                 }
             }
 
-            $io->write('<info>Devcontainer configuration created. You can modify it using the .env file located in the .devcontainer directory. Happy coding!</info>');
+            $io->write('<info>Devcontainer .env file created. You can modify it at /.devcontainer/.env</info>');
+            $io->write('<info>Devcontainer devcontainer.json file created. You can modify it at /.devcontainer/devcontainer.json</info>');
+            $io->write('<info>Devcontainer style.css file created. You can modify it at /style.css</info>');
         } else {
-            $io->write('<info>You can modify the theme\'s devcontainer using the .env file located in the .devcontainer directory. Happy coding!</info>');
+            $io->write('<info>Devcontainer setup skipped. You can modify your devcontainer configuration at /.devcontainer/ and your theme\'s metadata at /style.css</info>');
         }
+
+        $io->write('<info>Happy coding!</info>');
     }
 
     /**
@@ -210,6 +228,8 @@ class ComposerScripts {
             self::configureWordpress($io, $environmentManager);
         }
 
+        $io->write('<comment>Handling package installations...</comment>');
+
         // Handle package installations
         foreach ($composer->getRepositoryManager()->getLocalRepository()->getPackages() as $package) {
             $packageName = $package->getName();
@@ -226,7 +246,7 @@ class ComposerScripts {
 
             // Install package
             elseif (isset($extra['meros'], $extra['meros']['provider'])) {
-                $io->write("<info>Installing package {$packageName} from provider {$extra['meros']['provider']}...</info>");
+                $io->write("<comment>Installing package {$packageName} from provider {$extra['meros']['provider']}...</comment>");
 
                 $result = $environmentManager->installPackage(
                     $extra['meros']['provider']
@@ -235,7 +255,7 @@ class ComposerScripts {
                 if ($result !== true) {
                     $error = $environmentManager->getError();
                     if ($error === 'Package already installed.') {
-                        $io->write("<info>Package {$packageName} is already installed. Skipping.</info>");
+                        $io->write("<comment>Package {$packageName} is already installed. Skipping.</comment>");
                     } else {
                         $io->write("<error>Failed to install package {$packageName}: {$error}</error>");
                     }
@@ -258,7 +278,7 @@ class ComposerScripts {
      * @return void
      */
     private static function configureWordpress(IOInterface $io, object $environmentManager): void {
-        $io->write('<info>Installing & Configuring WordPress...</info>');
+        $io->write('<comment>Installing & Configuring WordPress...</comment>');
         
         $status = $environmentManager->create();
         if (! $status) {

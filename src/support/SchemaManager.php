@@ -447,7 +447,7 @@ final class SchemaManager {
         };
     
         $isTrackingTable = $tableName === 'meros_migrations';
-        $userAllowed = current_user_can('manage_options');
+        $userAllowed = app()->runningInConsole() || current_user_can('manage_options');
 
         if (!$userAllowed) {
             $error = "Current user does not have permission to perform this operation on table '$tableName'.";

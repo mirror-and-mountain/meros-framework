@@ -47,6 +47,7 @@ use MM\Meros\Registers\Assets\Assets;
 
 use MM\Meros\Scripts\InstallCommands;
 use MM\Meros\Scripts\UninstallCommands;
+use MM\Meros\Scripts\UpdateCommands;
 
 use MM\Meros\Facades\Theme as ThemeFacade;
 use MM\Meros\Facades\Packages as PackagesFacade;
@@ -312,9 +313,11 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         if (defined('WP_CLI') && class_exists('WP_CLI') && \WP_CLI) {
             $installCli   = new InstallCommands();
             $uninstallCli = new UninstallCommands();
+            $updateCli    = new UpdateCommands();
             
             \WP_CLI::add_command('meros:install', $installCli);
             \WP_CLI::add_command('meros:uninstall', $uninstallCli);
+            \WP_CLI::add_command('meros:update', $updateCli);
 
             if (getenv('MEROS_ENVIRONMENT') === 'true') {
                 $environmentsCli = new \MM\Meros\Scripts\EnvironmentCommands();

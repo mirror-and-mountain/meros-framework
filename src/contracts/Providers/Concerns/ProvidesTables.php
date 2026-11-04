@@ -18,6 +18,20 @@ trait ProvidesTables {
     use Abstracts, SanitizesHtml;
 
     /**
+     * Caches the collection of tables for the provider.
+     *
+     * @var Collection|null
+     */
+    private ?Collection $cachedTables = null;
+
+    /**
+     * Stores the last error message encountered during table operations.
+     *
+     * @var string
+     */
+    private string $lastInstallerError = '';
+
+    /**
      * Resolves a specific table or the tables register based on the provided handle.
      *
      * @param string $handle Optional. The handle of the table to retrieve.
@@ -49,6 +63,155 @@ trait ProvidesTables {
             return $table->isRequired() && !$table->isInstalled();
         });
     }
+
+    // =========================================================================
+    // Provider level table operations
+    // =========================================================================
+
+    /**
+     * Installs the specified database table, or all tables if no table name is provided.
+     *
+     * @param string|null $tableName
+     * @param bool $requiredOnly Optional. Whether to install only required tables. Default is false.
+     *
+     * @return void
+     */
+    public function install(?string $tableName = null, bool $requiredOnly = false): void {
+        $this->runTableOperation($tableName, 'install', function (Table $table, bool $log) use ($requiredOnly) {
+            if ((!$requiredOnly && !$table->autoInstallsWithDependencies()) || 
+                   ($table->isRequired() && !$table->autoInstallsWithDependencies() && !$table->isInstalled())) {
+                return true;
+            }
+
+            if ($log) {
+                \WP_CLI::log("Skipping installation of table {$table->getName()}. Table is not required or is already installed.");
+            }
+            return false;
+        });
+    }
+
+    /**
+     * Updates the specified database table if it has updates available, or all tables if no table name is provided.
+     *
+     * @param string|null $tableName
+     *
+     * @return void
+     */
+    public function update(?string $tableName = null): void {
+        $this->runTableOperation($tableName, 'update', function (Table $table, bool $log) {
+            if ($table->isInstalled() && $table->hasUpdates()) {
+                return true;
+            }
+
+            if ($log) {
+                \WP_CLI::log("Skipping update of table {$table->getName()}. Table is not installed or no updates are available.");
+            }
+            return false;
+        });
+    }
+
+    /**
+     * Uninstalls the specified database table if it has no installed dependent tables, or all tables if no table name is provided.
+     *
+     * @param string|null $tableName
+     *
+     * @return void
+     */
+    public function uninstall(?string $tableName = null): void {
+        $this->runTableOperation($tableName, 'uninstall', function (Table $table, bool $log) {
+            $hasDependents = $table->hasDependentTables();
+
+            if ($hasDependents) {
+                foreach ($table->getDependents() as $dependent) {
+                    if ($dependent->isInstalled()) {
+                        if ($log) {
+                            \WP_CLI::log("Cannot uninstall table {$table->getName()} because dependent table {$dependent->getName()} is installed.");
+                            return false;
+                        }
+
+                        throw new \RuntimeException("Dependent table {$dependent->getName()} is installed and prevents uninstallation of {$table->getName()}.");
+                    }
+                }
+            }
+
+            return $table->isInstalled();
+        });
+    }
+
+    /**
+     * Runs the specified operation on the given table or all tables if no table name is provided, based on the provided condition.
+     *
+     * @param string|null $tableName
+     * @param string      $operation
+     * @param Closure     $shouldRun
+     *
+     * @return void
+     */
+    private function runTableOperation(?string $tableName, string $operation, Closure $shouldRun): void {
+        $tables = $this->cachedTables ?? $this->cachedTables = $this->tables()->init(null, false);
+        $log    = app()->runningInConsole() && defined('WP_CLI') && class_exists('WP_CLI') && \WP_CLI;
+        
+        if (empty($tableName) && $tables->isNotEmpty()) {
+            $batchId = Str::ulid();
+
+            if ($operation === 'uninstall') {
+                $tables = $tables->reverse();
+            }
+
+            foreach ($tables as $table) {
+                if ($table instanceof Table && method_exists($table, $operation) && $shouldRun($table, $log)) {
+                    if ($operation !== 'uninstall') {
+                        $table->{$operation}($batchId);
+                    } else {
+                        $table->{$operation}();
+                    }
+
+                    $error = $table->getLastError();
+                    if ($error !== '') {
+                        $this->lastInstallerError = $error;
+                        if ($log) {
+                            \WP_CLI::warning('Table ' . $table->getName() . ': ' . $error . ' Skipping operation.');
+                        }
+                    } else if ($log) {
+                        \WP_CLI::success('Table ' . $table->getName() . ' operation succeeded.');
+                    }
+                }
+            }
+            return;
+        }
+
+        else if (empty($tableName) && $tables->isEmpty()) {
+            if ($log) {
+                \WP_CLI::log('No tables found to perform the operation.');
+            }
+        }
+
+        else if (!empty($tableName) && $tables->isNotEmpty()) {
+            $table = $tables->firstWhere(function (Table $table) use ($tableName) {
+                return $table->getName() === $tableName;
+            });
+
+            if ($table instanceof Table && method_exists($table, $operation) && $shouldRun($table, $log)) {
+                $table->{$operation}();
+                $error = $table->getLastError();
+                if ($error !== '') {
+                    $this->lastInstallerError = $error;
+                    if ($log) {
+                        \WP_CLI::warning('Table ' . $table->getName() . ': ' . $error);
+                    }
+                } else if ($log) {
+                    \WP_CLI::success('Table ' . $table->getName() . ' operation succeeded.');
+                }
+            } else if (($table instanceof Table === false || !method_exists($table, $operation)) && $log) {
+                \WP_CLI::warning('Table ' . ($table?->getName() ?? $tableName) . ': Operation could not be performed. The table may not exist or the operation is invalid.');
+            }
+        }
+
+    }
+
+    // =========================================================================
+    // WP Admin UI Operations
+    // =========================================================================
 
     /**
      * Initialises the table management page for the provider.

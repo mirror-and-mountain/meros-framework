@@ -2,30 +2,64 @@
 
 namespace MM\Meros\Scripts;
 
-use MM\Meros\App\Facades\Theme;
-use MM\Meros\App\Facades\Registry;
-use MM\Meros\Scripts\Concerns\HasInstallableActions;
+use MM\Meros\Facades\Framework;
+use MM\Meros\Facades\Theme;
+use MM\Meros\Facades\Packages;
+
+use MM\Meros\App\Package;
 
 class UninstallCommands {
-
-    use HasInstallableActions;
-
     /**
-     * Uninstalls the theme's migrations, or a specific migration for the theme, with the option to refresh them.
+     * Uninstalls the framework tables.
      *
      * ## OPTIONS
-     *
-     * [<installable>]
-     * : The handle of the migration to run. If not provided, all migrations for the theme will be run.
      * 
-     * [--refresh]
-     * : Whether to rollback migrations before running them again. (default: false)
+     * [--table-name=<table>]
+     * : The name of the table to uninstall.
      *
      * ## EXAMPLES
      *
-     * wp meros:uninstall theme --user=admin
-     * wp meros:uninstall theme my_migration_slug --user=admin
-     * wp meros:uninstall theme my_migration_slug --refresh --user=admin
+     * wp meros:uninstall framework
+     * wp meros:uninstall framework --table-name=<table>
+     *
+     * @subcommand framework
+     *
+     * @when after_wp_load
+     *
+     * @param  array  $args  Positional arguments.
+     * @param  array  $assoc_args  Associative arguments.
+     */
+    public function framework($args, $assoc_args) {
+        if (isset($assoc_args['table-name'])) {
+            $tableName = $assoc_args['table-name'];
+        } else {
+            $tableName = null;
+        }
+
+        \WP_CLI::line('Uninstalling framework tables' . ($tableName ? ' (' . $tableName . ')' : ''));
+
+        try {
+            Framework::uninstall($tableName);
+        } catch (\Exception $e) {
+            \WP_CLI::error($e->getMessage());
+        }
+
+        \WP_CLI::success('Framework operation completed successfully.');
+
+    }
+
+    /**
+     * Uninstalls the theme tables.
+     *
+     * ## OPTIONS
+     * 
+     * [--table-name=<table>]
+     * : The name of the table to uninstall.
+     *
+     * ## EXAMPLES
+     *
+     * wp meros:uninstall theme
+     * wp meros:uninstall theme --table-name=<table>
      *
      * @subcommand theme
      *
@@ -35,43 +69,38 @@ class UninstallCommands {
      * @param  array  $assoc_args  Associative arguments.
      */
     public function theme($args, $assoc_args) {
-        // Check user is set
-        if (!current_user_can('manage_options')) {
-            \WP_CLI::error("You must be logged in as a user with the 'manage_options' capability to run this command. Remember to include the --user argument when running the command, e.g. --user=admin");
-            return;
+        if (isset($assoc_args['table-name'])) {
+            $tableName = $assoc_args['table-name'];
+        } else {
+            $tableName = null;
         }
 
-        // Parse arguments
-        $installableHandle = $args[0] ?? null;
-        $refresh           = isset($assoc_args['refresh']) && $assoc_args['refresh'] === true ? true : false;
+        \WP_CLI::line('Uninstalling theme tables' . ($tableName ? ' (' . $tableName . ')' : ''));
 
-        // Prep the install action
-        $installable = $this->prep('uninstall', Theme::instance(), $installableHandle, $refresh);
-
-        // Run the uninstall action
-        if ($installable !== false) {
-            $this->runAction('uninstall', $installable, $refresh);
+        try {
+            Theme::uninstall($tableName);
+        } catch (\Exception $e) {
+            \WP_CLI::error($e->getMessage());
         }
+
+        \WP_CLI::success('Theme operation completed successfully.');
     }
-    
+
     /**
-     * Uninstalls a package's migrations, or a specific migration for the package, with the option to refresh them.
+     * Uninstalls a package's tables.
      *
      * ## OPTIONS
-     *
-     * <package>
-     * : The package handle to run migrations for.
-     * [<installable>]
-     * : The handle of the migration to run. If not provided, all migrations for the package will be run.
      * 
-     * [--refresh]
-     * : Whether to rollback migrations before running them again. (default: false)
+     * <package>
+     * : The package to uninstall tables for.
+     * 
+     * [--table-name=<table>]
+     * : The name of the table to uninstall.
      *
      * ## EXAMPLES
      *
-     * wp meros:uninstall package my_package_handle --user=admin
-     * wp meros:uninstall package my_package_handle my_migration_slug --user=admin
-     * wp meros:uninstall package my_package_handle my_migration_slug --refresh --user=admin
+     * wp meros:uninstall package my-package
+     * wp meros:uninstall package my-package --table-name=<table>
      *
      * @subcommand package
      *
@@ -81,24 +110,31 @@ class UninstallCommands {
      * @param  array  $assoc_args  Associative arguments.
      */
     public function package($args, $assoc_args) {
-        // Parse arguments
-        $packageHandle     = $args[0] ?? null;
-        $installableHandle = $args[1] ?? null;
-        $refresh           = isset($assoc_args['refresh']) && $assoc_args['refresh'] === true ? true : false;
-
-        // Get the package to run on
-        $package = Registry::getPackages()->firstWhere('handle', $packageHandle);
-        if (!$package) {
-            \WP_CLI::error("No package found with handle: " . $packageHandle);
-            return;
+        if (isset($assoc_args['table-name'])) {
+            $tableName = $assoc_args['table-name'];
+        } else {
+            $tableName = null;
         }
 
-        // Prep the uninstall action
-        $installable = $this->prep('uninstall', $package, $installableHandle, $refresh);
-        
-        // Run the uninstall action
-        if ($installable !== false) {
-            $this->runAction('uninstall', $installable, $refresh);
+        if (empty($args[0])) {
+            \WP_CLI::error('Please specify a package.');
         }
+
+        $packageName = $args[0];
+        $package = Packages::get($packageName);
+
+        if ($package instanceof Package === false) {
+            \WP_CLI::error('Package not found.');
+        }
+
+        \WP_CLI::line('Uninstalling package tables for ' . $packageName . ($tableName ? ' (' . $tableName . ')' : ''));
+
+        try {
+            $package->uninstall($tableName);
+        } catch (\Exception $e) {
+            \WP_CLI::error($e->getMessage());
+        }
+
+        \WP_CLI::success('Package operation completed successfully.');
     }
 }

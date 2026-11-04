@@ -324,6 +324,24 @@ final class Table extends Feature implements Makeable {
     }
 
     /**
+     * Checks if the table has any dependent tables that rely on it.
+     *
+     * @return boolean
+     */
+    public function hasDependentTables(): bool {
+        return !empty($this->dependents);
+    }
+
+    /**
+     * Returns an array of tables that depend on this table.
+     *
+     * @return array
+     */
+    public function getDependents(): array {
+        return $this->dependents;
+    }
+
+    /**
      * Checks if the table has an update that can be rolled back.
      *
      * @return boolean
@@ -484,6 +502,7 @@ final class Table extends Feature implements Makeable {
         $lastUpdate = $this->getLastUpdate();
 
         if ($lastUpdate === null) {
+            $this->lastError = 'Table ' . $this->name . ' has no updates to roll back.';
             return $this;
         }
 
