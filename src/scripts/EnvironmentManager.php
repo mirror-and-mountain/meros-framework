@@ -173,8 +173,15 @@ class EnvironmentManager {
             $options = $config['local_options'] ?? [];
         }
 
+        $extraPhp = <<<'PHP'
+define('WP_DEBUG', true);
+if ( isset( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https' ) {
+    $_SERVER['HTTPS'] = 'on';
+}
+PHP;
+
         $configCommand = sprintf(
-        'cd %s && wp config create --dbname=%s --dbuser=%s --dbpass=%s --dbhost=%s --dbcharset=%s --dbcollate=%s --dbprefix=%s',
+        'cd %s && wp config create --dbname=%s --dbuser=%s --dbpass=%s --dbhost=%s --dbcharset=%s --dbcollate=%s --dbprefix=%s --extra-php=%s',
             escapeshellarg($this->config['path']),
             escapeshellarg($this->config['db']['name']),
             escapeshellarg($this->config['db']['user']),
@@ -182,7 +189,8 @@ class EnvironmentManager {
             escapeshellarg($this->config['db']['host']),
             escapeshellarg($this->config['db']['charset']),
             escapeshellarg($this->config['db']['collate']),
-            escapeshellarg($this->config['db']['prefix'])
+            escapeshellarg($this->config['db']['prefix']),
+            escapeshellarg("<<PHP\n" . $extraPhp . "\n?>\n")
         );
 
         $installCommand = sprintf(

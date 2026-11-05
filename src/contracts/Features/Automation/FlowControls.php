@@ -1,6 +1,6 @@
 <?php
 
-namespace MM\Meros\App\Content;
+namespace MM\Meros\Contracts\Features\Automation;
 
 use Illuminate\Support\Str;
 
@@ -9,7 +9,8 @@ use MM\Meros\Contracts\Providers\FeatureProvider;
 use MM\Meros\Contracts\Features\Components\Form as FormComponent;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\FieldRow;
-use MM\Meros\Contracts\Features\Automation\FlowAction;
+
+use MM\Meros\App\Content\Form;
 
 use MM\Meros\App\Components\Fields\Select;
 use MM\Meros\App\Components\Fields\Textarea;
@@ -20,7 +21,7 @@ use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Components\FieldGroups;
 use MM\Meros\Facades\Automation\FlowActions;
 
-final class FormActionsGroup {
+class FlowControls {
     /**
      * The Form CPT instance.
      *
@@ -43,20 +44,38 @@ final class FormActionsGroup {
     private array $availableFlowActions;
 
     /**
-     * The constructed FieldGroup instance used to configure the FlowAction in WP-Admin.
+     * The default dynamic options for the flow controls.
+     *
+     * @var array
+     */
+    private array $defaultDynamicOptions = [];
+
+    /**
+     * The constructed FlowControls instance used to configure the FlowAction in WP-Admin.
      *
      * @var FieldGroup
      */
     private FieldGroup $group;
 
-    public function __construct(Form $form) {
+    // =========================================================================
+    // Initialisation
+    // =========================================================================
+
+    /**
+     * Constructs a new FlowControls instance.
+     *
+     * @param Form  $form
+     * @param array $defaultDynamicOptions
+     */
+    public function __construct(Form $form, array $defaultDynamicOptions = []) {
         $this->form = $form;
         $this->availableFlowActions = $this->getAvailableFlowActions();
+        $this->defaultDynamicOptions = $this->getDefaultDynamicOptions($defaultDynamicOptions);
         $this->init();
     }
 
     /**
-     * Initialises a FieldGroup instance to contain a Repeater field instance for configuring form actions.
+     * Initialises a FieldGroup instance to contain a Repeater field instance for configuring flow actions.
      *
      * @return void
      */
@@ -93,13 +112,51 @@ final class FormActionsGroup {
     }
 
     /**
+     * Returns the default dynamic options for the flow controls.
+     *
+     * @return array
+     */
+    private function getDefaultDynamicOptions(array $additionalOptions = []): array {
+        return array_merge([
+            'user_id' => [
+                'name'      => 'user_id',
+                'label'     => 'User: ID',
+                'data_type' => 'integer'
+            ],
+            'user_display_name' => [
+                'name'      => 'user_display_name',
+                'label'     => 'User: Display Name',
+                'data_type' => 'string'
+            ],
+            'form_id' => [
+                'name'      => 'form_id',
+                'label'     => 'Form: ID',
+                'data_type' => 'integer'
+            ],
+            'form_response_id' => [
+                'name'      => 'form_response_id',
+                'label'     => 'Form Response: ID',
+                'data_type' => 'integer'
+            ]
+        ], $additionalOptions);
+    }
+
+    // =========================================================================
+    // Getters
+    // =========================================================================
+
+    /**
      * Returns the constructed FieldGroup instance used to configure the FlowAction in WP-Admin.
      *
      * @return FieldGroup
      */
-    public function getGroup(): FieldGroup {
+    public function getControls(): FieldGroup {
         return $this->group;
     }
+
+    // =========================================================================
+    // Configuration
+    // =========================================================================
 
     /**
      * Returns the edit form for a specific form action within the repeater.
@@ -203,6 +260,10 @@ final class FormActionsGroup {
         return $formComponent;
     }
 
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
     /**
      * Helper method to retrieve an instance of a registered FlowAction by its name.
      *
@@ -253,28 +314,7 @@ final class FormActionsGroup {
      * @return array
      */
     private function buildDynamicOptions(string $actionId, array $repeaterValue): array {
-        $options = [
-            'user_id' => [
-                'name'      => 'user_id',
-                'label'     => 'User: ID',
-                'data_type' => 'integer'
-            ],
-            'user_display_name' => [
-                'name'      => 'user_display_name',
-                'label'     => 'User: Display Name',
-                'data_type' => 'string'
-            ],
-            'form_id' => [
-                'name'      => 'form_id',
-                'label'     => 'Form: ID',
-                'data_type' => 'integer'
-            ],
-            'form_response_id' => [
-                'name'      => 'form_response_id',
-                'label'     => 'Form Response: ID',
-                'data_type' => 'integer'
-            ]
-        ];
+        $options = $this->defaultDynamicOptions;
 
         if ($repeaterValue !== []) {
             foreach ($repeaterValue as $row => $rowValue) {

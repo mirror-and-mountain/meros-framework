@@ -14,6 +14,7 @@ use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\App\Components\Fields\Repeater;
 
 use MM\Meros\Facades\Automation\FlowActions;
+use MM\Meros\Contracts\Features\Automation\FlowControls;
 use MM\Meros\Support\FormActionsRunner;
 
 class Form extends PostType {
@@ -31,7 +32,7 @@ class Form extends PostType {
 
         add_action('meros_framework_booted', function () {
             $this->builder()->register();
-            $this->configureFormActionsFields();
+            $this->configureFormActionsControls();
         });
 
         // Sets the render callback for form post types, filtering 'the content'
@@ -113,9 +114,9 @@ class Form extends PostType {
      *
      * @return void
      */
-    private function configureFormActionsFields(): void {
-        $group = new FormActionsGroup($this)->getGroup();
-        $this->fields($group);
+    private function configureFormActionsControls(): void {
+        $controls = new FlowControls($this)->getControls();
+        $this->fields($controls);
     }
 
     // =========================================================================
@@ -402,29 +403,5 @@ class Form extends PostType {
         }
         
         return [];
-    }
-
-    /**
-     * Helper to retrieve available form actions for the form.
-     *
-     * @return array
-     */
-    private function getAvailableFormActions(): array {
-        return collect(FlowActions::getRegisteredFeatures())
-            ->keyBy('alias')
-            ->mapWithKeys(function ($action, $alias) {
-                $label = Str::title(Str::replace('_', ' ', $alias));
-
-                if ($action['initialised'] ?? false) {
-                    $instance = FlowActions::get($alias);
-
-                    if ($instance !== null) {
-                        $label = $instance->getLabel();
-                    }
-                }
-
-                return [$alias => $label];
-            })
-            ->all();
     }
 }

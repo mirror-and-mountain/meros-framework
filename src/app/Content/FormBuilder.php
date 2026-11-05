@@ -30,11 +30,29 @@ class FormBuilder {
     public const STRUCTURE_META_KEY = '_meros_form_structure';
 
     /**
+     * The post meta key under which a form's actions are stored.
+     */
+    public const ACTIONS_META_KEY = '_meros_form_actions';
+
+    /**
+     * The post meta key under which a form's settings are stored.
+     */
+    public const SETTINGS_META_KEY = '_meros_form_settings';
+
+    /**
      * The post type that owns the form builder.
      *
      * @var PostType
      */
     private PostType $postType;
+
+    /**
+     * The template used for the form builder. This can be either a Post instance representing a stored form template,
+     * a FormComponent instance representing a component template, or null if no template is set.
+     *
+     * @var Post|FormComponent|null
+     */
+    private Post|FormComponent|null $template = null;
 
     public function __construct(PostType $postType) {
         $this->postType = $postType;
@@ -46,25 +64,52 @@ class FormBuilder {
 
     /**
      * Registers the builder meta box and the save action for the owning post type.
+     * 
+     * @param Post|FormComponent|null $template Optional. The template to use for the form builder.
      *
      * @return void
      */
-    public function register(): void {
+    public function register(Post|FormComponent|null $template = null): void {
+        $this->template    = $template;
         $componentTemplate = $this->makeComponentTemplate();
+
         $this->addSaveAction();
 
         $this->postType->metaBox('form_builder', 'Form Builder', function (\WP_Post $post) use ($componentTemplate): void {
             $formData = $this->getStructure($post->ID);
-
-            if ($formData === null) {
-                $formData = [];
-            }
 
             echo Livewire::mount('meros::form-builder', [
                 'formData'          => $formData,
                 'componentTemplate' => $componentTemplate
             ]);
         });
+    }
+
+    /**
+     * Static helper to retrieve the meta key used for storing a form's structure.
+     *
+     * @return string
+     */
+    public static function getStructureMetaKey(): string {
+        return self::STRUCTURE_META_KEY;
+    }
+
+    /**
+     * Static helper to retrieve the meta key used for storing a form's actions.
+     *
+     * @return string
+     */
+    public static function getActionsMetaKey(): string {
+        return self::ACTIONS_META_KEY;
+    }
+
+    /**
+     * Static helper to retrieve the meta key used for storing a form's settings.
+     *
+     * @return string
+     */
+    public static function getSettingsMetaKey(): string {
+        return self::SETTINGS_META_KEY;
     }
 
     /**
@@ -132,7 +177,7 @@ class FormBuilder {
     // =========================================================================
 
     /**
-     * Configures the save action for the post type to save the form's structural data as post meta.
+     * Configures the save action for the post type to save its form's structural data as post meta.
      *
      * @return void
      */
@@ -373,35 +418,87 @@ class FormBuilder {
     }
 
     // =========================================================================
-    // Structure
+    // Structure Helpers
     // =========================================================================
 
     /**
-     * Retrieves a form's stored structure from the post meta table with the given id.
+     * Attempts to retrieve the form structure for the given post ID. If no post ID is provided, 
+     * it will attempt to use the template associated with the form builder (if any).
      *
-     * @param integer $postId
+     * @param int|null $postId
      *
      * @return array|null
      */
-    public function getStructure(int $postId): ?array {
-        $model = Post::find($postId);
+    public function getStructure(?int $postId = null): array {
+        if ($postId === null && $this->template instanceof Post) {
+            return $this->getStructureFromModel($this->template);
+        } 
+        
+        else if ($postId === null && $this->template instanceof FormComponent) {
+            return $this->template->serialize('storage');
+        } 
+        
+        else if ($postId !== null) {
+            $model = Post::find($postId);
 
-        if (!($model instanceof Post)) {
-            return null;
+            if (!($model instanceof Post)) {
+                return $this->hasTemplate()
+                    ? $this->getStructure()
+                    : [];
+            }
+
+            $structure = $this->getStructureFromModel($model);
+            if (!empty($structure)) {
+                return $structure;
+            }
+
+            return $this->hasTemplate()
+                ? $this->getStructure()
+                : [];
         }
 
+        return [];
+    }
+
+    /**
+     * Attempts to retrieve the stored structure for the given model. Returns an empty array if not found.
+     *
+     * @param Post $model
+     *
+     * @return array
+     */
+    private function getStructureFromModel(Post $model): array {
         $meta = $model->meta->where('meta_key', self::STRUCTURE_META_KEY)->first();
 
         if ($meta === null) {
-            return null;
+            return [];
         }
 
         $unserialized = unserialize($meta->meta_value);
         if (!is_array($unserialized)) {
-            return null;
+            return [];
         }
 
         return $unserialized;
+    }
+
+    /**
+     * Checks if the form builder has a template of the specified type, or either type if no type is specified.
+     *
+     * @param string $type
+     *
+     * @return boolean
+     */
+    private function hasTemplate(string $type = ''): bool {
+        if ($type === 'stored') {
+            return $this->template instanceof Post;
+        }
+
+        if ($type === 'template') {
+            return $this->template instanceof FormComponent;
+        }
+
+        return $this->template instanceof Post || $this->template instanceof FormComponent;
     }
 
     /**
