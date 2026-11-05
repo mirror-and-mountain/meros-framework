@@ -190,7 +190,7 @@ PHP;
             escapeshellarg($this->config['db']['charset']),
             escapeshellarg($this->config['db']['collate']),
             escapeshellarg($this->config['db']['prefix']),
-            escapeshellarg("<<PHP\n" . $extraPhp . "\n?>\n")
+            escapeshellarg($extraPhp)
         );
 
         $installCommand = sprintf(
