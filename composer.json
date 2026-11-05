@@ -11,9 +11,9 @@
         }
     ],
     "require": {
-        "roots/acorn": "^6.2",
-        "livewire/livewire": "^4.3.3",
-        "symfony/uid": "^8.1.0"
+        "roots/acorn": "^6.3",
+        "livewire/livewire": "^4.4.8",
+        "symfony/uid": "^8.1.9"
     },
     "autoload": {
         "psr-4": {
