@@ -85,10 +85,10 @@ class ComposerScripts {
                 'db_prefix'         => 'wp_',
                 'db_charset'        => 'utf8mb4',
                 'db_collate'        => 'utf8mb4_unicode_ci',
-                'wp_port'           => '8000',
-                'phpmyadmin_port'   => '9000',
-                'mailpit_smtp_port' => '1025',
-                'mailpit_ui_port'   => '8025',
+                'wp_port'           => getenv('MEROS_WP_PORT') ?: '8000',
+                'phpmyadmin_port'   => getenv('MEROS_PHPMYADMIN_PORT') ?: '9000',
+                'mailpit_smtp_port' => getenv('MEROS_MAILPIT_SMTP_PORT') ?: '1025',
+                'mailpit_ui_port'   => getenv('MEROS_MAILPIT_UI_PORT') ?: '8025',
             ];
 
             $configureThemeSettings = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s theme settings? [yes]: </question>', true);
@@ -119,12 +119,17 @@ class ComposerScripts {
                 $config['db_collate']       = $io->ask('<question>Set the database collate: [' . $config['db_collate'] . ']: </question>', $config['db_collate']);
             }
 
-            $configurePorts = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s ports? [yes]: </question>', true);
-            if ($configurePorts) {
-                $config['wp_port'] = $io->ask('<question>Set the WordPress port: [' . $config['wp_port'] . ']: </question>', $config['wp_port']);
-                $config['phpmyadmin_port'] = $io->ask('<question>Set the phpMyAdmin port: [' . $config['phpmyadmin_port'] . ']: </question>', $config['phpmyadmin_port']);
-                $config['mailpit_ui_port'] = $io->ask('<question>Set the Mailpit UI port: [' . $config['mailpit_ui_port'] . ']: </question>', $config['mailpit_ui_port']);
-                $config['mailpit_smtp_port'] = $io->ask('<question>Set the Mailpit SMTP port: [' . $config['mailpit_smtp_port'] . ']: </question>', $config['mailpit_smtp_port']);
+            $configurePorts = false;
+            $portsProvidedViaEnv = (bool) (getenv('MEROS_WP_PORT') ?: false);
+            
+            if (!$portsProvidedViaEnv) {
+                $configurePorts = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s ports? [yes]: </question>', true);
+                if ($configurePorts) {
+                    $config['wp_port'] = $io->ask('<question>Set the WordPress port: [' . $config['wp_port'] . ']: </question>', $config['wp_port']);
+                    $config['phpmyadmin_port'] = $io->ask('<question>Set the phpMyAdmin port: [' . $config['phpmyadmin_port'] . ']: </question>', $config['phpmyadmin_port']);
+                    $config['mailpit_ui_port'] = $io->ask('<question>Set the Mailpit UI port: [' . $config['mailpit_ui_port'] . ']: </question>', $config['mailpit_ui_port']);
+                    $config['mailpit_smtp_port'] = $io->ask('<question>Set the Mailpit SMTP port: [' . $config['mailpit_smtp_port'] . ']: </question>', $config['mailpit_smtp_port']);
+                }
             }
         
             $io->write('');
