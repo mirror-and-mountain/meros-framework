@@ -47,6 +47,7 @@ class InstallCommands {
             $requiredOnly = isset($assoc_args['required-only']) && $assoc_args['required-only'] === true;
         }
 
+        $isMerosEnv = getenv('MEROS_ENVIRONMENT') && getenv('MEROS_ENVIRONMENT') === 'true';
         $suppressEnvError = isset($assoc_args['surpress-env-error']) && $assoc_args['surpress-env-error'] === true;
 
         if ($tableName !== null) {
@@ -58,19 +59,21 @@ class InstallCommands {
         try {
             Framework::install($tableName, $requiredOnly);
         } catch (\Exception $e) {
-            \WP_CLI::error($e->getMessage());
+            if ($suppressEnvError === false && $isMerosEnv) {
+                \WP_CLI::error($e->getMessage());
+            }
         }
 
         \WP_CLI::success('Framework tables installed successfully.');
 
-        if (!getenv('MEROS_ENVIRONMENT') || getenv('MEROS_ENVIRONMENT') !== 'true') {
+        if (! $isMerosEnv) {
             return;
         }
 
         $envManager = EnvironmentManager::get('local_dev');
         $result = $envManager->initLocalThemeEnv();
         if ($result !== true) {
-            if ($suppressEnvError === false) {
+            if ($suppressEnvError === false && $isMerosEnv) {
                 \WP_CLI::error($result);
             }
         }
