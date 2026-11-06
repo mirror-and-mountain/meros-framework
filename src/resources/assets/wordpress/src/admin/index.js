@@ -10,6 +10,8 @@ import {
     __meros_integrations_revoke_connection
 } from './integrations.js';
 
+import { __meros_send_test_email } from './mail.js';
+
 import '../mforms/admin.js';
 import './style.scss';
 
@@ -41,4 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Expose the revoke connection function to the global scope
     window.__meros_integrations_revoke_connection = __meros_integrations_revoke_connection;
+
+    // Handle meros dev test email tool
+    document.addEventListener('mforms::meros_send_test_email', __meros_send_test_email);
 });

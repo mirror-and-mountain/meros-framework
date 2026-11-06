@@ -15,7 +15,7 @@ use MM\Meros\App\Content\Orchestrator as ContentOrchestrator;
 use MM\Meros\Contracts\Providers\Concerns\IsFrameworkProvider;
 use MM\Meros\Contracts\Providers\Concerns\IsNonPackageProvider;
 
-use MM\Meros\Contracts\Features\Data\Table;
+use MM\Meros\Facades\Support\Ajax;
 
 final class Framework extends Provider {
     use IsFrameworkProvider, IsNonPackageProvider;
@@ -167,14 +167,12 @@ final class Framework extends Provider {
     /**
      * Configures wp_mail to use Mailpit SMTP for local development without relying on SMTP plugins.
      *
-     * Set MEROS_MAIL_HOST / MEROS_MAIL_PORT to override defaults.
-     *
      * @return void
      */
     private function configureLocalMailTransport(): void {
         add_action('phpmailer_init', function ($phpmailer) {
-            $host = getenv('MEROS_MAIL_HOST') ?: 'mailpit';
-            $port = (int) (getenv('MEROS_MAIL_PORT') ?: 1025);
+            $host = 'mailpit';
+            $port = (int) (getenv('MAILPIT_SMTP_PORT') ?: 1025);
 
             $phpmailer->isSMTP();
             $phpmailer->Host = $host;
@@ -183,6 +181,31 @@ final class Framework extends Provider {
             $phpmailer->SMTPSecure = '';
             $phpmailer->SMTPAutoTLS = false;
         });
+
+        Ajax::addAction('meros_send_test_email', function (array $args) {
+            $testEmail = $args['test_email'] ?? '';
+            if ($testEmail === '') {
+                wp_send_json_error(['message' => 'Test email address is required.']);
+                exit;
+            }
+
+            $subject = 'Test Email from Meros';
+            $message = '<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; padding: 24px;">'
+                . '<h1 style="margin: 0 0 16px; color: #222;">Meros Framework</h1>'
+                . '<p>This is a test email sent from the Meros framework.</p>'
+                . '<hr style="border: 0; border-top: 1px solid #ddd; margin: 24px 0;">'
+                . '<p style="font-size: 13px; color: #777;">If you received this message, email delivery is working.</p>'
+                . '</div>';
+            $headers = ['Content-Type: text/html; charset=UTF-8'];
+
+            $mailSent = wp_mail($testEmail, $subject, $message, $headers);
+            if (!$mailSent) {
+                wp_send_json_error(['message' => 'Failed to send test email.']);
+                exit;
+            }
+
+            wp_send_json_success(['message' => 'Test email sent successfully.']);
+        }, [], true);
     }
 
     // =========================================================================

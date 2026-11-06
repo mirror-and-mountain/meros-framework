@@ -14,6 +14,8 @@ use MM\Meros\App\Admin\Pages\MerosIntegrations as IntegrationsSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosAssets as AssetGroupSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosBlocksSettings as BlocksSettingsPage;
 
+use MM\Meros\App\Admin\Pages\MerosDev as DevPage;
+
 use MM\Meros\App\Admin\Sections\MerosSettings;
 
 use MM\Meros\App\Admin\Settings\Containers\MerosFrameworkSettings;
@@ -50,6 +52,7 @@ class Orchestrator extends SettingsOrchestrator {
         $this->pages(IntegrationsSettingsPage::class)->register();
         $this->pages(AssetGroupSettingsPage::class)->register();
         $this->pages(BlocksSettingsPage::class)->register();
+        $this->pages(DevPage::class)->make();
     }
 
     /**

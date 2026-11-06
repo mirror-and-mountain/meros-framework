@@ -96,7 +96,7 @@ class EnvironmentManager {
      */
     private string $error = '';
 
-    private function __construct( string $name, string $themePath ) {
+    private function __construct(string $name, string $themePath) {
         $this->name = $name === 'local' ? 'local_dev' : $name;
 
         $separator = DIRECTORY_SEPARATOR;
@@ -646,6 +646,70 @@ PHP;
     }
 
     /**
+     * Initialises the local theme environment file.
+     *
+     * Creates the .env file in the theme path if it does not exist and ensures required environment variables are set.
+     *
+     * @return string|boolean
+     */
+    public function initLocalThemeEnv(): string|bool {
+        $separator = DIRECTORY_SEPARATOR;
+        $themeEnv  = $this->themePath . $separator . '.env';
+
+        if (! is_file($themeEnv)) {
+            if (! touch($themeEnv)) {
+                return 'Unable to create theme .env file.';
+            }
+
+            $themeEnvContent = "# An App Key is required for Meros functionality\n";
+            $themeEnvContent .= "APP_KEY=base64:" . base64_encode(random_bytes(32)) . "\n";
+            $themeEnvContent .= "# Mailpit Configuration\n";
+            $themeEnvContent .= "MAILPIT_SMTP_PORT=" . ($_ENV['MAILPIT_SMTP_PORT'] ?? '1025') . "\n";
+
+            if (file_put_contents($themeEnv, $themeEnvContent) === false) {
+                return 'Unable to write theme .env file.';
+            }
+            
+            return true;
+        } else {
+            $themeEnvContent = file_get_contents($themeEnv);
+            if ($themeEnvContent === false) {
+                return 'Unable to read theme .env file.';
+            }
+
+            $requiredVariables = [
+                'APP_KEY' => 'base64:' . base64_encode(random_bytes(32)),
+                'MAILPIT_SMTP_PORT' => $_ENV['MAILPIT_SMTP_PORT'] ?? '1025',
+            ];
+
+            foreach ($requiredVariables as $variable => $value) {
+                $pattern = '/^([ \t]*(?:export[ \t]+)?' . preg_quote($variable, '/') . '[ \t]*=)([^\r\n]*)$/m';
+                if (preg_match($pattern, $themeEnvContent, $matches, PREG_OFFSET_CAPTURE)) {
+                    if (trim($matches[2][0]) === '') {
+                        $themeEnvContent = substr_replace(
+                            $themeEnvContent,
+                            $matches[1][0] . $value,
+                            $matches[0][1],
+                            strlen($matches[0][0])
+                        );
+                    }
+                } else {
+                    if ($themeEnvContent !== '' && ! str_ends_with($themeEnvContent, "\n")) {
+                        $themeEnvContent .= "\n";
+                    }
+                    $themeEnvContent .= $variable . '=' . $value . "\n";
+                }
+            }
+
+            if (file_put_contents($themeEnv, $themeEnvContent) === false) {
+                return 'Unable to update theme .env file.';
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Initialises the local environment configuration
      * from the devcontainer .env file.
      * 
@@ -655,6 +719,7 @@ PHP;
     private function initLocalConfig(string $separator): string|bool {
         $containerEnv  = $this->devContainerPath . $separator . '.env';
         $wordpressPath = realpath( dirname( $this->themePath, 3 ) );
+        $themeEnv = $this->themePath . $separator . '.env';
 
         if (! is_dir($wordpressPath) || ! is_file($containerEnv)) {
             return 'Devcontainer .env or WordPress path not found.';

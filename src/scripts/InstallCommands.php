@@ -6,11 +6,13 @@ use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Theme;
 use MM\Meros\Facades\Packages;
 
+use MM\Meros\Scripts\EnvironmentManager;
+
 use MM\Meros\App\Package;
 
 class InstallCommands {
     /**
-     * Installs the framework tables.
+     * Installs the framework tables and initialises the local theme environment.
      *
      * ## OPTIONS
      * 
@@ -54,8 +56,19 @@ class InstallCommands {
             \WP_CLI::error($e->getMessage());
         }
 
-        \WP_CLI::success('Framework operation completed successfully.');
+        \WP_CLI::success('Framework tables installed successfully.');
 
+        if (!getenv('MEROS_ENVIRONMENT') || getenv('MEROS_ENVIRONMENT') !== 'true') {
+            return;
+        }
+
+        $envManager = EnvironmentManager::get('local_dev');
+        $result = $envManager->initLocalThemeEnv();
+        if ($result !== true) {
+            \WP_CLI::error($result);
+        }
+
+        \WP_CLI::success('Local theme environment initialised successfully.');
     }
 
     /**
