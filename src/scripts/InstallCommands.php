@@ -21,6 +21,9 @@ class InstallCommands {
      *
      * [--required-only]
      * : Only install required tables.
+     * 
+     * [--surpress-env-error]
+     * : Suppress environment initialisation errors.
      *
      * ## EXAMPLES
      *
@@ -44,6 +47,8 @@ class InstallCommands {
             $requiredOnly = isset($assoc_args['required-only']) && $assoc_args['required-only'] === true;
         }
 
+        $suppressEnvError = isset($assoc_args['surpress-env-error']) && $assoc_args['surpress-env-error'] === true;
+
         if ($tableName !== null) {
             \WP_CLI::line('Installing framework table ' . $tableName);
         } else {
@@ -65,7 +70,9 @@ class InstallCommands {
         $envManager = EnvironmentManager::get('local_dev');
         $result = $envManager->initLocalThemeEnv();
         if ($result !== true) {
-            \WP_CLI::error($result);
+            if ($suppressEnvError === false) {
+                \WP_CLI::error($result);
+            }
         }
 
         \WP_CLI::success('Local theme environment initialised successfully.');

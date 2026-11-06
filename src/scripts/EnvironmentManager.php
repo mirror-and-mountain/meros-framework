@@ -719,8 +719,6 @@ PHP;
     private function initLocalConfig(string $separator): string|bool {
         $containerEnv  = $this->devContainerPath . $separator . '.env';
         $wordpressPath = realpath( dirname( $this->themePath, 3 ) );
-        $themeEnv = $this->themePath . $separator . '.env';
-
         if (! is_dir($wordpressPath) || ! is_file($containerEnv)) {
             return 'Devcontainer .env or WordPress path not found.';
         }
@@ -729,12 +727,7 @@ PHP;
         $dotenv->load();
 
         $port = $_ENV['WP_PORT'] ?? '8000';
-        $url  = 'http://localhost:' . $port;
-        $codespaceName = $_ENV['CODESPACE_NAME'] ?? null;
-
-        if ($codespaceName) {
-            $url = "https://{$codespaceName}-80.app.github.dev";
-        }
+        $url  = $_ENV['SITE_URL'] ?? 'http://localhost:' . $port;
 
         $this->config = [
             'site_title' => $_ENV['SITE_TITLE'] ?? 'Meros WP',

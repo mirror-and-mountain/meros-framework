@@ -63,8 +63,10 @@ class ComposerScripts {
             }
 
             $themeSlug = strtolower(str_replace(' ', '-', pathinfo(self::$projectRoot, PATHINFO_BASENAME)));
+            
             $defaultThemeName = ucwords(str_replace('-', ' ', $themeSlug));
             $defaultSiteTitle = $defaultThemeName;
+            $defaultSiteUrl   = getenv('MEROS_SITE_URL') ?: 'http://localhost:8000';
 
             $config = [
                 'theme_slug'        => $themeSlug,
@@ -74,6 +76,7 @@ class ComposerScripts {
                 'theme_author_uri'  => 'https://mirrorandmountain.com',
                 'theme_description' => 'A theme built using Meros by MIRROR AND MOUNTAIN.',
                 'site_title'        => $defaultSiteTitle,
+                'site_url'          => $defaultSiteUrl,
                 'admin_user'        => 'admin',
                 'admin_password'    => 'password',
                 'admin_email'       => 'admin@example.com',
@@ -103,6 +106,7 @@ class ComposerScripts {
             $configureSiteSettings = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s site settings? [yes]: </question>', true);
             if ($configureSiteSettings) {
                 $config['site_title']     = $io->ask('<question>Set the site title for the devcontainer: [' . $defaultSiteTitle . ']: </question>', $defaultSiteTitle);
+                $config['site_url']       = $io->ask('<question>Set the site URL for the devcontainer: [' . $defaultSiteUrl . ']: </question>', $defaultSiteUrl);
                 $config['admin_user']     = $io->ask('<question>Set the admin username: [' . $config['admin_user'] . ']: </question>', $config['admin_user']);
                 $config['admin_password'] = $io->ask('<question>Set the admin password: [' . $config['admin_password'] . ']: </question>', $config['admin_password']);
                 $config['admin_email']    = $io->ask('<question>Set the admin email: [' . $config['admin_email'] . ']: </question>', $config['admin_email']);
