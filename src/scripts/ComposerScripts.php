@@ -45,55 +45,65 @@ class ComposerScripts {
         $io = $event->getIO();
 
         $io->write('<info>Welcome to Meros!</info>');
-        $customise = $io->askConfirmation('<question>Would you like to customise the configuration for this theme\'s devcontainer? [no]: </question>', false);
+
+        // Detect if this is being called from meros-create-project
+        $isCalledFromMeros = getenv('MEROS_SITE_URL') !== false;
+
+        // Determine if SITE_URL is locked (tunnel scenario or meros call with predetermined URL)
+        $siteUrlLocked = $isCalledFromMeros && preg_match('/^https:\/\//', getenv('MEROS_SITE_URL') ?: '');
+
+        $customise = $io->askConfirmation('<question>Would you like to customise the devcontainer configuration? [' . ($isCalledFromMeros ? 'no' : 'yes') . ']: </question>', !$isCalledFromMeros);
+        if (!$customise && !$isCalledFromMeros) {
+            $io->write('<comment>Using default configuration.</comment>');
+        }
+
+        self::initialise($composer, $io);
+
+        $containerStubsDir = self::$stubsDir . DIRECTORY_SEPARATOR . 'container';
+        $envStub = $containerStubsDir . DIRECTORY_SEPARATOR . '.env.stub';
+        $devContainerJsonStub = $containerStubsDir . DIRECTORY_SEPARATOR . 'devcontainer.json.stub';
+
+        $themeStubsDir = self::$stubsDir . DIRECTORY_SEPARATOR . 'theme';
+        $styleStub = $themeStubsDir . DIRECTORY_SEPARATOR . 'style.css.stub';
+
+        if (!file_exists($envStub) || !file_exists($devContainerJsonStub) || !file_exists($styleStub)) {
+            $io->write('<error>Required stub files are missing. Aborting.</error>');
+            exit(1);
+        }
+
+        $themeSlug = strtolower(str_replace(' ', '-', pathinfo(self::$projectRoot, PATHINFO_BASENAME)));
+        
+        $defaultThemeName = ucwords(str_replace('-', ' ', $themeSlug));
+        $defaultSiteTitle = $defaultThemeName;
+        $defaultSiteUrl   = getenv('MEROS_SITE_URL') ?: 'http://localhost:8000';
+
+        $config = [
+            'theme_slug'        => $themeSlug,
+            'theme_name'        => $defaultThemeName,
+            'theme_uri'         => 'https://github.com/mirror-and-mountain/meros',
+            'theme_author'      => 'MIRROR AND MOUNTAIN',
+            'theme_author_uri'  => 'https://mirrorandmountain.com',
+            'theme_description' => 'A theme built using Meros by MIRROR AND MOUNTAIN.',
+            'site_title'        => $defaultSiteTitle,
+            'site_url'          => $defaultSiteUrl,
+            'admin_user'        => 'admin',
+            'admin_password'    => 'password',
+            'admin_email'       => 'admin@example.com',
+            'db_name'           => 'wordpress',
+            'db_host'           => 'db',
+            'db_user'           => 'dbuser',
+            'db_password'       => 'dbpassword',
+            'db_root_password'  => 'rootpassword',
+            'db_prefix'         => 'wp_',
+            'db_charset'        => 'utf8mb4',
+            'db_collate'        => 'utf8mb4_unicode_ci',
+            'wp_port'           => getenv('MEROS_WP_PORT') ?: '8000',
+            'phpmyadmin_port'   => getenv('MEROS_PHPMYADMIN_PORT') ?: '9000',
+            'mailpit_smtp_port' => getenv('MEROS_MAILPIT_SMTP_PORT') ?: '1025',
+            'mailpit_ui_port'   => getenv('MEROS_MAILPIT_UI_PORT') ?: '8025',
+        ];
 
         if ($customise === true) {
-            self::initialise($composer, $io);
-
-            $containerStubsDir = self::$stubsDir . DIRECTORY_SEPARATOR . 'container';
-            $envStub = $containerStubsDir . DIRECTORY_SEPARATOR . '.env.stub';
-            $devContainerJsonStub = $containerStubsDir . DIRECTORY_SEPARATOR . 'devcontainer.json.stub';
-
-            $themeStubsDir = self::$stubsDir . DIRECTORY_SEPARATOR . 'theme';
-            $styleStub = $themeStubsDir . DIRECTORY_SEPARATOR . 'style.css.stub';
-
-            if (!file_exists($envStub) || !file_exists($devContainerJsonStub) || !file_exists($styleStub)) {
-                $io->write('<error>Required stub files are missing. Aborting.</error>');
-                exit(1);
-            }
-
-            $themeSlug = strtolower(str_replace(' ', '-', pathinfo(self::$projectRoot, PATHINFO_BASENAME)));
-            
-            $defaultThemeName = ucwords(str_replace('-', ' ', $themeSlug));
-            $defaultSiteTitle = $defaultThemeName;
-            $defaultSiteUrl   = getenv('MEROS_SITE_URL') ?: 'http://localhost:8000';
-
-            $config = [
-                'theme_slug'        => $themeSlug,
-                'theme_name'        => $defaultThemeName,
-                'theme_uri'         => 'https://github.com/mirror-and-mountain/meros',
-                'theme_author'      => 'MIRROR AND MOUNTAIN',
-                'theme_author_uri'  => 'https://mirrorandmountain.com',
-                'theme_description' => 'A theme built using Meros by MIRROR AND MOUNTAIN.',
-                'site_title'        => $defaultSiteTitle,
-                'site_url'          => $defaultSiteUrl,
-                'admin_user'        => 'admin',
-                'admin_password'    => 'password',
-                'admin_email'       => 'admin@example.com',
-                'db_name'           => 'wordpress',
-                'db_host'           => 'db',
-                'db_user'           => 'dbuser',
-                'db_password'       => 'dbpassword',
-                'db_root_password'  => 'rootpassword',
-                'db_prefix'         => 'wp_',
-                'db_charset'        => 'utf8mb4',
-                'db_collate'        => 'utf8mb4_unicode_ci',
-                'wp_port'           => getenv('MEROS_WP_PORT') ?: '8000',
-                'phpmyadmin_port'   => getenv('MEROS_PHPMYADMIN_PORT') ?: '9000',
-                'mailpit_smtp_port' => getenv('MEROS_MAILPIT_SMTP_PORT') ?: '1025',
-                'mailpit_ui_port'   => getenv('MEROS_MAILPIT_UI_PORT') ?: '8025',
-            ];
-
             $configureThemeSettings = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s theme settings? [yes]: </question>', true);
             if ($configureThemeSettings) {
                 $config['theme_name']        = $io->ask('<question>Set the theme name: [' . $config['theme_name'] . ']: </question>', $config['theme_name']);
@@ -109,6 +119,10 @@ class ComposerScripts {
                 $config['admin_user']     = $io->ask('<question>Set the admin username: [' . $config['admin_user'] . ']: </question>', $config['admin_user']);
                 $config['admin_password'] = $io->ask('<question>Set the admin password: [' . $config['admin_password'] . ']: </question>', $config['admin_password']);
                 $config['admin_email']    = $io->ask('<question>Set the admin email: [' . $config['admin_email'] . ']: </question>', $config['admin_email']);
+                
+                if (!$siteUrlLocked) {
+                    $config['site_url'] = $io->ask('<question>Set the site URL: [' . $config['site_url'] . ']: </question>', $config['site_url']);
+                }
             }
 
             $configureDatabase = $io->askConfirmation('<question>Would you like to configure the devcontainer\'s database settings? [yes]: </question>', true);
@@ -141,63 +155,82 @@ class ComposerScripts {
                 $io->write('<comment>Cancelled. No files were created.</comment>');
                 return;
             }
-
-            $replacements = [];
+        } elseif (!$isCalledFromMeros) {
+            // When called directly via composer without customization, confirm before creating
+            $io->write('');
+            $io->write('<info>Configuration summary:</info>');
             foreach ($config as $key => $value) {
-                $replacements['{{' . strtoupper($key) . '}}'] = (string) $value;
+                $io->write(sprintf('  %-18s %s', $key, $value));
             }
+            $io->write('');
 
-            $forwardPorts = array_map('intval', [
-                $config['wp_port'],
-                $config['phpmyadmin_port'],
-                $config['mailpit_smtp_port'],
-                $config['mailpit_ui_port'],
-            ]);
+            if (!$io->askConfirmation('<question>Setup the devcontainer with this configuration? [yes]: </question>', true)) {
+                $io->write('<comment>Cancelled. No files were created.</comment>');
+                return;
+            }
+        }
+        // When called from meros-create-project with no customization, always create files
 
-            $envContents   = file_get_contents($envStub);
-            $styleContents = file_get_contents($styleStub);
-            $jsonContents  = file_get_contents($devContainerJsonStub);
+        // Sync SITE_URL with port if using localhost (regardless of calling context)
+        if (!$siteUrlLocked && preg_match('/^http:\/\/localhost:/', $config['site_url'])) {
+            // SITE_URL is localhost, so ensure it matches the configured WordPress port
+            $config['site_url'] = 'http://localhost:' . $config['wp_port'];
+        }
 
-            if ($envContents === false || $jsonContents === false || $styleContents === false) {
-                $io->write('<error>Failed to read stub files. Aborting.</error>');
+        // Create the files with the configuration (either customized or defaults)
+        $replacements = [];
+        foreach ($config as $key => $value) {
+            $replacements['{{' . strtoupper($key) . '}}'] = (string) $value;
+        }
+
+        $forwardPorts = array_map('intval', [
+            $config['wp_port'],
+            $config['phpmyadmin_port'],
+            $config['mailpit_smtp_port'],
+            $config['mailpit_ui_port'],
+        ]);
+
+        $envContents   = file_get_contents($envStub);
+        $styleContents = file_get_contents($styleStub);
+        $jsonContents  = file_get_contents($devContainerJsonStub);
+
+        if ($envContents === false || $jsonContents === false || $styleContents === false) {
+            $io->write('<error>Failed to read stub files. Aborting.</error>');
+            exit(1);
+        }
+
+        $envContents = strtr($envContents, $replacements);
+        $styleContents = strtr($styleContents, $replacements);
+
+        // Values inserted into JSON must be escaped
+        $jsonReplacements = array_map(
+            fn ($value) => substr(json_encode($value), 1, -1),
+            $replacements
+        );
+        $jsonReplacements['{{FORWARD_PORTS}}'] = json_encode($forwardPorts);
+        $jsonContents = strtr($jsonContents, $jsonReplacements);
+
+        $devContainerDir = self::$projectRoot . DIRECTORY_SEPARATOR . '.devcontainer';
+        $targets = [
+            $devContainerDir . DIRECTORY_SEPARATOR . '.env'                => $envContents,
+            $devContainerDir . DIRECTORY_SEPARATOR . 'devcontainer.json'   => $jsonContents,
+            self::$projectRoot . DIRECTORY_SEPARATOR . 'style.css'         => $styleContents,
+        ];
+
+        foreach ($targets as $path => $contents) {
+            if (file_exists($path) && !unlink($path)) {
+                $io->write('<error>Failed to remove existing ' . basename($path) . '. Aborting.</error>');
                 exit(1);
             }
-
-            $envContents = strtr($envContents, $replacements);
-            $styleContents = strtr($styleContents, $replacements);
-
-            // Values inserted into JSON must be escaped
-            $jsonReplacements = array_map(
-                fn ($value) => substr(json_encode($value), 1, -1),
-                $replacements
-            );
-            $jsonReplacements['{{FORWARD_PORTS}}'] = json_encode($forwardPorts);
-            $jsonContents = strtr($jsonContents, $jsonReplacements);
-
-            $devContainerDir = self::$projectRoot . DIRECTORY_SEPARATOR . '.devcontainer';
-            $targets = [
-                $devContainerDir . DIRECTORY_SEPARATOR . '.env'                => $envContents,
-                $devContainerDir . DIRECTORY_SEPARATOR . 'devcontainer.json'   => $jsonContents,
-                self::$projectRoot . DIRECTORY_SEPARATOR . 'style.css'         => $styleContents,
-            ];
-
-            foreach ($targets as $path => $contents) {
-                if (file_exists($path) && !unlink($path)) {
-                    $io->write('<error>Failed to remove existing ' . basename($path) . '. Aborting.</error>');
-                    exit(1);
-                }
-                if (file_put_contents($path, $contents) === false) {
-                    $io->write('<error>Failed to write ' . basename($path) . '. Aborting.</error>');
-                    exit(1);
-                }
+            if (file_put_contents($path, $contents) === false) {
+                $io->write('<error>Failed to write ' . basename($path) . '. Aborting.</error>');
+                exit(1);
             }
-
-            $io->write('<info>Devcontainer .env file created. You can modify it at /.devcontainer/.env</info>');
-            $io->write('<info>Devcontainer devcontainer.json file created. You can modify it at /.devcontainer/devcontainer.json</info>');
-            $io->write('<info>Devcontainer style.css file created. You can modify it at /style.css</info>');
-        } else {
-            $io->write('<info>Devcontainer setup skipped. You can modify your devcontainer configuration at /.devcontainer/ and your theme\'s metadata at /style.css</info>');
         }
+
+        $io->write('<info>Devcontainer .env file created. You can modify it at /.devcontainer/.env</info>');
+        $io->write('<info>Devcontainer devcontainer.json file created. You can modify it at /.devcontainer/devcontainer.json</info>');
+        $io->write('<info>Devcontainer style.css file created. You can modify it at /style.css</info>');
 
         $io->write('<info>Happy coding!</info>');
     }
