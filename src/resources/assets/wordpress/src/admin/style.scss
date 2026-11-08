@@ -1,5 +1,8 @@
 @use '../styles/modal.scss';
 
+/**
+ * Admin styles for the Meros form builder.
+ */
 .meros-form-builder {
     --mforms-builder-border: #d0d7de;
     --mforms-builder-muted: #6b7280;
@@ -334,7 +337,9 @@
     }
 }
 
-// Button Styles
+/**
+ * Admin button styles for the Meros admin interface.
+ */
 .meros-admin-button {
     transition: opacity 0.3s ease;
 }
@@ -392,7 +397,9 @@
 }
 
 
-// Settings Field Title Styles
+/**
+ * Settings field title styles for the Meros admin interface.
+ */
 .form-table tr:has(.meros-settings-field-title-wrapper-hidden) {
     display: none;
 }
@@ -410,7 +417,9 @@
     }
 }
 
-// Table Management Page Styles
+/**
+ * Table management page styles for the Meros admin interface.
+ */
 .meros-tables-actions {
     display: flex;
     gap: 0.5rem;
@@ -457,3 +466,11 @@
         }
     }
 }
+
+/**
+ * Hide the 'plain' option in the permalinks settings page.
+ */
+
+.form-table.permalink-structure .structure-selection .row:has(#permalink-input-plain) {
+    display: none !important;
+ }
