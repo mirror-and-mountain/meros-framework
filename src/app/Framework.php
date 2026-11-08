@@ -62,6 +62,7 @@ final class Framework extends Provider {
         $this->initialise(ContentOrchestrator::class);
 
         $this->registerTables();
+        $this->ensurePrettyPermalinks();
     }
 
     /**
@@ -79,6 +80,20 @@ final class Framework extends Provider {
          // Fires when the theme is deactivated, triggering any necessary cleanup actions.
         add_action('switch_theme', function () {
             $this->__whenThemeDeactivated();
+        });
+    }
+
+    /**
+     * Ensures that the site's permalink structure is set to use pretty permalinks.
+     * If the permalink structure is not set, it will be updated to '/%postname%/'.
+     *
+     * @return void
+     */
+    private function ensurePrettyPermalinks(): void {
+        add_action('init', function () {
+            if (get_option('permalink_structure') === '') {
+                update_option('permalink_structure', '/%postname%/');
+            }
         });
     }
 

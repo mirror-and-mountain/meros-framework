@@ -8,6 +8,7 @@ return [
      */
     'local_options' => [
         'blog_public' => 0,
+        'permalink_structure' => '/%postname%/',
     ],
 
     /**
