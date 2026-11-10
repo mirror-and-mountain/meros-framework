@@ -8,6 +8,10 @@ $mf-first-row-offset: -24px;
     display: grid;
     min-width: 0;
 
+    .mforms-form-description {
+        margin-top: 0;
+    }
+
     .mforms-body {
         > .mforms-row:not(:has(> .mforms-section)) {
             margin-top: $mf-first-row-offset;

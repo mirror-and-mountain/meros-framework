@@ -110,10 +110,12 @@ class DynamicBlock extends Block {
         $this->script->addAjaxData([
             'blocks' => [
                 $this->getName() => [
-                    'name'       => $this->getName(),
-                    'title'      => $this->title,
-                    'ajaxAction' => $ajaxAction,
-                    'attributes' => $this->attributes
+                    'name'        => $this->getName(),
+                    'title'       => $this->title,
+                    'icon'        => $this->icon,
+                    'description' => $this->description,
+                    'ajaxAction'  => $ajaxAction,
+                    'attributes'  => $this->attributes
                 ]
             ]
         ]);

@@ -7,10 +7,11 @@ use Livewire\Livewire;
 
 use MM\Meros\App\Models\Post;
 
-use MM\Meros\Contracts\Features\Content\PostType;
 use MM\Meros\Contracts\Features\Components\Form as FormComponent;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\FieldRow;
+
+use MM\Meros\Contracts\Features\Content\Interfaces\FormHost;
 
 use MM\Meros\App\Components\Fields\Repeater;
 
@@ -23,38 +24,14 @@ use MM\Meros\Facades\Components\Fields;
  * turns a stored structure back into a Form component instance.
  */
 class FormBuilder {
-
     /**
-     * The post meta key under which a form's structure is stored.
-     */
-    public const STRUCTURE_META_KEY = '_meros_form_structure';
-
-    /**
-     * The post meta key under which a form's actions are stored.
-     */
-    public const ACTIONS_META_KEY = '_meros_form_actions';
-
-    /**
-     * The post meta key under which a form's settings are stored.
-     */
-    public const SETTINGS_META_KEY = '_meros_form_settings';
-
-    /**
-     * The post type that owns the form builder.
+     * The post type that owns the form builder. Must implement the FormHost interface.
      *
-     * @var PostType
+     * @var FormHost
      */
-    private PostType $postType;
+    private FormHost $postType;
 
-    /**
-     * The template used for the form builder. This can be either a Post instance representing a stored form template,
-     * a FormComponent instance representing a component template, or null if no template is set.
-     *
-     * @var Post|FormComponent|null
-     */
-    private Post|FormComponent|null $template = null;
-
-    public function __construct(PostType $postType) {
+    public function __construct(FormHost $postType) {
         $this->postType = $postType;
     }
 
@@ -64,52 +41,23 @@ class FormBuilder {
 
     /**
      * Registers the builder meta box and the save action for the owning post type.
-     * 
-     * @param Post|FormComponent|null $template Optional. The template to use for the form builder.
      *
      * @return void
      */
-    public function register(Post|FormComponent|null $template = null): void {
-        $this->template    = $template;
+    public function register(): void {
         $componentTemplate = $this->makeComponentTemplate();
 
         $this->addSaveAction();
 
         $this->postType->metaBox('form_builder', 'Form Builder', function (\WP_Post $post) use ($componentTemplate): void {
-            $formData = $this->getStructure($post->ID);
+            $formData = [];
+            $formData = $this->postType->getFormStructure($post->ID);
 
             echo Livewire::mount('meros::form-builder', [
                 'formData'          => $formData,
                 'componentTemplate' => $componentTemplate
             ]);
         });
-    }
-
-    /**
-     * Static helper to retrieve the meta key used for storing a form's structure.
-     *
-     * @return string
-     */
-    public static function getStructureMetaKey(): string {
-        return self::STRUCTURE_META_KEY;
-    }
-
-    /**
-     * Static helper to retrieve the meta key used for storing a form's actions.
-     *
-     * @return string
-     */
-    public static function getActionsMetaKey(): string {
-        return self::ACTIONS_META_KEY;
-    }
-
-    /**
-     * Static helper to retrieve the meta key used for storing a form's settings.
-     *
-     * @return string
-     */
-    public static function getSettingsMetaKey(): string {
-        return self::SETTINGS_META_KEY;
     }
 
     /**
@@ -229,7 +177,7 @@ class FormBuilder {
             $formInstance = $this->makeFormInstance(Post::find($postId), $cleanRows);
             $serializedStructure = $formInstance->serialize('storage');
 
-            update_post_meta($postId, self::STRUCTURE_META_KEY, $serializedStructure);
+            update_post_meta($postId, $this->postType->getFormStructureMetaKey(), $serializedStructure);
         });
     }
 
@@ -363,9 +311,10 @@ class FormBuilder {
             }
         }
 
-        $name = $this->getSubmittedBuilderValue($group, 'name');
-        $title = $this->getSubmittedBuilderValue($group, 'title');
+        $name        = $this->getSubmittedBuilderValue($group, 'name');
+        $title       = $this->getSubmittedBuilderValue($group, 'title');
         $description = $this->getSubmittedBuilderValue($group, 'description');
+
         $id = $this->getSubmittedBuilderValue($group, 'id');
         $id = is_string($id) && $id !== ''
             ? Str::slug(Str::replace('_', '-', $id))
@@ -378,10 +327,10 @@ class FormBuilder {
         }
 
         $groupIds[$id] = true;
-
-        $name = is_string($name) && $name !== '' && $name !== 'group'
+        $name          = is_string($name) && $name !== '' && $name !== 'group'
             ? $name
             : '';
+
         if ($name === '' || preg_match('/^new_group(?:_\d+)?$/', $name) === 1) {
             $name = $this->makeUniqueGeneratedName('group', $groupNames);
         } else {
@@ -418,88 +367,8 @@ class FormBuilder {
     }
 
     // =========================================================================
-    // Structure Helpers
+    // Helpers
     // =========================================================================
-
-    /**
-     * Attempts to retrieve the form structure for the given post ID. If no post ID is provided, 
-     * it will attempt to use the template associated with the form builder (if any).
-     *
-     * @param int|null $postId
-     *
-     * @return array|null
-     */
-    public function getStructure(?int $postId = null): array {
-        if ($postId === null && $this->template instanceof Post) {
-            return $this->getStructureFromModel($this->template);
-        } 
-        
-        else if ($postId === null && $this->template instanceof FormComponent) {
-            return $this->template->serialize('storage');
-        } 
-        
-        else if ($postId !== null) {
-            $model = Post::find($postId);
-
-            if (!($model instanceof Post)) {
-                return $this->hasTemplate()
-                    ? $this->getStructure()
-                    : [];
-            }
-
-            $structure = $this->getStructureFromModel($model);
-            if (!empty($structure)) {
-                return $structure;
-            }
-
-            return $this->hasTemplate()
-                ? $this->getStructure()
-                : [];
-        }
-
-        return [];
-    }
-
-    /**
-     * Attempts to retrieve the stored structure for the given model. Returns an empty array if not found.
-     *
-     * @param Post $model
-     *
-     * @return array
-     */
-    private function getStructureFromModel(Post $model): array {
-        $meta = $model->meta->where('meta_key', self::STRUCTURE_META_KEY)->first();
-
-        if ($meta === null) {
-            return [];
-        }
-
-        $unserialized = unserialize($meta->meta_value);
-        if (!is_array($unserialized)) {
-            return [];
-        }
-
-        return $unserialized;
-    }
-
-    /**
-     * Checks if the form builder has a template of the specified type, or either type if no type is specified.
-     *
-     * @param string $type
-     *
-     * @return boolean
-     */
-    private function hasTemplate(string $type = ''): bool {
-        if ($type === 'stored') {
-            return $this->template instanceof Post;
-        }
-
-        if ($type === 'template') {
-            return $this->template instanceof FormComponent;
-        }
-
-        return $this->template instanceof Post || $this->template instanceof FormComponent;
-    }
 
     /**
      * Helper to retrieve available field types for the form builder.
@@ -532,7 +401,7 @@ class FormBuilder {
      * @return FormComponent
      */
     public function makeFormInstance(Post $post, array $rows = [], array $availableFields = [], bool $hideSubmitButton = false): FormComponent {
-        $rows = empty($rows) ? $this->getStructure($post->ID)['rows'] ?? [] : $rows;
+        $rows = empty($rows) ? $this->postType->getFormStructure($post->ID)['rows'] ?? [] : $rows;
         $availableFields = empty($availableFields) ? $this->getAvailableFieldTypes() : $availableFields;
 
         $form = Forms::checkout($this->postType->getProvider())->make(function (FormComponent $form) use ($post, $rows, $availableFields, $hideSubmitButton) {

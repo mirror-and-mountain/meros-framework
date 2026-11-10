@@ -33,6 +33,8 @@ use MM\Meros\Facades\Components\Fields;
 use MM\Meros\Facades\Content\PostTypes;
 
 use MM\Meros\App\Content\Form as FormPostType;
+use MM\Meros\App\Models\Post;
+use MM\Meros\Contracts\Features\Content\Interfaces\FormHost;
 
 class Orchestrator extends ComponentsOrchestrator {
     private array $fields = [
@@ -116,13 +118,18 @@ class Orchestrator extends ComponentsOrchestrator {
      */
     private function initFormAjax(): void {
         Ajax::addAction('meros_submit_form', function (array $args) {
-            $id = $args['form_id'] ?? null;
+            $id = $args['id'] ?? null;
             if ($id === null) {
                 $this->sendAjaxError('Unable to locate form: Null ID.');
             }
 
-            $controller = PostTypes::get('form');
-            if (!($controller instanceof FormPostType)) {
+            $post = Post::find($id);
+            if ($post === null) {
+                $this->sendAjaxError('Unable to locate form: Null Post Model.');
+            }
+
+            $controller = PostTypes::get($post->post_type);
+            if (!($controller instanceof FormHost)) {
                 $this->sendAjaxError('Unable to resolve form controller.');
             }
 
@@ -219,7 +226,7 @@ class Orchestrator extends ComponentsOrchestrator {
      * @return Field|null
      */
     private function findFormField(
-        array $args,
+        array  $args,
         string $name,
         string $originalName,
         string $fieldClass
@@ -227,11 +234,12 @@ class Orchestrator extends ComponentsOrchestrator {
         $formId = is_scalar($args['form_id'] ?? null) ? (string) $args['form_id'] : '';
 
         if ($formId !== '') {
-            $formPostId = filter_var($formId, FILTER_VALIDATE_INT);
-            $formType   = PostTypes::get('form');
+            $formPostId   = filter_var($formId, FILTER_VALIDATE_INT);
+            $formPost     = Post::find($formPostId);
+            $formPostType = $formPost !== null ? PostTypes::get($formPost->post_type) : null;
 
-            if ($formPostId !== false && $formPostId > 0 && $formType instanceof FormPostType) {
-                $field = $formType->findField($formPostId, $name, $originalName, $fieldClass);
+            if ($formPostId !== false && $formPostId > 0 && $formPostType instanceof FormHost) {
+                $field = $formPostType->findField($formPostId, $name, $originalName, $fieldClass);
                 if ($field !== null) {
                     return $field;
                 }

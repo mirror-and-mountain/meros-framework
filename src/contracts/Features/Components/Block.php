@@ -151,7 +151,7 @@ class Block extends Feature implements Registrable, Makeable {
      *
      * @return array
      */
-    private function getArgs(): array {
+    protected function getArgs(): array {
         $args = [
             'title',
             'api_version',

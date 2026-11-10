@@ -14,6 +14,8 @@ wp.domReady(() => {
 
         registerBlockType(name, {
             title: block.title || '',
+            icon: block.icon || '',
+            description: block.description || '',
             attributes: block.attributes,
 
             edit: Edit,

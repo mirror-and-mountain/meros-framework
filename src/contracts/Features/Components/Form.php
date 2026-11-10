@@ -15,6 +15,9 @@ use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 use MM\Meros\Contracts\Features\Components\Concerns\IsFormComponent;
 use MM\Meros\Contracts\Features\Components\Concerns\MakesFieldRows;
 
+use MM\Meros\App\Models\Post;
+
+use MM\Meros\Facades\Content\PostTypes;
 use MM\Meros\Facades\Components\Fields;
 use MM\Meros\Facades\Support\Ajax;
 
@@ -78,6 +81,20 @@ class Form extends Feature implements FormComponent, Makeable {
     protected Closure|string|null $onSubmit = null;
 
     /**
+     * Whether to hide the form's title.
+     *
+     * @var boolean
+     */
+    protected bool $hideTitle = false;
+
+    /**
+     * Whether to hide the form's description.
+     *
+     * @var boolean
+     */
+    protected bool $hideDescription = false;
+
+    /**
      * Whether to hide the submit button for the form.
      *
      * @var bool
@@ -122,6 +139,8 @@ class Form extends Feature implements FormComponent, Makeable {
             'submitText',
             'invalidText',
             'onSubmit',
+            'hideTitle',
+            'hideDescription',
             'hideSubmitButton'
         ]));
 
@@ -166,24 +185,6 @@ class Form extends Feature implements FormComponent, Makeable {
 
     public function getAjaxNonce(): ?string {
         return $this->ajaxNonce;
-    }
-    /**
-     * Handles the form submission by executing the onSubmit callback if it exists and is a Closure.
-     * May be overridden in subclasses to provide custom form submission handling logic.
-     *
-     * @param array $data
-     *
-     * @return void
-     */
-    public function handleFormSubmission(array $data): void {
-        if ($this->onSubmit instanceof Closure) {
-            call_user_func($this->onSubmit, $data);
-        }
-
-        wp_send_json_success([
-            'message' => 'Form submitted successfully.',
-            'data'    => $data
-        ]);
     }
 
     /**
@@ -358,6 +359,30 @@ class Form extends Feature implements FormComponent, Makeable {
      */
     final public function title(string $title): static {
         $this->title = $title;
+        return $this;
+    }
+
+    /**
+     * Sets whether to hide the form's title.
+     *
+     * @param boolean $hide
+     *
+     * @return static
+     */
+    final public function hideTitle(bool $hide = true): static {
+        $this->hideTitle = $hide;
+        return $this;
+    }
+
+    /**
+     * Sets whether to hide the form's description.
+     *
+     * @param boolean $hide
+     *
+     * @return static
+     */
+    final public function hideDescription(bool $hide = true): static {
+        $this->hideDescription = $hide;
         return $this;
     }
 

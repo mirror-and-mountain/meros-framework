@@ -7,6 +7,7 @@ use MM\Meros\Contracts\Orchestrators\ContentOrchestrator;
 class Orchestrator extends ContentOrchestrator {
     protected function configure(): void {
         $this->registerCorePostTypes();
+        $this->postTypes(FormTemplate::class)->make();
         $this->postTypes(Form::class)->make();
     }
 

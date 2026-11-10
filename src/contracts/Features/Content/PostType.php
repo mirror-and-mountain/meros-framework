@@ -100,11 +100,6 @@ class PostType extends Feature implements Makeable, Registrable {
         $this->identifier('handle', 'slug');
         $this->setHook('init', [$this, 'register']);
         $this->hook();
-
-        if ($this->creationMethod === 'made_from_class' && $this->handle === '') {
-            $this->handle(Str::slug(class_basename($this)));
-            $this->label(class_basename($this));
-        }
     }
 
     /**
@@ -113,6 +108,11 @@ class PostType extends Feature implements Makeable, Registrable {
      * @return void
      */
     final protected function whenConfigured(): void {
+        if ($this->creationMethod === 'made_from_class' && $this->handle === '') {
+            $this->handle(Str::slug(class_basename($this)));
+            $this->label(class_basename($this));
+        }
+
         $this->initMetaContainers();
 
         if ($this->metaBlocks !== []) {
@@ -1011,6 +1011,7 @@ class PostType extends Feature implements Makeable, Registrable {
         }
 
         $this->metaBlocks[] = $block;
+
         return $this;
     }
 

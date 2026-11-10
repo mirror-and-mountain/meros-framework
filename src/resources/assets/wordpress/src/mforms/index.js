@@ -104,7 +104,7 @@ const mform = () => {
             postData.append('action', this.ajaxAction);
             postData.append('nonce', this.ajaxNonce);
             postData.append('form_name', this.name);
-            postData.append('form_id', this.id);
+            postData.append('id', this.id);
             postData.append('form_data', JSON.stringify(formData));
 
             const request = fetch(this.ajaxUrl, {

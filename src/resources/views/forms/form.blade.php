@@ -1,5 +1,7 @@
 @php
     $hideSubmitButton = $hideSubmitButton ?? false;
+    $hideTitle = $hideTitle ?? false;
+    $hideDescription = $hideDescription ?? false;
     $submitButtonClass = 'mforms-submit-button button button-primary';
     if ($hideSubmitButton) {
         $submitButtonClass .= ' mforms-submit-button--hidden';
@@ -18,10 +20,10 @@
     {{ is_string($onSubmit) ? "data-onsubmit={$onSubmit}" : '' }}
     @submit.prevent="submitForm()"
 >
-    @if($title !== '')
+    @if(!$hideTitle && $title !== '')
         <h2 class="mforms-form-title">{{ $title }}</h2>
     @endif
-    @if($description !== '')
+    @if(!$hideDescription && $description !== '')
         <p class="mforms-form-description">{!! $description !!}</p>
     @endif
     <div class="mforms-body">
