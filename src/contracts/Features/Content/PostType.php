@@ -27,6 +27,8 @@ use MM\Meros\Contracts\Features\Concerns\IsHookable;
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 use MM\Meros\Contracts\Features\Concerns\MakesItems;
 
+use MM\Meros\Facades\Data\PostMetaContainers;
+
 // Here - setup post type options/settings containers.
 
 class PostType extends Feature implements Makeable, Registrable {
@@ -360,7 +362,9 @@ class PostType extends Feature implements Makeable, Registrable {
                 : $classOrAlias;
 
             $containerName = '_meros_' . Str::replace('-', '_', $alias);
-            $container = $this->getItem($containerName, PostMetaContainer::class);
+            $container = PostMetaContainers::all()->firstWhere(function (PostMetaContainer $container) use ($containerName) {
+                return $container->getName(true) === $containerName;
+            });
 
             // Add this post type to the existing container and return it
             if ($container !== null && $container instanceof PostMetaContainer) {
@@ -421,10 +425,11 @@ class PostType extends Feature implements Makeable, Registrable {
             return null;
         }
 
+        $containerName = $name !== '' ? $name : Str::replace('-', '_', $id);
         $container = $this->makeItem(
             PostMetaContainer::class,
             [
-                'name'        => $name !== '' ? $name : Str::replace('-', '_', $id),
+                'name'        => $containerName,
                 'label'       => $title,
                 'description' => $fieldGroup->getDescription()
             ]

@@ -10,7 +10,7 @@ use MM\Meros\Contracts\Features\Components\Form as FormComponent;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\FieldRow;
 
-use MM\Meros\App\Content\Form;
+use MM\Meros\Contracts\Features\Content\Interfaces\FormHost;
 
 use MM\Meros\App\Components\Fields\Select;
 use MM\Meros\App\Components\Fields\Textarea;
@@ -25,9 +25,9 @@ class FlowControls {
     /**
      * The Form CPT instance.
      *
-     * @var Form
+     * @var FormHost
      */
-    private Form $form;
+    private FormHost $formHost;
 
     /**
      * The current form's ID.
@@ -64,11 +64,11 @@ class FlowControls {
     /**
      * Constructs a new FlowControls instance.
      *
-     * @param Form  $form
+     * @param FormHost  $formHost
      * @param array $defaultDynamicOptions
      */
-    public function __construct(Form $form, array $defaultDynamicOptions = []) {
-        $this->form = $form;
+    public function __construct(FormHost $formHost, array $defaultDynamicOptions = []) {
+        $this->formHost = $formHost;
         $this->availableFlowActions = $this->getAvailableFlowActions();
         $this->defaultDynamicOptions = $this->getDefaultDynamicOptions($defaultDynamicOptions);
         $this->init();
@@ -80,13 +80,22 @@ class FlowControls {
      * @return void
      */
     private function init(): void {
-        $this->group = FieldGroups::checkout(Framework::get())
+        $group = FieldGroups::checkout($this->formHost->getProvider())->get('form-actions');
+
+        if ($group !== null) {
+            $this->group = $group;
+            return;
+        }
+
+        $this->group = FieldGroups::checkout($this->formHost->getProvider())
          ->make(function (FieldGroup $group) {
+            $group->id('form-actions');
             $group->title('Form Actions');
             $group->name('form_actions');
             $group->field('repeater', function (Repeater $repeater) {
                 $repeater->name('form_actions');
                 $repeater->label('Form Actions');
+                $repeater->hideLabel();
 
                 $repeater->field('select', [
                     'name'    => 'action',
@@ -202,7 +211,7 @@ class FlowControls {
 
         if ($inputSchema !== []) {
             $dynamicOptions = $this->buildDynamicOptions($actionId, $repeaterValue);
-            $formFields = $this->form->getStoredFields($this->formId, [
+            $formFields = $this->formHost->getStoredFields($this->formId, [
                 'list_type'     => 'with_type',
                 'prepend_label' => 'Field: '
             ]) ?? [];

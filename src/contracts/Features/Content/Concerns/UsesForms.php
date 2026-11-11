@@ -120,6 +120,10 @@ trait UsesForms {
         return $this;
     }
 
+    // =========================================================================
+    // Template Handling
+    // =========================================================================
+
     /**
      * Indicates that the post type should not use a form template.
      * This method should only be called for post types using a per-post form.
@@ -254,6 +258,58 @@ trait UsesForms {
         return null;
     }
 
+    // =========================================================================
+    // Actions Handling
+    // =========================================================================
+
+    /**
+     * Initialises the actions editor for the form.
+     *
+     * @return void
+     */
+    private function withActionsEditor(): void {
+        add_action('meros_framework_booted', function () {
+            $this->configureFormActionsControls();
+        });
+    }
+
+    /**
+     * Configures the meta box used to create form actions.
+     *
+     * @return void
+     */
+    private function configureFormActionsControls(): void {
+        $controls = new FlowControls($this)->getControls()->getId();
+        $this->fields($controls);
+    }
+
+    /**
+     * Retrieves a form's stored actions from the post meta table with the given id.
+     *
+     * @param integer $postId
+     *
+     * @return array
+     */
+    public function getFormActions(int $postId): array {
+        $data = $this->inspect($postId);
+
+        if (array_key_exists('form_actions', $data)) {
+            $actions = $data['form_actions'];
+
+            if (is_string($actions)) {
+                return unserialize($actions);
+            }
+
+            if (is_array($actions)) {
+                return $actions;
+            }
+
+            return [];
+        }
+        
+        return [];
+    }
+
     /**
      * Overrides PostType's inspect method to include form metadata.
      *
@@ -386,16 +442,6 @@ trait UsesForms {
      */
     public function getFormInstance(Post $post, array $rows = [], array $availableFields = [], bool $hideSubmitButton = false): FormComponent {
         return $this->formBuilder()->makeFormInstance($post, $rows, $availableFields, $hideSubmitButton);
-    }
-
-    /**
-     * Configures the meta box used to create form actions.
-     *
-     * @return void
-     */
-    private function configureFormActionsControls(): void {
-        $controls = new FlowControls($this)->getControls();
-        $this->fields($controls);
     }
 
     // =========================================================================
@@ -620,33 +666,6 @@ trait UsesForms {
         $response->status = $status;
         $response->completed_actions = $completedActions;
         return $response->save();
-    }
-
-    /**
-     * Retrieves a form's stored actions from the post meta table with the given id.
-     *
-     * @param integer $postId
-     *
-     * @return array
-     */
-    public function getFormActions(int $postId): array {
-        $data = $this->inspect($postId);
-
-        if (array_key_exists('form_actions', $data)) {
-            $actions = $data['form_actions'];
-
-            if (is_string($actions)) {
-                return unserialize($actions);
-            }
-
-            if (is_array($actions)) {
-                return $actions;
-            }
-
-            return [];
-        }
-        
-        return [];
     }
 
     // =========================================================================

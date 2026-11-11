@@ -14,6 +14,7 @@ interface FormHost {
     public function getFormStructureMetaKey(): string;
     public function handleSubmission(int $id, array|string $data): array;
     public function findField(Post $post, string $name, string $originalName, ?string $fieldClass = null): ?Field;
+    public function getStoredFields(int $postId, array $config = []): ?array;
     public function metaBox(string $id, string $title, Closure $callback, string $context = 'advanced', string $priority = 'default'): void;
 
 }
