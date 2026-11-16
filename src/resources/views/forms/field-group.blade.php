@@ -15,7 +15,7 @@
                 $class .= ' mforms-section-description-metabox';
             }
         @endphp
-        <small class="{{ $class }}">{!! $description !!}</small>
+        <div class="{{ $class }}">{!! $description !!}</div>
     @endif
     @foreach($rows as $row)
         @include('meros::forms.field-row', $row)

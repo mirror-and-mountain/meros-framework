@@ -2,8 +2,6 @@
 
 namespace MM\Meros\App\Components\Fields;
 
-use MM\Meros\Contracts\Features\Components\Field;
-use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Facades\Support\Ajax;
 
 class Lookup extends Select {
@@ -70,12 +68,9 @@ class Lookup extends Select {
      */
     protected static bool $showInFormBuilder = false;
 
-    public static function getBuilderControls(): ?FieldGroup {
-        return Field::getBuilderControls();
-    }
-
     final protected function init(): void {
-        parent::init();     
+        parent::init();
+        $this->ignoreProps(['ajaxUrl', 'ajaxNonce']);
         $this->setSerializableProperties([
             'object',
             'key',
@@ -190,8 +185,10 @@ class Lookup extends Select {
             }
             
             if ($option !== null) {
-                if (property_exists($option, $this->key) && property_exists($option, $this->labelledBy)) {
-                    $this->options[(string) $option->{$this->key}] = $option->{$this->labelledBy};
+                $key = is_array($option) ? ($option[$this->key] ?? null) : ($option->{$this->key} ?? null);
+                $label = is_array($option) ? ($option[$this->labelledBy] ?? null) : ($option->{$this->labelledBy} ?? null);
+                if ($key !== null && $label !== null) {
+                    $this->options[(string) $key] = $label;
                 }
             }
         }

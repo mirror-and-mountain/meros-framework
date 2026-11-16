@@ -1,6 +1,9 @@
 import MerosFormProcessor from '../form-processor.js';
 import MerosFieldsProcessor from '../fields-processor.js';
 import MerosModal from '../../classes/modal.js';
+import { createConditionEditor } from '../builder-conditions.js';
+import { createChoiceDefaultEditor } from '../builder-choice-default.js';
+import { positionTemplateFieldLocks, updateTemplateLockControls } from '../builder-template-locks.js';
 
 const mformsRepeater = () => {
     return {
@@ -173,6 +176,19 @@ const mformsRepeater = () => {
             const newRowIndex = this.resolveRows().length;
             const fields = this.resolveRowFields(newRow);
 
+            if (this.name?.endsWith('[repeater_fields]') && this.container.closest('[data-repeater-component]')) {
+                const nameField = fields.find(field => field.dataset.repeaterFieldName === 'field_name__template');
+                if (!nameField) throw new Error('The repeater column name field is missing.');
+                const existing = new Set(Array.from(this.resolveRows(), row => this.getRowData(row)?.field_name));
+                let name;
+                do {
+                    const bytes = new Uint8Array(4);
+                    window.crypto.getRandomValues(bytes);
+                    name = `field_${Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')}`;
+                } while (existing.has(name));
+                nameField.value = name;
+            }
+
             const updateName = (index, name) => {
                 return name?.replace('[-1]', `[${index}]`).replace('__template', '');
             }
@@ -217,6 +233,7 @@ const mformsRepeater = () => {
             if (!this.canAddRow() && this.addRowButton) {
                 this.addRowButton.disabled = true;
             }
+            this.container.dispatchEvent(new Event('change', { bubbles: true }));
         },
 
         handleEditRow(event) {
@@ -227,6 +244,104 @@ const mformsRepeater = () => {
 
             const rowData = this.getRowData(row);
             const currentValue = this.getValue();
+            const revision = JSON.stringify({ rowData, currentValue });
+
+            const modal = new MerosModal(
+                this.formTitle,
+                'Loading...',
+                'Save',
+                'Cancel',
+                false
+            );
+
+            modal.show();
+
+            const openForm = (html, stash = false) => {
+                if (!modal.modal) return;
+
+                modal.setContent(html);
+                if (stash) modal.stash(row, revision);
+
+                const processor = new MerosFieldsProcessor(modal.content);
+                modal.content.querySelectorAll('[data-field-type]').forEach((control) => {
+                    const name = control.dataset.name || control.name;
+                    if (name && Object.prototype.hasOwnProperty.call(rowData, name)) {
+                        processor.setFieldValue({ control, component: null }, rowData[name]);
+                    }
+                });
+
+                if (window.Alpine && typeof window.Alpine.initTree === 'function') {
+                    window.Alpine.initTree(modal.content);
+                }
+
+                let conditionEditor = null;
+                let conditionInput = null;
+                const card = this.container.closest('[data-form-field-component]');
+                const form = modal.content.querySelector('form');
+                if (card) updateTemplateLockControls(modal.content, card);
+                if (card && form) {
+                    createChoiceDefaultEditor(form, rowData.field_type, rowData.form_data || {},
+                        form.querySelector('[name="__builder_conditions_locked"]')?.value === '1');
+                }
+                if (card && !card.hasAttribute('data-repeater-component') && form) {
+                    const settings = rowData.form_data || {};
+                    const conditions = settings.__builder_conditions
+                        ? JSON.parse(settings.__builder_conditions)
+                        : settings.conditions || {};
+                    conditionEditor = createConditionEditor(card, conditions, {
+                        options: form.querySelector('[name="__builder_condition_options"]')?.value === '1',
+                        locked: form.querySelector('[name="__builder_conditions_locked"]')?.value === '1',
+                    });
+                    conditionInput = document.createElement('input');
+                    conditionInput.type = 'hidden';
+                    conditionInput.name = '__builder_conditions';
+                    form.append(conditionEditor.element, conditionInput);
+                }
+
+                if (card && form) positionTemplateFieldLocks(form);
+
+                modal.onConfirm((modalElement) => {
+                    const form = modalElement.querySelector('form')
+                    if (!form) return;
+
+                    if (conditionEditor) {
+                        if (!conditionEditor.validate()) {
+                            modal.enableButtons();
+                            return;
+                        }
+                        conditionInput.value = JSON.stringify(conditionEditor.getValue());
+                    }
+
+                    const component = this.getComponent(form);
+                    if (component && typeof component.submitForm === 'function') {
+                        const { success, invalid, error } = component.submitForm(true);
+
+                        if (success) {
+                            modal.hide();
+                        } else if (invalid === undefined) {
+                            modal.enableButtons();
+                            alert(error);
+                        } else {
+                            modal.setExtraContent(error, 'red', '1rem');
+                            modal.enableButtons();
+                        }
+
+                        return;
+                    }
+                });
+
+                this.editingRowIndex = row.getAttribute('data-row-index');
+                modal.onCancel(() => {
+                    this.editingRowIndex = null;
+                });
+                modal.focusContent();
+            };
+
+            const cachedHtml = MerosModal.getStashedContent(row, revision);
+            if (cachedHtml !== null) {
+                openForm(cachedHtml);
+                return;
+            }
 
             const formData = new FormData();
             formData.append('action', this.ajaxAction);
@@ -242,16 +357,6 @@ const mformsRepeater = () => {
                 formData.append('form_id', formId);
             }
 
-            const modal = new MerosModal(
-                this.formTitle,
-                'Loading...',
-                'Save',
-                'Cancel',
-                false
-            );
-
-            modal.show();
-
             fetch(this.ajaxurl, {
                 method: 'POST',
                 body: formData,
@@ -259,50 +364,25 @@ const mformsRepeater = () => {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success && data.data && data.data.html) {
-                        const html = data.data.html;
-
-                        modal.setContent(html);
-                        if (window.Alpine && typeof window.Alpine.initTree === 'function') {
-                            window.Alpine.initTree(modal.content);
-                        }
-
-                        modal.onConfirm((modalElement) => {
-                            const form = modalElement.querySelector('form')
-                            if (!form) return;
-
-                            const component = this.getComponent(form);
-                            if (component && typeof component.submitForm === 'function') {
-                                const { success, invalid, error } = component.submitForm(true);
-
-                                if (success) {
-                                    modal.hide();
-                                } else if (invalid === undefined) {
-                                    modal.enableButtons();
-                                    alert(error);
-                                } else {
-                                    modal.setExtraContent(error, 'red', '1rem');
-                                    modal.enableButtons();
-                                }
-
-                                return;
-                            }
-                        });
-
-                        this.editingRowIndex = row.getAttribute('data-row-index');
+                        openForm(data.data.html, true);
                     }
 
                     else if (data.data && data.data.message) {
-                        modal.destroy();
+                        modal.setExtraContent('Unable to load the edit form. Please cancel and try again.', 'red', '1rem');
+                        modal.hideConfirmButton();
                         console.error('Error fetching edit form:', data.data.message);
                     }
 
                     else {
-                        modal.destroy();
+                        modal.setExtraContent('Unable to load the edit form. Please cancel and try again.', 'red', '1rem');
+                        modal.hideConfirmButton();
                         console.error('Unexpected response:', data);
                     }
                 })
                 .catch((error) => {
-                    modal.destroy();
+                    if (!modal.modal) return;
+                    modal.setExtraContent('Unable to load the edit form. Please cancel and try again.', 'red', '1rem');
+                    modal.hideConfirmButton();
                     console.error('Error fetching edit form:', error);
                 });
         },
@@ -317,21 +397,48 @@ const mformsRepeater = () => {
             const formDataField = this.resolveRowFormDataField(row);
             if (!formDataField) return;
 
+            const processor = new MerosFieldsProcessor(row);
+            const formProcessor = new MerosFormProcessor(row);
+            delete formData.__builder_condition_options;
+            delete formData.__builder_conditions_locked;
+
             // Update any table fields with new values from the form data.
             Object.keys(formData).forEach((key) => {
                 const field = row.querySelector(`[data-repeater-field-name="${key}"]`);
                 if (field) {
-                    field.value = formData[key];
+                    processor.setFieldValue({
+                        control: field,
+                        component: formProcessor.getFieldComponent(field, false),
+                    }, formData[key]);
                     delete formData[key];
                 }
             });
 
             formDataField.value = JSON.stringify(formData);
+            this.container.dispatchEvent(new Event('change', { bubbles: true }));
             this.editingRowIndex = null;
         },
 
         handleReorderRows() {
             this.reindexTableFields();
+            this.container.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+
+        moveRow(event, direction) {
+            const button = event.currentTarget;
+            const row = button.closest('.meros-repeater-table-row');
+            const rows = Array.from(this.resolveRows());
+            const index = rows.indexOf(row);
+            const target = rows[index + direction];
+            const status = this.container.querySelector(':scope > .meros-repeater-status');
+            if (!target) {
+                if (status) status.textContent = direction < 0 ? 'This is already the first row.' : 'This is already the last row.';
+                return;
+            }
+            row.parentElement.insertBefore(row, direction < 0 ? target : target.nextElementSibling);
+            this.handleReorderRows();
+            button.focus();
+            if (status) status.textContent = `Row moved to position ${index + direction + 1} of ${rows.length}.`;
         },
 
         handleRemoveRow(event) {
@@ -354,6 +461,7 @@ const mformsRepeater = () => {
             if (this.addRowButton) {
                 this.addRowButton.disabled = false;
             }
+            this.container.dispatchEvent(new Event('change', { bubbles: true }));
         },
 
         reindexTableFields() {
@@ -410,7 +518,7 @@ const mformsRepeater = () => {
             // Create a tooltip element
             const tooltip = document.createElement('div');
             tooltip.className = 'meros-repeater-tooltip';
-            tooltip.textContent = description;
+            tooltip.innerHTML = description;
 
             // Position the tooltip near the mouse cursor
             const offsetX = 10;

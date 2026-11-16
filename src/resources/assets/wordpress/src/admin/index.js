@@ -10,6 +10,8 @@ import {
     __meros_integrations_revoke_connection
 } from './integrations.js';
 
+import {mformsBuilder} from '../mforms/builder.js';
+
 import { __meros_send_test_email } from './mail.js';
 
 import '../mforms/admin.js';
@@ -46,4 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle meros dev test email tool
     document.addEventListener('mforms::meros_send_test_email', __meros_send_test_email);
+});
+
+document.addEventListener('alpine:init', () => {
+    Alpine.data('mformsBuilder', mformsBuilder);
 });

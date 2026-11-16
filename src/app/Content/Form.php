@@ -22,7 +22,9 @@ class Form extends PostType implements FormHost {
         $this->useBlockTemplate();
         $this->menuIcon('dashicons-feedback');
 
-        $this->hasFormType('form')->withoutTemplate()->withActionsEditor();
+        $this->hasEditableForm()
+            ->withActionsEditor()
+            ->withFormSettings();
 
         // Sets the render callback for form post types, filtering 'the content'
         // to render the form using its stored strucure/

@@ -15,13 +15,8 @@ use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 use MM\Meros\Contracts\Features\Components\Concerns\IsFormComponent;
 use MM\Meros\Contracts\Features\Components\Concerns\MakesFieldRows;
 
-use MM\Meros\App\Models\Post;
-
-use MM\Meros\Facades\Content\PostTypes;
 use MM\Meros\Facades\Components\Fields;
 use MM\Meros\Facades\Support\Ajax;
-
-use Illuminate\Support\Facades\Log;
 
 class Form extends Feature implements FormComponent, Makeable {
     /**
@@ -100,6 +95,7 @@ class Form extends Feature implements FormComponent, Makeable {
      * @var bool
      */
     protected bool $hideSubmitButton = false;
+    protected bool $displayAsPages = false;
 
     /**
      * WP's ajax url.
@@ -141,12 +137,15 @@ class Form extends Feature implements FormComponent, Makeable {
             'onSubmit',
             'hideTitle',
             'hideDescription',
-            'hideSubmitButton'
+            'hideSubmitButton',
+            'displayAsPages',
+            'pages',
         ]));
 
         $this->setNonPersistableProperties([
             'ajaxUrl',
             'ajaxNonce',
+            'pages',
         ]);
 
         // Need to update this bit...
@@ -414,6 +413,11 @@ class Form extends Feature implements FormComponent, Makeable {
         return $this;
     }
 
+    final public function displayAsPages(bool $display = true): static {
+        $this->displayAsPages = $display;
+        return $this;
+    }
+
     /**
      * Sets the text shown on the form's submit button.
      *
@@ -478,6 +482,31 @@ class Form extends Feature implements FormComponent, Makeable {
      */
     final public function getRows(): array {
         return $this->rows;
+    }
+
+    final public function getPages(): array {
+        if (!$this->displayAsPages) {
+            return [];
+        }
+
+        $pages = [];
+        $ungrouped = false;
+        foreach ($this->rows as $row) {
+            if ($row->isEmpty()) {
+                continue;
+            }
+            $group = $row->getGroup();
+            if ($group !== null || !$ungrouped) {
+                $pages[] = [
+                    'title' => $group !== null && $group->getTitle() !== '' ? $group->getTitle() : 'Page ' . (count($pages) + 1),
+                    'rows' => [],
+                ];
+            }
+            $pages[array_key_last($pages)]['rows'][] = $row;
+            $ungrouped = $group === null;
+        }
+
+        return $pages;
     }
 
     /**

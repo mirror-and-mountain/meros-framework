@@ -121,12 +121,16 @@ trait HasOptions {
     public static function getConfigurableOptions(array $rawOptions): array {
         $options = [];
         foreach ($rawOptions as $value => $label) {
-            if (!is_string($value) || !is_string($label)) {
+            if (is_array($label)) {
+                $value = $label['value'] ?? null;
+                $label = $label['label'] ?? null;
+            }
+            if ((!is_string($value) && !is_int($value)) || !is_string($label)) {
                 continue;
             }
 
             $options[] = [
-                'value' => $value,
+                'value' => (string) $value,
                 'label' => $label
             ];
         }
@@ -164,6 +168,15 @@ trait HasOptions {
         }
 
         return $checkedOptions;
+    }
+
+    protected function filterStorageProperties(array $properties): array {
+        $properties = parent::filterStorageProperties($properties);
+        if (isset($properties['options']) && is_array($properties['options']) &&
+            array_filter(array_keys($properties['options']), 'is_int') !== []) {
+            $properties['options'] = self::getConfigurableOptions($properties['options']);
+        }
+        return $properties;
     }
 
     /**

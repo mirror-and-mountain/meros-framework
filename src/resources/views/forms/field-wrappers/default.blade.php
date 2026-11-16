@@ -10,10 +10,10 @@
     @if(!$inRepeater && $type !== 'hidden')
         <label for="{{ $id }}" class="meros-field-label">{{ $label }}</label>
     @endif
-    @include($view)
     @if (!$inRepeater && $description !== '')
-        <div style="margin-top: 0.5rem;">
+        <div style="margin-bottom: 0.5rem;">
             <small class="meros-field-description">{!! $description !!}</small>
         </div>
     @endif
+    @include($view)
 </div>

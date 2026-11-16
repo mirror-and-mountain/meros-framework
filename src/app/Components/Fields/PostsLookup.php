@@ -19,41 +19,6 @@ class PostsLookup extends Lookup {
      * @var boolean
      */
     protected static bool $showInFormBuilder = true;
-
-    public static function getBuilderControls(): ?FieldGroup {
-        $group = parent::getBuilderControls();
-
-        $postTypes = array_merge([
-            'any'  => 'Any',
-            'post' => 'Post',
-            'page' => 'Page'
-        ], self::getPostTypes());
-
-        $group->field('checkbox', [
-            'name'  => 'allowsMultiple',
-            'label' => 'Allow Multiple Values'
-        ]);
-
-        $group->row(function ($row) use ($postTypes) {
-            $row->field('select', [
-                'name'    => 'postType',
-                'label'   => 'Filter by Post Type',
-                'options' => $postTypes
-            ]);
-
-            $row->field('select', [
-                'name'    => 'postStatus',
-                'label'   => 'Filter by Post Status',
-                'options' => [
-                    'publish' => 'Published',
-                    'draft'   => 'Draft',
-                    'any'     => 'Any'
-                ]
-            ]);
-        });
-
-        return $group;
-    }
     
     protected function configure(): void {
         $this->clearFilters();
@@ -91,6 +56,48 @@ class PostsLookup extends Lookup {
     public function postStatus(string $postStatus): static {
         $this->postStatus = $postStatus;
         return $this;
+    }
+
+    /**
+     * Adds builder controls specific to the posts lookup field.
+     *
+     * @param FieldGroup $group
+     * @param boolean    $locked
+     * @param array      $rowData The data for the current row in the form builder.
+     *
+     * @return FieldGroup
+     */
+    protected static function addBuilderControls(FieldGroup $group,bool $locked = false, array $rowData = []): FieldGroup {
+        $postTypes = array_merge([
+            'any'  => 'Any',
+            'post' => 'Post',
+            'page' => 'Page'
+        ], self::getPostTypes());
+
+        $group->field('checkbox', [
+            'name'  => 'allowsMultiple',
+            'label' => 'Allow Multiple Values'
+        ]);
+
+        $group->row(function ($row) use ($postTypes) {
+            $row->field('select', [
+                'name'    => 'postType',
+                'label'   => 'Filter by Post Type',
+                'options' => $postTypes
+            ]);
+
+            $row->field('select', [
+                'name'    => 'postStatus',
+                'label'   => 'Filter by Post Status',
+                'options' => [
+                    'publish' => 'Published',
+                    'draft'   => 'Draft',
+                    'any'     => 'Any'
+                ]
+            ]);
+        });
+
+        return $group;
     }
 
     /**

@@ -17,8 +17,6 @@ use MM\Meros\Contracts\Features\Components\Concerns\MakesFieldRows;
 
 use MM\Meros\Facades\Components\Fields;
 
-use Illuminate\Support\Facades\Log;
-
 class FieldGroup extends Feature implements FormComponent, Makeable {
     /**
      * The field group's id.
@@ -75,6 +73,9 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      * @var array
      */
     protected array $conditions = [];
+    protected bool $__properties_locked_by_template = false;
+    protected bool $__move_locked_by_template = false;
+    protected bool $__remove_locked_by_template = false;
 
     use IsFormComponent,
         IsMakeable,
@@ -97,6 +98,9 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
             'metaBox',
             'conditions',
             'conditionsString',
+            '__properties_locked_by_template',
+            '__move_locked_by_template',
+            '__remove_locked_by_template',
             'ajaxUrl',
             'ajaxNonce'
         ]));
@@ -273,7 +277,7 @@ class FieldGroup extends Feature implements FormComponent, Makeable {
      * @return void
      */
     private function processVisibilityRules(string $type, array $rules, string $logic): void {
-        $operators = ['=', '!=', 'LIKE', 'CONTAINS', 'NOT CONTAINS', '<', '>', '=>', '=<'];
+        $operators = ['=', '!=', 'LIKE', 'CONTAINS', 'NOT CONTAINS', 'EMPTY', 'NOT EMPTY', '<', '>', '=>', '=<'];
         $processedRules = [];
 
         foreach ($rules as $rule) {

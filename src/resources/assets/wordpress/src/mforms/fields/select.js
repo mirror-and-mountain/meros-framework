@@ -1,5 +1,3 @@
-import TomSelect from 'tom-select';
-
 const mformsSelect = () => {
     return {
         name: null,
@@ -139,6 +137,7 @@ const mformsSelect = () => {
             const maxItems = this.multiple ? null : 1;
 
             const lookup = this.ajaxUrl && this.ajaxNonce && this.ajaxAction;
+            const preview = el.closest('[data-builder-repeater-preview]');
 
             const load = lookup
                 ? (query, callback) => {
@@ -149,19 +148,26 @@ const mformsSelect = () => {
                         return;
                     }
 
-                    const params = new URLSearchParams({
-                        action: this.ajaxAction,
-                        nonce: this.ajaxNonce,
-                        lookup_name: this.name,
-                        lookup_original_name: this.originalName,
-                        search: query,
-                    });
+                    const params = preview
+                        ? new URLSearchParams({
+                            action: preview.dataset.repeaterDefaultsAction,
+                            nonce: preview.dataset.repeaterDefaultsNonce,
+                            post_id: preview.dataset.postId,
+                            mode: 'lookup',
+                            columns: preview.dataset.columns,
+                            field_name: el.dataset.repeaterFieldName,
+                            search: query,
+                        })
+                        : new URLSearchParams({
+                            action: this.ajaxAction,
+                            nonce: this.ajaxNonce,
+                            lookup_name: this.name,
+                            lookup_original_name: this.originalName,
+                            search: query,
+                        });
 
-                    if (this.formId) {
-                        params.set('form_id', this.formId);
-                    }
-                    
-                    const url = this.ajaxUrl + '?' + params.toString();
+                    if (!preview && this.formId) params.set('form_id', this.formId);
+                    const url = (preview ? preview.dataset.repeaterDefaultsUrl : this.ajaxUrl) + '?' + params.toString();
 
                     fetch(url)
                         .then(response => response.json())

@@ -1,5 +1,10 @@
 @php
     $hasActions = $allowsRemove || $editForm;
+    $visibleFieldCount = count(array_filter($fields, fn ($field) =>
+        $field['type'] !== 'hidden' && !($field['attributes']['data-meros-hidden-field'] ?? false)
+    ));
+    $columnCount = max(1, $visibleFieldCount + ($allowsReorder ? 1 : 0) + ($hasActions ? 1 : 0));
+    $actionsWidth = $hasActions ? ($allowsRemove && $editForm ? '14rem' : '9rem') : '0rem';
 @endphp
 
 <fieldset 
@@ -9,6 +14,8 @@
     {!! $attributeString !!} 
     data-name="{{ $name }}"
     data-origin-name="{{ $originalName }}"
+    data-field-origin-name="{{ $originalName }}"
+    data-field-conditions="{{ $conditionsString }}"
     data-form-title="{{ $formTitle }}"
     data-ajax-url="{{ $ajaxUrl }}"
     data-ajax-nonce="{{ $ajaxNonce }}"
@@ -21,7 +28,7 @@
 >
     @if($renderContext !== 'settings')
         @if ($hideLabel !== true)
-            <legend class="meros-repeater-field-legend" style="margin-bottom: 0.5rem;">{{ $label }}</legend>
+            <legend class="meros-repeater-field-legend">{{ $label }}</legend>
         @endif
         @if($description !== '')
             <div style="margin-bottom: 0.5rem;">
@@ -29,24 +36,24 @@
             </div>
         @endif
     @endif
-    <div class="meros-repeater-scroll">
-        <table class="meros-repeater-table">
+    <div class="meros-repeater-scroll" role="region" aria-label="{{ $label ?: 'Repeater fields' }}" tabindex="0">
+        <table class="meros-repeater-table" style="--meros-repeater-fields-width: {{ $visibleFieldCount * 12 }}rem; --meros-repeater-move-width: {{ $allowsReorder ? '5rem' : '0rem' }}; --meros-repeater-actions-width: {{ $actionsWidth }};">
             {{-- Table Header Row --}}
             <thead class="meros-repeater-table-header">
                 <tr>
                     @if($allowsReorder)
-                        <th class="meros-repeater-table-header-cell meros-repeater-table-header-cell--move">Move</th>
+                        <th scope="col" class="meros-repeater-table-header-cell meros-repeater-table-header-cell--move">Move</th>
                     @endif
                     @foreach($fields as $index => $field)
                         @php
-                            $isHeaderHidden = $field['type'] === 'hidden';
+                            $isHeaderHidden = $field['type'] === 'hidden' || array_key_exists('attributes', $field) && ($field['attributes']['data-meros-hidden-field'] ?? false);
                             $headerClass = 'meros-repeater-table-header-cell meros-repeater-table-header-cell--field';
 
                             if ($isHeaderHidden) {
                                 $headerClass .= ' meros-repeater-table-header-cell--hidden';
                             }
                         @endphp
-                        <th class="{{ $headerClass }}">
+                        <th scope="col" class="{{ $headerClass }}">
                             {{ $field['label']}}
                             @if($field['description'] !== '')
                                 <span 
@@ -60,7 +67,7 @@
                         </th>
                     @endforeach
                     @if($hasActions)
-                        <th class="meros-repeater-table-header-cell meros-repeater-table-header-cell--actions">Actions</th>
+                        <th scope="col" class="meros-repeater-table-header-cell meros-repeater-table-header-cell--actions">Actions</th>
                     @endif
                 </tr>
             </thead>
@@ -78,19 +85,27 @@
                             x-sort:item="{{ $rowIndex }}"
                         >
                             @if($allowsReorder)
-                                <td class="meros-repeater-table-cell meros-repeater-table-cell--move" x-sort:handle>
-                                    <span 
-                                        class="meros-repeater-table-move-handle"
-                                        draggable="true"
-                                        title="Drag to reorder row"
-                                    >
-                                        ☰
-                                    </span>
+                                <td class="meros-repeater-table-cell meros-repeater-table-cell--move">
+                                    <div class="meros-repeater-row-controls">
+                                        <div class="meros-repeater-row-directions">
+                                            <button type="button" class="meros-repeater-row-move" aria-label="Move row up" @click.stop.prevent="moveRow($event, -1)">↑</button>
+                                            <button type="button" class="meros-repeater-row-move" aria-label="Move row down" @click.stop.prevent="moveRow($event, 1)">↓</button>
+                                        </div>
+                                        <span
+                                            class="meros-repeater-table-move-handle"
+                                            x-sort:handle
+                                            draggable="true"
+                                            aria-hidden="true"
+                                            title="Drag to reorder row"
+                                        >
+                                            ☰
+                                        </span>
+                                    </div>
                                 </td>
                             @endif
                             @foreach($rowData as $fieldIndex => $fieldData)
                                 @php
-                                    $isFieldHidden = $fieldData['type'] === 'hidden';
+                                    $isFieldHidden = $fieldData['type'] === 'hidden' || array_key_exists('attributes', $fieldData) && ($fieldData['attributes']['data-meros-hidden-field'] ?? false);
                                     $fieldClass = 'meros-repeater-table-cell meros-repeater-table-cell--field';
 
                                     if ($isFieldHidden) {
@@ -132,14 +147,14 @@
                     class="meros-repeater-table-row meros-repeater-table-row--empty"
                     x-show="numRows === 0"
                 >
-                    <td colspan="{{ count($fields) + ($allowsReorder ? 1 : 0) + ($hasActions ? 1 : 0) }}" class="meros-repeater-table-cell meros-repeater-table-cell--empty">
+                    <td colspan="{{ $columnCount }}" class="meros-repeater-table-cell meros-repeater-table-cell--empty">
                         {{ $emptyText }}
                     </td>
                 </tr>
             </tbody>
             <tfoot class="meros-repeater-table-footer">
                 <tr>
-                    <td colspan="{{ count($fields) + ($allowsReorder ? 1 : 0) + ($hasActions ? 1 : 0) }}" class="meros-repeater-table-cell meros-repeater-table-cell--add">
+                    <td colspan="{{ $columnCount }}" class="meros-repeater-table-cell meros-repeater-table-cell--add">
                         @if($allowsAdd)
                             <button 
                                 type="button" 
@@ -154,4 +169,5 @@
             </tfoot>
         </table>
     </div>
+    <div class="meros-repeater-status" role="status" aria-atomic="true"></div>
 </fieldset>

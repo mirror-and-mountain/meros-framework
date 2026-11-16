@@ -236,11 +236,42 @@ class PostMetaContainer extends DataContainer {
 
         $containerName = $this->getName(true);
 
-        if (!isset($_POST[$containerName]) || !is_array($_POST[$containerName])) {
+        $hasSubmittedValue = array_key_exists($containerName, $_POST);
+
+        if ($hasSubmittedValue && !is_array($_POST[$containerName])) {
             return;
         }
 
-        $this->savePostMeta($postId, $_POST[$containerName]);
+        $value = $hasSubmittedValue ? $_POST[$containerName] : [];
+        $hasCheckboxField = false;
+        $fieldNamePrefix = $containerName . '[';
+
+        foreach ($this->fieldGroupInstance->getFields() as $field) {
+            if ($field->getHandle() !== 'checkbox' || $field->hasAttribute('disabled')) {
+                continue;
+            }
+
+            $fieldName = $field->getName();
+
+            if (!str_starts_with($fieldName, $fieldNamePrefix) || !str_ends_with($fieldName, ']')) {
+                continue;
+            }
+
+            $fieldName = substr($fieldName, strlen($fieldNamePrefix), -1);
+
+            if ($fieldName === '') {
+                continue;
+            }
+
+            $hasCheckboxField = true;
+            $value[$fieldName] ??= false;
+        }
+
+        if (!$hasSubmittedValue && !$hasCheckboxField) {
+            return;
+        }
+
+        $this->savePostMeta($postId, $value);
     }
 
     /**

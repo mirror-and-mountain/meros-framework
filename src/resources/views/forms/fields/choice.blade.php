@@ -7,7 +7,7 @@
 <fieldset
     x-data="mformsChoice"
     id="{{ $id }}"
-    class="meros-choice-field nice-form-group mforms-field-wrapper"
+    class="meros-choice-field meros-field-wrapper nice-form-group mforms-field-wrapper"
     data-name="{{ $name }}"
     data-field-conditions="{{ $conditionsString }}"
     data-field-origin-name="{{ $originalName }}"
@@ -17,7 +17,7 @@
         <legend class="meros-choice-field-legend">{{ $label }}</legend>
     @endif
     @if (!$inRepeater && $renderContext !== 'settings' && $description !== '')
-        <div style="margin-top: 0.5rem;">
+        <div style="margin-bottom: 0.5rem;">
             <small class="meros-field-description">{!! $description !!}</small>
         </div>
     @endif
@@ -25,8 +25,12 @@
     @foreach($options as $optValue => $optLabel)
         @php
             $checked = $allowsMultiple === true
-                ? (is_array($defaultValue) && in_array($optValue, $defaultValue, true))
-                : $defaultValue !== null && (string) $defaultValue === $optValue;
+                ? (is_array($defaultValue) && in_array(
+                    (string) $optValue,
+                    array_map(static fn ($value): string => (string) $value, $defaultValue),
+                    true
+                ))
+                : $defaultValue !== null && (string) $defaultValue === (string) $optValue;
 
             
         @endphp

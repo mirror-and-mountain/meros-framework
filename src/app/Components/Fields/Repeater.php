@@ -4,6 +4,7 @@ namespace MM\Meros\App\Components\Fields;
 
 use Closure;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 use MM\Meros\Contracts\Features\Components\Form;
 use MM\Meros\Contracts\Features\Components\Field;
@@ -148,6 +149,12 @@ class Repeater extends Field {
      */
     protected bool $hideLabel = false;
 
+    protected function init(): void {
+        parent::init();
+        // These are runtime values, not configuration that can be reconstructed.
+        $this->ignoreProps(['editForm', 'ajaxUrl', 'ajaxNonce']);
+    }
+
     protected function configure(): void {
         $this->view('meros::forms.fields.repeater');
         $this->wrapper('site', '');
@@ -174,6 +181,7 @@ class Repeater extends Field {
         ]);
 
         $this->setNonPersistableProperties([
+            'editForm',
             'ajaxUrl',
             'ajaxNonce',
         ]);
@@ -200,7 +208,11 @@ class Repeater extends Field {
             }
 
             if (is_array($field) && array_key_exists('type', $field)) {
-                return $this->field($field['type'], $field, false);
+                $type = $field['type'];
+                if (Fields::getRegisteredFeatureClass($type) === null) {
+                    $type = Str::replace('_', '-', $type);
+                }
+                return $this->field($type, $field, false);
             }
         }, $this->fields);
     }
@@ -358,12 +370,21 @@ class Repeater extends Field {
     /**
      * Sets the callback function to generate the edit form for a repeater row.
      *
+     * The rendered form is cached per row until the row or repeater value changes.
+     *
      * @param Closure|callable $callback
      * @param string           $buttonText
+     * @param string           $formTitle
+     * @param string           $resetField
      *
      * @return static
      */
-    public function editForm(Closure|callable $callback, string $buttonText = '', string $formTitle = ''): static {
+    public function editForm(
+        Closure|callable $callback, 
+        string $buttonText = '', 
+        string $formTitle = '', 
+        string $resetField = ''
+    ): static {
         $this->editFormCallback = $callback instanceof Closure
             ? $callback
             : Closure::fromCallable($callback);
@@ -386,9 +407,15 @@ class Repeater extends Field {
                     $form->attribute('data-repeater-edit-form', 'true');
                 });
 
-            $this->field('hidden', function ($field) {
+            $this->field('hidden', function (Field $field) use ($resetField) {
                 $field->name('__form_data');
                 $field->label('Form Data');
+
+                if (!empty($resetField)) {
+                    $field->setValueWhen([
+                        [$resetField, 'CHANGED', null, '']
+                    ]);
+                }
             });
         }
 
@@ -537,6 +564,16 @@ class Repeater extends Field {
     // Edit Form Rendering
     // =========================================================================
 
+    /**
+     * Renders the edit form for a repeater row.
+     *
+     * This method generates the HTML for the edit form of a repeater row based on the provided row data and repeater value.
+     *
+     * @param array $rowData
+     * @param array $repeaterValue
+     *
+     * @return string
+     */
     public function renderEditForm(array $rowData = [], array $repeaterValue = []): string {
         if ($this->hasEditForm() === false) {
             return 'Sorry, no edit form is defined for this repeater.';
@@ -593,9 +630,15 @@ class Repeater extends Field {
 
     protected function filterStorageProperties(array $properties): array {
         unset($properties['tableRows']);
+        $properties['fields'] = array_map(fn (Field $field) => $field->serialize('storage'), $this->fields);
         return parent::filterStorageProperties($properties);
     }
 
+    /**
+     * Builds the table rows for the repeater field, including a template row.
+     *
+     * @return array
+     */
     private function buildTableRows(): array {
         $value = $this->getDefaultValue();
         $items = is_array($value) ? $value : [];
@@ -615,6 +658,15 @@ class Repeater extends Field {
         return $rows;
     }
 
+    /**
+     * Builds a single table row for the repeater field.
+     *
+     * @param integer    $index
+     * @param Collection $rowData
+     * @param boolean    $templateRow
+     *
+     * @return array
+     */
     private function buildTableRow(int $index, Collection $rowData, bool $templateRow = false): array {
         $row = [];
         

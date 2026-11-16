@@ -472,6 +472,21 @@ class PostType extends Feature implements Makeable, Registrable {
     }
 
     /**
+     * Attempts to retrieve a meta container by its name, optionally considering the prefix.
+     *
+     * @param string  $name
+     * @param boolean $withPrefix
+     *
+     * @return PostMetaContainer|null
+     */
+    protected function getContainer(string $name, bool $withPrefix = false): ?PostMetaContainer {
+        return collect($this->metaContainers)
+            ->firstWhere(function (PostMetaContainer $container) use ($name, $withPrefix) {
+                return $container->getName($withPrefix) === $name;
+            });
+    }
+
+    /**
      * Retrieves the fields associated with the post type, if any exist.
      *
      * @param boolean $collect
@@ -510,8 +525,9 @@ class PostType extends Feature implements Makeable, Registrable {
         if (is_int($postId)) {
             $data = Post::where('post_type', $this->handle)
                 ->where('ID', $postId)
-                ->first()
-                ->toArray();
+                ->first();
+
+            $data = $data instanceof Post ? $data->toArray() : [];
         } else {
             $data = $this->getDefaultProperties();
         }

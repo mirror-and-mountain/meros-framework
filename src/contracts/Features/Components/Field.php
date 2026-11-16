@@ -78,6 +78,11 @@ abstract class Field extends Feature implements FormComponent {
      */
     protected bool $isFieldSet = false;
 
+    /**
+     * Additional metadata for the field.
+     *
+     * @var array
+     */
     protected array $metadata = [];
 
     // =========================================================================
@@ -227,6 +232,22 @@ abstract class Field extends Feature implements FormComponent {
      */
     protected static int $occupiesRowPositions = 1;
 
+    /**
+     * For form builder use only. Indicates whether the field is locked by a template.
+     *
+     * @var bool
+     */
+    protected bool $__properties_locked_by_template = false;
+    protected bool $__move_locked_by_template = false;
+    protected bool $__remove_locked_by_template = false;
+
+    /**
+     * For form builder use only. Indicates whether the field is part of a template.
+     *
+     * @var boolean
+     */
+    protected bool $__is_template_field = false;
+
     use IsFormComponent;
 
     // =========================================================================
@@ -273,10 +294,13 @@ abstract class Field extends Feature implements FormComponent {
      * Returns a FieldGroup instance providing additional controls for this field type
      * in the form builder.
      *
+     * @param bool $locked Indicates whether the field is locked by a template.
+     * @param array $rowData The data for the current row in the form builder.
+     *
      * @return FieldGroup
      */
-    public static function getBuilderControls(): ?FieldGroup {
-        return self::getBuilderControlsGroup(function (FieldGroup $group) {
+    final public static function getBuilderControls(bool $locked = false, array $rowData = []): ?FieldGroup {
+        return self::getBuilderControlsGroup(function (FieldGroup $group) use ($locked, $rowData) {
             $group->field('text', [
                 'name'        => 'field_type',
                 'label'       => 'Field Type',
@@ -287,29 +311,38 @@ abstract class Field extends Feature implements FormComponent {
             $group->field('text', [
                 'name'        => 'field_name', 
                 'label'       => 'Field Name',
+                'readonly'    => $locked,
                 'description' => "The field's unique name."
             ]);
 
             $group->field('text', [
                 'name'        => 'field_label',
                 'label'       => 'Field Label',
+                'readonly'    => $locked,
                 'description' => "The field's label.",
-            ]);
+            ], false);
 
-            $group->field('text', [
+            $group->field('richtext', [
                 'name'        => 'field_description',
                 'label'       => 'Field Description',
-                'description' => "The field's description.",
-            ]);
+                'readonly'    => $locked,
+                'description' => "The field's description. This appears below the field's control.",
+            ], false);
 
             $group->field('checkbox', [
-                'name'  => 'required',
-                'label' => 'Required'
-            ]);
+                'name'        => 'required',
+                'label'       => 'Required',
+                'toggle'      => true,
+                'disabled'    => $locked,
+                'description' => "Whether the field is required."
+            ], false);
+
+            $group = static::addBuilderControls($group, $locked, $rowData);
 
             $group->field('repeater', function (Repeater $repeater) {
                 $repeater->name('metadata');
                 $repeater->label('Meta Data');
+                $repeater->description("Additional meta data for the field.");
 
                 $repeater->field('text', [
                     'name'  => 'key',
@@ -325,6 +358,20 @@ abstract class Field extends Feature implements FormComponent {
     }
 
     /**
+     * Adds additional builder controls to the field's control group.
+     *
+     * @param FieldGroup $group
+     * @param bool       $locked  Indicates whether the field is locked by a template.
+     * @param array      $rowData The data for the current row in the form builder.
+     *
+     * @return FieldGroup
+     */
+    protected static function addBuilderControls(FieldGroup $group, bool $locked = false, array $rowData = []): FieldGroup {
+        // Subclasses can add additional builder controls here...
+        return $group;
+    }
+
+    /**
      * Internal helper to create a FieldGroup instance for rendering the field's controls
      * in the form builder.
      *
@@ -337,6 +384,45 @@ abstract class Field extends Feature implements FormComponent {
             ->make(function (FieldGroup $group) use ($callback) {
                 call_user_func($callback, $group);
             });
+    }
+
+    /**
+     * Locks the field's properties for the form builder.
+     *
+     * @return static
+     */
+    final public function lock(): static {
+        $this->__properties_locked_by_template = true;
+        return $this;
+    }
+
+    /**
+     * For internal use only.
+     * Marks the field as a template field.
+     *
+     * @return static
+     */
+    final public function templateField(): static {
+        $this->__is_template_field = true;
+        return $this;
+    }
+
+    /**
+     * Checks if the field is locked by a template.
+     *
+     * @return boolean
+     */
+    final public function isLocked(): bool {
+        return $this->__properties_locked_by_template === true;
+    }
+
+    /**
+     * Checks if the field is a template field.
+     *
+     * @return boolean
+     */
+    final public function isTemplateField(): bool {
+        return $this->__is_template_field === true;
     }
 
     // =========================================================================
@@ -365,8 +451,15 @@ abstract class Field extends Feature implements FormComponent {
         $this->originalName = '';
 
         $this->ignoreProps([
-            'defaultValue', 'attributes', 'classes', 'form', 'group', 'wrapper'
+            'defaultValue', 'attributes', 'classes', 'form', 'group', 'wrapper', 'conditions'
         ]);
+
+        if (array_key_exists('conditions', $this->passedProps)) {
+            if (!is_array($this->passedProps['conditions'])) {
+                throw new \InvalidArgumentException('Field conditions must be an array.');
+            }
+            $this->conditions = $this->passedProps['conditions'];
+        }
 
         $this->setSerializableProperties([
             'type',
@@ -395,7 +488,11 @@ abstract class Field extends Feature implements FormComponent {
             'view',
             'renderContext',
             'isFieldSet',
-            'metadata'
+            'metadata',
+            '__is_template_field',
+            '__properties_locked_by_template',
+            '__move_locked_by_template',
+            '__remove_locked_by_template'
         ], false);
     }
 
@@ -456,6 +553,26 @@ abstract class Field extends Feature implements FormComponent {
             $this->defaultValue = $this->normaliseValue($this->passedProps['default']);
         } else if ($this->defaultValue === null) {
             $this->defaultValue = $this->normaliseValue(null);
+        }
+
+        // Lock the field if the 'lock' property is passed and true.
+        if (array_key_exists('lock', $this->passedProps) && $this->passedProps['lock']) {
+            $this->lock();
+        }
+
+        // Lock the field if the 'lock' property is passed and true.
+        if ($this->passedProps['__properties_locked_by_template'] ?? $this->passedProps['__is_locked_by_template'] ?? false) {
+            $this->lock();
+        }
+
+        // Set the template field flag if passed
+        if (array_key_exists('__is_template_field', $this->passedProps) && $this->passedProps['__is_template_field']) {
+            $this->__is_template_field = true;
+        }
+
+        // Set the hide attribute if passed
+        if ($this->passedProps['hide'] ?? false) {
+            $this->hide();
         }
 
         // Set required attribute if passed
@@ -1022,6 +1139,10 @@ abstract class Field extends Feature implements FormComponent {
      * Sets the field to a fixed value, or dynamically from the triggering field when
      * the fourth rule element is omitted or contains {value}/{unique_id} placeholders.
      * The {row_index} placeholder is available for fields inside a repeater.
+     * Use ['field', 'CHANGED'] to copy a source value only when it changes, or
+     * ['field', 'CHANGED', null, 'value'] to set a fixed or templated value.
+     * CHANGED does not run on initialisation; with AND, the other rules must match
+     * when the change occurs. The first matching rule supplies the destination value.
      *
      * @param array  $rules
      * @param string $logic
@@ -1033,7 +1154,22 @@ abstract class Field extends Feature implements FormComponent {
         return $this;
     }
 
-    final protected function processRules(string $ruleset, array $rules, bool $boolean, string $logic): void {
+    /**
+     * Processes the given set of rules for the field based on the ruleset, boolean flag, and logic.
+     *
+     * @param string  $ruleset
+     * @param array   $rules
+     * @param boolean $boolean
+     * @param string  $logic
+     *
+     * @return void
+     */
+    final protected function processRules(
+        string $ruleset, 
+        array $rules, 
+        bool $boolean, 
+        string $logic
+    ): void {
         $operators = [
             '=',
             '!=',
@@ -1053,7 +1189,8 @@ abstract class Field extends Feature implements FormComponent {
                 continue;
             }
 
-            $requiredKeys = [0, 1, 2];
+            $isChangedRule = $ruleset === 'set_value' && ($rule[1] ?? null) === 'CHANGED';
+            $requiredKeys = $isChangedRule ? [0, 1] : [0, 1, 2];
             if (!$boolean && $ruleset !== 'set_value') {
                 $requiredKeys[] = 3;
             }
@@ -1068,7 +1205,7 @@ abstract class Field extends Feature implements FormComponent {
                 continue;
             }
 
-            if (!is_string($rule[0]) || !in_array($rule[1], $operators)) {
+            if (!$isChangedRule && !in_array($rule[1], $operators)) {
                 continue;
             }
 
@@ -1076,7 +1213,7 @@ abstract class Field extends Feature implements FormComponent {
                 $ruleset,
                 $rule[0],
                 $rule[1],
-                $rule[2],
+                $rule[2] ?? null,
                 $rule[3] ?? null,
                 $ruleset === 'set_value' && !array_key_exists(3, $rule)
             );

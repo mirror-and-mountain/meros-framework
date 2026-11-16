@@ -1,11 +1,18 @@
 .meros-repeater-field {
     min-inline-size: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin-inline: 0;
 	padding: 0;
 	border: 0;
 	background: transparent;
 	box-shadow: none;
 
     .meros-repeater-scroll {
+        // Avoid contributing the table's intrinsic width to parent grid and table layouts.
+        width: 0;
+        min-width: 100%;
+        box-sizing: border-box;
         overflow-x: auto;
         overflow-y: hidden;
         border: 1px solid #d1d5db;
@@ -18,8 +25,9 @@
         scrollbar-gutter: stable both-edges;
 
         .meros-repeater-table {
-            width: max-content;
-            min-width: 100%;
+            width: 100%;
+            min-width: calc(var(--meros-repeater-fields-width, 0rem) + var(--meros-repeater-move-width, 0rem) + var(--meros-repeater-actions-width, 0rem));
+            table-layout: fixed;
             border-collapse: separate;
             border-spacing: 0;
             font-size: 0.875rem;
@@ -46,6 +54,8 @@
             }
 
             th.meros-repeater-table-header-cell--field {
+                overflow-wrap: anywhere;
+
                 .meros-repeater-field-description {
                     cursor: pointer;
                     padding-left: 0.25rem;
@@ -53,12 +63,11 @@
             }
 
             th.meros-repeater-table-header-cell--move {
-                width: 2.5rem;
+                width: var(--meros-repeater-move-width, 5rem);
             }
 
             th.meros-repeater-table-header-cell--actions {
-                width: 1%;
-                white-space: nowrap;
+                width: var(--meros-repeater-actions-width, 9rem);
                 text-align: right;
             }
 
@@ -95,8 +104,19 @@
             }
 
             td.meros-repeater-table-cell--move {
-                width: 2.5rem;
+                width: var(--meros-repeater-move-width, 5rem);
                 text-align: center;
+            }
+
+            .meros-repeater-row-controls {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.375rem;
+            }
+
+            .meros-repeater-row-directions {
+                display: grid;
+                gap: 0.125rem;
             }
 
             .meros-repeater-table-move-handle {
@@ -115,9 +135,8 @@
             }
 
             td.meros-repeater-table-cell--actions {
-                width: 1%;
+                width: var(--meros-repeater-actions-width, 9rem);
                 text-align: right;
-                white-space: nowrap;
             }
 
             td.meros-repeater-table-cell--hidden {
@@ -129,6 +148,12 @@
                 flex-wrap: nowrap;
                 justify-content: flex-end;
                 gap: 0.375rem;
+
+                .meros-repeater-table-button {
+                    flex: 0 0 auto;
+                    white-space: nowrap;
+                    overflow-wrap: normal;
+                }
             }
 
             .meros-repeater-table-row--template {
@@ -253,4 +278,30 @@
 /* Handling for nested choice fields */
 .meros-repeater-field .meros-repeater-table-cell--field fieldset.nice-form-group {
     margin-top: 0 !important;
+}
+.meros-repeater-row-move {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #d0d7de;
+    border-radius: 3px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.meros-repeater-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
 }

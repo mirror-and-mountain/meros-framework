@@ -49,7 +49,7 @@ export default class MerosFieldsProcessor {
                     !row.classList.contains('meros-repeater-table-row--template');
             }
 
-            return repeater === null;
+            return repeater === null || repeater === wrapper;
         });
     }
 
@@ -92,6 +92,12 @@ export default class MerosFieldsProcessor {
         Object.values(this.groups).forEach(group => {
             this.applyGroupConditions(group.name);
         });
+
+        this.refreshRequiredStates();
+
+        actionFields.forEach(field => {
+            field.lastActionValue = JSON.stringify(this.getFieldValue(field));
+        });
     }
 
     /**
@@ -123,6 +129,11 @@ export default class MerosFieldsProcessor {
                 this.applyFieldConditions(field.name);
             }
         });
+
+        rowFields.filter(field => field.actionListenerInitialized).forEach(field => {
+            field.lastActionValue = JSON.stringify(this.getFieldValue(field));
+        });
+        this.refreshRequiredStates();
     }
 
     /**
@@ -161,7 +172,8 @@ export default class MerosFieldsProcessor {
         const fieldName     = control.dataset.name || control.dataset.fieldName || control.name;
         if (!fieldName || !fieldBaseName) return;
 
-        const component = this.getFieldComponent(control);
+        const componentElement = control.dataset.fieldType === 'richtext' ? control.parentElement : control;
+        const component = this.getFieldComponent(componentElement);
         const group = control.closest('.mforms-field-group');
         const repeater = control.closest('.mforms-repeater-field');
 
@@ -291,7 +303,12 @@ export default class MerosFieldsProcessor {
 
         actionField.actionListenerInitialized = true;
         const control = actionField.control;
+        actionField.lastActionValue = JSON.stringify(this.getFieldValue(actionField));
         const updateDependentFields = () => {
+            const value = JSON.stringify(this.getFieldValue(actionField));
+            const changedField = value !== actionField.lastActionValue ? actionField : null;
+            actionField.lastActionValue = value;
+
             actionField.actions.forEach(targetName => {
                 if (targetName.startsWith('group:')) {
                     this.applyGroupConditions(targetName.slice('group:'.length));
@@ -308,7 +325,7 @@ export default class MerosFieldsProcessor {
                     return;
                 }
 
-                this.applyFieldConditions(targetName);
+                this.applyFieldConditions(targetName, changedField);
             });
         };
 
@@ -335,19 +352,21 @@ export default class MerosFieldsProcessor {
         } else {
             group.control.setAttribute('data-meros-hidden-field', '');
         }
+        this.refreshRequiredStates();
     }
 
     /**
      * Evaluates a field's visibility rules and updates its hidden, value, and required state.
      *
      * @param {string} fieldName Name of the field to update.
+     * @param {object|null} changedField Source field whose value changed, if any.
      * @returns {void}
      */
-    applyFieldConditions(fieldName) {
+    applyFieldConditions(fieldName, changedField = null) {
         const field = this.fields[fieldName];
         if (!field) return;
 
-        this.applyConditionalValue(field);
+        this.applyConditionalValue(field, changedField);
         this.applyConditionalOptions(field);
 
         const hasShowRules = this.shouldProcessConditionType('show') &&
@@ -361,7 +380,9 @@ export default class MerosFieldsProcessor {
             field.control.removeAttribute('data-meros-hidden-field');
         } else {
             field.control.setAttribute('data-meros-hidden-field', '');
-            this.clearFieldValue(field);
+            if (!field.control.classList.contains('mforms-repeater-field')) {
+                this.clearFieldValue(field);
+            }
         }
 
         const shouldRequire = this.evaluateConditionType(field, 'require');
@@ -377,7 +398,9 @@ export default class MerosFieldsProcessor {
 
         const shouldDisable = this.evaluateConditionType(field, 'disable');
         const shouldEnable = this.evaluateConditionType(field, 'enable');
-        const disabled = shouldDisable
+        const disabled = !isVisible && field.control.classList.contains('mforms-repeater-field')
+            ? true
+            : shouldDisable
             ? true
             : shouldEnable
                 ? false
@@ -434,7 +457,8 @@ export default class MerosFieldsProcessor {
                     ? this.evaluateRule(
                         this.getFieldValue(sourceField),
                         rule.operator,
-                        this.getRuleSourceValue(rule)
+                        this.getRuleSourceValue(rule),
+                        sourceField.control.dataset.fieldType
                     )
                     : false;
             });
@@ -454,7 +478,7 @@ export default class MerosFieldsProcessor {
      * @param {*} expected Configured condition value.
      * @returns {boolean} Whether the comparison matches.
      */
-    evaluateRule(actual, operator, expected) {
+    evaluateRule(actual, operator, expected, fieldType = null) {
         const normalizedOperator = String(operator).trim().toUpperCase();
         const actualString = actual == null ? '' : String(actual);
         const expectedString = expected == null ? '' : String(expected);
@@ -487,18 +511,39 @@ export default class MerosFieldsProcessor {
             case 'NOT EMPTY':
                 return !this.evaluateRule(actual, 'EMPTY', expected);
             case '>':
-                return Number(actual) > Number(expected);
+                return this.orderedValue(actual, fieldType) > this.orderedValue(expected, fieldType);
             case '<':
-                return Number(actual) < Number(expected);
+                return this.orderedValue(actual, fieldType) < this.orderedValue(expected, fieldType);
             case '=>':
             case '>=':
-                return Number(actual) >= Number(expected);
+                return this.orderedValue(actual, fieldType) >= this.orderedValue(expected, fieldType);
             case '=<':
             case '<=':
-                return Number(actual) <= Number(expected);
+                return this.orderedValue(actual, fieldType) <= this.orderedValue(expected, fieldType);
             default:
                 return false;
         }
+    }
+
+    orderedValue(value, fieldType) {
+        if (fieldType === 'date') {
+            if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return NaN;
+            const date = new Date(`${value}T00:00:00Z`);
+            return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value
+                ? NaN
+                : date.getTime();
+        }
+        if (fieldType === 'time') {
+            if (typeof value !== 'string') return NaN;
+            const parts = /^(\d{2}):(\d{2})(?::(\d{2})(\.\d+)?)?$/.exec(value);
+            if (!parts) return NaN;
+            const hours = Number(parts[1]);
+            const minutes = Number(parts[2]);
+            const seconds = Number(parts[3] || 0) + Number(parts[4] || 0);
+            if (hours > 23 || minutes > 59 || seconds >= 60) return NaN;
+            return hours * 3600 + minutes * 60 + seconds;
+        }
+        return Number(value);
     }
 
     /**
@@ -608,6 +653,7 @@ export default class MerosFieldsProcessor {
      * @returns {Array<{value: string, label: string, disabled: boolean}>} Initial options.
      */
     getControlOptions(control) {
+        if (control.classList.contains('mforms-repeater-field')) return [];
         if (control.tagName === 'SELECT') {
             return Array.from(control.options, option => ({
                 value: option.value,
@@ -652,22 +698,25 @@ export default class MerosFieldsProcessor {
      * Applies a configured set-value rule, restoring the pre-condition value when it stops matching.
      *
      * @param {object} field Conditional field.
+     * @param {object|null} changedField Source field whose value changed, if any.
      * @returns {void}
      */
-    applyConditionalValue(field) {
-        const matches = this.getMatchingConditionRules(field, 'set_value')
+    applyConditionalValue(field, changedField = null) {
+        const matches = this.getMatchingConditionRules(field, 'set_value', changedField)
             .filter(rule =>
                 Object.prototype.hasOwnProperty.call(rule, 'dest_value') ||
                 rule.dest_value_from_source === true
             );
 
         if (matches.length > 0) {
-            if (!field.conditionalValueActive) {
+            const rule = matches[0];
+            const isChangedRule = matches.some(match => match.operator === 'CHANGED');
+
+            if (!isChangedRule && !field.conditionalValueActive) {
                 field.conditionalValueState = this.getFieldValue(field);
                 field.conditionalValueActive = true;
             }
 
-            const rule = matches[0];
             const isValueTemplate = typeof rule.dest_value === 'string' &&
                 /\{(?:value|unique_id|row_index)\}/.test(rule.dest_value);
 
@@ -691,10 +740,10 @@ export default class MerosFieldsProcessor {
                 }
 
                 this.setFieldValue(field, value);
-                field.conditionalValueFromSource = true;
+                if (!isChangedRule) field.conditionalValueFromSource = true;
             } else {
                 this.setFieldValue(field, rule.dest_value);
-                field.conditionalValueFromSource = false;
+                if (!isChangedRule) field.conditionalValueFromSource = false;
             }
             return;
         }
@@ -752,9 +801,10 @@ export default class MerosFieldsProcessor {
      *
      * @param {object} field Conditional field.
      * @param {string} type Condition type.
+     * @param {object|null} changedField Source field whose value changed, if any.
      * @returns {Array<object>} Matching rules.
      */
-    getMatchingConditionRules(field, type) {
+    getMatchingConditionRules(field, type, changedField = null) {
         const config = field.conditions?.[type];
         if (!config || typeof config !== 'object' || !config.rules || typeof config.rules !== 'object') {
             return [];
@@ -767,10 +817,15 @@ export default class MerosFieldsProcessor {
 
                 return {
                     rule,
-                    matches: sourceField !== null && this.evaluateRule(
-                        this.getFieldValue(sourceField),
-                        rule.operator,
-                        this.getRuleSourceValue(rule)
+                    matches: sourceField !== null && (
+                        type === 'set_value' && rule.operator === 'CHANGED'
+                            ? sourceField === changedField
+                            : this.evaluateRule(
+                                this.getFieldValue(sourceField),
+                                rule.operator,
+                                this.getRuleSourceValue(rule),
+                                sourceField.control.dataset.fieldType
+                            )
                     )
                 };
             });
@@ -839,6 +894,7 @@ export default class MerosFieldsProcessor {
         const component = field.component;
         if (component && typeof component.setValue === 'function') {
             component.setValue(value);
+            if (field.control.dataset.fieldType === 'richtext') return;
         }
 
         if (field.control.matches('input[type="checkbox"]')) {
@@ -889,7 +945,9 @@ export default class MerosFieldsProcessor {
      * @returns {void}
      */
     setFieldRequiredState(field, required) {
+        field.conditionalRequired = required;
         field.requiredAttributes ||= new Map();
+        const hidden = field.control.closest('[data-meros-hidden-field]') !== null;
 
         this.getFieldControls(field).forEach(control => {
             if (!field.requiredAttributes.has(control)) {
@@ -900,18 +958,27 @@ export default class MerosFieldsProcessor {
             }
 
             const initial = field.requiredAttributes.get(control);
-            const nextState = required === null ? initial.required : required;
+            const nextState = !hidden && (required === null ? initial.required : required);
             if (nextState) {
                 control.setAttribute('required', '');
                 control.setAttribute('aria-required', 'true');
             } else {
                 control.removeAttribute('required');
-                if (required === null && initial.ariaRequired !== null) {
+                if (!hidden && required === null && initial.ariaRequired !== null) {
                     control.setAttribute('aria-required', initial.ariaRequired);
                 } else {
                     control.removeAttribute('aria-required');
                 }
             }
+        });
+        if (field.control.classList.contains('mforms-repeater-field')) {
+            field.component?.fieldsProcessor?.refreshRequiredStates();
+        }
+    }
+
+    refreshRequiredStates() {
+        Object.values(this.fields).forEach(field => {
+            this.setFieldRequiredState(field, field.conditionalRequired ?? null);
         });
     }
 
@@ -956,7 +1023,7 @@ export default class MerosFieldsProcessor {
     getFieldControls(field) {
         const control = field.control;
 
-        if (control.matches('input, select, textarea')) {
+        if (control.matches('input, select, textarea, .mforms-repeater-field')) {
             return [control];
         }
 

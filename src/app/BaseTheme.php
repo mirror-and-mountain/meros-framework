@@ -18,8 +18,6 @@ use MM\Meros\Support\SchemaManager;
 use MM\Meros\App\Models\Migration as TrackedMigration;
 use MM\Meros\App\Models\Option;
 
-use MM\Meros\Facades\Framework;
-
 abstract class BaseTheme extends Provider {
     use IsNonFrameworkProvider, IsNonPackageProvider;
 
@@ -76,14 +74,6 @@ abstract class BaseTheme extends Provider {
             $setting->default(false);
             $setting->field();
             $setting->section('meros-theme-settings-section');
-            $setting->onUpdate(function ($value, $oldValue, $itemName, $optionName) {
-                if ($value === true) {
-                   if (Framework::installFormTables() === false) {
-                        $value = false;
-                   }
-                }
-                return $value;
-            });
         });
 
         // Deactivation preferences

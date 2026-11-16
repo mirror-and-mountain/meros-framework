@@ -11,43 +11,6 @@ use MM\Meros\App\Components\Fields\Repeater;
 
 class Select extends Field {
     use HasOptions;
-
-    public static function getBuilderControls(): ?FieldGroup {
-        $group = parent::getBuilderControls();
-        $group->field('repeater', function (Repeater $repeater) {
-            $repeater->name('options');
-            $repeater->label('Options');
-            $repeater->description("The field's available options");
-
-            $repeater->field('text', [
-                'name'  => 'value',
-                'label' => 'Option Value'
-            ]);
-
-            $repeater->field('text', [
-                'name'  => 'label',
-                'label' => 'Option Label'
-            ]);
-        });
-
-        $group->field('checkbox', [
-            'name'  => 'allowsMultiple',
-            'label' => 'Allow Multiple Values'
-        ]);
-
-        $group->field('checkbox', function (Checkbox $field) {
-            $field->name('searchable');
-            $field->label('Searchable');
-            $field->setValueWhen([
-                ['allowsMultiple', '=', true, true]
-            ]);
-            $field->disableWhen([
-                ['allowsMultiple', '=', true]
-            ]);
-        });
-
-        return $group;
-    }
     
     protected function init(): void {
         parent::init();
@@ -132,5 +95,52 @@ class Select extends Field {
         if (array_key_exists('searchable', $this->passedProps)) {
             $this->searchable((bool) $this->passedProps['searchable']);
         }
+    }
+
+    /**
+     * Adds builder controls specific to the select field.
+     *
+     * @param FieldGroup $group
+     * @param boolean    $locked
+     * @param array      $rowData The data for the current row in the form builder.
+     *
+     * @return FieldGroup
+     */
+    protected static function addBuilderControls(FieldGroup $group, bool $locked = false, array $rowData = []): FieldGroup {
+        $group->field('repeater', function (Repeater $repeater) {
+            $repeater->name('options');
+            $repeater->label('Options');
+            $repeater->description("The field's available options");
+
+            $repeater->field('text', [
+                'name'  => 'value',
+                'label' => 'Option Value'
+            ]);
+
+            $repeater->field('text', [
+                'name'  => 'label',
+                'label' => 'Option Label'
+            ]);
+        });
+
+        $group->row(function ($row) {
+            $row->field('checkbox', [
+                'name'  => 'allowsMultiple',
+                'label' => 'Allow Multiple Values'
+            ]);
+
+            $row->field('checkbox', function (Checkbox $field) {
+                $field->name('searchable');
+                $field->label('Searchable');
+                $field->setValueWhen([
+                    ['allowsMultiple', '=', true, true]
+                ]);
+                $field->disableWhen([
+                    ['allowsMultiple', '=', true]
+                ]);
+            });
+        });
+
+        return $group;
     }
 }

@@ -34,6 +34,13 @@ abstract class Register implements FeatureRegister {
     private bool $uniqueInstances = false;
 
     /**
+     * Whether or not the register should throw an error when a duplicate feature is added (attached).
+     *
+     * @var boolean
+     */
+    private bool $errorOnDuplicate = true;
+
+    /**
      * Whether to bind feature instances as singleton's to the service container.
      *
      * @var boolean
@@ -147,6 +154,17 @@ abstract class Register implements FeatureRegister {
      */
     final public function usesUniqueInstances(): bool {
         return $this->uniqueInstances;
+    }
+
+    /**
+     * Sets whether the register should throw an error when a duplicate feature is added.
+     *
+     * @param boolean $error
+     *
+     * @return void
+     */
+    final protected function errorOnDuplicate(bool $error = true): void {
+        $this->errorOnDuplicate = $error;
     }
 
     /**
@@ -287,8 +305,10 @@ abstract class Register implements FeatureRegister {
             $hasExisting = $existing !== null;
 
             if ($hasExisting) {
-                if (!$this->allowAttach($feature, $existing)) {
+                if ($this->errorOnDuplicate &&!$this->allowAttach($feature, $existing)) {
                     throw new \LogicException("A feature with handle '{$feature->getIdentifier()}' is already attached to this register (" . static::class . ") and the register is set to use unique instances.");
+                } else {
+                    return; // Skip attaching the duplicate feature and don't throw an error.
                 }
             }
         }

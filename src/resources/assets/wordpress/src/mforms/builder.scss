@@ -1,0 +1,719 @@
+/**
+ * Admin styles for the Meros form builder.
+ */
+.meros-modal .mforms-builder-modal-locks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+
+    > .mforms-field-wrapper.nice-form-group {
+        margin: 0;
+    }
+}
+
+.mforms-builder-conditions {
+    display: grid;
+    gap: 1rem;
+    container-type: inline-size;
+
+    .mforms-builder-condition-set {
+        display: grid;
+        gap: 0.75rem;
+        min-width: 0;
+        padding: 1rem;
+        border: 1px solid #d0d7de;
+
+        > label {
+            width: 100%;
+            max-width: 26rem;
+        }
+    }
+
+    .mforms-builder-condition-rules,
+    .mforms-builder-condition-options {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .mforms-builder-condition-comparison,
+    .mforms-builder-condition-option {
+        display: grid;
+        align-items: start;
+        gap: 0.75rem;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .mforms-builder-condition-comparison {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .mforms-builder-condition-option {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) auto auto;
+
+        label:has(> input[type="checkbox"]) {
+            grid-template-rows: auto 40px;
+
+            input {
+                align-self: center;
+                justify-self: start;
+                margin: 0;
+            }
+        }
+
+        > button {
+            align-self: end;
+            min-height: 40px;
+        }
+    }
+
+    .mforms-builder-condition-rule {
+        display: grid;
+        gap: 0.75rem;
+        min-width: 0;
+        padding: 0.75rem;
+        background: #f8fafc;
+
+        > button {
+            justify-self: start;
+        }
+    }
+
+    .mforms-builder-condition-option-editor {
+        display: grid;
+        gap: 0.75rem;
+        width: 100%;
+        min-width: 0;
+        padding: 0.75rem;
+        box-sizing: border-box;
+        border: 1px solid #d0d7de;
+        background: #fff;
+
+        > button {
+            justify-self: start;
+        }
+    }
+
+    label {
+        display: grid;
+        gap: 0.25rem;
+        min-width: 0;
+        margin: 0;
+
+        > :is(input:not([type="checkbox"]), select) {
+            box-sizing: border-box;
+            width: 100%;
+            max-width: 100%;
+            min-height: 40px;
+            margin: 0;
+        }
+
+        > :is(input:not([type="checkbox"]), select:not([multiple])) {
+            height: 40px;
+        }
+
+        > small:empty {
+            display: none;
+        }
+    }
+
+    @container (max-width: 42rem) {
+        .mforms-builder-condition-comparison,
+        .mforms-builder-condition-option {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .mforms-builder-condition-option > button {
+            justify-self: start;
+        }
+    }
+
+    @container (max-width: 25rem) {
+        .mforms-builder-condition-comparison,
+        .mforms-builder-condition-option {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+}
+
+.mforms-builder-choice-default {
+    display: grid;
+    gap: 0.375rem;
+    margin-top: 1.5rem;
+
+    > select {
+        width: 100%;
+        max-width: 100%;
+        min-height: 40px;
+    }
+
+    > small:empty {
+        display: none;
+    }
+}
+
+.mforms-builder-move-control {
+    display: grid;
+    gap: 0.5rem;
+
+    select {
+        width: 100%;
+        max-width: 100%;
+        min-height: 40px;
+    }
+}
+
+#form_builder .meros-fullscreen-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: none;
+    color: #787c82;
+    vertical-align: top;
+    cursor: pointer;
+
+    &:hover,
+    &:focus {
+        color: #135e96;
+    }
+
+    .dashicons {
+        width: 20px;
+        height: 20px;
+        font-size: 20px;
+        line-height: 20px;
+    }
+}
+
+body.meros-builder-fullscreen {
+    overflow: hidden;
+}
+
+#form_builder.postbox {
+    .wp-tooltip.wp-is-tooltip {
+        display: none;
+    }
+
+    .postbox-header .handle-actions > :not(.meros-fullscreen-toggle) {
+        display: none;
+    }
+
+    &.closed .inside {
+        display: block;
+    }
+}
+
+#form_builder.postbox:has(.meros-form-builder.fullscreen) {
+    position: fixed;
+    top: var(--wp-admin--admin-bar--height, 32px);
+    right: 0;
+    bottom: 0;
+    left: 160px;
+    z-index: 99999;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    width: auto;
+    min-width: 0;
+    height: auto;
+    overflow: hidden;
+    border-radius: 0;
+    background: #fff;
+
+    > .postbox-header {
+        flex: 0 0 auto;
+    }
+
+    > .inside {
+        display: block;
+        flex: 1 1 auto;
+        min-height: 0;
+        margin: 0;
+        padding: 12px;
+        overflow: auto;
+    }
+}
+
+body.folded #form_builder.postbox:has(.meros-form-builder.fullscreen) {
+    left: 36px;
+}
+
+@media screen and (max-width: 960px) {
+    body.auto-fold #form_builder.postbox:has(.meros-form-builder.fullscreen) {
+        left: 36px;
+    }
+}
+
+@media screen and (max-width: 782px) {
+    #form_builder.postbox:has(.meros-form-builder.fullscreen),
+    body.auto-fold #form_builder.postbox:has(.meros-form-builder.fullscreen),
+    body.folded #form_builder.postbox:has(.meros-form-builder.fullscreen) {
+        top: var(--wp-admin--admin-bar--height, 46px);
+        left: 0;
+    }
+}
+
+.meros-form-builder {
+    --mforms-builder-border: #d0d7de;
+    --mforms-builder-muted: #6b7280;
+    --mforms-builder-surface: #ffffff;
+    --mforms-builder-surface-subtle: #f8fafc;
+    --mforms-builder-accent: #2271b1;
+
+    .mforms-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 0.25rem 0;
+    }
+
+    .mforms-row {
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        gap: 0.75rem;
+        min-width: 0;
+    }
+
+    &.mforms-form .mforms-body > .mforms-row {
+        margin: 0;
+    }
+
+    .mforms-builder-field-card,
+    .mforms-builder-group-card {
+        box-sizing: border-box;
+        min-width: 0;
+        border: 1px solid var(--mforms-builder-border);
+        border-radius: 0.5rem;
+        background: var(--mforms-builder-surface);
+        box-shadow: 0 1px 2px rgb(16 24 40 / 5%);
+        transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+        overflow: visible;
+    }
+
+    .mforms-builder-field-card {
+        display: grid;
+        flex: 1 1 0;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.5rem 0.75rem;
+        padding: 0.75rem;
+
+        &:hover {
+            border-color: #aebbc8;
+            box-shadow: 0 2px 5px rgb(16 24 40 / 8%);
+        }
+
+        > .mforms-field-drag-handle {
+            display: flex;
+            grid-column: 1;
+            align-items: center;
+            justify-content: flex-start;
+            justify-self: start;
+            gap: 0.375rem;
+            min-height: 2rem;
+            padding: 0.25rem 0.375rem;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 0.375rem;
+            color: var(--mforms-builder-muted);
+            font-size: 1.125rem;
+            line-height: 1;
+            cursor: grab;
+            user-select: none;
+            transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+
+            &:hover {
+                border-color: #dbe3ec;
+                background: var(--mforms-builder-surface-subtle);
+                color: var(--mforms-builder-accent);
+            }
+
+            &:active {
+                cursor: grabbing;
+            }
+        }
+    }
+
+    .mforms-builder-field-content {
+        grid-column: 1 / -1;
+        min-width: 0;
+
+        > .meros-repeater-field {
+            box-sizing: border-box;
+            width: 100%;
+            min-width: 0;
+            margin: 0;
+        }
+
+        .meros-repeater-scroll {
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+            overflow-x: auto;
+        }
+
+        .meros-repeater-table {
+            width: 100%;
+
+            .meros-repeater-table-header {
+                background: transparent;
+            }
+
+            th.meros-repeater-table-header-cell {
+                padding: 0.25rem 0.5rem 0.5rem;
+                border-bottom-color: #eef1f4;
+                color: #475569;
+            }
+
+            td.meros-repeater-table-cell {
+                padding: 0.5rem;
+            }
+
+            .meros-repeater-table-footer {
+                background: transparent;
+
+                td.meros-repeater-table-cell--add {
+                    padding: 0.5rem 0 0;
+                    border-top: 0;
+                }
+            }
+        }
+
+        .mforms-builder-repeater-editor {
+            > .meros-field-wrapper.nice-form-group {
+                margin: 0 0 0.75rem;
+            }
+
+            > div > .meros-field-wrapper.nice-form-group {
+                margin: 0 0 1.5rem;
+            }
+
+            > div > .mforms-group-description-control {
+                margin: 0.75rem 0 1.5rem;
+            }
+
+            .mforms-builder-lock-controls {
+                row-gap: 0;
+
+                > .meros-field-wrapper.nice-form-group {
+                    margin: 0.75rem 0 0;
+                }
+            }
+
+            > div > .meros-repeater-field {
+                margin-top: 0;
+            }
+
+            [inert] {
+                opacity: 0.65;
+            }
+        }
+
+        .meros-repeater-table-button {
+            border-radius: 0.375rem;
+        }
+    }
+
+    .mforms-builder-group-card {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 100%;
+        align-items: stretch;
+        min-height: 3.25rem;
+        padding: 0.75rem;
+        color: #344054;
+        font-weight: 600;
+
+        &:hover {
+            border-color: #aebbc8;
+            background: var(--mforms-builder-surface-subtle);
+        }
+    }
+
+    .mforms-builder-field-card > .mforms-builder-remove {
+        grid-column: 2;
+        align-self: center;
+        padding: 0 0.5rem;
+        font-size: 1.125rem;
+        line-height: 1.5rem;
+    }
+
+    .mforms-builder-remove {
+        align-self: flex-start;
+        padding: 0.375rem 0.625rem;
+        border: 1px solid #f0b4b4;
+        border-radius: 0.375rem;
+        background: #fff;
+        color: #b42318;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        cursor: pointer;
+
+        &:hover {
+            border-color: #b42318;
+            background: #fef3f2;
+        }
+
+        &:focus-visible {
+            outline: 2px solid #b42318;
+            outline-offset: 2px;
+        }
+    }
+
+    .mforms-group-builder-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0 0.25rem 0.75rem;
+        border-bottom: 1px solid #eef1f4;
+
+        .mforms-field-drag-handle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            min-height: 2rem;
+            padding: 0.25rem 0.375rem;
+            border: 1px solid transparent;
+            border-radius: 0.375rem;
+            background: transparent;
+            color: var(--mforms-builder-muted);
+            font-size: 1.125rem;
+            user-select: none;
+            cursor: grab;
+        }
+
+        > label {
+            display: flex;
+            flex: 1 1 auto;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 0;
+
+            > span {
+                color: #475569;
+                font-size: 0.8125rem;
+                white-space: nowrap;
+            }
+
+            input {
+                flex: 1 1 auto;
+                min-width: 0;
+                width: 100%;
+                max-width: 32rem;
+                margin: 0;
+            }
+        }
+    }
+
+    .mforms-group-header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        margin-left: auto;
+
+        > button {
+            box-sizing: border-box;
+            align-self: center;
+            min-height: 2rem;
+            margin: 0;
+            padding: 0.375rem 0.625rem;
+            border-width: 1px;
+            border-style: solid;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            line-height: 1.125rem;
+        }
+    }
+
+    .mforms-builder-lock-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 1rem;
+
+        > label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            margin: 0;
+            font-size: 0.8125rem;
+
+            > input {
+                margin: 0;
+                flex-shrink: 0;
+            }
+        }
+    }
+
+    .mforms-group-description-control {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.375rem;
+        margin: 0.75rem 0 0;
+
+        > span,
+        > .mforms-richtext-field > .meros-field-label {
+            color: #475569;
+            font-size: 0.8125rem;
+        }
+
+        textarea {
+            box-sizing: border-box;
+            width: 100%;
+            min-height: 4rem;
+            margin: 0;
+        }
+    }
+
+    .meros-group-form-builder {
+        width: 100%;
+        background: transparent;
+
+        .mforms-body {
+            gap: 0.5rem;
+        }
+
+        .meros-group-form-builder .mforms-row {
+            flex-wrap: wrap;
+
+            .mforms-builder-field-card {
+                flex: 1 1 calc(50% - 0.375rem);
+            }
+        }
+
+        .mforms-builder-actions {
+            padding-bottom: 0;
+        }
+    }
+
+    .mforms-field-drop-zone {
+        box-sizing: border-box;
+        flex: 0 0 0;
+        width: 0;
+        min-width: 0;
+        align-self: stretch;
+        border: 1px dashed transparent;
+        border-radius: 9999px;
+        opacity: 0;
+        pointer-events: none;
+        transition: width 150ms ease, flex-basis 150ms ease, opacity 150ms ease, background-color 150ms ease, border-color 150ms ease;
+    }
+
+    .mforms-row-drop-zone {
+        box-sizing: border-box;
+        height: 0;
+        margin: 0;
+        border: 1px dashed transparent;
+        border-radius: 9999px;
+        opacity: 0;
+        pointer-events: none;
+        transition: height 150ms ease, margin 150ms ease, opacity 150ms ease, background-color 150ms ease, border-color 150ms ease;
+    }
+
+    .mforms-builder-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        justify-content: center;
+        padding: 0.25rem 0;
+    }
+
+    .mforms-builder-add-field {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.5rem;
+        padding: 0.5rem 1rem;
+        border: 1px solid #b8c4d0;
+        border-radius: 0.5rem;
+        background: var(--mforms-builder-surface);
+        color: #344054;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+
+        > span {
+            color: var(--mforms-builder-accent);
+            font-size: 1.125rem;
+            line-height: 1;
+        }
+
+        &:hover {
+            border-color: var(--mforms-builder-accent);
+            background: #f0f6fc;
+            color: #135e96;
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--mforms-builder-accent);
+            outline-offset: 2px;
+        }
+
+        &:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+    }
+
+    .mforms-builder-component-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .mforms-builder-move-label {
+        font-size: 0.75rem;
+        font-weight: 400;
+        line-height: 1.25;
+    }
+
+    :is(button, input, select, textarea, [contenteditable="true"]):focus-visible {
+        outline: 2px solid var(--mforms-builder-accent);
+        outline-offset: 3px;
+    }
+
+    .mforms-builder-remove {
+        min-width: 2rem;
+        min-height: 2rem;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            transition: none !important;
+            animation: none !important;
+        }
+    }
+
+    @media (max-width: 782px) {
+        .mforms-row {
+            flex-wrap: wrap;
+        }
+
+        .mforms-builder-field-card {
+            flex-basis: 100%;
+        }
+
+        .mforms-group-builder-header {
+            align-items: flex-start;
+
+            > label {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+        }
+    }
+}

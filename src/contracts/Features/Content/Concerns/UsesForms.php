@@ -5,14 +5,16 @@ namespace MM\Meros\Contracts\Features\Content\Concerns;
 use Closure;
 use Illuminate\Support\Str;
 
-use MM\Meros\App\Content\FormBuilder;
-
 use MM\Meros\App\Models\Post;
 use MM\Meros\App\Models\FormTemplate;
 use MM\Meros\App\Models\FormResponse;
 
+use MM\Meros\App\Content\Form as FormCPT;
+use MM\Meros\App\Content\FormTemplate as TemplateCPT;
+
 use MM\Meros\App\Components\Fields\Repeater;
 
+use MM\Meros\Contracts\Features\Data\PostMeta;
 use MM\Meros\Contracts\Features\Data\PostMetaContainer;
 use MM\Meros\Contracts\Features\Components\DynamicBlock;
 
@@ -20,10 +22,17 @@ use MM\Meros\Contracts\Features\Makeable;
 use MM\Meros\Contracts\Features\Components\Form as FormComponent;
 use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
+use MM\Meros\Contracts\Features\Content\Interfaces\FormHost;
 
-use MM\Meros\Facades\Automation\FlowActions;
-use MM\Meros\Contracts\Features\Automation\FlowControls;
+use MM\Meros\Support\FlowControls;
 use MM\Meros\Support\FormActionsRunner;
+
+use MM\Meros\Support\FormBuilder;
+use MM\Meros\Support\FormSettingsControls;
+use MM\Meros\Support\FormHostSettingsControls;
+use MM\Meros\Support\FormTemplateSettingsControls;
+
+use MM\Meros\Facades\Support\Context;
 
 trait UsesForms {
     /**
@@ -34,43 +43,55 @@ trait UsesForms {
     /**
      * The post meta key under which a form's actions are stored.
      */
-    public const FORM_ACTIONS_META_KEY = '_meros_form_actions';
+    public const FORM_ACTIONS_META_KEY = 'form_actions';
 
     /**
-     * The post meta key under which a form's settings are stored.
-     */
-    public const FORM_SETTINGS_META_KEY = '_meros_form_settings';
-
-    /**
-     * The label identifying the form type associated with this post type.
-     * For example, 'Registration Form' or 'Application Form'
-     *
-     * @var string
-     */
-    private string $formTypeLabel = '';
-
-    /**
-     * Indicates whether the post type has a global form.
+     * Indicates whether the post type has a form type associated with it.
      *
      * @var boolean
      */
-    private bool $hasGlobalForm = false;
+    private bool $hasForm = false;
 
     /**
-     * Indicates whether the post type has a per-post form.
-     * These post types will render a FormBuilder instance for each post.
+     * Indicates whether the post type should use a FormBuilder instance for each post.
      *
      * @var boolean
      */
-    private bool $hasPerPostForm = false;
+    private bool $usesFormBuilder = false;
 
     /**
-     * The form template associated with the post type.
-     * Can be a FormComponent instance or a stored Post representing the template.
+     * The configurable form template associated with the post type.
      *
-     * @var FormComponent|FormTemplate|null
+     * @var FormTemplate|null
      */
-    private FormComponent|FormTemplate|null $formTemplate = null;
+    private FormTemplate|null $configurableFormTemplate = null;
+
+    private ?string $configurableFormTemplateName = null;
+
+    private bool $storedFormTemplateLookupDone = false;
+
+    private ?FormTemplate $resolvedStoredFormTemplate = null;
+
+    /**
+     * The form component template associated with the post type.
+     *
+     * @var FormComponent|null
+     */
+    private FormComponent|null $componentFormTemplate = null;
+
+    /**
+     * If the template has an associated FormComponent template, this array stores its actions.
+     *
+     * @var array
+     */
+    private array $formComponentActions = [];
+
+    /**
+     * If the template has an associated FormComponent template, this array stores its settings.
+     *
+     * @var array
+     */
+    private array $formComponentSettings = [];
 
     /**
      * The FormBuilder instance associated with the post type.
@@ -87,37 +108,128 @@ trait UsesForms {
     abstract public function getHandle(string $format = 'default'): string;
     abstract public function getSingularLabel(): string;
     abstract public function fields(FieldGroup|Closure|string $fieldGroupOrClosure, Closure|array $callbackOrProps = []): PostMetaContainer;
+
     abstract protected function makeItem(string $class, array|Closure $callback = [], array $props = []): Makeable;
+    abstract protected function getContainer(string $name, bool $withPrefix = false): ?PostMetaContainer;
+
+    // =========================================================================
+    // Form Handling
+    // =========================================================================
 
     /**
-     * Sets the post type to use a global form using the specified form type label.
-     * This method should be followed by a call to withTemplate() to specify the form template.
-     *
-     * @param string $formTypeLabel
+     * Marks the post type as having an associated form.
      *
      * @return static
      */
-    private function hasGlobalFormType(string $formTypeLabel): static {
-        $this->formTypeLabel = $formTypeLabel;
-        $this->hasGlobalForm = true;
+    private function hasForm(): static {
+        if ($this->hasForm === true) {
+            throw new \LogicException('Form has already been associated with this post type.');
+        }
+
+        $this->hasForm = true;
+
+        // Remove form capability if no template is associated with the post type.
+        add_action("meros_after_post_type_configured_{$this->getHandle()}", function () {
+            if ($this->hasForm && $this->componentFormTemplate === null) {
+                $this->hasForm = false;
+            }
+        });
+
         return $this;
     }
 
     /**
-     * Sets the post type to use a per-post form using the specified form type label.
-     * This method should be followed by a call to either withTemplate() to specify the form 
-     * template or withoutTemplate() to indicate no template should be used.
-     *
-     * @param string $formTypeLabel
+     * Marks the post type as using an editable per-post form.
      *
      * @return static
      */
-    private function hasFormType(string $formTypeLabel): static {
-        $this->formTypeLabel  = $formTypeLabel;
-        $this->hasPerPostForm = true;
+    private function hasEditableForm(): static {
+        if ($this->usesFormBuilder === true) {
+            throw new \LogicException('Per-post forms have already been associated with this post type.');
+        }
 
-        $this->formBuilder = new FormBuilder($this);
+        $this->hasForm         = true;
+        $this->usesFormBuilder = true;
+        $this->formBuilder     = new FormBuilder($this);
+
+        // Register the form builder once the framework is booted.
+        add_action('meros_framework_booted', function() {
+            if ($this->hasForm && $this->usesFormBuilder) {
+                $this->formBuilder()->register(
+                    $this->getFormTemplateSettings(), 
+                    $this->getFormTemplateActions()
+                );
+            }
+        });
         return $this;
+    }
+
+    /**
+     * Returns whether the post type has a configurable form template associated with it.
+     *
+     * @return boolean
+     */
+    public function hasConfigurableFormTemplate(): bool {
+        return $this->getConfigurableFormTemplate() instanceof FormTemplate;
+    }
+
+    /**
+     * Returns whether the post type has a component form template associated with it.
+     *
+     * @return boolean
+     */
+    public function hasComponentFormTemplate(): bool {
+        return $this->componentFormTemplate instanceof FormComponent;
+    }
+
+    /**
+     * Returns whether the post type has any form template associated with it.
+     *
+     * @return boolean
+     */
+    public function hasFormTemplate(): bool {
+        return $this->hasConfigurableFormTemplate() || $this->hasComponentFormTemplate();
+    }
+
+    /**
+     * Returns the form template associated with the post type, if any.
+     * 
+     * @param string $type The type of form template to retrieve ('default', 'configurable', 'component').
+     *
+     * @return FormTemplate|FormComponent|null
+     */
+    public function getFormTemplate(string $type = 'default'): FormTemplate|FormComponent|null {
+        if ($type === 'default') {
+            return $this->getConfigurableFormTemplate() ?? $this->getComponentFormTemplate();
+        }
+
+        if ($type === 'configurable') {
+            return $this->getConfigurableFormTemplate();
+        }
+
+        if ($type === 'component') {
+            return $this->getComponentFormTemplate();
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns the configurable form template associated with the post type, if any.
+     *
+     * @return FormTemplate|null
+     */
+    public function getConfigurableFormTemplate(): FormTemplate|null {
+        return $this->resolveStoredFormTemplate();
+    }
+
+    /**
+     * Returns the component form template associated with the post type, if any.
+     *
+     * @return FormComponent|null
+     */
+    public function getComponentFormTemplate(): FormComponent|null {
+        return $this->componentFormTemplate;
     }
 
     // =========================================================================
@@ -125,114 +237,174 @@ trait UsesForms {
     // =========================================================================
 
     /**
-     * Indicates that the post type should not use a form template.
-     * This method should only be called for post types using a per-post form.
+     * Associates a configurable form template with the post type.
+     *
+     * A configurable template allows stores a FormTemplate instance associated with the post type for future use.
+     *
+     * @param string                     $templateName
+     * @param FormComponent|Closure|null $componentTemplate
+     * @param array                      $actions
+     * @param array                      $settings
      *
      * @return static
-     * @throws \RuntimeException if a form template is already set or if the post type uses a global form.
      */
-    private function withoutTemplate(): static {
-        if ($this->formTemplate !== null) {
-            throw new \RuntimeException('Cannot use withoutTemplate when a form template is already set.');
-        }
-
-        if ($this->hasGlobalForm) {
-            throw new \RuntimeException('Cannot use withoutTemplate when the post type uses a global form.');
-        }
-
-        if (!$this->hasPerPostForm) {
-            throw new \RuntimeException('Cannot use withoutTemplate when the post type does not use a per-post form.');
-        }
-
-        if ($this->hasPerPostForm && $this->formBuilder instanceof FormBuilder) {
-            add_action('meros_framework_booted', function () {
-                $this->formBuilder->register();
-            });
-        }
-
-        return $this;
+    private function withConfigurableTemplate(
+        string $templateName, 
+        FormComponent|Closure|null $componentTemplate = null,
+        array $actions = [],
+        array $settings = [],
+    ): static {
+        return $this->__withTemplate($templateName, $componentTemplate, true, $actions, $settings);
+    }
+    /**
+     * Associates a standard FormComponent template with the post type.
+     *
+     * @param string                     $templateName
+     * @param FormComponent|Closure|null $componentTemplate
+     * @param array                      $actions
+     * @param array                      $settings
+     *
+     * @return static
+     */
+    private function withTemplate(
+        string $templateName, 
+        FormComponent|Closure|null $componentTemplate,
+        array $actions = [],
+        array $settings = [],
+    ): static {
+        return $this->__withTemplate($templateName, $componentTemplate, false, $actions, $settings);
     }
 
     /**
-     * Sets the form template for the post type.
-     * If $isEditable is true, the template will be stored and retrieved as a Post.
-     * If $isEditable is false, the template will be used as-is.
+     * Internal helper for associating a form template with the post type.
      *
-     * @param FormComponent $template
-     * @param boolean       $isEditable
+     * @param string                     $templateName
+     * @param FormComponent|Closure|null $componentTemplate
+     * @param bool                       $isConfigurable
+     * @param array                      $actions
+     * @param array                      $settings
      *
      * @return static
      */
-    private function withTemplate(FormComponent $template, bool $isEditable): static {
-        $template->name($this->getHandle() . '_' . $this->formTypeLabel . '_form_template');
-        $template->title($this->getSingularLabel() . ' ' . ucfirst($this->formTypeLabel) . ' Form');
+    private function __withTemplate(
+        string $templateName, 
+        FormComponent|Closure|null $componentTemplate = null, 
+        bool $isConfigurable = false,
+        array $actions = [],
+        array $settings = [],
+    ): static {
+        if ($this instanceof FormTemplate) {
+            throw new \LogicException('Cannot associate a form template with a FormTemplate instance.');
+        }
 
-        if ($isEditable) {
-            $this->formTemplate = $this->getStoredFormTemplate($template);
+        if ($componentTemplate instanceof Closure) {
+            $componentTemplate = $this->makeItem(FormComponent::class, $componentTemplate);
+        }
 
-            if (!($this->formTemplate instanceof FormTemplate)) {
-                throw new \RuntimeException('Failed to retrieve or create stored form template.');
+        if ($isConfigurable) {
+            $this->configurableFormTemplateName = Str::slug($templateName);
+        }
+
+        // Create missing configurable templates only when editing in wp admin.
+        if ($isConfigurable && (Context::isEditingPostType($this->getHandle()) || Context::isEditingPostType('form-template'))) {
+            $this->configurableFormTemplate = $this->__getStoredFormTemplate(
+                $templateName, 
+                $componentTemplate,
+                $actions,
+                $settings
+            );
+            if ($componentTemplate instanceof FormComponent) {
+                $this->componentFormTemplate = $componentTemplate;
+                $this->formComponentActions  = $actions;
+                $this->formComponentSettings = $settings;
             }
-            
-        } else {
-            $this->formTemplate = $template;
-        }
 
-        if ($this->hasPerPostForm && $this->formBuilder instanceof FormBuilder) {
-            add_action('meros_framework_booted', function () {
-                $this->formBuilder->register();
-            });
+        } else {
+            $this->componentFormTemplate = $componentTemplate;
+            $this->formComponentActions  = $actions;
+            $this->formComponentSettings = $settings;
         }
 
         return $this;
     }
 
     /**
+     * For internal use only.
+     * 
      * Retrieves the stored form template for the post type.
      * If a template is provided and no stored template exists, it will create one.
      *
-     * @param FormComponent|null $template
+     * @param string             $name              The name of the form template.
+     * @param FormComponent|null $componentTemplate The form component template, if any.
+     * @param array              $actions           The actions to be associated with the form template.
+     * @param array              $settings          The settings to be associated with the form template.
      *
-     * @return FormTemplate|null
+     * @return FormTemplate
      */
-    private function getStoredFormTemplate(?FormComponent $template = null): ?FormTemplate {
-        if ($this->formTemplate instanceof FormTemplate) {
-            return $this->formTemplate;
+    private function __getStoredFormTemplate(
+        string $name, 
+        ?FormComponent $componentTemplate = null,
+        array $actions = [],
+        array $settings = []
+    ): FormTemplate {
+        if ($this->configurableFormTemplate instanceof FormTemplate) {
+            return $this->configurableFormTemplate;
         }
 
-        $this->formTemplate = FormTemplate::where('post_type', 'form-template')
-            ->where('post_name', $this->getHandle() . '_' . $this->formTypeLabel . '_form_template')
+        $formattedName = Str::slug($name);
+
+        $template = FormTemplate::where('post_type', 'form-template')
+            ->where('post_name', $formattedName)
             ->where('post_status', 'publish')
             ->first();
 
-        if ($this->formTemplate instanceof FormTemplate) {
-            return $this->formTemplate;
+        if ($template instanceof FormTemplate) {
+            return $template;
         }
 
-        if ($template instanceof FormComponent) {
-            $this->makeStoredFormTemplate($template);
-        }
-
-        return null;
+        return $this->__makeStoredFormTemplate(
+            $formattedName, 
+            $componentTemplate, 
+            $actions, 
+            $settings
+        );
     }
 
     /**
+     * For internal use only.
+     * 
      * Creates and stores a form template as a Post if it doesn't already exist.
      *
-     * @param FormComponent $template
+     * @param string             $formattedName     The formatted (slug) name of the form template.
+     * @param FormComponent|null $componentTemplate The form component template to use for creating the form template.
+     * @param array              $actions           The actions to be associated with the form template.
+     * @param array              $settings          The settings to be associated with the form template.
      *
-     * @return FormTemplate|null
+     * @return FormTemplate
      */
-    private function makeStoredFormTemplate(FormComponent $template): ?FormTemplate {
-        $templateName   = $template->getName();
-        $templateTitle  = $template->getTitle() ?: Str::title(Str::replace('-', ' ', $templateName));
-        $templateDescription = $template->getDescription();
+    private function __makeStoredFormTemplate(
+        string $formattedName, 
+        ?FormComponent $componentTemplate = null,
+        array $actions = [],
+        array $settings = []
+    ): FormTemplate {
+        if (!($componentTemplate instanceof FormComponent)) {
+            $templateTitle = Str::title(Str::replace('-', ' ', $formattedName));
+            $templateDescription = '';
+        } else {
+            $templateTitle  = $componentTemplate->getTitle() ?: Str::title(Str::replace('-', ' ', $formattedName));
+            $templateDescription = $componentTemplate->getDescription();
+
+            foreach ($componentTemplate->getFields() as $field) {
+                $field->templateField();
+            }
+        }
 
         $time = current_time('mysql');
         $gmtTime = current_time('mysql', 1);
 
         FormTemplate::create([
-            'post_name'         => $templateName,
+            'post_name'         => $formattedName,
             'post_title'        => $templateTitle,
             'post_content'      => $templateDescription,
             'post_status'       => 'publish',
@@ -243,19 +415,24 @@ trait UsesForms {
         ]);
 
         $storedTemplate = FormTemplate::where('post_type', 'form-template')
-            ->where('post_name', $this->getHandle() . '_' . $this->formTypeLabel . '_form_template')
+            ->where('post_name', $formattedName)
             ->where('post_status', 'publish')
             ->first();
 
-        if ($storedTemplate instanceof FormTemplate) {
-            $structure = $template->serialize('storage');
+        if ($storedTemplate instanceof FormTemplate && $componentTemplate instanceof FormComponent) {
+            $structure = $componentTemplate->serialize('storage');
             update_post_meta($storedTemplate->ID, self::FORM_STRUCTURE_META_KEY, $structure);
-
-            $this->formTemplate = $storedTemplate;
-            return $this->formTemplate;
         }
 
-        return null;
+        if ($storedTemplate instanceof FormTemplate && !empty($actions)) {
+            update_post_meta($storedTemplate->ID, self::FORM_ACTIONS_META_KEY, $actions);
+        }
+
+        if ($storedTemplate instanceof FormTemplate && !empty($settings)) {
+            update_post_meta($storedTemplate->ID, $this->__getFormSettingsMetaKey('template', true), $settings);
+        }
+
+        return $storedTemplate;
     }
 
     // =========================================================================
@@ -263,52 +440,95 @@ trait UsesForms {
     // =========================================================================
 
     /**
-     * Initialises the actions editor for the form.
+     * Initialises the form actions editor.
      *
-     * @return void
+     * @return static
      */
-    private function withActionsEditor(): void {
+    private function withActionsEditor(): static {
         add_action('meros_framework_booted', function () {
-            $this->configureFormActionsControls();
+            $this->__configureFormActionsControls();
         });
+
+        return $this;
     }
 
     /**
+     * For internal use only.
      * Configures the meta box used to create form actions.
      *
      * @return void
      */
-    private function configureFormActionsControls(): void {
+    private function __configureFormActionsControls(): void {
         $controls = new FlowControls($this)->getControls()->getId();
         $this->fields($controls);
     }
 
+    // =========================================================================
+    // Form Settings
+    // =========================================================================
+
     /**
-     * Retrieves a form's stored actions from the post meta table with the given id.
+     * Initialises the form settings editor.
      *
-     * @param integer $postId
-     *
-     * @return array
+     * @return static
      */
-    public function getFormActions(int $postId): array {
-        $data = $this->inspect($postId);
+    private function withFormSettings(): static {
+        add_action('meros_framework_booted', function () {
+            $this->__configureFormSettingsControls();
+        });
 
-        if (array_key_exists('form_actions', $data)) {
-            $actions = $data['form_actions'];
-
-            if (is_string($actions)) {
-                return unserialize($actions);
-            }
-
-            if (is_array($actions)) {
-                return $actions;
-            }
-
-            return [];
-        }
-        
-        return [];
+        return $this;
     }
+
+    /**
+     * For internal use only.
+     * Configures the meta box used to display form settings.
+     *
+     * @return void
+     */
+    private function __configureFormSettingsControls(): void {
+        if ($this instanceof FormCPT) {
+            $controls = new FormSettingsControls()->getControls()->getId();
+            $this->fields($controls);
+            return;
+        }
+
+        if ($this instanceof TemplateCPT) {
+            $controls = new FormTemplateSettingsControls()->getControls()->getId();
+            $this->fields($controls);
+            return;
+        }
+
+        $controls = new FormHostSettingsControls()->getControls()->getId();
+        $this->fields($controls);
+
+        $template = $this->getConfigurableFormTemplate();
+        if ($template instanceof FormTemplate) {
+            $container = $this->getContainer('form_host_settings');
+            if ($container instanceof PostMetaContainer) {
+                $formTemplateName = $container->getItems(true)->firstWhere(function (PostMeta $item) {
+                    return $item->getName() === 'form_template';
+                });
+
+                if ($formTemplateName instanceof PostMeta) {
+                    $formTemplateName->default($template->post_name);
+                }
+
+                $formTemplateId = $container->getItems(true)->firstWhere(function (PostMeta $item) {
+                    return $item->getName() === 'form_template_id';
+                });
+
+                if ($formTemplateId instanceof PostMeta) {
+                    $formTemplateId->default($template->ID);
+                }
+            }
+        }
+            
+    }
+
+    // =========================================================================
+    // Form Data
+    // =========================================================================
 
     /**
      * Overrides PostType's inspect method to include form metadata.
@@ -325,12 +545,16 @@ trait UsesForms {
             $data[self::FORM_STRUCTURE_META_KEY] = unserialize($data[self::FORM_STRUCTURE_META_KEY]);
         }
 
+        if (array_key_exists(self::FORM_ACTIONS_META_KEY, $data)) {
+            $data[self::FORM_ACTIONS_META_KEY] = $this->__parseFormActions($data[self::FORM_ACTIONS_META_KEY]);
+        }
+
+        if (array_key_exists('_meros_form_actions', $data)) {
+            $data[self::FORM_ACTIONS_META_KEY] = $this->__parseFormActions($data['_meros_form_actions']);
+        }
+
         return $data;
     }
-
-    // =========================================================================
-    // Form Data
-    // =========================================================================
 
     /**
      * Helper for FormBuilder to retrieve the meta key for the form structure.
@@ -348,69 +572,227 @@ trait UsesForms {
      *
      * @return array
      */
-    public function getFormStructure(?int $postId = null): array {
-        if ($postId === null && $this->formTemplate instanceof FormTemplate) {
-            return $this->getFormStructureFromModel($this->formTemplate);
-        }
-
-        else if ($postId === null && $this->formTemplate instanceof FormComponent) {
-            return $this->formTemplate->serialize('storage');
+    public function getFormStructure(?int $postId = null, bool $refresh = false): array {
+        if ($postId === null) {
+            return $this->getFormTemplateStructure($refresh);
         }
 
         else if ($postId !== null) {
-            $model = Post::find($postId);
-            if ($model instanceof Post) {
-                return $this->getFormStructureFromModel($model);
+            $data = $this->inspect($postId, $refresh);
+            if (array_key_exists(self::FORM_STRUCTURE_META_KEY, $data)) {
+                return $data[self::FORM_STRUCTURE_META_KEY];
             }
+
+            return $this->getFormTemplateStructure($refresh);
         }
-        
+
         return [];
     }
 
     /**
-     * Retrieves the form structure from the given model.
+     * Helper to retrieve the form structure from a template, if one exists.
      *
-     * @param Post $model
+     * @param boolean $refresh
      *
      * @return array
      */
-    private function getFormStructureFromModel(Post $model): array {
-        return $this->getFormMetaFromModel($model, self::FORM_STRUCTURE_META_KEY);
+    public function getFormTemplateStructure(bool $refresh = false): array {
+        $template = $this->resolveStoredFormTemplate();
+        if ($template instanceof FormTemplate) {
+            $data = $this->inspect($template->ID, $refresh);
+            if (array_key_exists(self::FORM_STRUCTURE_META_KEY, $data)) {
+                return $data[self::FORM_STRUCTURE_META_KEY];
+            }
+        }
+
+        if ($this->componentFormTemplate instanceof FormComponent) {
+            return $this->componentFormTemplate->serialize('storage');
+        }
+
+        return [];
     }
 
     /**
-     * Retrieves the form actions from the given model.
+     * Retrieves the form actions for the given post ID, or the template if no post ID is provided.
      *
-     * @param Post $model
+     * @param integer|null $postId
      *
      * @return array
      */
-    private function getFormActionsFromModel(Post $model): array {
-        return $this->getFormMetaFromModel($model, self::FORM_ACTIONS_META_KEY);
+    public function getFormActions(?int $postId = null, bool $refresh = false): array {
+        if ($postId === null && $this->getConfigurableFormTemplate() instanceof FormTemplate) {
+            return $this->getFormTemplateActions($refresh);
+        }
+
+        else if ($postId === null && $this->componentFormTemplate instanceof FormComponent) {
+            return $this->formComponentActions;
+        }
+
+        else if ($postId !== null) {
+            $data = $this->inspect($postId, $refresh);
+            if (array_key_exists(self::FORM_ACTIONS_META_KEY, $data)) {
+                return $data[self::FORM_ACTIONS_META_KEY];
+            }
+
+            return $this->getFormTemplateActions($refresh);
+        }
+
+        return [];
     }
 
     /**
-     * Retrieves the form settings from the given model.
+     * Helper to retrieve the form actions from a template, if one exists.
      *
-     * @param Post $model
+     * @param boolean $refresh
      *
      * @return array
      */
-    private function getFormSettingsFromModel(Post $model): array {
-        return $this->getFormMetaFromModel($model, self::FORM_SETTINGS_META_KEY);
+    public function getFormTemplateActions(bool $refresh = false): array {
+        $template = $this->getConfigurableFormTemplate();
+        if ($template instanceof FormTemplate) {
+            $data = $this->inspect($template->ID, $refresh);
+            return array_key_exists(self::FORM_ACTIONS_META_KEY, $data) 
+                ? $data[self::FORM_ACTIONS_META_KEY]
+                : [];
+        }
+
+        if ($this->componentFormTemplate instanceof FormComponent) {
+            return $this->formComponentActions;
+        }
+
+        return [];
+    }
+
+
+    /**
+     * Parses the form actions into a structured array.
+     *
+     * @param array|string $actions
+     *
+     * @return array
+     */
+    private function __parseFormActions(array|string $actions): array {
+        if (is_string($actions)) {
+            $actions = unserialize($actions);
+        }
+
+        if (!array_key_exists('form_actions', $actions)) {
+            return $actions;
+        }
+
+        $actions = $actions['form_actions'];
+
+        foreach ($actions as $index => $action) {
+            foreach ($action as $property => $value) {
+                if ($property === '__form_data') {
+                    $value = is_string($value) ? json_decode($value, true) : $value;
+                    $actions[$index] = array_merge($action, $value);
+                    unset($actions[$index]['__form_data']);
+                    break;
+                }
+            }
+        }
+        return $actions;
     }
 
     /**
-     * Retrieves the specified meta value from the given model.
+     * Retrieves the form settings for the given post ID, or the template if no post ID is provided.
      *
-     * @param Post $model
-     * @param string    $metaKey
+     * @param integer|null $postId
+     * @param boolean      $refresh
      *
      * @return array
      */
-    private function getFormMetaFromModel(Post $model, string $metaKey): array {
-        $meta = $model->meta->where('meta_key', $metaKey)->first();
-        return $meta ? unserialize($meta->meta_value) : [];
+    public function getFormSettings(?int $postId = null, bool $refresh = false): array {
+        if ($postId === null && $this->getConfigurableFormTemplate() instanceof FormTemplate) {
+            return $this->getFormTemplateSettings($refresh);
+        }
+
+        else if ($postId === null && $this->componentFormTemplate instanceof FormComponent) {
+            return $this->formComponentSettings;
+        }
+
+        else if ($postId !== null) {
+            $data   = $this->inspect($postId, $refresh);
+            $key    = $this->__getFormSettingsMetaKey('default', true);
+            $altKey = $this->__getFormSettingsMetaKey('default', false);
+
+            if (array_key_exists($key, $data)) {
+                return $this->__parseFormSettings($data[$key]);
+            }
+
+            if (array_key_exists($altKey, $data)) {
+                return $this->__parseFormSettings($data[$altKey]);
+            }
+
+            return $this->getFormTemplateSettings($refresh);
+        }
+
+        return [];
+    }
+
+    /**
+     * Helper to retrieve the form settings from a template, if one exists.
+     *
+     * @param boolean $refresh
+     *
+     * @return array
+     */
+    public function getFormTemplateSettings(bool $refresh = false): array {
+        $template = $this->getConfigurableFormTemplate();
+        if ($template instanceof FormTemplate) {
+            $data   = $this->inspect($template->ID, $refresh);
+            $key    = $this->__getFormSettingsMetaKey('template', true);
+            $altKey = $this->__getFormSettingsMetaKey('template', false);
+
+            if (array_key_exists($key, $data)) {
+                return $this->__parseFormSettings($data[$key]);
+            }
+
+            if (array_key_exists($altKey, $data)) {
+                return $this->__parseFormSettings($data[$altKey]);
+            }
+
+            return [];
+        }
+
+        if ($this->componentFormTemplate instanceof FormComponent) {
+            return $this->formComponentSettings;
+        }
+
+        return [];
+    }
+
+    private function __parseFormSettings(string|array $settings): array {
+        if (is_string($settings)) {
+            return unserialize($settings);
+        }
+
+        return is_array($settings) ? $settings : [];
+    }
+
+    /**
+     * For internal use only.
+     * Returns the meta key used to store the form settings for the current post type.
+     * 
+     * @param string $type The type of form settings key to retrieve (default, actions, settings).
+     *
+     * @return string
+     */
+    private function __getFormSettingsMetaKey(string $type = 'default', bool $withPrefix = false): string {
+        if ($type === 'template' || ($type === 'default' && $this instanceof TemplateCPT)) {
+            return $withPrefix ? '_meros_form_template_settings' : 'form_template_settings';
+        }
+
+        if ($type === 'form' || ($type === 'default' && $this instanceof FormCPT)) {
+            return $withPrefix ? '_meros_form_settings' : 'form_settings';
+        }
+
+        if ($type === 'host' || ($type === 'default' && $this instanceof FormHost)) {
+            return $withPrefix ? '_meros_form_host_settings' : 'form_host_settings';
+        }
+
+        throw new \InvalidArgumentException("Invalid form settings type: {$type}");
     }
 
     // =========================================================================
@@ -455,8 +837,8 @@ trait UsesForms {
      */
     private function makeFormBlock(): void {
         $block = $this->makeItem(DynamicBlock::class, [], [
-            'name'  => $this->handle . '-form-block',
-            'title' => Str::title($this->handle) . ' Form Block',
+            'name'  => $this->getHandle() . '-form-block',
+            'title' => Str::title($this->getHandle()) . ' Form Block',
             'icon'  => 'feedback'
         ]);
 
@@ -466,7 +848,7 @@ trait UsesForms {
 
         $block->attribute('title', [
             'type'    => 'string',
-            'default' => Str::title($this->handle) . ' Form',
+            'default' => Str::title($this->getHandle()) . ' Form',
             'control' => true
         ]);
 
@@ -507,7 +889,7 @@ trait UsesForms {
         });
 
         $block->renderCallback(function (array $args) {
-            $title = isset($args['attributes']['title']) ? $args['attributes']['title'] : ucfirst($this->formTypeLabel) . ' Form';
+            $title = isset($args['attributes']['title']) ? $args['attributes']['title'] : '';
             $description = isset($args['attributes']['description']) ? $args['attributes']['description'] : '';
             $hideTitle = isset($args['attributes']['show_title']) && $args['attributes']['show_title'] === false;
             $hideDescription = isset($args['attributes']['show_description']) && $args['attributes']['show_description'] === false;
@@ -672,7 +1054,7 @@ trait UsesForms {
     // Helpers
     // =========================================================================
 
-        /**
+    /**
      * Helper to retrieve a form's stored fields array.
      *
      * @param integer $postId
@@ -704,14 +1086,14 @@ trait UsesForms {
         if ($instance instanceof FormComponent) {
             $fields = $instance->getFields(true);
 
-            $listType = is_string($config['list_type'] ?? null) && in_array($config['list_type'], ['options', 'with_type', 'full'])
+            $listType = is_string($config['list_type'] ?? null) && in_array($config['list_type'], ['options', 'with_type', 'full', 'template'])
                 ? $config['list_type']
                 : 'simple';
 
             $appendLabel  = $config['append_label'] ?? '';
             $prependLabel = $config['prepend_label'] ?? '';
 
-            if (in_array($listType, ['simple', 'with_type'])) {
+            if (in_array($listType, ['simple', 'with_type', 'template'])) {
                 $arr = [];
                 
                 foreach ($fields as $field) {
@@ -734,6 +1116,9 @@ trait UsesForms {
 
                     if ($listType === 'simple') {
                         $arr[$name] = $label;
+                    
+                    } else if ($listType === 'template') {
+                        $arr[$name] = $this->formatTemplateField($field, $label);
                     } else {
                         $arr[$name] = [
                             'name'      => $name,
@@ -751,6 +1136,74 @@ trait UsesForms {
         }
 
         return null;
+    }
+
+    /**
+     * Retrieves the template fields for the form, either from a 
+     * configurable form template or a component form template.
+     *
+     * @return array|null
+     */
+    private function resolveStoredFormTemplate(): ?FormTemplate {
+        $template = $this->configurableFormTemplate;
+        if ($template === null && $this->configurableFormTemplateName !== null) {
+            if (!$this->storedFormTemplateLookupDone) {
+                $this->resolvedStoredFormTemplate = FormTemplate::where('post_type', 'form-template')
+                    ->where('post_name', $this->configurableFormTemplateName)
+                    ->where('post_status', 'publish')
+                    ->first();
+                $this->storedFormTemplateLookupDone = true;
+            }
+            $template = $this->resolvedStoredFormTemplate;
+        }
+        return $template;
+    }
+
+    /**
+     * Retrieves the template fields for the form, either from a 
+     * configurable form template or a component form template.
+     *
+     * @return array|null
+     */
+    public function getTemplateFields(): ?array {
+        $template = $this->resolveStoredFormTemplate();
+        if ($template instanceof FormTemplate) {
+            return $this->getStoredFields(
+                $template->ID,
+                [
+                    'list_type' => 'template'
+                ]
+            );
+        }
+
+        if ($this->hasComponentFormTemplate()) {
+            $fields = [];
+            foreach ($this->componentFormTemplate->getFields() as $field) {
+                $fields[$field->getName()] = $this->formatTemplateField($field, $field->getLabel());
+            }
+            return $fields;
+        }
+
+        return null;
+    }
+
+    /**
+     * Formats a template field into an array structure suitable for use in forms.
+     *
+     * @param Field  $field
+     * @param string $label
+     *
+     * @return array
+     */
+    private function formatTemplateField(Field $field, string $label): array {
+        return [
+            'name'        => $field->getName(),
+            'label'       => $label,
+            'description' => $field->getDescription(),
+            'default'     => $field->getDefaultValue(),
+            'locked'      => $field->isLocked(),
+            ...$field->serialize('storage')
+        ];
     }
 
     /**

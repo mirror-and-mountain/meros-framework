@@ -26,7 +26,9 @@ export default class MerosFormProcessor {
     process(data) {
         this.payload = { ...data };
 
+        // Process checkbox fields first, ensuring they are included in the payload even if unchecked.
         this.form.querySelectorAll('input[type="checkbox"][data-field-type="checkbox"][name]').forEach((checkbox) => {
+            if (checkbox.matches(':disabled')) return;
             if (Object.prototype.hasOwnProperty.call(this.payload, checkbox.name)) {
                 return;
             }
@@ -34,6 +36,17 @@ export default class MerosFormProcessor {
             this.payload[checkbox.name] = checkbox.checked;
         });
 
+        // Process richtext fields, ensuring they are included in the payload even if empty.
+        this.form.querySelectorAll('[data-field-type="richtext"][data-name]').forEach((field) => {
+            const name = field.dataset.name;
+            if (!name || field.hasAttribute('disabled') || field.closest('fieldset[disabled]')) return;
+
+            if (!Object.prototype.hasOwnProperty.call(this.payload, name)) {
+                this.payload[name] = null;
+            }
+        });
+
+        // Process all fields in the payload, normalising keys and handling repeaters and multi-choice fields.
         Object.keys(this.payload).forEach((key) => {
             let normalisedKey = key;
 
@@ -158,6 +171,10 @@ export default class MerosFormProcessor {
         
         if (field === null) {
             field = getFieldByAttribute('name', fieldName);
+        }
+
+        if (field === null) {
+            field = this.form.querySelector(`[data-field-type="richtext"][data-name="${fieldName}"]`);
         }
 
         return field;

@@ -17,6 +17,7 @@ use MM\Meros\App\Components\Fields\Password;
 use MM\Meros\App\Components\Fields\PostsLookup;
 use MM\Meros\App\Components\Fields\Radio;
 use MM\Meros\App\Components\Fields\Repeater;
+use MM\Meros\App\Components\Fields\RichText;
 use MM\Meros\App\Components\Fields\Select;
 use MM\Meros\App\Components\Fields\Tel;
 use MM\Meros\App\Components\Fields\Text;
@@ -32,7 +33,6 @@ use MM\Meros\Facades\Support\Ajax;
 use MM\Meros\Facades\Components\Fields;
 use MM\Meros\Facades\Content\PostTypes;
 
-use MM\Meros\App\Content\Form as FormPostType;
 use MM\Meros\App\Models\Post;
 use MM\Meros\Contracts\Features\Content\Interfaces\FormHost;
 
@@ -49,6 +49,7 @@ class Orchestrator extends ComponentsOrchestrator {
         'posts_lookup' => PostsLookup::class,
         'radio'        => Radio::class,
         'repeater'     => Repeater::class,
+        'richtext'     => RichText::class,
         'select'       => Select::class,
         'tel'          => Tel::class,
         'text'         => Text::class,
@@ -239,7 +240,7 @@ class Orchestrator extends ComponentsOrchestrator {
             $formPostType = $formPost !== null ? PostTypes::get($formPost->post_type) : null;
 
             if ($formPostId !== false && $formPostId > 0 && $formPostType instanceof FormHost) {
-                $field = $formPostType->findField($formPostId, $name, $originalName, $fieldClass);
+                $field = $formPostType->findField($formPost, $name, $originalName, $fieldClass);
                 if ($field !== null) {
                     return $field;
                 }

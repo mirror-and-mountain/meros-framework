@@ -60,18 +60,31 @@ abstract class Input extends Field {
         return $this;
     }
 
-    public static function getBuilderControls(): ?FieldGroup {
-        $group = parent::getBuilderControls();
+    /**
+     * Adds builder controls specific to the input field.
+     *
+     * @param FieldGroup $group
+     * @param boolean    $locked
+     * @param array      $rowData The data for the current row in the form builder.
+     *
+     * @return FieldGroup
+     */
+    protected static function addBuilderControls(FieldGroup $group, bool $locked = false, array $rowData = []): FieldGroup {
+        $group->row(function ($row) use ($locked) {
+            $row->field('text', [
+                'name'        => 'placeholder',
+                'label'       => 'Placeholder',
+                'readonly'    => $locked,
+                'description' => "The field's placeholder text."
+            ]);
 
-        $group->field('text', [
-            'name'  => 'placeholder',
-            'label' => 'Placeholder'
-        ]);
-
-        $group->field(Str::lower(class_basename(static::class)), [
-            'name'  => 'defaultValue',
-            'label' => 'Default Value'
-        ]);
+            $row->field(Str::lower(class_basename(static::class)), [
+                'name'        => 'defaultValue',
+                'label'       => 'Default Value',
+                'readonly'    => $locked,
+                'description' => "The field's default value."
+            ]);
+        });
 
         return $group;
     }

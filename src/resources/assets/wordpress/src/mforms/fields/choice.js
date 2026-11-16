@@ -46,7 +46,11 @@ const mformsChoice = () => {
             const currentValue = this.getValue();
             const currentInput = this.inputs?.[0];
             const inputType = currentInput?.type || (this.type === 'checkboxes' ? 'checkbox' : 'radio');
-            const inputName = currentInput?.name || '';
+            const name = this.$el.dataset.name;
+            if (!currentInput?.name && !name) {
+                throw new Error('Cannot set choice options without a field name.');
+            }
+            const inputName = currentInput?.name || `${name}${this.type === 'checkboxes' ? '[]' : ''}`;
             const values = new Set((Array.isArray(options) ? options : []).map(option => String(option.value)));
             const nextValue = Array.isArray(currentValue)
                 ? currentValue.filter(value => values.has(String(value)))

@@ -147,19 +147,6 @@ final class Context {
     }
 
     /**
-     * Returns the ajax hook prefix based on the current context (admin or site).
-     *
-     * @param boolean $private
-     *
-     * @return string
-     */
-    public function getAjaxHook(string $hook, bool $private = false): string {
-        return $this->isAdmin() 
-            ? 'wp_ajax_' . $hook 
-            : ($private === false ? 'wp_ajax_nopriv_' . $hook : 'wp_ajax_' . $hook);
-    }
-
-    /**
      * Returns whether the user is currently editing a post of the specified post type in WP Admin.
      *
      * @param string $postType
@@ -189,6 +176,10 @@ final class Context {
             }
 
             return $post->post_type === $postType;
+        }
+
+        if ($this->adminScreen === 'edit.php') {
+            return ($this->params['post_type'] ?? '') === $postType;
         }
 
         return false;

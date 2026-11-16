@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\File;
 use MM\Meros\Contracts\MerosServiceProvider;
 
 use MM\Meros\App\Framework;
-use MM\Meros\App\Listeners\MigrationEventSubscriber;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
@@ -219,8 +218,6 @@ class FrameworkServiceProvider extends MerosServiceProvider {
      * @return void
      */
     final public function boot(): void {
-        $this->initEventSubscribers();
-
         // Instantiate the framework
         $framework = $this->app->make(Framework::class)->get();
 
@@ -251,15 +248,6 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         $this->app->booted(function () {
             do_action('meros_framework_booted');
         });
-    }
-
-    /**
-     * Initialises event subscribers for the framework.
-     *
-     * @return void
-     */
-    private function initEventSubscribers(): void {
-        Event::subscribe(MigrationEventSubscriber::class);
     }
 
     /**

@@ -1,21 +1,24 @@
 <?php
 
-namespace MM\Meros\Contracts\Features\Automation;
+namespace MM\Meros\Support;
 
 use Illuminate\Support\Str;
 
 use MM\Meros\Contracts\Providers\FeatureProvider;
 
+use MM\Meros\Contracts\Features\Automation\FlowAction;
 use MM\Meros\Contracts\Features\Components\Form as FormComponent;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\FieldRow;
 
 use MM\Meros\Contracts\Features\Content\Interfaces\FormHost;
 
+use MM\Meros\App\Components\Fields\Checkbox;
 use MM\Meros\App\Components\Fields\Select;
 use MM\Meros\App\Components\Fields\Textarea;
 use MM\Meros\App\Components\Fields\Hidden;
 use MM\Meros\App\Components\Fields\Repeater;
+
 
 use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Components\FieldGroups;
@@ -80,14 +83,14 @@ class FlowControls {
      * @return void
      */
     private function init(): void {
-        $group = FieldGroups::checkout($this->formHost->getProvider())->get('form-actions');
+        $group = FieldGroups::checkout(Framework::get())->get('form-actions');
 
         if ($group !== null) {
             $this->group = $group;
             return;
         }
 
-        $this->group = FieldGroups::checkout($this->formHost->getProvider())
+        $this->group = FieldGroups::checkout(Framework::get())
          ->make(function (FieldGroup $group) {
             $group->id('form-actions');
             $group->title('Form Actions');
@@ -110,12 +113,17 @@ class FlowControls {
                     ]);
                 });
 
+                $postId = $_GET['post'] ?? '';
+                if (!is_string($postId)) {
+                    $postId = '';
+                }
+
                 $repeater->field('hidden', [
                     'name'    => 'post_id',
-                    'default' => $_GET['post'] ?? ''
+                    'default' => $postId
                 ]);
 
-                $repeater->editForm([$this, 'getEditForm'], 'Configure', 'Edit Action');
+                $repeater->editForm([$this, 'getEditForm'], 'Configure', 'Edit Action', 'action');
             });
         });
     }
@@ -419,10 +427,11 @@ class FlowControls {
             'readonly' => true,
         ]);
 
-        $row->field('checkbox', function ($field) use ($inputName, $dynamicAllowed) {
+        $row->field('checkbox', function (Checkbox $field) use ($inputName, $dynamicAllowed) {
             $field->name('use_dynamic_value_' . $inputName);
             $field->label('Use Dynamic Value');
             $field->default($dynamicAllowed);
+            $field->vertical();
 
             if ($dynamicAllowed === false) {
                 $field->disabled();
@@ -440,7 +449,7 @@ class FlowControls {
      * @return void
      */
     private function buildInputValueRow(FieldRow $row, string $inputName, array $properties, array $dynamicOptions, array $formFields): void {
-        $dataType       = $properties['type'] ?? null;
+        $dataType = $properties['type'] ?? null;
 
         if ($dataType === null || !is_string($dataType) || empty($dataType)) {
             return;
