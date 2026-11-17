@@ -1,5 +1,12 @@
 @php
     $inRepeater = $repeaterId !== null;
+
+    if (($resolveDynamicValues ?? true) && isset($defaultValue) && is_string($defaultValue) && Str::startsWith($defaultValue, '{{') && Str::endsWith($defaultValue, '}}')) {
+        $dynamicValue = \MM\Meros\Facades\Support\FormDynamicValues::resolve($defaultValue);
+        if ($dynamicValue !== null) {
+            $defaultValue = $dynamicValue;
+        }
+    }
 @endphp
 
 <div 

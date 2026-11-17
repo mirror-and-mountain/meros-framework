@@ -54,6 +54,20 @@ class FormSettingsControls {
                     'toggle'      => true,
                 ], false);
 
+                $group->field('text', [
+                    'name'        => 'submit_button_text',
+                    'label'       => 'Submit Button Text',
+                    'description' => 'Text displayed on the form submit button.',
+                    'default'     => 'Submit',
+                ], false);
+
+                $group->field('richtext', [
+                    'name'        => 'success_message',
+                    'label'       => 'Success Message',
+                    'description' => "Message displayed upon successful form submission.",
+                    'default'     => 'Form Submitted Successfully.',
+                ], false);
+
                 foreach (['open', 'close'] as $prefix) {
                     $group->row(function ($row) use ($prefix) {
                         $row->field('date', [

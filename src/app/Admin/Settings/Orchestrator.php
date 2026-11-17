@@ -21,6 +21,7 @@ use MM\Meros\App\Admin\Sections\MerosSettings;
 use MM\Meros\App\Admin\Sections\MerosFormsFieldStyles;
 use MM\Meros\App\Admin\Sections\MerosFormsProgressStyles;
 use MM\Meros\App\Admin\Sections\MerosFormsButtonStyles;
+use MM\Meros\App\Admin\Sections\MerosFormsFeedbackStyles;
 
 use MM\Meros\App\Admin\Settings\Containers\MerosFrameworkSettings;
 use MM\Meros\App\Admin\Settings\Containers\MerosIntegrationSettings;
@@ -70,6 +71,7 @@ class Orchestrator extends SettingsOrchestrator {
         $this->settingsSections()->register(MerosFormsFieldStyles::class, 'meros-forms-field-styles-section');
         $this->settingsSections()->register(MerosFormsProgressStyles::class, 'meros-forms-progress-styles-section');
         $this->settingsSections()->register(MerosFormsButtonStyles::class, 'meros-forms-button-styles-section');
+        $this->settingsSections()->register(MerosFormsFeedbackStyles::class, 'meros-forms-feedback-styles-section');
     }
 
     /**
@@ -195,6 +197,67 @@ class Orchestrator extends SettingsOrchestrator {
             $setting->field('number');
             $setting->page('meros-forms-styles');
             $setting->section('meros-forms-field-styles-section');
+        });
+
+        // Messages
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_feedback_success_text_color');
+            $setting->label('Forms Feedback Success Text Color');
+            $setting->description('This controls the text colour of success feedback messages across the site.');
+            $setting->default('#166534');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-feedback-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_feedback_success_border_color');
+            $setting->label('Forms Feedback Success Border Color');
+            $setting->description('This controls the border colour of success feedback messages across the site.');
+            $setting->default('#86efac');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-feedback-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_feedback_success_bg_color');
+            $setting->label('Forms Feedback Success Background Color');
+            $setting->description('This controls the background colour of success feedback messages across the site.');
+            $setting->default('#f0fdf4');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-feedback-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_feedback_error_text_color');
+            $setting->label('Forms Feedback Error Text Color');
+            $setting->description('This controls the text colour of error feedback messages across the site.');
+            $setting->default('#991b1b');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-feedback-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_feedback_error_border_color');
+            $setting->label('Forms Feedback Error Border Color');
+            $setting->description('This controls the border colour of error feedback messages across the site.');
+            $setting->default('#fca5a5');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-feedback-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_feedback_error_bg_color');
+            $setting->label('Forms Feedback Error Background Color');
+            $setting->description('This controls the background colour of error feedback messages across the site.');
+            $setting->default('#fef2f2');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-feedback-styles-section');
         });
 
         // Buttons

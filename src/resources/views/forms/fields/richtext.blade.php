@@ -5,7 +5,14 @@
 @if ($wrapper === 'meros::forms.fields.richtext')
     <div x-data="mformsRichText" class="mforms-richtext-field meros-field-wrapper mforms-field-wrapper nice-form-group">
         @if(!$inRepeater && $type !== 'hidden')
-            <label for="{{ $id }}" class="meros-field-label">{{ $label }}</label>
+            <label 
+                for="{{ $id }}" 
+                class="meros-field-label">
+                {{ $label }}
+                @if($required ?? false)
+                    <span class="meros-field-required">*</span>
+                @endif
+            </label>
         @endif
         @if (!$inRepeater && $description !== '')
             <div style="margin-bottom: 0.5rem;">

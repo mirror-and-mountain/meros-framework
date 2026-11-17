@@ -100,6 +100,34 @@ export default class MerosFieldsProcessor {
         });
     }
 
+    reset() {
+        const fields = Object.values(this.fields);
+        fields.forEach(field => {
+            if (field.control.classList.contains('mforms-repeater-field')) {
+                field.component?.reset();
+                return;
+            }
+
+            if (field.conditionalOptionsActive) {
+                this.setFieldOptions(field, field.initialOptions);
+            }
+            field.conditionalOptionsActive = false;
+            field.conditionalValueState = null;
+            field.conditionalValueActive = false;
+            field.conditionalValueFromSource = false;
+            this.setFieldValue(field, field.initialValue);
+        });
+
+        fields.forEach(field => {
+            if (this.fieldHasConditions(field.name)) this.applyFieldConditions(field.name);
+        });
+        Object.values(this.groups).forEach(group => this.applyGroupConditions(group.name));
+        this.refreshRequiredStates();
+        fields.forEach(field => {
+            field.lastActionValue = JSON.stringify(this.getFieldValue(field));
+        });
+    }
+
     /**
      * Registers and initializes fields added to a repeater row after its initial setup.
      *
@@ -180,6 +208,7 @@ export default class MerosFieldsProcessor {
         const conditions = wrapperElement.dataset.fieldConditions
             ? JSON.parse(wrapperElement.dataset.fieldConditions)
             : null;
+        const initialValue = this.getControlValue(control, component);
 
         this.fields[fieldName] = {
             name: fieldName,
@@ -195,7 +224,7 @@ export default class MerosFieldsProcessor {
             control: control,
             component: component,
             conditions: conditions,
-            initialValue: this.getControlValue(control, component),
+            initialValue: Array.isArray(initialValue) ? [...initialValue] : initialValue,
             initialOptions: this.getControlOptions(control),
             conditionalValueState: null,
             conditionalValueActive: false,
@@ -272,6 +301,7 @@ export default class MerosFieldsProcessor {
 
             Object.values(config.rules).forEach(rule => {
                 if (typeof rule !== 'object') return;
+                if (rule.field === '__user_signed_in') return;
                 if (!rule.field) return;
                 if (!rule.operator) return;
                 if (
@@ -451,6 +481,19 @@ export default class MerosFieldsProcessor {
         const results = Object.values(config.rules)
             .filter(rule => rule && typeof rule === 'object' && rule.field && rule.operator)
             .map(rule => {
+                if (rule.field === '__user_signed_in' && ['show', 'hide'].includes(type)) {
+                    const form = this.parent.closest('.mforms-form');
+                    const component = form ? this.getFieldComponent(form) : null;
+                    if (typeof component?.userSignedIn !== 'boolean') {
+                        throw new Error('User sign-in conditions require an initialized form component.');
+                    }
+                    return this.evaluateRule(
+                        component.userSignedIn,
+                        rule.operator,
+                        this.getRuleSourceValue(rule),
+                        'checkbox'
+                    );
+                }
                 const sourceField = this.getFieldByConditionName(rule.field, field);
 
                 return sourceField

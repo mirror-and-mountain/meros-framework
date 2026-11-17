@@ -6,6 +6,8 @@ import { createChoiceDefaultEditor } from '../builder-choice-default.js';
 import { positionTemplateFieldLocks, updateTemplateLockControls } from '../builder-template-locks.js';
 
 const mformsRepeater = () => {
+    let initialRows = [];
+
     return {
         container: null,
         numRows: 0,
@@ -64,6 +66,7 @@ const mformsRepeater = () => {
                 this.container.removeAttribute('data-ajax-nonce');
                 this.container.removeAttribute('data-on-remove');
                 this.numRows = this.resolveRows().length;
+                initialRows = Array.from(this.resolveRows(), row => row.cloneNode(true));
 
                 this.$nextTick(() => {
                     this.fieldsProcessor = new MerosFieldsProcessor(this.container);
@@ -234,6 +237,27 @@ const mformsRepeater = () => {
                 this.addRowButton.disabled = true;
             }
             this.container.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+
+        reset() {
+            const restoreRows = () => {
+                this.resolveRows().forEach(row => {
+                    window.Alpine?.destroyTree(row);
+                    row.remove();
+                });
+                initialRows.forEach(initialRow => {
+                    const row = initialRow.cloneNode(true);
+                    this.resolveTableBody().appendChild(row);
+                    window.Alpine?.initTree(row);
+                });
+            };
+            if (window.Alpine) window.Alpine.mutateDom(restoreRows);
+            else restoreRows();
+
+            this.numRows = this.resolveRows().length;
+            this.editingRowIndex = null;
+            if (this.addRowButton) this.addRowButton.disabled = !this.canAddRow();
+            this.fieldsProcessor = new MerosFieldsProcessor(this.container);
         },
 
         handleEditRow(event) {

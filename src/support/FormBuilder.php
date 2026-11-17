@@ -157,10 +157,10 @@ class FormBuilder {
 
                 foreach (TemplateComponentLocks::SETTINGS as $flag => $setting) {
                     $repeater->field('checkbox', [
-                        'name' => $flag,
-                        'label' => $flag,
+                        'name'    => $flag,
+                        'label'   => $flag,
                         'default' => false,
-                        'hide' => true,
+                        'hide'    => true,
                     ]);
                 }
 
@@ -310,7 +310,7 @@ class FormBuilder {
                     'fields' => $fields,
                     'defaultValue' => $defaults,
                 ]);
-                wp_send_json_success(['html' => $repeater->html()]);
+                wp_send_json_success(['html' => $repeater->html(['resolveDynamicValues' => false], true)]);
             } catch (\JsonException | \InvalidArgumentException $exception) {
                 wp_send_json_error(['message' => $exception->getMessage()], 400);
             }
@@ -328,6 +328,8 @@ class FormBuilder {
      * @return FormComponent
      */
     private function configureFieldEditForm(FormComponent $form, array $rowData, bool $withTemplateLock = true): FormComponent {
+        $form->resolveDynamicValues(false);
+
         $fieldType = $rowData['field_type'] ?? '';
         if (empty($fieldType)) {
             return $form;
@@ -345,11 +347,11 @@ class FormBuilder {
                     '__remove_locked_by_template' => 'Prevent Removal',
                 ] as $flag => $label) {
                     $row->field('checkbox', [
-                        'name' => $flag,
-                        'label' => $label,
-                        'toggle' => true,
-                        'hide' => !$isTemplate && !$locks[$flag],
-                        'default' => $locks[$flag],
+                        'name'     => $flag,
+                        'label'    => $label,
+                        'toggle'   => true,
+                        'hide'     => !$isTemplate && !$locks[$flag],
+                        'default'  => $locks[$flag],
                         'disabled' => !$isTemplate,
                     ]);
                 }
@@ -836,8 +838,17 @@ class FormBuilder {
                 foreach ($config['rules'] as $rule) {
                     $source = is_array($rule) ? ($rule['field'] ?? null) : null;
                     $operator = is_array($rule) ? ($rule['operator'] ?? null) : null;
+                    if ($source === '__user_signed_in') {
+                        $value = $rule['source_value'] ?? $rule['value'] ?? null;
+                        if (in_array($type, ['show', 'hide'], true) &&
+                            in_array($operator, ['=', '!='], true) &&
+                            in_array($value, [true, false, 'true', 'false'], true)) {
+                            $rules[] = $rule;
+                            continue;
+                        }
+                    }
                     $sourceType = is_string($source) ? ($precedingFields[$source] ?? null) : null;
-                    if ($sourceType === null || $source === $fieldName ||
+                    if ($source === '__user_signed_in' || $sourceType === null || $source === $fieldName ||
                         ($sourceType === 'repeater' && !in_array($operator, ['EMPTY', 'NOT EMPTY'], true))) {
                         $removed[] = [
                             'target' => $component['name'] ?? '',
@@ -968,12 +979,6 @@ class FormBuilder {
         if ($useStoredRows) {
             $removedConditions = [];
             $rows = $this->removeInvalidConditionRules($rows, $availableFields, $removedConditions);
-            if ($removedConditions !== []) {
-                Log::warning('Skipped invalid form builder condition rules while rendering.', [
-                    'post_id' => $post->ID,
-                    'rules' => $removedConditions,
-                ]);
-            }
         }
 
         $form = Forms::checkout($this->postType->getProvider())->make(function (FormComponent $form) use ($post, $rows, $availableFields, $hideSubmitButton) {
@@ -988,6 +993,20 @@ class FormBuilder {
                 ? ($templateSettings['display_as_pages'] ?? false)
                 : ($settings['display_as_pages'] ?? $templateSettings['display_as_pages'] ?? false);
             $form->displayAsPages(filter_var($displayAsPages, FILTER_VALIDATE_BOOLEAN));
+
+            foreach ([
+                'submit_button_text' => ['submitText', 'allow_edit_submit_button_text'],
+                'success_message' => ['successMessage', 'allow_edit_success_message'],
+            ] as $key => [$method, $permission]) {
+                $locked = array_key_exists($permission, $templateSettings) &&
+                    !filter_var($templateSettings[$permission], FILTER_VALIDATE_BOOLEAN);
+                $value = $locked
+                    ? ($templateSettings[$key] ?? null)
+                    : ($settings[$key] ?? $templateSettings[$key] ?? null);
+                if ($value !== null) {
+                    $form->{$method}($value);
+                }
+            }
 
             if ($hideSubmitButton) {
                 $form->hideSubmitButton(true);

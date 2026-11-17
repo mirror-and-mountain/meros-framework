@@ -12,16 +12,20 @@ const mform = () => {
         ajaxNonce: null,
         conditionsAjaxNonce: null,
         onSubmit: null,
+        submitButton: null,
         invalidText: null,
+        successMessage: 'Form Submitted Successfully.',
         fieldsProcessor: null,
         feedbackMessage: '',
         feedbackType: '',
+        isSubmitting: false,
         pages: [],
         availablePages: [],
         activePage: null,
         pageNumber: 0,
         pageCount: 0,
         pageTitle: '',
+        userSignedIn: false,
 
         get hasPreviousPage() {
             return this.pageNumber > 1;
@@ -42,17 +46,22 @@ const mform = () => {
         init() {
             this.id = this.$el.id || null;
             this.name = this.$el.dataset.name || null;
+            this.userSignedIn = this.$el.hasAttribute('data-user-signed-in');
 
             this.ajaxAction = 'meros_submit_form';
             this.ajaxUrl = this.$el.dataset.ajaxUrl || null;
             this.ajaxNonce = this.$el.dataset.ajaxNonce || null;
 
             this.onSubmit = this.$el.dataset.onsubmit || null;
+            this.submitButton = this.$el.querySelector('[type="submit"]') || null;
             this.invalidText = this.$el.dataset.invalidText || null;
+            this.successMessage = this.$el.dataset.successMessage ?? this.successMessage;
 
             this.$el.removeAttribute('data-ajax-url');
             this.$el.removeAttribute('data-ajax-nonce');
             this.$el.removeAttribute('data-invalid-text');
+            this.$el.removeAttribute('data-success-message');
+            this.$el.removeAttribute('data-user-signed-in');
 
             // Nested Alpine components are initialized after this component's init hook.
             this.$nextTick(() => {
@@ -139,6 +148,7 @@ const mform = () => {
         },
 
         nextPage() {
+            if (this.isSubmitting) return;
             this.refreshPages();
             if (!this.hasNextPage) return;
             const invalid = this.findInvalidControl(this.activePage);
@@ -150,6 +160,7 @@ const mform = () => {
         },
 
         previousPage() {
+            if (this.isSubmitting) return;
             this.refreshPages();
             if (this.hasPreviousPage) this.showPage(this.availablePages[this.pageNumber - 2], true);
         },
@@ -159,6 +170,8 @@ const mform = () => {
         // =========================================================================
 
         submitForm(returnOutcome = false) {
+            if (this.isSubmitting) return;
+
             const genericError = 'An error occured while submitting the form.'
             const invalidError = this.invalidText || "The form is invalid. Please check the information you've entered."
 
@@ -196,7 +209,7 @@ const mform = () => {
                 });
 
                 return this.completeSubmission(
-                    {success: true, error: null, message: 'Form submitted successfully.'},
+                    {success: true, error: null, message: this.successMessage},
                     returnOutcome
                 );
             }
@@ -212,6 +225,8 @@ const mform = () => {
             postData.append('form_name', this.name);
             postData.append('id', this.id);
             postData.append('form_data', JSON.stringify(formData));
+
+            this.isSubmitting = true;
 
             const request = fetch(this.ajaxUrl, {
                 method: 'POST',
@@ -229,7 +244,7 @@ const mform = () => {
                     return {
                         success: true,
                         error: null,
-                        message: data.data.message || 'Form submitted successfully.'
+                        message: data.data.message || this.successMessage
                     };
                 }
 
@@ -243,6 +258,11 @@ const mform = () => {
                     success: false,
                     error: error instanceof Error ? error.message : genericError
                 };
+            })
+            .finally(async () => {
+                this.isSubmitting = false;
+                // Remove inert before a successful reset focuses the first page.
+                await this.$nextTick(() => {});
             });
 
             if (returnOutcome) {
@@ -258,9 +278,22 @@ const mform = () => {
             }
 
             this.feedbackMessage = outcome.success
-                ? outcome.message || 'Form submitted successfully.'
+                ? outcome.message ?? this.successMessage
                 : outcome.error || 'An error occured while submitting the form.';
             this.feedbackType = outcome.success ? 'success' : 'error';
+            if (outcome.success) this.resetForm();
+        },
+
+        resetForm() {
+            const form = this.resolveForm();
+            if (!form) return;
+
+            HTMLFormElement.prototype.reset.call(form);
+            this.fieldsProcessor?.reset();
+            if (this.pages.length) {
+                this.refreshPages();
+                this.showPage(this.availablePages[0] || null, true);
+            }
         },
 
         // =========================================================================

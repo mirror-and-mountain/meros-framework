@@ -303,8 +303,8 @@ class FormBuilder extends Component {
             'default'  => $value,
             'readonly' => $readonly,
         ]);
-        $control->wrapper('settings', $control->getWrapper('site'));
 
+        $control->wrapper('settings', $control->getWrapper('site'));
         return $control->html();
     }
 

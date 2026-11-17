@@ -78,7 +78,7 @@ abstract class Input extends Field {
                 'description' => "The field's placeholder text."
             ]);
 
-            $row->field(Str::lower(class_basename(static::class)), [
+            $row->field('text', [
                 'name'        => 'defaultValue',
                 'label'       => 'Default Value',
                 'readonly'    => $locked,

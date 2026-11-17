@@ -1,5 +1,12 @@
 @php
     $inRepeater = $repeaterId !== null;
+    
+    if (($resolveDynamicValues ?? true) && isset($defaultValue) && is_string($defaultValue) && Str::startsWith($defaultValue, '{{') && Str::endsWith($defaultValue, '}}')) {
+        $dynamicValue = \MM\Meros\Facades\Support\FormDynamicValues::resolve($defaultValue);
+        if ($dynamicValue !== null) {
+            $defaultValue = $dynamicValue;
+        }
+    }
 @endphp
 
 <div 
@@ -8,7 +15,14 @@
     data-field-origin-name="{{ $originalName }}"
 > 
     @if(!$inRepeater && $type !== 'hidden')
-        <label for="{{ $id }}" class="meros-field-label">{{ $label }}</label>
+        <label 
+            for="{{ $id }}" 
+            class="meros-field-label"
+        >{{ $label }}
+        @if($required ?? false)
+            <span class="meros-field-required">*</span>
+        @endif
+    </label>
     @endif
     @if (!$inRepeater && $description !== '')
         <div style="margin-bottom: 0.5rem;">

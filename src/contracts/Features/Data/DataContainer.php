@@ -603,6 +603,11 @@ abstract class DataContainer extends Feature implements Storable {
                 ],
             };
 
+            if ($itemSchema['type'] === 'string' && $item instanceof DataItem &&
+                $item->getField()?->getType() === 'richtext') {
+                $itemSchema['format'] = 'html';
+            }
+
             if (method_exists($item, 'getLabel')) {
                 $label = $item->getLabel();
 

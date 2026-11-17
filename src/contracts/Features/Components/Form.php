@@ -56,6 +56,13 @@ class Form extends Feature implements FormComponent, Makeable {
     private string $view = 'meros::forms.form';
 
     /**
+     * The message displayed upon successful form submission.
+     *
+     * @var string
+     */
+    protected string $successMessage = 'Form Submitted Successfully.';
+
+    /**
      * The text shown on the form's submit button.
      *
      * @var string
@@ -96,7 +103,20 @@ class Form extends Feature implements FormComponent, Makeable {
      * @var bool
      */
     protected bool $hideSubmitButton = false;
+
+    /**
+     * Whether to display the form as paginated pages.
+     *
+     * @var boolean
+     */
     protected bool $displayAsPages = false;
+
+    /**
+     * Whether to resolve dynamic values for the form.
+     *
+     * @var boolean
+     */
+    protected bool $resolveDynamicValues = true;
 
     /**
      * WP's ajax url.
@@ -133,6 +153,7 @@ class Form extends Feature implements FormComponent, Makeable {
             'rows',
             'ajaxUrl',
             'ajaxNonce',
+            'successMessage',
             'submitText',
             'invalidText',
             'onSubmit',
@@ -140,12 +161,14 @@ class Form extends Feature implements FormComponent, Makeable {
             'hideDescription',
             'hideSubmitButton',
             'displayAsPages',
+            'resolveDynamicValues',
             'pages',
         ]));
 
         $this->setNonPersistableProperties([
             'ajaxUrl',
             'ajaxNonce',
+            'resolveDynamicValues',
             'pages',
         ]);
 
@@ -387,18 +410,17 @@ class Form extends Feature implements FormComponent, Makeable {
     }
 
     /**
-     * Sets the callback function to be executed when the form is submitted. If a string is provided, 
-     * it will be used as the name of a client-side event which will be triggered instead of a server-side callback.
+     * Sets the client-side event to trigger on form submission.
      * 
      * Event names are prefixed with 'mforms::' to avoid conflicts with other events. Example:
      * mforms::myCustomEvent.
      *
-     * @param Closure|string|null $callback
+     * @param string $jsCallback The name of the client-side event to trigger on form submission.
      *
      * @return static
      */
-    final public function onSubmit(Closure|string|null $callback): static {
-        $this->onSubmit = $callback;
+    final public function onSubmit(string $jsCallback): static {
+        $this->onSubmit = $jsCallback;
         return $this;
     }
 
@@ -420,6 +442,19 @@ class Form extends Feature implements FormComponent, Makeable {
     }
 
     /**
+     * Controls whether field views resolve dynamic defaults, including nested fields.
+     * Disable when editing literal default tokens in the form builder.
+     * 
+     * @param bool $resolve Whether to resolve dynamic values. Defaults to true.
+     *
+     * @return static
+     */
+    final public function resolveDynamicValues(bool $resolve = true): static {
+        $this->resolveDynamicValues = $resolve;
+        return $this;
+    }
+
+    /**
      * Sets the text shown on the form's submit button.
      *
      * @param string $text
@@ -428,6 +463,18 @@ class Form extends Feature implements FormComponent, Makeable {
      */
     final public function submitText(string $text): static {
         $this->submitText = $text;
+        return $this;
+    }
+
+    /**
+     * Sets the message displayed upon successful form submission.
+     *
+     * @param string $message
+     *
+     * @return static
+     */
+    final public function successMessage(string $message): static {
+        $this->successMessage = wp_kses_post($message);
         return $this;
     }
 
@@ -474,6 +521,10 @@ class Form extends Feature implements FormComponent, Makeable {
      */
     final public function getTitle(): string {
         return $this->title;
+    }
+
+    final public function getSuccessMessage(): string {
+        return $this->successMessage;
     }
 
     /**
@@ -571,6 +622,8 @@ class Form extends Feature implements FormComponent, Makeable {
 
     public function render(array $properties = [], bool $mergeProperties = false): void {
         $view = $this->view;
+
+        $this->attribute('data-user-signed-in', apply_filters('mforms_user_signed_in', is_user_logged_in()));
 
         if ($mergeProperties) {
             $properties = array_merge(

@@ -10,7 +10,6 @@ use MM\Meros\Contracts\MerosServiceProvider;
 use MM\Meros\App\Framework;
 
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Blade;
 
 use MM\Meros\Support\Ajax;
@@ -18,6 +17,7 @@ use MM\Meros\Support\ClassInfo;
 use MM\Meros\Support\Registers;
 use MM\Meros\Support\Context;
 use MM\Meros\Support\ViteAssets;
+use MM\Meros\Support\FormDynamicValues;
 
 use MM\Meros\Registers\Packages;
 
@@ -61,7 +61,8 @@ class FrameworkServiceProvider extends MerosServiceProvider {
     private array $helpers = [
         Ajax::class,
         Context::class,
-        Registers::class
+        Registers::class,
+        FormDynamicValues::class
     ];
 
     /**

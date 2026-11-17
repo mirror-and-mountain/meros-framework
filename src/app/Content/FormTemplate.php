@@ -14,7 +14,7 @@ class FormTemplate extends PostType implements FormHost {
         $this->handle('form-template');
         $this->label('Form Template', 'Form Templates');
         $this->menuIcon('dashicons-feedback');
-        $this->supports(['title', 'thumbnail'], false);
+        $this->supports(['title', 'editor', 'thumbnail'], false);
         $this->hasEditableForm()
             ->withActionsEditor()
             ->withFormSettings();

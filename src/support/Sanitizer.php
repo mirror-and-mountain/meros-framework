@@ -84,7 +84,9 @@ class Sanitizer {
         return match ($type) {
             'object'  => $this->sanitizeObject(is_array($value) ? $value : [], $schema),
             'array'   => $this->sanitizeArrayBySchema(is_array($value) ? $value : [], $schema),
-            'string'  => $this->sanitizeString((string) ($value ?? '')),
+            'string'  => ($schema['format'] ?? null) === 'html'
+                ? wp_kses_post((string) ($value ?? ''))
+                : $this->sanitizeString((string) ($value ?? '')),
             'integer' => $this->sanitizeInteger($value),
             'number'  => $this->sanitizeNumber($value),
             'boolean' => $this->sanitizeBoolean($value),

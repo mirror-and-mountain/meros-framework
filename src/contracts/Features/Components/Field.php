@@ -12,6 +12,7 @@ use MM\Meros\Contracts\Features\Components\Concerns\IsFormComponent;
 use MM\Meros\App\Components\Fields\Repeater;
 
 use MM\Meros\Facades\Framework;
+use MM\Meros\Facades\Support\FormDynamicValues;
 use MM\Meros\Facades\Components\FieldGroups;
 
 abstract class Field extends Feature implements FormComponent {
@@ -1310,12 +1311,19 @@ abstract class Field extends Feature implements FormComponent {
 
     /**
      * Sets the field's default value.
+     * 
+     * Values wrapped in {{}} will be treated as dynamic and resolved at runtime.
      *
      * @param mixed $value The default value to set.
      * 
      * @return static
      */
     public function default(mixed $value): static {
+        if (is_string($value) && Str::startsWith($value, '{{') && Str::endsWith($value, '}}')) {
+            $this->defaultValue = $value;
+            return $this;
+        }
+
         $this->defaultValue = $this->normaliseValue($value);
         $this->whenDefaultSet();
 

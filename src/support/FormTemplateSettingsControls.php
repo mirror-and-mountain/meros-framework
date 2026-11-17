@@ -47,6 +47,22 @@ class FormTemplateSettingsControls {
                 $group->name('form_template_settings');
 
                 $group->field('checkbox', [
+                    'name'        => 'allow_edit_form_title',
+                    'label'       => 'Allow Editing Form Title',
+                    'description' => 'Allow editing the form title.',
+                    'default'     => true,
+                    'toggle'      => true,
+                ], false);
+
+                $group->field('checkbox', [
+                    'name'        => 'allow_edit_form_description',
+                    'label'       => 'Allow Editing Form Description',
+                    'description' => 'Allow editing the form description.',
+                    'default'     => true,
+                    'toggle'      => true,
+                ], false);
+
+                $group->field('checkbox', [
                     'name'        => 'allow_add_components',
                     'label'       => 'Allow New Components',
                     'description' => 'Allow adding new components (fields or groups) to the form.',
@@ -100,6 +116,36 @@ class FormTemplateSettingsControls {
                     'description' => 'Allow overriding default actions for the form.',
                     'default'     => true,
                     'toggle'      => true,
+                ], false);
+
+                $group->field('checkbox', [
+                    'name'        => 'allow_edit_submit_button_text',
+                    'label'       => 'Allow Editing Submit Button Text',
+                    'description' => 'Allow editing the submit button text for the form.',
+                    'default'     => true,
+                    'toggle'      => true,
+                ], false);
+
+                 $group->field('text', [
+                    'name'        => 'submit_button_text',
+                    'label'       => 'Submit Button Text',
+                    'description' => 'Text displayed on the form submit button.',
+                    'default'     => 'Submit',
+                ], false);
+
+                $group->field('checkbox', [
+                    'name' => 'allow_edit_success_message',
+                    'label'       => 'Allow Editing Success Message',
+                    'description' => 'Allow editing the success message for the form.',
+                    'default'     => true,
+                    'toggle'      => true,
+                ], false);
+
+                $group->field('richtext', [
+                    'name'        => 'success_message',
+                    'label'       => 'Success Message',
+                    'description' => "Message displayed upon successful form submission.",
+                    'default'     => 'Form Submitted Successfully.',
                 ], false);
             });
     }

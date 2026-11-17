@@ -32,6 +32,7 @@ use MM\Meros\Support\FormSettingsControls;
 use MM\Meros\Support\FormHostSettingsControls;
 use MM\Meros\Support\FormTemplateSettingsControls;
 
+use MM\Meros\Facades\Content\PostTypes;
 use MM\Meros\Facades\Support\Context;
 
 trait UsesForms {
@@ -499,7 +500,13 @@ trait UsesForms {
             return;
         }
 
-        $controls = new FormHostSettingsControls()->getControls()->getId();
+        $templateSettings = $this->hasFormTemplate() ? array_merge($this->getFormTemplateSettings(), [
+            'template_name' => $this->getFormTemplateName(),
+            'template_title' => $this->getFormTemplateTitle(),
+            'template_description' => $this->getFormTemplateDescription()
+        ]) : [];
+
+        $controls = new FormHostSettingsControls($templateSettings)->getControls()->getId();
         $this->fields($controls);
 
         $template = $this->getConfigurableFormTemplate();
@@ -713,19 +720,25 @@ trait UsesForms {
         }
 
         else if ($postId !== null) {
-            $data   = $this->inspect($postId, $refresh);
-            $key    = $this->__getFormSettingsMetaKey('default', true);
-            $altKey = $this->__getFormSettingsMetaKey('default', false);
+            $container = null;
 
-            if (array_key_exists($key, $data)) {
-                return $this->__parseFormSettings($data[$key]);
+            if ($this instanceof TemplateCPT) {
+                $container = $this->getContainer('form_template_settings');
             }
 
-            if (array_key_exists($altKey, $data)) {
-                return $this->__parseFormSettings($data[$altKey]);
+            else if ($this instanceof FormCPT) {
+                $container = $this->getContainer('form_settings');
+            }
+            
+            else if ($this instanceof FormHost) {
+                $container = $this->getContainer('form_host_settings');
             }
 
-            return $this->getFormTemplateSettings($refresh);
+            if ($container === null) {
+                return [];
+            }
+
+            return $container->value($postId, $refresh);
         }
 
         return [];
@@ -740,17 +753,12 @@ trait UsesForms {
      */
     public function getFormTemplateSettings(bool $refresh = false): array {
         $template = $this->getConfigurableFormTemplate();
+
         if ($template instanceof FormTemplate) {
-            $data   = $this->inspect($template->ID, $refresh);
-            $key    = $this->__getFormSettingsMetaKey('template', true);
-            $altKey = $this->__getFormSettingsMetaKey('template', false);
+            $templateCPT = PostTypes::get('form-template');
 
-            if (array_key_exists($key, $data)) {
-                return $this->__parseFormSettings($data[$key]);
-            }
-
-            if (array_key_exists($altKey, $data)) {
-                return $this->__parseFormSettings($data[$altKey]);
+            if ($templateCPT instanceof TemplateCPT) {
+                return $templateCPT->getFormSettings($template->ID, $refresh);
             }
 
             return [];
@@ -763,6 +771,70 @@ trait UsesForms {
         return [];
     }
 
+    /**
+     * Retrieves the name of the form template or component associated with the current post type.
+     *
+     * @return string
+     */
+    public function getFormTemplateName(): string {
+        $template = $this->getConfigurableFormTemplate();
+
+        if ($template instanceof FormTemplate) {
+            return $template->post_name;
+        }
+
+        if ($this->componentFormTemplate instanceof FormComponent) {
+            return $this->componentFormTemplate->getName();
+        }
+
+        return '';
+    }
+
+    /**
+     * Retrieves the title of the form template or component associated with the current post type.
+     *
+     * @return string
+     */
+    public function getFormTemplateTitle(): string {
+        $template = $this->getConfigurableFormTemplate();
+
+        if ($template instanceof FormTemplate) {
+            return $template->post_title;
+        }
+
+        if ($this->componentFormTemplate instanceof FormComponent) {
+            return $this->componentFormTemplate->getTitle();
+        }
+
+        return '';
+    }
+
+    /**
+     * Retrieves the description of the form template or component associated with the current post type.
+     *
+     * @return string
+     */
+    public function getFormTemplateDescription(): string {
+        $template = $this->getConfigurableFormTemplate();
+
+        if ($template instanceof FormTemplate) {
+            return $template->post_content;
+        }
+
+        if ($this->componentFormTemplate instanceof FormComponent) {
+            return $this->componentFormTemplate->getDescription();
+        }
+
+        return '';
+    }
+
+    /**
+     * Parses form settings into an array.
+     *
+     * @param string|array $settings
+     *
+     * @return array
+     */
     private function __parseFormSettings(string|array $settings): array {
         if (is_string($settings)) {
             return unserialize($settings);
@@ -846,20 +918,6 @@ trait UsesForms {
             return;
         }
 
-        $block->attribute('title', [
-            'type'    => 'string',
-            'default' => Str::title($this->getHandle()) . ' Form',
-            'control' => true
-        ]);
-
-        $block->attribute('description', [
-            'type'    => 'string',
-            'default' => '',
-            'control' => [
-                'type' => 'long-text'
-            ]
-        ]);
-
         $block->attribute('show_title', [
             'type'    => 'boolean',
             'default' => true,
@@ -889,8 +947,19 @@ trait UsesForms {
         });
 
         $block->renderCallback(function (array $args) {
-            $title = isset($args['attributes']['title']) ? $args['attributes']['title'] : '';
-            $description = isset($args['attributes']['description']) ? $args['attributes']['description'] : '';
+            $postId = $args['post_id'] ?? 0;
+
+            $title = $postId !== 0 ? $this->getFormSettings($postId)['form_title'] ?? '' : '';
+            $description = $postId !== 0 ? $this->getFormSettings($postId)['form_description'] ?? '' : '';
+
+            if ($title === '' && $this->hasFormTemplate()) {
+                $title = $this->getFormTemplateTitle();
+            }
+
+            if ($description === '' && $this->hasFormTemplate()) {
+                $description = $this->getFormTemplateDescription();
+            }
+
             $hideTitle = isset($args['attributes']['show_title']) && $args['attributes']['show_title'] === false;
             $hideDescription = isset($args['attributes']['show_description']) && $args['attributes']['show_description'] === false;
 
@@ -995,12 +1064,14 @@ trait UsesForms {
         if ($result === false) {
             $errorType = $flowRunner->getErrorAsSuccess() ? 'success' : 'error'; 
             return [
-                'message' => $errorType === 'success' ? $flowRunner->getSuccessMessage() : $flowRunner->getLastError(),
+                'message' => $errorType === 'success'
+                    ? wp_kses_post($flowRunner->getSuccessMessage() ?: $instance->getSuccessMessage())
+                    : $flowRunner->getLastError(),
                 'type'    => $errorType
             ];
         }
 
-        $message = $flowRunner->getSuccessMessage() ?: 'Form submitted successfully.';
+        $message = wp_kses_post($flowRunner->getSuccessMessage() ?: $instance->getSuccessMessage());
 
         return [
             'message' => $message,

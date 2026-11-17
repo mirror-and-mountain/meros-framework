@@ -28,6 +28,21 @@ $mf-first-row-offset: -24px;
     }
 }
 
+.mforms-form.working {
+    position: relative;
+    isolation: isolate;
+    cursor: wait;
+
+    &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        background-color: var(--mforms-working-overlay-color, rgb(255 255 255 / 50%));
+        cursor: wait;
+    }
+}
+
 .mforms-page {
     min-width: 0;
     display: grid;
@@ -126,6 +141,37 @@ $mf-first-row-offset: -24px;
     margin-top: 1rem;
 }
 
+.mforms-submit-button.working {
+    position: relative;
+    z-index: 2;
+    gap: 0.5rem;
+    opacity: 0.75;
+    cursor: wait;
+
+    &::after {
+        content: '';
+        width: 1em;
+        height: 1em;
+        flex-shrink: 0;
+        border: 2px solid currentColor;
+        border-inline-end-color: transparent;
+        border-radius: 50%;
+        animation: mforms-submit-spin 0.75s linear infinite;
+    }
+}
+
+@keyframes mforms-submit-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mforms-submit-button.working::after {
+        animation: none;
+    }
+}
+
 .mforms-footer {
     margin-top: 1rem;
 }
@@ -156,15 +202,15 @@ $mf-first-row-offset: -24px;
 }
 
 .mforms-feedback--success {
-    color: #166534;
-    border-color: #86efac;
-    background-color: #f0fdf4;
+    color: var(--mforms-feedback-success-text-color, #166534);
+    border-color: var(--mforms-feedback-success-border-color, #86efac);
+    background-color: var(--mforms-feedback-success-bg-color, #f0fdf4);
 }
 
 .mforms-feedback--error {
-    color: #991b1b;
-    border-color: #fca5a5;
-    background-color: #fef2f2;
+    color: var(--mforms-feedback-error-text-color, #991b1b);
+    border-color: var(--mforms-feedback-error-border-color, #fca5a5);
+    background-color: var(--mforms-feedback-error-bg-color, #fef2f2);
 }
 
 // Sections
@@ -222,6 +268,10 @@ form.mforms-form .mforms-section {
     width: 100%;
     min-width: 0;
     margin-top: 2rem;
+}
+
+.meros-field-required {
+    color: #ff0000;
 }
 
 .meros-field-wrapper.nice-form-group > * {

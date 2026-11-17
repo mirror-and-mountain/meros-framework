@@ -2,21 +2,7 @@
 
 namespace MM\Meros\Support;
 
-use Illuminate\Support\Str;
-
-use MM\Meros\Contracts\Providers\FeatureProvider;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
-
-
-use MM\Meros\Contracts\Features\Content\Interfaces\FormHost;
-
-use MM\Meros\App\Components\Fields\Select;
-use MM\Meros\App\Components\Fields\Textarea;
-use MM\Meros\App\Components\Fields\Hidden;
-use MM\Meros\App\Components\Fields\Repeater;
-
-use MM\Meros\App\Content\Form;
-use MM\Meros\App\Content\FormTemplate;
 
 use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Components\FieldGroups;
@@ -29,6 +15,13 @@ class FormHostSettingsControls {
      */
     private FieldGroup $group;
 
+    /**
+     * Holds the template-specific settings for the form, if any.
+     *
+     * @var array
+     */
+    private array $templateSettings = [];
+
     // =========================================================================
     // Initialisation
     // =========================================================================
@@ -37,7 +30,8 @@ class FormHostSettingsControls {
      * Constructs a new FormSettingsControls instance.
      *
      */
-    public function __construct() {
+    public function __construct(array $templateSettings = []) {
+        $this->templateSettings = $templateSettings;
         $this->init();
     }
 
@@ -59,23 +53,82 @@ class FormHostSettingsControls {
                 $group->id('form-host-settings');
                 $group->title('Form Settings');
                 $group->name('form_host_settings');
-                
+
+                $title = array_key_exists('template_title', $this->templateSettings)
+                    ? $this->templateSettings['template_title']
+                    : '';
+
+                $titleLocked = array_key_exists('allow_edit_form_title', $this->templateSettings)
+                    ? !$this->templateSettings['allow_edit_form_title']
+                    : false;
+
+                $description = array_key_exists('template_description', $this->templateSettings)
+                    ? $this->templateSettings['template_description']
+                    : '';
+
+                $descriptionLocked = array_key_exists('allow_edit_form_description', $this->templateSettings)
+                    ? !$this->templateSettings['allow_edit_form_description']
+                    : false;
+
+                $submitButtonText = array_key_exists('submit_button_text', $this->templateSettings)
+                    ? $this->templateSettings['submit_button_text']
+                    : 'Submit';
+
+                $submitButtonTextLocked = array_key_exists('allow_edit_submit_button_text', $this->templateSettings)
+                    ? !$this->templateSettings['allow_edit_submit_button_text']
+                    : false;
+
+                $successMessage = array_key_exists('success_message', $this->templateSettings)
+                    ? $this->templateSettings['success_message']
+                    : 'Form Submitted Successfully.';
+
+                $successMessageLocked = array_key_exists('allow_edit_success_message', $this->templateSettings)
+                    ? !$this->templateSettings['allow_edit_success_message']
+                    : false;
+
                 $group->field('text', [
-                    'name' => 'form_title',
-                    'label' => 'Form Title',
+                    'name'        => 'form_title',
+                    'label'       => 'Form Title',
+                    'description' => 'The title of the form. This setting may be locked by the template.',
+                    'default'     => $title,
+                    'readonly'    => $titleLocked
                 ], false);
 
-                $group->field('textarea', [
-                    'name' => 'form_description',
-                    'label' => 'Form Description',
+                $group->field('richtext', [
+                    'name'        => 'form_description',
+                    'label'       => 'Form Description',
+                    'description' => 'The description of the form. This setting may be locked by the template.',
+                    'default'     => $description,
+                    'readonly'    => $descriptionLocked
+                ], false);
+
+                $group->field('text', [
+                    'name'        => 'submit_button_text',
+                    'label'       => 'Submit Button Text',
+                    'description' => 'Text displayed on the form submit button.',
+                    'default'     => $submitButtonText,
+                    'readonly'    => $submitButtonTextLocked,
+                ], false);
+
+                $group->field('richtext', [
+                    'name'        => 'success_message',
+                    'label'       => 'Success Message',
+                    'description' => "Message displayed upon successful form submission.",
+                    'default'     => $successMessage,
+                    'readonly'    => $successMessageLocked,
                 ], false);
 
                 $group->field('checkbox', [
                     'name'        => 'display_as_pages',
                     'label'       => 'Display as Pages',
-                    'description' => 'Display the form as paginated pages, unless this setting is locked by the template.',
-                    'default'     => false,
+                    'description' => 'Display the form as paginated pages. This setting may be locked by the template.',
+                    'default'     => array_key_exists('display_as_pages', $this->templateSettings)
+                        ? $this->templateSettings['display_as_pages']
+                        : false,
                     'toggle'      => true,
+                    'disabled'    => array_key_exists('lock_display_as_pages', $this->templateSettings)
+                        ? $this->templateSettings['lock_display_as_pages']
+                        : false
                 ], false);
 
                 foreach (['open', 'close'] as $prefix) {
@@ -120,8 +173,4 @@ class FormHostSettingsControls {
     public function getControls(): FieldGroup {
         return $this->group;
     }
-
-    // =========================================================================
-    // Helpers
-    // =========================================================================
 }

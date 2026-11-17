@@ -19,7 +19,7 @@ function operatorsForType(type) {
         available = [...equality, ...emptiness, ...ordering];
     } else if (['text', 'textarea', 'text_area', 'text-area', 'richtext', 'rich_text', 'rich-text', 'email', 'url', 'tel', 'password', 'hidden'].includes(type)) {
         available = [...equality, ...textMatching, ...emptiness];
-    } else if (type === 'checkbox') {
+    } else if (['checkbox', 'user-signed-in'].includes(type)) {
         available = equality;
     } else if (['select', 'radio', 'checkboxes', 'lookup', 'posts-lookup', 'posts_lookup', 'users-lookup', 'users_lookup'].includes(type)) {
         available = [...equality, 'CONTAINS', 'NOT CONTAINS', ...emptiness];
@@ -133,10 +133,14 @@ export function createConditionEditor(target, conditions, { options = false, loc
     const types = options ? [['show', 'Show'], ['hide', 'Hide'], ['set_options', 'Set options']] : [['show', 'Show'], ['hide', 'Hide']];
     editor.append(element('h3', {}, 'Conditions'));
     if (!sources.length) {
-        editor.append(element('p', {}, 'No earlier fields are available. Conditions can only depend on fields before this component.'));
+        editor.append(element('p', {}, 'No earlier fields are available. Show/hide rules can still use user sign-in status.'));
     }
 
     types.forEach(([type, title]) => {
+        const ruleSources = type === 'set_options' ? sources : [
+            ['__user_signed_in', 'User signed in', 'user-signed-in'],
+            ...sources,
+        ];
         const config = original[type] || {};
         const rules = config.rules ? Object.values(config.rules) : [];
         const section = element('fieldset', { className: 'mforms-builder-condition-set' });
@@ -152,12 +156,12 @@ export function createConditionEditor(target, conditions, { options = false, loc
 
         const addRule = (rule = {}) => {
             const row = element('div', { className: 'mforms-builder-condition-rule' });
-            const fieldOptions = [['', 'Select a field'], ...sources];
-            if (rule.field && !sources.some(([name]) => name === rule.field)) {
+            const fieldOptions = [['', 'Select a source'], ...ruleSources];
+            if (rule.field && !ruleSources.some(([name]) => name === rule.field)) {
                 fieldOptions.push([rule.field, `${rule.field} (unavailable)`]);
             }
             const field = select(fieldOptions, rule.field || '');
-            if (rule.field && !sources.some(([name]) => name === rule.field)) {
+            if (rule.field && !ruleSources.some(([name]) => name === rule.field)) {
                 field.selectedOptions[0].disabled = true;
             }
             field.required = true;
@@ -172,7 +176,7 @@ export function createConditionEditor(target, conditions, { options = false, loc
             valueLabel.append(element('span', {}, 'Value'));
             const valueHint = element('small', { id: `mforms-condition-value-hint-${++hintSequence}` });
             const updateValueControl = () => {
-                const source = sources.find(([name]) => name === field.value);
+                const source = ruleSources.find(([name]) => name === field.value);
                 const sourceType = source?.[2];
                 const selectedValues = (Array.isArray(currentValue) ? currentValue : [currentValue])
                     .filter(item => item !== null && item !== undefined)
@@ -199,8 +203,9 @@ export function createConditionEditor(target, conditions, { options = false, loc
                     hint = options.length === 0
                         ? 'No options are configured for this field.'
                         : multiple ? 'Hold Ctrl (or Command) to select multiple values.' : '';
-                } else if (sourceType === 'checkbox') {
-                    control = select([['', 'Select a value'], ['true', 'Checked'], ['false', 'Unchecked']], String(currentValue ?? ''));
+                } else if (['checkbox', 'user-signed-in'].includes(sourceType)) {
+                    const labels = sourceType === 'user-signed-in' ? ['Signed in', 'Signed out'] : ['Checked', 'Unchecked'];
+                    control = select([['', 'Select a value'], ['true', labels[0]], ['false', labels[1]]], String(currentValue ?? ''));
                     control.required = true;
                 } else {
                     const inputType = ['date', 'time', 'number'].includes(sourceType) ? sourceType : 'text';
@@ -230,7 +235,7 @@ export function createConditionEditor(target, conditions, { options = false, loc
                 valueLabel.append(valueHint);
             };
             const updateOperators = (selected, preserveUnsupported = false) => {
-                const source = sources.find(([name]) => name === field.value);
+                const source = ruleSources.find(([name]) => name === field.value);
                 let available = operatorsForType(source?.[2] || '');
                 const invalidRepeaterOperator = source?.[2] === 'repeater' && !available.includes(selected);
                 if (preserveUnsupported && selected && !available.includes(selected)) {
@@ -257,7 +262,7 @@ export function createConditionEditor(target, conditions, { options = false, loc
                 valueControl.disabled = emptiness.includes(operator.value);
             });
             const comparison = element('div', { className: 'mforms-builder-condition-comparison' });
-            comparison.append(labeledControl('Field', field), labeledControl('Operator', operator), valueLabel);
+            comparison.append(labeledControl('Source', field), labeledControl('Operator', operator), valueLabel);
             row.append(comparison);
             const optionList = element('div', { className: 'mforms-builder-condition-options' });
             const optionControls = [];
