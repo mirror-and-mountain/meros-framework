@@ -4,6 +4,7 @@
 $mf-row-gap: 1rem;
 $mf-first-row-offset: -24px;
 
+// Form and page layout
 .mforms-form {
     display: grid;
     min-width: 0;
@@ -27,14 +28,6 @@ $mf-first-row-offset: -24px;
     }
 }
 
-.mforms-submit-button {
-    margin-top: 1rem;
-}
-
-.mforms-submit-button--hidden {
-    display: none !important;
-}
-
 .mforms-page {
     min-width: 0;
     display: grid;
@@ -50,18 +43,47 @@ $mf-first-row-offset: -24px;
     }
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .mforms-page {
+        transition: none !important;
+    }
+}
+
+.mforms-page > .mforms-row:first-child:not(:has(> .mforms-section)) {
+    margin-top: $mf-first-row-offset;
+}
+
+.mforms-body,
+.mforms-section {
+    .mforms-row {
+        display: flex;
+        gap: $mf-row-gap;
+        flex-wrap: wrap;
+        align-items: stretch;
+        min-width: 0;
+    }
+
+    .mforms-row > * {
+        flex: 1 1 calc((100% - (#{$mf-row-gap} * 2)) / 3);
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+// Progress and page navigation
 .mforms-progress {
     margin-bottom: 1.5rem;
 
     p {
         margin: 0 0 0.5rem;
+        font-size: smaller;
     }
 
     progress {
         display: block;
         width: 100%;
         height: 0.75rem;
-        accent-color: #2271b1;
+        accent-color: var(--mforms-progress-bar-color, #2271b1);
     }
 }
 
@@ -71,8 +93,41 @@ $mf-first-row-offset: -24px;
     gap: 0.75rem;
 }
 
-.mforms-page > .mforms-row:first-child:not(:has(> .mforms-section)) {
-    margin-top: $mf-first-row-offset;
+// Buttons and form footer
+.mforms-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--mforms-button-border-color, transparent);
+    border-radius: var(--mforms-button-border-radius, 4px);
+    background-color: var(--mforms-button-bg-color, #2271b1);
+    color: var(--mforms-button-text-color, #fff);
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    font-size: 1rem;
+    line-height: 1.5;
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+
+    &:hover {
+        color: var(--mforms-button-hover-text-color, #ffffff);
+        background-color: var(--mforms-button-hover-bg-color, #1a5a8a);
+        border-color: var(--mforms-button-hover-border-color, #1a5a8a);
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.mforms-submit-button {
+    margin-top: 1rem;
+}
+
+.mforms-footer {
+    margin-top: 1rem;
 }
 
 .mforms-footer:has(> .mforms-page-navigation) {
@@ -92,10 +147,7 @@ $mf-first-row-offset: -24px;
     }
 }
 
-.mforms-form [x-cloak] {
-    display: none !important;
-}
-
+// Feedback messages
 .mforms-feedback {
     margin-top: 1rem;
     padding: 0.75rem 1rem;
@@ -115,6 +167,7 @@ $mf-first-row-offset: -24px;
     background-color: #fef2f2;
 }
 
+// Sections
 .mforms-section {
     .mforms-section-description {
         font-size: smaller;
@@ -138,19 +191,11 @@ $mf-first-row-offset: -24px;
     }
 }
 
-.mforms-repeater-field[data-meros-hidden-field] {
-    display: none !important;
-}
-
 form.mforms-form .mforms-section {
     border: 0;
     padding: 0;
     line-height: normal;
     white-space: normal;
-
-    &[data-meros-hidden-field] {
-        display: none !important;
-    }
 
     .mforms-section-title {
         padding: 0 !important;
@@ -160,25 +205,15 @@ form.mforms-form .mforms-section {
     }
 }
 
-.mforms-body,
-.mforms-section {
-    .mforms-row {
-        display: flex;
-        gap: $mf-row-gap;
-        flex-wrap: wrap;
-        align-items: stretch;
-        min-width: 0;
-    }
-
-    .mforms-row > * {
-        flex: 1 1 calc((100% - (#{$mf-row-gap} * 2)) / 3);
-        width: 100%;
-        min-width: 0;
-    }
-}
-
-.mforms-footer {
-    margin-top: 1rem;
+// Field wrappers and individual field type styles
+.nice-form-group {
+    --nf-input-background-color: var(--mforms-nf-input-background-color, #f9fafb);
+    --nf-input-color: var(--mforms-nf-input-color, #20242f);
+    --nf-input-border-color: var(--mforms-nf-input-border-color, #c0c4c9);
+    --nf-input-focus-border-color: var(--mforms-nf-input-focus-border-color, #3b4ce2);
+    --nf-input-border-radius: var(--mforms-nf-input-border-radius, 4px);
+    --nf-invalid-input-border-bottom-color: var(--mforms-nf-invalid-input-border-bottom-color, #ff0000);
+    --nf-valid-input-border-bottom-color: var(--mforms-nf-valid-input-border-bottom-color, #008000);
 }
 
 .meros-field-wrapper.nice-form-group {
@@ -187,10 +222,6 @@ form.mforms-form .mforms-section {
     width: 100%;
     min-width: 0;
     margin-top: 2rem;
-}
-
-.meros-field-wrapper.nice-form-group:has([data-hidden]) {
-    display: none;
 }
 
 .meros-field-wrapper.nice-form-group > * {
@@ -202,7 +233,7 @@ form.mforms-form .mforms-section {
     padding: 0;
 }
 
-.meros-field-wrapper.nice-form-group input:not([type="checkbox"], [type="radio"]) {
+.meros-field-wrapper.nice-form-group input:not([type="checkbox"], [type="radio"], [type="color"]) {
     width: 100% !important;
 }
 
@@ -228,10 +259,6 @@ form.mforms-form .mforms-section {
     }
 }
 
-.meros-field-wrapper.nice-form-group:not(.meros-repeater-field):has([data-meros-hidden-field]) {
-    display: none !important;
-}
-
 .meros-choice-field {
     min-inline-size: 0;
     box-sizing: border-box;
@@ -252,6 +279,7 @@ form.mforms-form .mforms-section {
     margin: 0 !important;
 }
 
+// Rich-text fields
 .mforms-richtext-field .ql-container {
     height: auto;
 }
@@ -261,4 +289,29 @@ form.mforms-form .mforms-section {
     min-height: 4rem;
     font-weight: normal;
     background-color: #fff;
+}
+
+// Visibility states
+.mforms-submit-button--hidden {
+    display: none !important;
+}
+
+.mforms-form [x-cloak] {
+    display: none !important;
+}
+
+.mforms-repeater-field[data-meros-hidden-field] {
+    display: none !important;
+}
+
+form.mforms-form .mforms-section[data-meros-hidden-field] {
+    display: none !important;
+}
+
+.meros-field-wrapper.nice-form-group:has([data-hidden]) {
+    display: none;
+}
+
+.meros-field-wrapper.nice-form-group:not(.meros-repeater-field):has([data-meros-hidden-field]) {
+    display: none !important;
 }

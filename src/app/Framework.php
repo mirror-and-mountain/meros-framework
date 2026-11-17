@@ -2,6 +2,7 @@
 
 namespace MM\Meros\App;
 
+use Illuminate\Support\Arr;
 use MM\Meros\Contracts\Provider;
 
 use MM\Meros\Registers\Admin\SettingsContainers;
@@ -81,6 +82,8 @@ final class Framework extends Provider {
         add_action('switch_theme', function () {
             $this->__whenThemeDeactivated();
         });
+
+        $this->__getFormsSettings();
     }
 
     /**
@@ -137,6 +140,19 @@ final class Framework extends Provider {
      */
     public function __getPackageSettings(bool $refresh = false): array {
         return $this->getContainerSettings('meros_package_settings', $refresh);
+    }
+
+    /**
+     * Retrieves the framework's global forms settings values.
+     *
+     * @param boolean $refresh
+     *
+     * @return array
+     */
+    public function __getFormsSettings(bool $refresh = false): array {
+        return Arr::where($this->getContainerSettings('meros_framework_settings', $refresh), function ($value, $key) {
+            return str_starts_with($key, 'mforms_');
+        });
     }
 
     /**

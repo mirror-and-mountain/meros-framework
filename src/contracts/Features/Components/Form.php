@@ -15,8 +15,9 @@ use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 use MM\Meros\Contracts\Features\Components\Concerns\IsFormComponent;
 use MM\Meros\Contracts\Features\Components\Concerns\MakesFieldRows;
 
-use MM\Meros\Facades\Components\Fields;
+use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Support\Ajax;
+use MM\Meros\Facades\Components\Fields;
 
 class Form extends Feature implements FormComponent, Makeable {
     /**
@@ -584,7 +585,75 @@ class Form extends Feature implements FormComponent, Makeable {
                 : $properties;
         }
 
+        $properties['style'] = $this->mapFormStyles();
+
         echo view($view, $properties);
+    }
+
+    /**
+     * Maps the form styles based on the global colour settings.
+     *
+     * @return string
+     */
+    private function mapFormStyles(): string {
+        $globalColourSettings = Framework::__getFormsSettings();
+        $styles = '';
+
+        // These styles map to nice-forms.css styles.
+        foreach ($globalColourSettings as $key => $value) {
+            if (Str::startsWith($key, 'mforms_field')) {
+                switch ($key) {
+                    case 'mforms_field_bg_color':
+                        $formattedKey = '--mforms-nf-input-background-color';
+                        $styles .= $formattedKey . ': ' . $value . '; ';
+                        break;
+                    case 'mforms_field_text_color':
+                        $formattedKey = '--mforms-nf-input-color';
+                        $styles .= $formattedKey . ': ' . $value . '; ';
+                        break;
+                    case 'mforms_field_border_color':
+                        $formattedKey = '--mforms-nf-input-border-color';
+                        $styles .= $formattedKey . ': ' . $value . '; ';
+                        break;
+                    case 'mforms_field_focus_border_color':
+                        $formattedKey = '--mforms-nf-input-focus-border-color';
+                        $styles .= $formattedKey . ': ' . $value . '; ';
+                        break;
+                    case 'mforms_field_invalid_border_color':
+                        $formattedKey = '--mforms-nf-invalid-input-border-bottom-color';
+                        $styles .= $formattedKey . ': ' . $value . '; ';
+                        break;
+                    case 'mforms_field_valid_border_color':
+                        $formattedKey = '--mforms-nf-valid-input-border-bottom-color';
+                        $styles .= $formattedKey . ': ' . $value . '; ';
+                        break;
+                    case 'mforms_field_border_radius':
+                        $formattedKey = '--mforms-nf-input-border-radius';
+                        $styles .= $formattedKey . ': ' . $value . 'px; ';
+                        break;
+                }
+
+                continue;
+            }
+        }
+
+        foreach ($globalColourSettings as $key => $value) {
+            if (!Str::startsWith($key, 'mforms')) {
+                continue;
+            }
+
+            if (Str::startsWith($key, 'mforms_field')) {
+                continue;
+            }
+            
+            $formattedStyleKey = '--' . Str::replace('_', '-', $key);
+            if (Str::endsWith($key, 'radius')) {
+                $value .= 'px';
+            }
+            $styles .= $formattedStyleKey . ': ' . $value . '; ';
+        }
+
+        return $styles;
     }
 
     public function html(array $properties = [], bool $mergeProperties = false): string {

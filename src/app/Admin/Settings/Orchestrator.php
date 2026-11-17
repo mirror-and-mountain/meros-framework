@@ -13,10 +13,14 @@ use MM\Meros\App\Admin\Pages\MerosPackages as PackageSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosIntegrations as IntegrationsSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosAssets as AssetGroupSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosBlocksSettings as BlocksSettingsPage;
+use MM\Meros\App\Admin\Pages\MerosFormsStyles as FormsSettingsPage;
 
 use MM\Meros\App\Admin\Pages\MerosDev as DevPage;
 
 use MM\Meros\App\Admin\Sections\MerosSettings;
+use MM\Meros\App\Admin\Sections\MerosFormsFieldStyles;
+use MM\Meros\App\Admin\Sections\MerosFormsProgressStyles;
+use MM\Meros\App\Admin\Sections\MerosFormsButtonStyles;
 
 use MM\Meros\App\Admin\Settings\Containers\MerosFrameworkSettings;
 use MM\Meros\App\Admin\Settings\Containers\MerosIntegrationSettings;
@@ -52,6 +56,7 @@ class Orchestrator extends SettingsOrchestrator {
         $this->pages(IntegrationsSettingsPage::class)->register();
         $this->pages(AssetGroupSettingsPage::class)->register();
         $this->pages(BlocksSettingsPage::class)->register();
+        $this->pages(FormsSettingsPage::class)->register();
         $this->pages(DevPage::class)->make();
     }
 
@@ -62,6 +67,9 @@ class Orchestrator extends SettingsOrchestrator {
      */
     private function registerSettingsSections(): void {
         $this->settingsSections()->register(MerosSettings::class, 'meros-theme-settings-section');
+        $this->settingsSections()->register(MerosFormsFieldStyles::class, 'meros-forms-field-styles-section');
+        $this->settingsSections()->register(MerosFormsProgressStyles::class, 'meros-forms-progress-styles-section');
+        $this->settingsSections()->register(MerosFormsButtonStyles::class, 'meros-forms-button-styles-section');
     }
 
     /**
@@ -84,6 +92,8 @@ class Orchestrator extends SettingsOrchestrator {
      * @return void
      */
     private function registerSettings(): void {
+        $this->registerFormSettings();
+
         $packageToggleSetting = $this->settings()->add('boolean', function ($setting) {
             $setting->name('meros_package_toggled');
             $setting->default(false);
@@ -96,6 +106,166 @@ class Orchestrator extends SettingsOrchestrator {
                 flush_rewrite_rules(); // Ensure that any new rewrite rules are applied after packages have been toggled.
                 $packageToggleSetting->setValue(false);
             }
+        });
+    }
+
+    /**
+     * Registers global form-related settings in the appearance menu.
+     *
+     * @return void
+     */
+    private function registerFormSettings(): void {
+        // Progress Bar
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_progress_bar_color');
+            $setting->label('Forms Progress Bar Color');
+            $setting->description('This controls the colour of the progress bar in forms across the site.');
+            $setting->default('#2271b1');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-progress-styles-section');
+        });
+
+        // Fields
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_field_bg_color');
+            $setting->label('Forms Field Background Color');
+            $setting->description('This controls the background colour of form fields across the site.');
+            $setting->default('#f9fafb');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-field-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_field_text_color');
+            $setting->label('Forms Field Text Color');
+            $setting->description('This controls the text colour of form fields across the site.');
+            $setting->default('#20242f');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-field-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_field_border_color');
+            $setting->label('Forms Field Border Color');
+            $setting->description('This controls the border colour of form fields across the site.');
+            $setting->default('#c0c4c9');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-field-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_field_focus_border_color');
+            $setting->label('Forms Field Focus Border Color');
+            $setting->description('This controls the border colour of form fields when focused across the site.');
+            $setting->default('#3b4ce2');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-field-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_field_invalid_border_color');
+            $setting->label('Forms Field Invalid Border Color');
+            $setting->description('This controls the border colour of form fields when invalid across the site.');
+            $setting->default('#ff0000');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-field-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_field_valid_border_color');
+            $setting->label('Forms Field Valid Border Color');
+            $setting->description('This controls the border colour of form fields when valid across the site.');
+            $setting->default('#008000');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-field-styles-section');
+        });
+
+        $this->settings()->add('integer', function (Setting $setting) {
+            $setting->name('mforms_field_border_radius');
+            $setting->label('Forms Field Border Radius (px)');
+            $setting->description('This controls the border radius of form fields across the site.');
+            $setting->default(4);
+            $setting->field('number');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-field-styles-section');
+        });
+
+        // Buttons
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_button_bg_color');
+            $setting->label('Forms Button Background Color');
+            $setting->description('This controls the background colour of form buttons across the site.');
+            $setting->default('#2271b1');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-button-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_button_hover_bg_color');
+            $setting->label('Forms Button Background Hover Color');
+            $setting->description('This controls the background colour of form buttons when hovered across the site.');
+            $setting->default('#1a5a8a');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-button-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_button_border_color');
+            $setting->label('Forms Button Border Color');
+            $setting->description('This controls the border colour of form buttons across the site.');
+            $setting->default('#2271b1');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-button-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_button_hover_border_color');
+            $setting->label('Forms Button Border Hover Color');
+            $setting->description('This controls the border colour of form buttons when hovered across the site.');
+            $setting->default('#1a5a8a');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-button-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_button_text_color');
+            $setting->label('Forms Button Text Color');
+            $setting->description('This controls the text colour of form buttons across the site.');
+            $setting->default('#ffffff');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-button-styles-section');
+        });
+
+        $this->settings()->add('string', function (Setting $setting) {
+            $setting->name('mforms_button_hover_text_color');
+            $setting->label('Forms Button Text Hover Color');
+            $setting->description('This controls the text colour of form buttons when hovered across the site.');
+            $setting->default('#ffffff');
+            $setting->field('color');
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-button-styles-section');
+        });
+
+        $this->settings()->add('integer', function (Setting $setting) {
+            $setting->name('mforms_button_border_radius');
+            $setting->label('Forms Button Border Radius (px)');
+            $setting->description('This controls the border radius of form buttons across the site.');
+            $setting->default(4);
+            $setting->field();
+            $setting->page('meros-forms-styles');
+            $setting->section('meros-forms-button-styles-section');
         });
     }
 

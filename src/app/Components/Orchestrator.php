@@ -8,6 +8,7 @@ use MM\Meros\Contracts\Features\Components\Field;
 // Field Components
 use MM\Meros\App\Components\Fields\Checkbox;
 use MM\Meros\App\Components\Fields\Checkboxes;
+use MM\Meros\App\Components\Fields\Color;
 use MM\Meros\App\Components\Fields\Date;
 use MM\Meros\App\Components\Fields\Email;
 use MM\Meros\App\Components\Fields\Hidden;
@@ -40,6 +41,7 @@ class Orchestrator extends ComponentsOrchestrator {
     private array $fields = [
         'checkbox'     => Checkbox::class,
         'checkboxes'   => Checkboxes::class,
+        'color'        => Color::class,
         'date'         => Date::class,
         'email'        => Email::class,
         'hidden'       => Hidden::class,

@@ -3,7 +3,7 @@
     $hideTitle = $hideTitle ?? false;
     $hideDescription = $hideDescription ?? false;
     $displayAsPages = $displayAsPages ?? false;
-    $submitButtonClass = 'mforms-submit-button button button-primary';
+    $submitButtonClass = 'mforms-button mforms-submit-button';
     if ($hideSubmitButton) {
         $submitButtonClass .= ' mforms-submit-button--hidden';
     }
@@ -21,6 +21,7 @@
     {!! $attributeString !!}
     {{ is_string($onSubmit) ? "data-onsubmit={$onSubmit}" : '' }}
     @submit.prevent="hasNextPage ? nextPage() : submitForm()"
+    style="{{ $style ?? '' }}"
 >
     @if(!$hideTitle && $title !== '')
         <h2 class="mforms-form-title">{{ $title }}</h2>
@@ -40,6 +41,9 @@
                 <section
                     class="mforms-page"
                     data-form-page
+                    x-cloak
+                    x-show="activePage === $el"
+                    x-transition:enter.opacity.duration.200ms
                     data-page-title="{{ $page['title'] }}"
                     aria-label="{{ $page['title'] }}"
                     tabindex="-1"
@@ -58,8 +62,8 @@
     <div class="mforms-footer">
         @if($displayAsPages)
             <div class="mforms-page-navigation" x-cloak x-show="pageCount &gt; 1">
-                <button type="button" class="button" x-show="hasPreviousPage" @click="previousPage()">Previous</button>
-                <button type="button" class="button button-primary" x-show="hasNextPage" @click="nextPage()">Next</button>
+                <button type="button" class="mforms-button" x-show="hasPreviousPage" @click="previousPage()">Previous</button>
+                <button type="button" class="mforms-button" x-show="hasNextPage" @click="nextPage()">Next</button>
             </div>
         @endif
         <button 

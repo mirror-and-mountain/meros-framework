@@ -13,7 +13,7 @@ class MerosAssetGroupSettings extends SettingsContainer {
     protected function configure(): void {
         $this->name('meros_asset_group_settings');
         $this->label('Meros Asset Group Settings');
-        $this->description('Toggles for asset groups registered via the Meros framework. ');
+        $this->description('Toggles for asset groups registered via the Meros framework.');
         $this->page('meros-assets');
     }
 }
