@@ -300,9 +300,7 @@ export default class MerosFieldsProcessor {
             if (typeof config.rules !== 'object') return;
 
             Object.values(config.rules).forEach(rule => {
-                if (typeof rule !== 'object') return;
-                if (rule.field === '__user_signed_in') return;
-                if (!rule.field) return;
+                if (!rule || typeof rule.field !== 'string' || !rule.field) return;
                 if (!rule.operator) return;
                 if (
                     !Object.prototype.hasOwnProperty.call(rule, 'source_value') &&
@@ -479,20 +477,19 @@ export default class MerosFieldsProcessor {
         }
 
         const results = Object.values(config.rules)
-            .filter(rule => rule && typeof rule === 'object' && rule.field && rule.operator)
+            .filter(rule => typeof rule?.field === 'string' && rule.field && rule.operator)
             .map(rule => {
-                if (rule.field === '__user_signed_in' && ['show', 'hide'].includes(type)) {
+                if (rule.field.startsWith('__')) {
                     const form = this.parent.closest('.mforms-form');
-                    const component = form ? this.getFieldComponent(form) : null;
-                    if (typeof component?.userSignedIn !== 'boolean') {
-                        throw new Error('User sign-in conditions require an initialized form component.');
+                    const values = form ? this.getFieldComponent(form)?.conditionValues : null;
+                    if (values && Object.hasOwn(values, rule.field)) {
+                        const actual = values[rule.field];
+                        if (actual === null || !['show', 'hide'].includes(type)) return false;
+                        const expected = String(this.getRuleSourceValue(rule));
+                        if (rule.operator === '=') return actual === expected;
+                        if (rule.operator === '!=') return actual !== expected;
+                        return false;
                     }
-                    return this.evaluateRule(
-                        component.userSignedIn,
-                        rule.operator,
-                        this.getRuleSourceValue(rule),
-                        'checkbox'
-                    );
                 }
                 const sourceField = this.getFieldByConditionName(rule.field, field);
 

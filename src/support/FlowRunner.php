@@ -10,8 +10,14 @@ use MM\Meros\Contracts\Features\Automation\FlowAction;
 use MM\Meros\Contracts\Features\Automation\FlowActionResponse;
 
 use MM\Meros\Facades\Automation\FlowActions;
+use MM\Meros\Facades\Support\FormDynamicValues;
 
-class FlowRunner {    
+class FlowRunner {
+    /**
+     * Reserved dynamic values for flow actions.
+     */
+    protected const RESERVED_DYNAMIC_VALUES = ['user_id', 'user_display_name'];
+
     /**
      * The list of actions to be executed in the flow.
      *
@@ -397,23 +403,7 @@ class FlowRunner {
      * @return mixed
      */
     protected function resolveDynamicValue(string $dynamicValue): mixed {
-        // Handle dynamic values for the current user.
-        if (Str::startsWith($dynamicValue, 'user_')) {
-            $userId = get_current_user_id();
-            switch ($dynamicValue) {
-                case 'user_id':
-                    return $userId;
-                case 'user_display_name':
-                    $user = get_user_by('ID', $userId);
-                    if ($user instanceof \WP_User) {
-                        return $user->display_name;
-                    } else {
-                        return null;
-                    }
-                default: 
-                    return null;
-            }
-        }
+        $dynamicValue = trim(str_replace(['{{', '}}'], '', $dynamicValue));
 
         // Handle dynamic values sourced from other actions.
         if (Str::contains($dynamicValue, '_source_')) {
@@ -422,23 +412,23 @@ class FlowRunner {
                 $sourceActionId = $parts[1];
                 $dynamicValue = $parts[0];
 
-                if (array_key_exists($dynamicValue, $this->triggerPayload[$sourceActionId] ?? [])) {
-                    return $this->triggerPayload[$sourceActionId][$dynamicValue] ?? null;   
-                }
-
-                return null;
+                return $this->triggerPayload[$sourceActionId][$dynamicValue] ?? null;
             }
 
             return null;
         }
 
-        // Handle dynamic values for the current form's field values.
+        // Keep existing field references ahead of newly available context tokens.
+        if (in_array($dynamicValue, static::RESERVED_DYNAMIC_VALUES, true)) {
+            return FormDynamicValues::resolve($dynamicValue);
+        }
+
         $fieldValues = $this->triggerPayload['data'] ?? [];
 
         if (array_key_exists($dynamicValue, $fieldValues) && is_array($fieldValues[$dynamicValue])) {
             return $fieldValues[$dynamicValue]['user_value'] ?? null;
         }
 
-        return null;
+        return FormDynamicValues::resolve($dynamicValue);
     }
 }

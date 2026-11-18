@@ -15,6 +15,7 @@ const mform = () => {
         submitButton: null,
         invalidText: null,
         successMessage: 'Form Submitted Successfully.',
+        showSuccessOnNewPage: false,
         fieldsProcessor: null,
         feedbackMessage: '',
         feedbackType: '',
@@ -26,6 +27,11 @@ const mform = () => {
         pageCount: 0,
         pageTitle: '',
         userSignedIn: false,
+        conditionValues: {},
+
+        get showingConfirmation() {
+            return this.showSuccessOnNewPage && this.feedbackType === 'success';
+        },
 
         get hasPreviousPage() {
             return this.pageNumber > 1;
@@ -46,7 +52,10 @@ const mform = () => {
         init() {
             this.id = this.$el.id || null;
             this.name = this.$el.dataset.name || null;
-            this.userSignedIn = this.$el.hasAttribute('data-user-signed-in');
+            this.conditionValues = this.$el.hasAttribute('data-condition-values')
+                ? JSON.parse(this.$el.dataset.conditionValues)
+                : { __user_signed_in: String(this.$el.hasAttribute('data-user-signed-in')) };
+            this.userSignedIn = this.conditionValues.__user_signed_in === 'true';
 
             this.ajaxAction = 'meros_submit_form';
             this.ajaxUrl = this.$el.dataset.ajaxUrl || null;
@@ -56,11 +65,13 @@ const mform = () => {
             this.submitButton = this.$el.querySelector('[type="submit"]') || null;
             this.invalidText = this.$el.dataset.invalidText || null;
             this.successMessage = this.$el.dataset.successMessage ?? this.successMessage;
+            this.showSuccessOnNewPage = this.$el.hasAttribute('data-success-on-new-page');
 
             this.$el.removeAttribute('data-ajax-url');
             this.$el.removeAttribute('data-ajax-nonce');
             this.$el.removeAttribute('data-invalid-text');
             this.$el.removeAttribute('data-success-message');
+            this.$el.removeAttribute('data-condition-values');
             this.$el.removeAttribute('data-user-signed-in');
 
             // Nested Alpine components are initialized after this component's init hook.
@@ -108,6 +119,7 @@ const mform = () => {
         },
 
         refreshPages() {
+            if (this.showingConfirmation) return;
             const previous = this.activePage;
             const previousIndex = this.pages.indexOf(previous);
             this.availablePages = this.pages.filter(page =>
@@ -170,7 +182,7 @@ const mform = () => {
         // =========================================================================
 
         submitForm(returnOutcome = false) {
-            if (this.isSubmitting) return;
+            if (this.isSubmitting || this.showingConfirmation) return;
 
             const genericError = 'An error occured while submitting the form.'
             const invalidError = this.invalidText || "The form is invalid. Please check the information you've entered."
@@ -244,7 +256,7 @@ const mform = () => {
                     return {
                         success: true,
                         error: null,
-                        message: data.data.message || this.successMessage
+                        message: data.data.message ?? this.successMessage
                     };
                 }
 
@@ -280,11 +292,24 @@ const mform = () => {
             this.feedbackMessage = outcome.success
                 ? outcome.message ?? this.successMessage
                 : outcome.error || 'An error occured while submitting the form.';
+            if (outcome.success) this.resetForm(!this.showSuccessOnNewPage);
             this.feedbackType = outcome.success ? 'success' : 'error';
-            if (outcome.success) this.resetForm();
+            if (this.showingConfirmation) {
+                this.$nextTick(() => this.$el.querySelector('.mforms-confirmation')?.focus());
+            }
         },
 
-        resetForm() {
+        startAnotherResponse() {
+            if (!this.showingConfirmation) return;
+            this.feedbackMessage = '';
+            this.feedbackType = '';
+            this.$nextTick(() => {
+                if (this.pages.length) this.refreshPages();
+                (this.activePage ?? this.$el).focus();
+            });
+        },
+
+        resetForm(focus = true) {
             const form = this.resolveForm();
             if (!form) return;
 
@@ -292,7 +317,7 @@ const mform = () => {
             this.fieldsProcessor?.reset();
             if (this.pages.length) {
                 this.refreshPages();
-                this.showPage(this.availablePages[0] || null, true);
+                this.showPage(this.availablePages[0] || null, focus);
             }
         },
 

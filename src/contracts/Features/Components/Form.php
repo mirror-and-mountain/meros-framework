@@ -18,6 +18,7 @@ use MM\Meros\Contracts\Features\Components\Concerns\MakesFieldRows;
 use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Support\Ajax;
 use MM\Meros\Facades\Components\Fields;
+use MM\Meros\Support\FormConditionSources;
 
 class Form extends Feature implements FormComponent, Makeable {
     /**
@@ -110,6 +111,8 @@ class Form extends Feature implements FormComponent, Makeable {
      * @var boolean
      */
     protected bool $displayAsPages = false;
+    protected bool $showSuccessOnNewPage = false;
+    protected bool $showSubmitAnotherResponse = false;
 
     /**
      * Whether to resolve dynamic values for the form.
@@ -161,6 +164,8 @@ class Form extends Feature implements FormComponent, Makeable {
             'hideDescription',
             'hideSubmitButton',
             'displayAsPages',
+            'showSuccessOnNewPage',
+            'showSubmitAnotherResponse',
             'resolveDynamicValues',
             'pages',
         ]));
@@ -441,6 +446,16 @@ class Form extends Feature implements FormComponent, Makeable {
         return $this;
     }
 
+    final public function showSuccessOnNewPage(bool $show = true): static {
+        $this->showSuccessOnNewPage = $show;
+        return $this;
+    }
+
+    final public function showSubmitAnotherResponse(bool $show = true): static {
+        $this->showSubmitAnotherResponse = $show;
+        return $this;
+    }
+
     /**
      * Controls whether field views resolve dynamic defaults, including nested fields.
      * Disable when editing literal default tokens in the form builder.
@@ -623,8 +638,6 @@ class Form extends Feature implements FormComponent, Makeable {
     public function render(array $properties = [], bool $mergeProperties = false): void {
         $view = $this->view;
 
-        $this->attribute('data-user-signed-in', apply_filters('mforms_user_signed_in', is_user_logged_in()));
-
         if ($mergeProperties) {
             $properties = array_merge(
                 $this->filterSerializedProperties($this->toArray()),
@@ -639,6 +652,7 @@ class Form extends Feature implements FormComponent, Makeable {
         }
 
         $properties['style'] = $this->mapFormStyles();
+        $properties['conditionValues'] = FormConditionSources::values();
 
         echo view($view, $properties);
     }

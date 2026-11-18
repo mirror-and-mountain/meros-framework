@@ -2,9 +2,12 @@
 
 namespace MM\Meros\Support;
 
-use Illuminate\Support\Str;
-
 class FormActionsRunner extends FlowRunner {
+    /**
+     * Reserved dynamic values for form actions.
+     */
+    protected const RESERVED_DYNAMIC_VALUES = [...parent::RESERVED_DYNAMIC_VALUES, 'form_id', 'form_response_id'];
+
     /**
      * The ID of the current form.
      *
@@ -26,17 +29,18 @@ class FormActionsRunner extends FlowRunner {
     }
 
     protected function resolveDynamicValue(string $dynamicValue): mixed {
-        if (Str::startsWith($dynamicValue, 'form_')) {
-            switch ($dynamicValue) {
-                case 'form_id':
-                    return $this->formId;
-                case 'form_response_id':
-                    return $this->formResponseId;
-                default:
-                    return null;
-            }
-        }
+        $addFormValues = fn (array $values): array => [
+            'form_values' => [
+                'form_id' => $this->formId,
+                'form_response_id' => $this->formResponseId,
+            ] + ($values['form_values'] ?? []),
+        ] + $values;
 
-        return parent::resolveDynamicValue($dynamicValue);
+        add_filter('meros_dynamic_form_values', $addFormValues, PHP_INT_MAX);
+        try {
+            return parent::resolveDynamicValue($dynamicValue);
+        } finally {
+            remove_filter('meros_dynamic_form_values', $addFormValues, PHP_INT_MAX);
+        }
     }
 }

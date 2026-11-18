@@ -19,7 +19,7 @@ function operatorsForType(type) {
         available = [...equality, ...emptiness, ...ordering];
     } else if (['text', 'textarea', 'text_area', 'text-area', 'richtext', 'rich_text', 'rich-text', 'email', 'url', 'tel', 'password', 'hidden'].includes(type)) {
         available = [...equality, ...textMatching, ...emptiness];
-    } else if (['checkbox', 'user-signed-in'].includes(type)) {
+    } else if (['checkbox', 'context'].includes(type)) {
         available = equality;
     } else if (['select', 'radio', 'checkboxes', 'lookup', 'posts-lookup', 'posts_lookup', 'users-lookup', 'users_lookup'].includes(type)) {
         available = [...equality, 'CONTAINS', 'NOT CONTAINS', ...emptiness];
@@ -127,20 +127,21 @@ export function createConditionEditor(target, conditions, { options = false, loc
     }
     const original = Array.isArray(conditions) && conditions.length === 0 ? {} : conditions;
     if (Array.isArray(original)) throw new Error('Invalid saved conditions.');
-    const sources = getConditionSources(target);
+    const root = topBuilder(target);
+    if (!root) throw new Error('The form builder could not be found.');
+    const contextSources = Object.entries(JSON.parse(root.dataset.conditionSources ?? '{}'))
+        .map(([name, { label, values }]) => [name, label, 'context', values]);
+    const sources = getConditionSources(target).filter(([name]) => !contextSources.some(([key]) => key === name));
     const editor = element('div', { className: 'mforms-builder-conditions' });
     const controls = [];
     const types = options ? [['show', 'Show'], ['hide', 'Hide'], ['set_options', 'Set options']] : [['show', 'Show'], ['hide', 'Hide']];
     editor.append(element('h3', {}, 'Conditions'));
-    if (!sources.length) {
-        editor.append(element('p', {}, 'No earlier fields are available. Show/hide rules can still use user sign-in status.'));
+    if (!sources.length && !contextSources.length) {
+        editor.append(element('p', {}, 'No condition sources are available.'));
     }
 
     types.forEach(([type, title]) => {
-        const ruleSources = type === 'set_options' ? sources : [
-            ['__user_signed_in', 'User signed in', 'user-signed-in'],
-            ...sources,
-        ];
+        const ruleSources = type === 'set_options' ? sources : [...contextSources, ...sources];
         const config = original[type] || {};
         const rules = config.rules ? Object.values(config.rules) : [];
         const section = element('fieldset', { className: 'mforms-builder-condition-set' });
@@ -203,9 +204,9 @@ export function createConditionEditor(target, conditions, { options = false, loc
                     hint = options.length === 0
                         ? 'No options are configured for this field.'
                         : multiple ? 'Hold Ctrl (or Command) to select multiple values.' : '';
-                } else if (['checkbox', 'user-signed-in'].includes(sourceType)) {
-                    const labels = sourceType === 'user-signed-in' ? ['Signed in', 'Signed out'] : ['Checked', 'Unchecked'];
-                    control = select([['', 'Select a value'], ['true', labels[0]], ['false', labels[1]]], String(currentValue ?? ''));
+                } else if (sourceType === 'checkbox' || sourceType === 'context') {
+                    const values = sourceType === 'context' ? Object.entries(source[3]) : [['true', 'Checked'], ['false', 'Unchecked']];
+                    control = select([['', 'Select a value'], ...values], String(currentValue ?? ''));
                     control.required = true;
                 } else {
                     const inputType = ['date', 'time', 'number'].includes(sourceType) ? sourceType : 'text';
@@ -237,13 +238,13 @@ export function createConditionEditor(target, conditions, { options = false, loc
             const updateOperators = (selected, preserveUnsupported = false) => {
                 const source = ruleSources.find(([name]) => name === field.value);
                 let available = operatorsForType(source?.[2] || '');
-                const invalidRepeaterOperator = source?.[2] === 'repeater' && !available.includes(selected);
+                const invalidOperator = ['repeater', 'context'].includes(source?.[2]) && !available.includes(selected);
                 if (preserveUnsupported && selected && !available.includes(selected)) {
                     available = [...available, selected];
                 }
                 operator.replaceChildren(...available.map(item => element('option', { value: item }, operatorLabels[item] || item)));
                 operator.value = available.includes(selected) ? selected : available[0];
-                if (preserveUnsupported && invalidRepeaterOperator) {
+                if (preserveUnsupported && invalidOperator) {
                     operator.selectedOptions[0].disabled = true;
                 }
             };

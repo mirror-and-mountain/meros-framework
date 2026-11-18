@@ -155,7 +155,7 @@ class FormBuilder {
                     'hide'    => true
                 ]);
 
-                foreach (TemplateComponentLocks::SETTINGS as $flag => $setting) {
+                foreach (FormTemplateComponentLocks::SETTINGS as $flag => $setting) {
                     $repeater->field('checkbox', [
                         'name'    => $flag,
                         'label'   => $flag,
@@ -336,7 +336,7 @@ class FormBuilder {
         }
 
         $isTemplate = $withTemplateLock && ($rowData['__is_form_template'] ?? false);
-        $locks = $withTemplateLock ? TemplateComponentLocks::flags($rowData, null, [], true) : [];
+        $locks = $withTemplateLock ? FormTemplateComponentLocks::flags($rowData, null, [], true) : [];
         $isLockedByTemplate = $locks['__properties_locked_by_template'] ?? false;
 
         if ($withTemplateLock) {
@@ -504,7 +504,7 @@ class FormBuilder {
                 && $data['field_name'] !== ''
                 && $data['field_name'] !== '__FIELD_NAME__'
             ) {
-                foreach (array_merge(['__is_template_field', '__is_form_template'], array_keys(TemplateComponentLocks::SETTINGS)) as $key) {
+                foreach (array_merge(['__is_template_field', '__is_form_template'], array_keys(FormTemplateComponentLocks::SETTINGS)) as $key) {
                     $raw = $data[$key] ?? ($key === '__properties_locked_by_template' ? ($data['__is_locked_by_template'] ?? false) : false);
                     $value = filter_var($raw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
                     if ($value === null) {
@@ -757,7 +757,7 @@ class FormBuilder {
             'id'          => $id,
         ];
 
-        foreach (TemplateComponentLocks::SETTINGS as $flag => $setting) {
+        foreach (FormTemplateComponentLocks::SETTINGS as $flag => $setting) {
             $value = filter_var($this->getSubmittedBuilderValue($group, $flag, false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
             if ($value === null) {
                 throw new \InvalidArgumentException("Invalid checkbox value for '{$flag}'.");
@@ -823,8 +823,9 @@ class FormBuilder {
      * @return array
      */
     private function removeInvalidConditionRules(array $rows, array $availableTypes, array &$removed): array {
+        $conditionSources = FormConditionSources::definitions();
         $precedingFields = [];
-        $filterConditions = function (array &$component, ?string $fieldName = null) use (&$precedingFields, &$removed): void {
+        $filterConditions = function (array &$component, ?string $fieldName = null) use ($conditionSources, &$precedingFields, &$removed): void {
             if (!is_array($component['conditions'] ?? null)) {
                 return;
             }
@@ -838,17 +839,19 @@ class FormBuilder {
                 foreach ($config['rules'] as $rule) {
                     $source = is_array($rule) ? ($rule['field'] ?? null) : null;
                     $operator = is_array($rule) ? ($rule['operator'] ?? null) : null;
-                    if ($source === '__user_signed_in') {
+                    $contextSource = is_string($source) ? ($conditionSources[$source] ?? null) : null;
+                    if ($contextSource !== null) {
                         $value = $rule['source_value'] ?? $rule['value'] ?? null;
                         if (in_array($type, ['show', 'hide'], true) &&
                             in_array($operator, ['=', '!='], true) &&
-                            in_array($value, [true, false, 'true', 'false'], true)) {
+                            FormConditionSources::allowsValue($contextSource, $value)) {
                             $rules[] = $rule;
                             continue;
                         }
                     }
                     $sourceType = is_string($source) ? ($precedingFields[$source] ?? null) : null;
-                    if ($source === '__user_signed_in' || $sourceType === null || $source === $fieldName ||
+                    if ($contextSource !== null || $source === FormConditionSources::SIGNED_IN ||
+                        $sourceType === null || $source === $fieldName ||
                         ($sourceType === 'repeater' && !in_array($operator, ['EMPTY', 'NOT EMPTY'], true))) {
                         $removed[] = [
                             'target' => $component['name'] ?? '',
@@ -973,7 +976,7 @@ class FormBuilder {
 
         // A template's own reconstruction must not recursively load its template fields.
         if (!$this->isFormTemplate && $post->post_type !== 'form-template') {
-            $templateGroups = TemplateComponentLocks::groups($this->postType->getFormStructure()['rows'] ?? []);
+            $templateGroups = FormTemplateComponentLocks::groups($this->postType->getFormStructure()['rows'] ?? []);
             $rows = $this->applyTemplateFields($rows, $this->postType->getTemplateFields() ?? [], $availableFields, $templateGroups);
         }
         if ($useStoredRows) {
@@ -988,11 +991,17 @@ class FormBuilder {
             $form->description($post->post_content);
             $settings = $this->postType->getFormSettings($post->ID);
             $templateSettings = $this->postType->hasFormTemplate() ? $this->postType->getFormSettings() : [];
-            $paginationLocked = filter_var($templateSettings['lock_display_as_pages'] ?? false, FILTER_VALIDATE_BOOLEAN);
-            $displayAsPages = $paginationLocked
-                ? ($templateSettings['display_as_pages'] ?? false)
-                : ($settings['display_as_pages'] ?? $templateSettings['display_as_pages'] ?? false);
-            $form->displayAsPages(filter_var($displayAsPages, FILTER_VALIDATE_BOOLEAN));
+            foreach ([
+                'display_as_pages' => 'displayAsPages',
+                'show_success_on_new_page' => 'showSuccessOnNewPage',
+                'show_submit_another_response' => 'showSubmitAnotherResponse',
+            ] as $key => $method) {
+                $locked = filter_var($templateSettings['lock_' . $key] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $value = $locked
+                    ? ($templateSettings[$key] ?? false)
+                    : ($settings[$key] ?? $templateSettings[$key] ?? false);
+                $form->{$method}(filter_var($value, FILTER_VALIDATE_BOOLEAN));
+            }
 
             foreach ([
                 'submit_button_text' => ['submitText', 'allow_edit_submit_button_text'],
@@ -1071,7 +1080,7 @@ class FormBuilder {
         foreach ($rows as &$row) {
             foreach ($row['fields'] ?? [] as $index => $field) {
                 $templateField = $templateFields[$field['name'] ?? ''] ?? null;
-                if (!is_array($templateField) || !TemplateComponentLocks::flags($field, $templateField, $this->templateSettings, false)['__properties_locked_by_template']) {
+                if (!is_array($templateField) || !FormTemplateComponentLocks::flags($field, $templateField, $this->templateSettings, false)['__properties_locked_by_template']) {
                     continue;
                 }
 
@@ -1094,7 +1103,7 @@ class FormBuilder {
             if (!empty($row['childGroup'])) {
                 $group = &$row['childGroup'];
                 $templateGroup = $templateGroups[$group['name'] ?? ''] ?? null;
-                if (is_array($templateGroup) && TemplateComponentLocks::flags($group, $templateGroup, $this->templateSettings, false)['__properties_locked_by_template']) {
+                if (is_array($templateGroup) && FormTemplateComponentLocks::flags($group, $templateGroup, $this->templateSettings, false)['__properties_locked_by_template']) {
                     foreach (['title', 'description', 'conditions', 'conditionsString'] as $key) {
                         if (array_key_exists($key, $templateGroup)) {
                             $group[$key] = $templateGroup[$key];

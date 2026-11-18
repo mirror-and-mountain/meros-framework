@@ -239,9 +239,31 @@ Show/hide rules can use the reserved source `__user_signed_in`:
 $field->showWhen([['__user_signed_in', '=', true]]);
 ```
 
-The browser reads the containing form component's `userSignedIn` state, initialised by PHP's signed-in attribute. `mforms_user_signed_in` filters that initial flag. In the builder this source is labelled **User signed in**, with **Signed in** and **Signed out** values; it is available even before any fields.
+PHP resolves sign-in status at render time. `mforms_user_signed_in` still filters that flag, and the form component exposes it as `userSignedIn`. In the builder this source is labelled **User signed in**, with **Signed in** and **Signed out** values; it is available even before any fields.
 
 All these conditions control presentation. Validate submitted data and enforce permissions on the server; neither hidden fields nor a client-side sign-in flag provides authorization.
+
+### Registering context sources
+
+Use the `meros_form_condition_sources` WordPress filter to add a source or change an existing source's labels. Register the filter on both admin and front-end requests so rules remain available when editing, saving and rendering.
+
+```php
+add_filter('meros_form_condition_sources', function (array $sources): array {
+    $sources['__site_mode'] = [
+        'label' => 'Site mode',
+        'values' => ['standard' => 'Standard', 'preview' => 'Preview'],
+        'resolve' => static fn (): string => get_option('example_preview_mode')
+            ? 'preview'
+            : 'standard',
+    ];
+
+    return $sources;
+});
+```
+
+Use a unique `__`-prefixed lowercase key. Sources are available for show/hide rules with `=` and `!=`. The server validates stored rules against the registered values, so keep source and value keys stable when renaming labels. The resolver returns a configured key (a boolean maps to `'true'` or `'false'`), or `null` when unavailable. An unavailable source does not match either operator.
+
+The Livewire builder receives labels and choices, not resolver callbacks. Resolved values are visible in front-end markup, so return only public, non-sensitive state and keep resolvers inexpensive. Do not use these rules for authorization.
 
 ## Repeaters
 
@@ -393,16 +415,20 @@ Modal headers, Close controls and Save/Cancel actions stay visible while the bod
 
 ## Settings and template locks
 
-Form and host settings include **Display as Pages**, **Submit Button Text** and a rich-text **Success Message**. Host settings additionally expose form title/description and associated template information. Open/close date/time controls are also defined; their presence alone should not be treated as server-side submission enforcement.
+Form and host settings include **Display as Pages**, **Submit Button Text**, a rich-text **Success Message**, and two confirmation options. Host settings additionally expose form title/description and associated template information. Open/close date/time controls are also defined; their presence alone should not be treated as server-side submission enforcement.
+
+The three settings panels share control definitions in [FormSettingsControls](../src/support/FormSettingsControls.php), but keep distinct field groups and storage keys. The template panel defines defaults and permissions; the host panel uses those values to set its defaults and render locked fields as read-only or disabled.
 
 | Setting | PHP/rendering effect | Template control |
 | --- | --- | --- |
 | `display_as_pages` | Calls `displayAsPages()`. | `lock_display_as_pages` enforces the template value, whether true or false. |
 | `submit_button_text` | Calls `submitText()`. | `allow_edit_submit_button_text = false` enforces template text. |
 | `success_message` | Calls `successMessage()`. | `allow_edit_success_message = false` enforces the template message. |
+| `show_success_on_new_page` | **Show Success Message on a New Page** calls `showSuccessOnNewPage()`. Success replaces the form on the same URL. | `lock_show_success_on_new_page` enforces the template value. |
+| `show_submit_another_response` | **Show Button to Submit Another Response** calls `showSubmitAnotherResponse()`. The button is only shown on the confirmation page. | `lock_show_submit_another_response` enforces the template value independently. |
 | `form_title`, `form_description` | Used by the host block rendering path. | `allow_edit_form_title`, `allow_edit_form_description` control editing. |
 
-For pagination and submission text, an unlocked local value takes precedence over the template value; absent values fall back to the template, then component defaults. Direct component rendering does not automatically apply all block-specific title/description overrides.
+For pagination, submission text, and confirmation options, an unlocked local value takes precedence over the template value; absent values fall back to the template, then component defaults. Both confirmation options default to off. Direct component rendering does not automatically apply all block-specific title/description overrides.
 
 ### Component locks
 
@@ -485,11 +511,15 @@ data[field_name]
 
 Field-definition metadata is added when the submitted key matches a known field. Building this payload is not itself a complete server-side validation or authorization layer. Validate accepted values and permissions in your application/action pipeline.
 
-Actions are configured through the host's actions editor. Available actions depend on registered flow actions; `FormActionsRunner` adds `form_id` and `form_response_id` dynamic values to the underlying flow runner.
+Actions are configured through the host's actions editor. Available actions depend on registered flow actions. At runtime, action inputs can resolve current user/post tokens and custom groups from `meros_dynamic_form_values`, as well as submitted fields and earlier action outputs (`output_name_source_action_id`). `FormActionsRunner` adds `form_id` and `form_response_id` through that same filter for its own lookups. The filter extends runtime resolution, not the action editor's list of choices.
+
+The existing user ID, user display name and form identifiers take precedence over submitted fields of the same name. Other submitted field names take precedence over shared context tokens, so adding a token does not change an existing field reference.
 
 ### Feedback and reset
 
 An explicit action success message takes priority over the configured form success message. Successful messages are passed through `wp_kses_post()` and rendered as HTML; errors remain plain text. An action flow may intentionally return an error-as-success outcome, which the browser also treats as success.
+
+For stored forms submitted over AJAX, type a placeholder into the **Success Message** editor using the field's name, not its label. For example, `Thanks, {{first_name}}!` uses the submitted `first_name` value. Placeholders are resolved in message text, not in links' URLs or other HTML attributes. Values are escaped as text, scalar lists are joined with commas, and missing values render as empty text. Password fields are not exposed. Built-in user and post tokens keep precedence over identically named fields. Action-provided messages and client-only `onSubmit()` callbacks do not use this interpolation.
 
 After an ordinary successful submission:
 
@@ -497,7 +527,7 @@ After an ordinary successful submission:
 - Repeaters restore their initial rows, removing added rows and reinstating removed rows.
 - Conditions and required states are reevaluated.
 - Pagination returns to the first available page.
-- The success feedback remains visible.
+- Success feedback remains visible inline by default. If **Show Success Message on a New Page** is enabled, the form is replaced by a confirmation without reloading or changing the URL. If **Show Button to Submit Another Response** is also enabled, the button returns to the reset form without submitting again.
 
 Values remain untouched while an AJAX request is pending or when it fails. Resetting restores render-time defaults; it does not fetch fresh dynamic token values from the server.
 
@@ -584,5 +614,5 @@ For an enhanced browser field, follow the existing `getValue()`/`setValue()` com
 | Front-end lifecycle | [form.js](../src/resources/assets/wordpress/src/mforms/form.js), [form Blade](../src/resources/views/forms/form.blade.php) |
 | Dynamic defaults | [FormDynamicValues](../src/support/FormDynamicValues.php) |
 | Settings | [Form settings](../src/support/FormSettingsControls.php), [host settings](../src/support/FormHostSettingsControls.php), [template settings](../src/support/FormTemplateSettingsControls.php) |
-| Template locks | [TemplateComponentLocks](../src/support/TemplateComponentLocks.php) |
+| Template locks | [FormTemplateComponentLocks](../src/support/FormTemplateComponentLocks.php) |
 | AJAX and action execution | [components orchestrator](../src/app/Components/Orchestrator.php), [FormActionsRunner](../src/support/FormActionsRunner.php) |

@@ -9,6 +9,7 @@
     data-repeater-defaults-nonce="{{ $repeaterDefaultsNonce }}"
     data-post-id="{{ $postId }}"
     data-template-settings="{{ json_encode($templateLockSettings, JSON_THROW_ON_ERROR) }}"
+    data-condition-sources="{{ json_encode((object) $conditionSources, JSON_THROW_ON_ERROR) }}"
 >
     <div class="mforms-body">
         @if($templateRows !== null)

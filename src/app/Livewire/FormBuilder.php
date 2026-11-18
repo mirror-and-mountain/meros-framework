@@ -8,7 +8,8 @@ use MM\Meros\App\Components\Fields\Repeater;
 use MM\Meros\App\Components\Fields\Select;
 
 use MM\Meros\Facades\Components\Fields;
-use MM\Meros\Support\TemplateComponentLocks;
+use MM\Meros\Support\FormTemplateComponentLocks;
+use MM\Meros\Support\FormConditionSources;
 
 class FormBuilder extends Component {
     /**
@@ -111,7 +112,9 @@ class FormBuilder extends Component {
     }
 
     public function render() {
-        return view('meros::forms.builder');
+        return view('meros::forms.builder', [
+            'conditionSources' => FormConditionSources::choices(),
+        ]);
     }
 
     /**
@@ -123,7 +126,7 @@ class FormBuilder extends Component {
      */
     public function fieldLocks(array $field): array {
         $template = $this->templateFields[$field['name'] ?? ''] ?? null;
-        return TemplateComponentLocks::flags($field, is_array($template) ? $template : null, $this->templateSettings, $this->isFormTemplate);
+        return FormTemplateComponentLocks::flags($field, is_array($template) ? $template : null, $this->templateSettings, $this->isFormTemplate);
     }
 
     /**
@@ -134,8 +137,8 @@ class FormBuilder extends Component {
      * @return array
      */
     public function groupLocks(array $group): array {
-        $template = TemplateComponentLocks::groups($this->templateRows)[$group['name'] ?? ''] ?? null;
-        return TemplateComponentLocks::flags($group, is_array($template) ? $template : null, $this->templateSettings, $this->isFormTemplate);
+        $template = FormTemplateComponentLocks::groups($this->templateRows)[$group['name'] ?? ''] ?? null;
+        return FormTemplateComponentLocks::flags($group, is_array($template) ? $template : null, $this->templateSettings, $this->isFormTemplate);
     }
 
     /**
@@ -146,7 +149,7 @@ class FormBuilder extends Component {
      * @return array|null
      */
     public function templateGroup(array $group): ?array {
-        return TemplateComponentLocks::groups($this->templateRows)[$group['name'] ?? ''] ?? null;
+        return FormTemplateComponentLocks::groups($this->templateRows)[$group['name'] ?? ''] ?? null;
     }
 
     /**

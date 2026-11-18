@@ -52,6 +52,49 @@ class FormDynamicValues {
         return null;
     }
 
+    /**
+     * Parses the given content and replaces dynamic value placeholders with their resolved values.
+     *
+     * @param string $content
+     * @param callable|null $formatValue Formats a resolved value for the output context.
+     *
+     * @return string
+     */
+    public function parse(string $content, ?callable $formatValue = null): string {
+        return preg_replace_callback('/{{\s*([^}]+)\s*}}/', function ($matches) use ($formatValue) {
+            $value = $this->resolve(trim($matches[1]));
+            return $formatValue !== null ? $formatValue($value) : (is_scalar($value) ? (string) $value : '');
+        }, $content);
+    }
+
+    /**
+     * Parses the given HTML content and replaces dynamic value placeholders with their resolved values, escaping them for safe HTML output.
+     *
+     * @param string $content
+     *
+     * @return string
+     */
+    public function parseHtml(string $content): string {
+        $formatValue = static function (mixed $value): string {
+            if (is_array($value)) {
+                $value = implode(', ', array_filter($value, 'is_scalar'));
+            }
+            return esc_html(is_scalar($value) ? (string) $value : '');
+        };
+
+        // Interpolate text nodes only. In particular, never substitute into link URLs.
+        $parts = wp_html_split(wp_kses_post($content));
+        for ($i = 0, $count = count($parts); $i < $count; $i += 2) {
+            $parts[$i] = $this->parse($parts[$i], $formatValue);
+        }
+        return implode('', $parts);
+    }
+
+    /**
+     * Sets the current user data for dynamic value resolution.
+     *
+     * @return void
+     */
     private function setUserData(): void {
         $currentUserId = get_current_user_id();
         $currentUser   = get_user_by('ID', $currentUserId);

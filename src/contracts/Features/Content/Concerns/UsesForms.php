@@ -34,6 +34,7 @@ use MM\Meros\Support\FormTemplateSettingsControls;
 
 use MM\Meros\Facades\Content\PostTypes;
 use MM\Meros\Facades\Support\Context;
+use MM\Meros\Facades\Support\FormDynamicValues;
 
 trait UsesForms {
     /**
@@ -1061,22 +1062,47 @@ trait UsesForms {
             $result === false ? 'error' : 'success'
         );
     
-        if ($result === false) {
-            $errorType = $flowRunner->getErrorAsSuccess() ? 'success' : 'error'; 
+        if ($result === false && !$flowRunner->getErrorAsSuccess()) {
             return [
-                'message' => $errorType === 'success'
-                    ? wp_kses_post($flowRunner->getSuccessMessage() ?: $instance->getSuccessMessage())
-                    : $flowRunner->getLastError(),
-                'type'    => $errorType
+                'message' => $flowRunner->getLastError(),
+                'type'    => 'error'
             ];
         }
 
-        $message = wp_kses_post($flowRunner->getSuccessMessage() ?: $instance->getSuccessMessage());
+        $actionMessage = $flowRunner->getSuccessMessage();
+        $message = $actionMessage
+            ? wp_kses_post($actionMessage)
+            : $this->parseFormSuccessMessage($instance->getSuccessMessage(), $payload['data']);
 
         return [
             'message' => $message,
             'type'    => 'success'
         ];
+    }
+
+    /**
+     * Parses the form success message and replaces dynamic value placeholders with their resolved values.
+     *
+     * @param string $message
+     * @param array  $fields
+     *
+     * @return string
+     */
+    private function parseFormSuccessMessage(string $message, array $fields): string {
+        $submitted = [];
+        foreach ($fields as $name => $entry) {
+            if (isset($entry['field_type']) && $entry['field_type'] !== 'password') {
+                $submitted[$name] = $entry['user_value'];
+            }
+        }
+
+        $addSubmittedValues = static fn (array $values): array => ['submitted_fields' => $submitted] + $values;
+        add_filter('meros_dynamic_form_values', $addSubmittedValues, PHP_INT_MAX);
+        try {
+            return FormDynamicValues::parseHtml($message);
+        } finally {
+            remove_filter('meros_dynamic_form_values', $addSubmittedValues, PHP_INT_MAX);
+        }
     }
 
     /**
