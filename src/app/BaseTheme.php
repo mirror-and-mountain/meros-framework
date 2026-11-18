@@ -35,6 +35,8 @@ abstract class BaseTheme extends Provider {
         $this->setPath(\get_stylesheet_directory());
         $this->setUri(\get_stylesheet_directory_uri());
 
+        // Enable classic menu editor.
+        add_theme_support('menus');
         $this->enqueueStyleSheet();
     }
 

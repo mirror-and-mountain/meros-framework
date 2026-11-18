@@ -15,7 +15,7 @@ final class MFormsDeps extends AssetGroup {
         ];
 
         foreach ($assets as $handle => $path) {
-            $this->add($path, $handle, ['site', 'admin']);
+            $this->add($path, $handle, ['site', 'admin', 'editor']);
         }
 
         $this->name('meros_forms_dependencies');

@@ -17,7 +17,7 @@ final class MForms extends AssetGroup {
             ]
         ];
 
-        $this->add($assets, ['admin', 'site']);
+        $this->add($assets, ['admin', 'site', 'editor']);
         $this->name('meros_forms_assets');
         $this->description('Assets registered by Meros for the forms.');
     }

@@ -3,7 +3,8 @@ import { addFilter } from '@wordpress/hooks';
 import { createHigherOrderComponent } from '@wordpress/compose';
 
 import { Fragment } from '@wordpress/element';
-import { InspectorControls } from '@wordpress/block-editor';
+import { InspectorControls, URLInput } from '@wordpress/block-editor';
+import RepeaterControl from './repeater-control.js';
 import {
     PanelBody,
     ToggleControl,
@@ -15,13 +16,25 @@ import {
     CheckboxControl
 } from '@wordpress/components';
 
-const createControl = (attribute, config, attributes, setAttributes, label) => {
+const createControl = (attribute, config, attributes, setAttributes, label, name) => {
     const value = attributes[attribute];
     const updateValue = (newValue) => setAttributes({
         [attribute]: newValue
     });
 
     switch (config.type) {
+        case 'repeater':
+            return (
+                <RepeaterControl
+                    key={attribute}
+                    label={label}
+                    value={value}
+                    onChange={updateValue}
+                    action={config.ajaxAction}
+                    ajaxUrl={window.meros_script_data?.ajax_url}
+                    nonce={window.meros_script_data?.blocks?.[name]?.repeaterNonces?.[config.ajaxAction]}
+                />
+            );
         case 'toggle':
             return (
                 <ToggleControl
@@ -40,6 +53,19 @@ const createControl = (attribute, config, attributes, setAttributes, label) => {
                     placeholder={config.placeholder || ''}
                     onChange={updateValue}
                 />
+            );
+        case 'url':
+            return (
+                <div key={attribute} style={{ marginBottom: '16px' }}>
+                    <URLInput
+                        className="meros-inspector-url-input"
+                        label={label}
+                        value={value || ''}
+                        placeholder={config.placeholder}
+                        isFullWidth
+                        onChange={updateValue}
+                    />
+                </div>
             );
         case 'date':
             return (
@@ -131,7 +157,7 @@ const MerosDynamicBlockControls = createHigherOrderComponent((BlockEdit) => {
                                     .trim()
                                     .replace(/^./, (character) => character.toUpperCase());
 
-                                return createControl(attribute, config, attributes, setAttributes, label);
+                                return createControl(attribute, config, attributes, setAttributes, label, name);
                             })}
                         </PanelBody>
                     </InspectorControls>

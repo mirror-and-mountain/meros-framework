@@ -262,10 +262,27 @@ const mformsRepeater = () => {
         },
 
         handleEditRow(event) {
-            if (!this.name || !this.originalName || !this.ajaxAction || !this.ajaxurl || !this.ajaxNonce) return;
-
             const row = event.target.closest('tr.meros-repeater-table-row');
             if (!row) return;
+
+            if (this.container.closest('[data-meros-block-repeater]')) {
+                const index = Array.from(this.resolveRows()).indexOf(row);
+                if (index < 0) return;
+
+                this.container.dispatchEvent(new CustomEvent('meros:block-repeater-edit-row', {
+                    bubbles: true,
+                    detail: {
+                        index,
+                        value: this.getValue(),
+                        title: this.formTitle,
+                        trigger: event.currentTarget,
+                        save: (formData) => this.handleRowFormSubmit(formData, row),
+                    },
+                }));
+                return;
+            }
+
+            if (!this.name || !this.originalName || !this.ajaxAction || !this.ajaxurl || !this.ajaxNonce) return;
 
             const rowData = this.getRowData(row);
             const currentValue = this.getValue();
@@ -424,15 +441,15 @@ const mformsRepeater = () => {
                 });
         },
 
-        handleRowFormSubmit(formData) {
-            const rowIndex = this.editingRowIndex;
-            if (rowIndex === null) return;
-
-            const row = this.resolveRow(rowIndex);
-            if (!row) return;
+        handleRowFormSubmit(formData, row = null) {
+            if (row && !this.container.contains(row)) return false;
+            if (!row && this.editingRowIndex !== null) {
+                row = this.resolveRow(this.editingRowIndex);
+            }
+            if (!row) return false;
 
             const formDataField = this.resolveRowFormDataField(row);
-            if (!formDataField) return;
+            if (!formDataField) return false;
 
             const processor = new MerosFieldsProcessor(row);
             const formProcessor = new MerosFormProcessor(row);
@@ -450,8 +467,9 @@ const mformsRepeater = () => {
             }
 
             // Update any table fields with new values from the form data.
+            const fields = this.resolveRowFields(row);
             Object.keys(formData).forEach((key) => {
-                const field = row.querySelector(`[data-repeater-field-name="${key}"]`);
+                const field = fields.find((control) => control.dataset.repeaterFieldName === key);
                 if (field) {
                     processor.setFieldValue({
                         control: field,
@@ -464,6 +482,7 @@ const mformsRepeater = () => {
             formDataField.value = JSON.stringify(formData);
             this.container.dispatchEvent(new Event('change', { bubbles: true }));
             this.editingRowIndex = null;
+            return true;
         },
 
         handleReorderRows() {

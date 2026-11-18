@@ -1,6 +1,13 @@
 @use '../styles/modal.scss';
 @use '../../src/mforms/builder.scss';
 
+.block-editor-url-input.meros-inspector-url-input {
+    // WordPress gives URL inputs a 300px minimum on desktop.
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
 /**
  * Admin button styles for the Meros admin interface.
  */

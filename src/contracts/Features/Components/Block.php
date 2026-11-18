@@ -328,11 +328,17 @@ class Block extends Feature implements Registrable, Makeable {
     /**
      * Adds parent blocks to the block's parents array.
      *
-     * @param array<string> $parents
+     * @param array<string|Block> $parents
      *
      * @return static
      */
     final public function parent(array $parents): static {
+        foreach ($parents as &$parent) {
+            if ($parent instanceof Block) {
+                $parent = $parent->getName(true);
+            }
+        }
+
         $this->parent = $parents;
         return $this;
     }

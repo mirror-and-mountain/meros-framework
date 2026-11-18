@@ -93,6 +93,8 @@ Use the component serializers instead of persisting render data yourself. Runtim
 
 Forms contain `FieldRow` objects. A row has three layout positions; field types determine how many they occupy. `field($type, $propertiesOrClosure, $autoRow = true)` fills the current row when it has capacity, otherwise it starts another row.
 
+At viewport widths of 782px or less, fields within each row stack at full width in their original order, including rows inside groups and paginated forms. Stacked fields use the same vertical spacing whether they share a row or are in consecutive rows.
+
 Pass `false` as the third argument to place a field on a fresh row. Use `row()` for explicit arrangements and `section()` for a field group:
 
 ```php
@@ -301,6 +303,68 @@ Controls include `allowAdd()`, `allowRemove()`, `allowReorder()`, `maxRows()` (`
 For more complex row editing, `editForm($callback, $buttonText, $formTitle, $resetField)` defines a modal form. The callback receives the form and row data; use the existing row-edit mechanism rather than treating that modal as a separate stored form.
 
 On the client, the repeater's `getValue()` resolves its row data. Template rows are excluded from the submitted payload.
+
+### Repeaters in dynamic block inspectors
+
+Use an `array` attribute with `control => true` and a `control_callback`, or set
+`control => ['type' => 'repeater']` explicitly:
+
+```php
+use MM\Meros\App\Components\Fields\Repeater;
+use MM\Meros\Contracts\Features\Components\Field;
+
+$block->attribute('menu_links', [
+    'type' => 'array',
+    'default' => [],
+    'control' => true,
+    'control_callback' => function (Repeater $repeater): void {
+        $repeater->field('text', function (Field $field): void {
+            $field->name('label')->label('Label');
+        });
+        $repeater->field('url', function (Field $field): void {
+            $field->name('url')->label('URL');
+        });
+    },
+]);
+```
+
+The inspector button opens a WordPress modal populated from the current attribute.
+In `field()`, the first argument is the registered Meros field type (such as
+`text` or `url`); the field's `name` is its key in each saved row.
+**Apply** stores the rows in their displayed order as an array of objects keyed by
+field name. **Cancel** or closing the modal leaves the attribute unchanged. Save
+the post to persist the block changes.
+
+Fields can be edited directly in the table or through a repeater's `editForm()`.
+The callback must return the `Form` after adding its fields:
+
+```php
+use MM\Meros\Contracts\Features\Components\Form;
+
+$repeater->editForm(function (Form $form): Form {
+    return $form->field('posts_lookup', [
+        'name' => 'linked_post',
+        'label' => 'Linked post',
+    ]);
+});
+```
+
+For a `posts_lookup` whose saved value should be a permalink instead of an ID,
+call `$field->key('url')`. Using `$field->postType('any')` searches Posts, Pages,
+and the custom post types listed in the form builder, subject to the configured
+post status and any additional filters.
+
+**Edit row** opens the form in the same modal. **Save row** updates the draft
+repeater, and **Cancel row edit** returns to the table without changing the row.
+Only **Apply** writes the draft to the block attribute. Form-only values are
+stored under the row's `form_data` key and restored when the modal is reopened.
+
+The control callback runs on the server for rendering and lookup searches,
+including lookups inside row edit forms. The editor asset group loads the standard Meros field runtime
+and its dependencies, including Tom Select and Quill. Register additional
+field scripts with an editor-area Asset or attach their registered handles
+with `$block->editorScript()`. Load styles for the modal in the admin screen
+since the inspector is outside the block canvas.
 
 ## WordPress form hosts and templates
 

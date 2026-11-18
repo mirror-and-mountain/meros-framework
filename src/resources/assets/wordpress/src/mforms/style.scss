@@ -132,12 +132,20 @@ $mf-first-row-offset: -24px;
         flex-wrap: wrap;
         align-items: stretch;
         min-width: 0;
+
+        @media (max-width: 782px) {
+            row-gap: 0; // Field margins already space stacked fields.
+        }
     }
 
     .mforms-row > * {
         flex: 1 1 calc((100% - (#{$mf-row-gap} * 2)) / 3);
         width: 100%;
         min-width: 0;
+
+        @media (max-width: 782px) {
+            flex-basis: 100%;
+        }
     }
 }
 

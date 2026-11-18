@@ -138,18 +138,28 @@ const mformsSelect = () => {
 
             const lookup = this.ajaxUrl && this.ajaxNonce && this.ajaxAction;
             const preview = el.closest('[data-builder-repeater-preview]');
+            const blockRepeater = el.dataset.merosBlockLookupField
+                ? el.closest('[data-meros-block-repeater]')
+                : null;
 
-            const load = lookup
+            const load = lookup || blockRepeater
                 ? (query, callback) => {
-                    if (!this.name || !this.originalName || !this.ajaxUrl || !this.ajaxNonce) return;
-
                     if (query.length < 3) {
                         callback();
                         return;
                     }
 
-                    const params = preview
+                    if (!blockRepeater && (!this.name || !this.originalName || !this.ajaxUrl || !this.ajaxNonce)) return;
+
+                    const params = blockRepeater
                         ? new URLSearchParams({
+                            action: blockRepeater.dataset.merosBlockRepeater,
+                            nonce: blockRepeater.dataset.ajaxNonce,
+                            mode: 'lookup',
+                            field: el.dataset.merosBlockLookupField,
+                            search: query,
+                        })
+                        : preview ? new URLSearchParams({
                             action: preview.dataset.repeaterDefaultsAction,
                             nonce: preview.dataset.repeaterDefaultsNonce,
                             post_id: preview.dataset.postId,
@@ -166,10 +176,16 @@ const mformsSelect = () => {
                             search: query,
                         });
 
-                    if (!preview && this.formId) params.set('form_id', this.formId);
-                    const url = (preview ? preview.dataset.repeaterDefaultsUrl : this.ajaxUrl) + '?' + params.toString();
+                    if (!blockRepeater && !preview && this.formId) params.set('form_id', this.formId);
+                    if (blockRepeater?.hasAttribute('data-meros-block-repeater-row')) {
+                        params.set('row', blockRepeater.dataset.merosBlockRepeaterRow);
+                        params.set('value', blockRepeater.dataset.merosBlockRepeaterValue);
+                    }
+                    const request = blockRepeater
+                        ? fetch(blockRepeater.dataset.ajaxUrl, { method: 'POST', body: params })
+                        : fetch(`${preview ? preview.dataset.repeaterDefaultsUrl : this.ajaxUrl}?${params}`);
 
-                    fetch(url)
+                    request
                         .then(response => response.json())
                         .then(data => {
                             if (data.success && data.data && data.data.results) {

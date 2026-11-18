@@ -579,6 +579,23 @@ class Repeater extends Field {
             return 'Sorry, no edit form is defined for this repeater.';
         }
 
+        return $this->prepareEditForm($rowData, $repeaterValue)?->html()
+            ?? 'Something went wrong while rendering the edit form.';
+    }
+
+    /**
+     * Prepares the edit form for a repeater row.
+     *
+     * @param array $rowData
+     * @param array $repeaterValue
+     *
+     * @return Form|null
+     */
+    public function prepareEditForm(array $rowData, array $repeaterValue): ?Form {
+        if (!$this->hasEditForm()) {
+            return null;
+        }
+
         $formData = $rowData['form_data'] ?? [];
 
         $form = call_user_func(
@@ -606,10 +623,10 @@ class Repeater extends Field {
                 }
             });
 
-            return $form->html();
+            return $form;
         }
 
-        return 'Something went wrong while rendering the edit form.';
+        return null;
     }
 
     // =========================================================================
@@ -628,6 +645,13 @@ class Repeater extends Field {
         return $properties;
     }
 
+    /**
+     * Filters the properties before they are stored.
+     *
+     * @param array $properties
+     *
+     * @return array
+     */
     protected function filterStorageProperties(array $properties): array {
         unset($properties['tableRows']);
         $properties['fields'] = array_map(fn (Field $field) => $field->serialize('storage'), $this->fields);
@@ -676,6 +700,11 @@ class Repeater extends Field {
             $name  = $clone->getName();
             $id    = "{$this->id}-{$clone->getId()}";
             $value = $templateRow ? $clone->getDefaultValue() : $rowData->get($name);
+
+            if (!$templateRow && $name === '__form_data' && $this->hasEditForm() &&
+                $value === null && is_array($rowData->get('form_data'))) {
+                $value = json_encode($rowData->get('form_data'), JSON_THROW_ON_ERROR);
+            }
 
             // Hydrates lookups
             if ($field->handle === 'lookup' && !$templateRow) {

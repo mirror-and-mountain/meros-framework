@@ -123,10 +123,34 @@ class Lookup extends Select {
      * @return array
      */
     public function resolve(string $search): array {
+        return $this->resolveOptions($search, $this->key);
+    }
+
+    protected function resolveOptions(string $search, string $key): array {
         if ($search === '') {
             return [];
         }
 
+        $options = $this->lookupQuery()
+            ->where($this->labelledBy, 'LIKE', '%' . $search . '%')
+            ->limit($this->limit)
+            ->get([$this->labelledBy, $key]);
+
+        return $options->mapWithKeys(function ($option) use ($key): array {
+            $value = is_array($option) ? ($option[$key] ?? null) : ($option->{$key} ?? null);
+            $label = is_array($option)
+                ? ($option[$this->labelledBy] ?? null)
+                : ($option->{$this->labelledBy} ?? null);
+
+            if ($value === null || $label === null) {
+                return [];
+            }
+
+            return [(string) $value => $label];
+        })->all();
+    }
+
+    protected function lookupQuery() {
         if ($this->object !== '') {
             $query = $this->model::{$this->object}();
         } else {
@@ -143,25 +167,7 @@ class Lookup extends Select {
             }
         }
 
-        $options = $query
-            ->where($this->labelledBy, 'LIKE', '%' . $search . '%')
-            ->limit($this->limit)
-            ->get([$this->labelledBy, $this->key]);
-
-        return $options->mapWithKeys(function ($option): array {
-            $value = is_array($option)
-                ? ($option[$this->key] ?? null)
-                : ($option->{$this->key} ?? null);
-            $label = is_array($option)
-                ? ($option[$this->labelledBy] ?? null)
-                : ($option->{$this->labelledBy} ?? null);
-
-            if ($value === null || $label === null) {
-                return [];
-            }
-
-            return [(string) $value => $label];
-        })->all();
+        return $query;
     }
 
     /**
@@ -173,8 +179,10 @@ class Lookup extends Select {
         parent::whenDefaultSet();
 
         $defaultValue = $this->getDefaultValue();
-        $defaultValues = is_array($defaultValue) ? $defaultValue : [$defaultValue];
+        $this->hydrateDefaultOptions(is_array($defaultValue) ? $defaultValue : [$defaultValue]);
+    }
 
+    protected function hydrateDefaultOptions(array $defaultValues): void {
         foreach ($defaultValues as $value) {
             $option = null;
 

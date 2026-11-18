@@ -9,5 +9,24 @@ This framework underpins our Meros starter themes for Wordpress. Under the hood 
 ### Documentation
 - [Forms](docs/FORMS.md): the PHP form API, WordPress form hosts and templates, client-side builder, conditions, pagination, submissions and field extension points.
 
+#### Nested dynamic blocks
+
+A Meros dynamic block can declare its direct parent with `$child->parent([$parent])`.
+The parent gets a native block inserter and an editable area for its children.
+By default, the inserter allows the dynamic blocks that declared that parent.
+Use `$parent->allowedBlocks([...])` to set the permitted block names explicitly.
+
+WordPress saves the nested blocks with the parent. To display the rendered
+children on the front end, include `$args['content']` in the parent's
+`renderCallback` output.
+
+#### Dynamic block inspector controls
+
+The attribute's `type` is its WordPress storage type. Use `control => true`
+to infer a control from that type, or `control => ['type' => 'url']` to show
+a labeled URL field for a `string` attribute. The field fits the inspector
+sidebar. Paste a URL or type to search for an existing link using WordPress
+suggestions. Set `placeholder` in the control options to override the default prompt.
+
 ### License 
 The Meros Framework is open-sourced software licensed under the MIT license.

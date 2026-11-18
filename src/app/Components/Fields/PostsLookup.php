@@ -21,21 +21,55 @@ class PostsLookup extends Lookup {
     protected static bool $showInFormBuilder = true;
     
     protected function configure(): void {
-        $this->clearFilters();
-
-        if ($this->postStatus !== 'any') {
-            $this->filter('post_status', $this->postStatus);
-        }
-
-        if ($this->postType !== 'any') {
-            $this->filter('post_type', $this->postType);
-        }
-
         $this->setSerializableProperties(['postType', 'postStatus']);
     }
 
+    protected function lookupQuery() {
+        $query = parent::lookupQuery();
+        if ($this->postStatus !== 'any') {
+            $query->where('post_status', $this->postStatus);
+        }
+
+        return $this->postType === 'any'
+            ? $query->whereIn('post_type', array_keys(self::getPostTypes()))
+            : $query->where('post_type', $this->postType);
+    }
+
+    public function resolve(string $search): array {
+        if ($this->key !== 'url') {
+            return parent::resolve($search);
+        }
+
+        $links = [];
+        foreach ($this->resolveOptions($search, 'ID') as $id => $label) {
+            $url = get_permalink((int) $id);
+            if ($url) {
+                $links[$url] = $label;
+            }
+        }
+
+        return $links;
+    }
+
+    protected function hydrateDefaultOptions(array $defaultValues): void {
+        if ($this->key !== 'url') {
+            parent::hydrateDefaultOptions($defaultValues);
+            return;
+        }
+
+        foreach ($defaultValues as $url) {
+            if (!is_string($url) || $url === '') {
+                continue;
+            }
+
+            $id = url_to_postid($url);
+            $label = $id ? $this->lookupQuery()->where('ID', $id)->value($this->labelledBy) : null;
+            $this->options[$url] = $label ?: $url;
+        }
+    }
+
     /**
-     * Sets the post type to return options for. Passing 'any' will return results for all post types.
+     * Passing 'any' includes Posts, Pages, and the custom types available in the form builder.
      *
      * @param string $postType
      *
@@ -69,9 +103,7 @@ class PostsLookup extends Lookup {
      */
     protected static function addBuilderControls(FieldGroup $group,bool $locked = false, array $rowData = []): FieldGroup {
         $postTypes = array_merge([
-            'any'  => 'Any',
-            'post' => 'Post',
-            'page' => 'Page'
+            'any' => 'Any',
         ], self::getPostTypes());
 
         $group->field('checkbox', [
@@ -114,6 +146,6 @@ class PostsLookup extends Lookup {
             $postTypes[$handle] = Str::title(Str::replace(['-', '_'], ' ', $label));
         }
 
-        return $postTypes;
+        return ['post' => 'Post', 'page' => 'Page'] + $postTypes;
     }
 }
