@@ -344,6 +344,7 @@ abstract class Field extends Feature implements FormComponent {
                 $repeater->name('metadata');
                 $repeater->label('Meta Data');
                 $repeater->description("Additional meta data for the field.");
+                $repeater->addRowText('Add Meta Data');
 
                 $repeater->field('text', [
                     'name'  => 'key',

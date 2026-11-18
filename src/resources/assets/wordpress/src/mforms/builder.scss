@@ -153,6 +153,10 @@
     }
 }
 
+.mforms-builder-choice-default ~ .mforms-builder-conditions {
+    margin-top: 1.5rem;
+}
+
 .mforms-builder-move-control {
     display: grid;
     gap: 0.5rem;
