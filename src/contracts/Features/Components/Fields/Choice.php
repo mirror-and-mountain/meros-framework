@@ -19,17 +19,19 @@ abstract class Choice extends Field {
         $this->view('meros::forms.fields.choice');
         
         $this->setSerializableProperties(['allowsMultiple', 'options']);
+        $this->ignoreProps(['options']);
         $this->addSupports(['multiple']);
     }
 
     protected function whenConfigured(): void {
-        parent::whenConfigured();
-        if (array_key_exists('options', $this->passedProps) && 
-            is_array($this->passedProps['options']) &&
-            !empty($this->passedProps['options'])
-        ) {
-            $this->options = $this->sanitizeOptions($this->passedProps['options']);
+        if (array_key_exists('options', $this->passedProps)) {
+            if ($this->defaultValue === null) {
+                $this->options($this->passedProps['options']);
+            } elseif ($this->passedProps['options'] !== []) {
+                $this->options = $this->sanitizeOptions($this->passedProps['options']);
+            }
         }
+        parent::whenConfigured();
     }
 
     /**
@@ -46,6 +48,7 @@ abstract class Choice extends Field {
             $repeater->name('options');
             $repeater->label('Options');
             $repeater->description("The field's available options");
+            $repeater->addRowText('Add Option');
 
             $repeater->field('text', [
                 'name'  => 'value',
