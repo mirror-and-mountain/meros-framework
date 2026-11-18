@@ -511,9 +511,29 @@ data[field_name]
 
 Field-definition metadata is added when the submitted key matches a known field. Building this payload is not itself a complete server-side validation or authorization layer. Validate accepted values and permissions in your application/action pipeline.
 
-Actions are configured through the host's actions editor. Available actions depend on registered flow actions. At runtime, action inputs can resolve current user/post tokens and custom groups from `meros_dynamic_form_values`, as well as submitted fields and earlier action outputs (`output_name_source_action_id`). `FormActionsRunner` adds `form_id` and `form_response_id` through that same filter for its own lookups. The filter extends runtime resolution, not the action editor's list of choices.
+Actions are configured through the host's actions editor. Available actions depend on registered flow actions. At runtime, action inputs can resolve current user/post tokens and custom groups from `meros_dynamic_form_values`, as well as submitted fields and earlier action outputs (`output_name_source_action_id`). `FormActionsRunner` adds `form_id` and `form_response_id` through that same filter for its own lookups.
 
 The existing user ID, user display name and form identifiers take precedence over submitted fields of the same name. Other submitted field names take precedence over shared context tokens, so adding a token does not change an existing field reference.
+
+#### Adding dynamic value choices to the action editor
+
+Use `meros_flow_controls_dynamic_options` to add, relabel, or remove dynamic value choices in the action editor. The filter receives the built-in choices merged with any additional options supplied to [FlowControls](../src/support/FlowControls.php). Each entry has a `name` (the token key without braces), a `label`, and a `data_type` that must match the action input's type.
+
+For example, `user_first_name` is already available at runtime but is not listed by default. To expose it in the editor, register this filter in your plugin or theme:
+
+```php
+add_filter('meros_flow_controls_dynamic_options', function (array $options): array {
+    $options['user_first_name'] = [
+        'name'      => 'user_first_name',
+        'label'     => 'User: First Name',
+        'data_type' => 'string',
+    ];
+
+    return $options;
+});
+```
+
+**User: First Name** now appears in the **Value** dropdown when **Use Dynamic Value** is enabled for a compatible string input. This filter only changes the editor's choices. If you add a custom token that isn't already resolved at runtime, supply its value separately through `meros_dynamic_form_values` using the same token key.
 
 ### Feedback and reset
 

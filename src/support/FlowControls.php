@@ -134,7 +134,7 @@ class FlowControls {
      * @return array
      */
     private function getDefaultDynamicOptions(array $additionalOptions = []): array {
-        return array_merge([
+        return apply_filters('meros_flow_controls_dynamic_options', array_merge([
             'user_id' => [
                 'name'      => 'user_id',
                 'label'     => 'User: ID',
@@ -155,7 +155,7 @@ class FlowControls {
                 'label'     => 'Form Response: ID',
                 'data_type' => 'integer'
             ]
-        ], $additionalOptions);
+        ], $additionalOptions));
     }
 
     // =========================================================================
