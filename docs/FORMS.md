@@ -25,7 +25,7 @@ This guide describes the current framework implementation. Examples assume a boo
 
 | Workflow | Definition | Submission |
 | --- | --- | --- |
-| Developer-defined form | Create a `Form` through the `Forms` facade. | Use `onSubmit()` to dispatch a browser event, then handle the data yourself. |
+| Developer-defined form | Use `$this->forms()->make(...)` inside your package provider. | Use `onSubmit()` to dispatch a browser event, then handle the data yourself. |
 | Stored WordPress form | Use the built-in Form post type and visual builder. | The framework reconstructs the form, stores a response and runs its configured actions. |
 | Form attached to another post type | Implement `FormHost` and use `UsesForms`. | Uses the same stored-form submission pipeline. |
 | Settings fields | Use fields and groups through the settings/data-container APIs. | Their containing WordPress/settings save handler persists the values; this is separate from front-end form submission. |
@@ -34,14 +34,12 @@ A standalone PHP form does not gain a custom server handler merely by having an 
 
 ## Creating a form in PHP
 
-Create forms in application code where your feature provider is available. `Framework::get()` selects the framework provider; inside a feature, use its own provider where appropriate.
+Create developer-defined forms inside a method on your [package provider](../src/app/Package.php). The [ProvidesComponents trait](../src/contracts/Providers/Concerns/ProvidesComponents.php) supplies `forms()`, which gives you the forms register for that provider.
 
 ```php
 use MM\Meros\Contracts\Features\Components\Form;
-use MM\Meros\Facades\Components\Forms;
-use MM\Meros\Facades\Framework;
 
-$form = Forms::checkout(Framework::get())->make(function (Form $form) {
+$form = $this->forms()->make(function (Form $form) {
     $form->id('contact-form');
     $form->name('contact');
     $form->title('Contact us');
