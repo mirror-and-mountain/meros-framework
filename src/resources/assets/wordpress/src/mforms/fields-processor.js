@@ -408,9 +408,6 @@ export default class MerosFieldsProcessor {
             field.control.removeAttribute('data-meros-hidden-field');
         } else {
             field.control.setAttribute('data-meros-hidden-field', '');
-            if (!field.control.classList.contains('mforms-repeater-field')) {
-                this.clearFieldValue(field);
-            }
         }
 
         const shouldRequire = this.evaluateConditionType(field, 'require');
@@ -426,9 +423,7 @@ export default class MerosFieldsProcessor {
 
         const shouldDisable = this.evaluateConditionType(field, 'disable');
         const shouldEnable = this.evaluateConditionType(field, 'enable');
-        const disabled = !isVisible && field.control.classList.contains('mforms-repeater-field')
-            ? true
-            : shouldDisable
+        const disabled = shouldDisable
             ? true
             : shouldEnable
                 ? false
@@ -707,31 +702,6 @@ export default class MerosFieldsProcessor {
             label: control.querySelector(`label[for="${CSS.escape(input.id)}"]`)?.textContent ?? input.value,
             disabled: input.disabled
         }));
-    }
-
-    /**
-     * Clears the value of an Alpine-backed or native field control.
-     *
-     * @param {object} field Registered field metadata.
-     * @returns {void}
-     */
-    clearFieldValue(field) {
-        const component = field.component;
-        if (component && typeof component.setValue === 'function') {
-            component.setValue(null);
-        }
-
-        field.control.querySelectorAll('input, select, textarea').forEach(control => {
-            if (control.type === 'checkbox' || control.type === 'radio') {
-                control.checked = false;
-            } else {
-                control.value = '';
-            }
-        });
-
-        if ('value' in field.control) {
-            field.control.value = '';
-        }
     }
 
     /**

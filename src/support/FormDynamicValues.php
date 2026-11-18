@@ -3,6 +3,8 @@
 namespace MM\Meros\Support;
 
 class FormDynamicValues {
+    public const TYPES = ['string', 'integer', 'number', 'boolean', 'array', 'array.scalar', 'array.object', 'null'];
+
     private array $userData = [];
     private array $postData = [];
 
@@ -13,10 +15,36 @@ class FormDynamicValues {
     public function get(): array {
         $this->setPostData();
         
-        return apply_filters('meros_dynamic_form_values', [
+        $values = apply_filters('meros_dynamic_form_values', [
             'user_values' => $this->userData,
             'post_values' => $this->postData
         ]);
+        if (!is_array($values)) {
+            throw new \UnexpectedValueException('Dynamic form values must be grouped arrays of typed definitions.');
+        }
+        foreach ($values as $groupName => $group) {
+            if (!is_array($group)) {
+                throw new \UnexpectedValueException("Dynamic form value group '{$groupName}' must be an array.");
+            }
+            foreach ($group as $key => $definition) {
+                if (!is_string($key) || !is_array($definition) ||
+                    !array_key_exists('value', $definition) || !isset($definition['type']) ||
+                    !in_array($definition['type'], self::TYPES, true)) {
+                    throw new \UnexpectedValueException("Dynamic form value '{$groupName}.{$key}' requires a valid type and value.");
+                }
+                $value = $definition['value'];
+                $valid = $value === null || match ($definition['type']) {
+                    'number' => is_int($value) || is_float($value),
+                    'array.scalar' => is_array($value) && count(array_filter($value, 'is_scalar')) === count($value),
+                    'array.object' => is_array($value) && count(array_filter($value, 'is_array')) === count($value),
+                    default => self::typeOf($value) === $definition['type'],
+                };
+                if (!$valid) {
+                    throw new \UnexpectedValueException("Dynamic form value '{$groupName}.{$key}' does not match its declared type '{$definition['type']}'.");
+                }
+            }
+        }
+        return $values;
     }
 
     /**
@@ -27,29 +55,38 @@ class FormDynamicValues {
      * @return mixed
      */
     public function resolve(string $key): mixed {
-        $key = str_replace(['{{', '}}'], '', $key);
+        return $this->definition($key)['value'] ?? null;
+    }
+
+    public function definition(string $key): ?array {
+        $key = trim(str_replace(['{{', '}}'], '', $key));
         $values = $this->get();
-
-        if (array_key_exists($key, $values['user_values'])) {
-            return $values['user_values'][$key];
-        }
-
-        if (array_key_exists($key, $values['post_values'])) {
-            return $values['post_values'][$key];
-        }
-
-        // In case filters have been applied and additional groups exist, check them as well.
-        foreach ($values as $groupName => $group) {
-            if ($groupName === 'user_values' || $groupName === 'post_values') {
-                continue;
-            }
-
+        foreach (['user_values' => $values['user_values'] ?? [], 'post_values' => $values['post_values'] ?? []] + $values as $group) {
             if (array_key_exists($key, $group)) {
                 return $group[$key];
             }
         }
-
         return null;
+    }
+
+    public function choices(): array {
+        $values = $this->get();
+        $choices = [];
+        foreach (['user_values' => $values['user_values'] ?? [], 'post_values' => $values['post_values'] ?? []] + $values as $group) {
+            foreach ($group as $name => $definition) {
+                $choices[$name] ??= ['name' => $name, 'type' => $definition['type']];
+            }
+        }
+        return array_values($choices);
+    }
+
+    public static function typeOf(mixed $value): string {
+        return match (gettype($value)) {
+            'double' => 'number',
+            'NULL' => 'null',
+            'string', 'integer', 'boolean', 'array' => gettype($value),
+            default => throw new \UnexpectedValueException('Dynamic form values must be scalar, arrays, or null.'),
+        };
     }
 
     /**
@@ -101,24 +138,29 @@ class FormDynamicValues {
         $userExists    = $currentUser instanceof \WP_User;
 
         $this->userData = [
-            'user_id'           => $currentUserId,
-            'user_display_name' => $userExists ? $currentUser->display_name : '',
-            'user_email'        => $userExists ? $currentUser->user_email : '',
-            'user_first_name'   => $userExists ? $currentUser->first_name : '',
-            'user_last_name'    => $userExists ? $currentUser->last_name : '',
-            'user_nickname'     => $userExists ? $currentUser->nickname : ''
+            'user_id'           => ['type' => 'integer', 'value' => $currentUserId],
+            'user_display_name' => ['type' => 'string', 'value' => $userExists ? $currentUser->display_name : ''],
+            'user_email'        => ['type' => 'string', 'value' => $userExists ? $currentUser->user_email : ''],
+            'user_first_name'   => ['type' => 'string', 'value' => $userExists ? $currentUser->first_name : ''],
+            'user_last_name'    => ['type' => 'string', 'value' => $userExists ? $currentUser->last_name : ''],
+            'user_nickname'     => ['type' => 'string', 'value' => $userExists ? $currentUser->nickname : '']
         ];
     }
 
+    /**
+     * Sets the current post data for dynamic value resolution.
+     *
+     * @return void
+     */
     private function setPostData(): void {
         $currentPostId = get_the_ID();
         $currentPost   = $currentPostId !== false ? get_post($currentPostId) : null;
         $postExists    = $currentPost instanceof \WP_Post;
 
         $this->postData = [
-            'post_id'    => $currentPostId,
-            'post_title' => $postExists ? $currentPost->post_title : '',
-            'post_slug'  => $postExists ? $currentPost->post_name : ''
+            'post_id'    => ['type' => 'integer', 'value' => $currentPostId === false ? null : $currentPostId],
+            'post_title' => ['type' => 'string', 'value' => $postExists ? $currentPost->post_title : ''],
+            'post_slug'  => ['type' => 'string', 'value' => $postExists ? $currentPost->post_name : '']
         ];
     }
 }

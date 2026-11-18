@@ -540,6 +540,20 @@ class FormBuilder {
                 }
                 unset($decodedSettings['__builder_conditions'], $decodedSettings['__builder_condition_options'], $decodedSettings['__builder_conditions_locked']);
 
+                $default = $decodedSettings['defaultValue'] ?? null;
+                $fieldClass = Fields::getRegisteredFeatureClass($data['field_type']);
+                if (is_string($default) && str_starts_with($default, '{{') && is_string($fieldClass) &&
+                    is_subclass_of($fieldClass, \MM\Meros\Contracts\Features\Components\Fields\Input::class)) {
+                    if (preg_match('/^\{\{\s*([^{}]+?)\s*\}\}$/D', $default, $matches) !== 1 || trim($matches[1]) === '') {
+                        throw new \InvalidArgumentException("Invalid dynamic default for field '{$name}'.");
+                    }
+                    $definition = \MM\Meros\Facades\Support\FormDynamicValues::definition($default);
+                    $field = Fields::checkout($this->postType->getProvider())->makeFrom($data['field_type']);
+                    if ($definition === null || !$field->isCompatibleWithDataType($definition['type'])) {
+                        throw new \InvalidArgumentException("Dynamic default for field '{$name}' must resolve to a compatible registered type.");
+                    }
+                }
+
                 if (in_array($data['field_type'], ['select', 'radio', 'checkboxes'], true) &&
                     array_key_exists('__builder_default_value', $decodedSettings)) {
                     if (!is_string($decodedSettings['__builder_default_value'])) {

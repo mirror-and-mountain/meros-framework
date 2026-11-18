@@ -31,8 +31,8 @@ class FormActionsRunner extends FlowRunner {
     protected function resolveDynamicValue(string $dynamicValue): mixed {
         $addFormValues = fn (array $values): array => [
             'form_values' => [
-                'form_id' => $this->formId,
-                'form_response_id' => $this->formResponseId,
+                'form_id' => ['type' => 'integer', 'value' => $this->formId],
+                'form_response_id' => ['type' => 'integer', 'value' => $this->formResponseId],
             ] + ($values['form_values'] ?? []),
         ] + $values;
 

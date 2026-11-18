@@ -136,8 +136,18 @@ class Orchestrator extends ComponentsOrchestrator {
                 $this->sendAjaxError('Unable to resolve form controller.');
             }
 
-            $data   = json_decode(stripslashes($args['form_data'] ?? '{}'), true);
-            $result = $controller->handleSubmission($id, $data);
+            $data = json_decode(stripslashes($args['form_data'] ?? '{}'), true);
+            $hiddenFields = [];
+            if (isset($args['hidden_fields'])) {
+                $hiddenFields = is_string($args['hidden_fields'])
+                    ? json_decode(wp_unslash($args['hidden_fields']), true)
+                    : null;
+                if (!is_array($hiddenFields) || !array_is_list($hiddenFields) ||
+                    count(array_filter($hiddenFields, 'is_string')) !== count($hiddenFields)) {
+                    $this->sendAjaxError('Invalid field visibility metadata.');
+                }
+            }
+            $result = $controller->handleSubmission($id, $data, $hiddenFields);
 
             if (isset($result['type']) && $result['type'] === 'error') {
                 $this->sendAjaxError($result['message'] ?? 'An error occurred during the operation.');

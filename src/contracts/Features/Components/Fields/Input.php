@@ -70,6 +70,8 @@ abstract class Input extends Field {
      * @return FieldGroup
      */
     protected static function addBuilderControls(FieldGroup $group, bool $locked = false, array $rowData = []): FieldGroup {
+        $default = $rowData['form_data']['defaultValue'] ?? null;
+        $dynamic = is_string($default) && Str::startsWith($default, '{{') && Str::endsWith($default, '}}');
         $group->row(function ($row) use ($locked) {
             $row->field('text', [
                 'name'        => 'placeholder',
@@ -77,14 +79,34 @@ abstract class Input extends Field {
                 'readonly'    => $locked,
                 'description' => "The field's placeholder text."
             ]);
-
-            $row->field('text', [
-                'name'        => 'defaultValue',
-                'label'       => 'Default Value',
-                'readonly'    => $locked,
-                'description' => "The field's default value."
-            ]);
         });
+
+        $group->field('checkbox', [
+            'name' => '__builder_use_dynamic_default',
+            'label' => 'Use Dynamic Default Value',
+            'toggle' => true,
+            'disabled' => $locked,
+            'default' => $dynamic,
+        ], false);
+        $literal = $group->field(Str::lower(class_basename(static::class)), [
+            'name' => 'defaultValue',
+            'label' => 'Default Value',
+            'readonly' => $locked,
+        ], false, true);
+        $literal->showWhen([['__builder_use_dynamic_default', '=', false]]);
+        $types = array_values(array_filter(\MM\Meros\Support\FormDynamicValues::TYPES,
+            fn (string $type): bool => $literal->isCompatibleWithDataType($type)));
+        $group->field('text', function (Field $field) use ($locked, $dynamic, $default, $types) {
+            $field->name('__builder_dynamic_default');
+            $field->label('Dynamic Default Value');
+            $field->description('Enter a complete dynamic value, for example {{user_email}}.');
+            $field->readonly($locked);
+            $field->default($dynamic ? $default : '');
+            $field->required();
+            $field->attribute('pattern', '\{\{[^{}]*[^\s{}][^{}]*\}\}');
+            $field->attribute('data-dynamic-value-types', json_encode($types, JSON_THROW_ON_ERROR));
+            $field->showWhen([['__builder_use_dynamic_default', '=', true]]);
+        }, false);
 
         return $group;
     }

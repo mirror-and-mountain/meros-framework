@@ -10,6 +10,7 @@ use MM\Meros\App\Components\Fields\Select;
 use MM\Meros\Facades\Components\Fields;
 use MM\Meros\Support\FormTemplateComponentLocks;
 use MM\Meros\Support\FormConditionSources;
+use MM\Meros\Facades\Support\FormDynamicValues;
 
 class FormBuilder extends Component {
     /**
@@ -114,6 +115,7 @@ class FormBuilder extends Component {
     public function render() {
         return view('meros::forms.builder', [
             'conditionSources' => FormConditionSources::choices(),
+            'dynamicValues' => FormDynamicValues::choices(),
         ]);
     }
 

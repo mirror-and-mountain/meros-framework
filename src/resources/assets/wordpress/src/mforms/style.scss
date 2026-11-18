@@ -4,6 +4,62 @@
 $mf-row-gap: 1rem;
 $mf-first-row-offset: -24px;
 
+.mforms-dynamic-suggestions-host {
+    position: relative;
+}
+
+.mforms-dynamic-suggestions {
+    position: absolute;
+    z-index: 20;
+    top: 100%;
+    left: 0;
+    min-width: 16rem;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    background: #fff;
+    color: #1d2327;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+
+    .mforms-dynamic-suggestions-host > &[hidden] {
+        display: none;
+    }
+
+    [role="listbox"] {
+        max-height: 14rem;
+        overflow: auto;
+    }
+
+    .mforms-dynamic-suggestions-close {
+        display: block;
+        margin-left: auto;
+        padding: 0.35rem 0.75rem;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+
+        &:hover {
+            text-decoration: underline;
+        }
+
+        &:focus-visible {
+            outline: 2px solid #2271b1;
+            outline-offset: -2px;
+        }
+    }
+
+    [role="option"] {
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+    }
+
+    [role="option"]:hover,
+    [aria-selected="true"] {
+        background: #e8f0fe;
+    }
+}
+
 // Form and page layout
 .mforms-form {
     display: grid;

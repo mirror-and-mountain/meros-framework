@@ -74,6 +74,10 @@ const mform = () => {
             this.$el.removeAttribute('data-condition-values');
             this.$el.removeAttribute('data-user-signed-in');
 
+            // Validate visible controls ourselves so retained hidden values cannot block submission.
+            const form = this.resolveForm();
+            if (form) form.noValidate = true;
+
             // Nested Alpine components are initialized after this component's init hook.
             this.$nextTick(() => {
                 this.fieldsProcessor = new MerosFieldsProcessor(this.$el);
@@ -94,8 +98,6 @@ const mform = () => {
             this.pages = Array.from(this.$el.querySelectorAll(':scope > .mforms-body > [data-form-page]'));
             if (!this.pages.length) return;
 
-            // Inactive pages retain their values and constraints; validation reveals the relevant page.
-            this.$el.noValidate = true;
             this.refreshPages();
             pageObserver = new MutationObserver(() => this.refreshPages());
             pageObserver.observe(this.$el, {
@@ -199,12 +201,9 @@ const mform = () => {
                 return this.completeSubmission({success: false, error: genericError}, returnOutcome);
             }
 
-            const invalid = this.pages.length ? this.findInvalidControl(form) : null;
-            const valid = this.pages.length ? !invalid : form.checkValidity();
-
-            if (valid === false) {
-                if (invalid) this.reportInvalidControl(invalid);
-                else form.reportValidity();
+            const invalid = this.findInvalidControl(form);
+            if (invalid) {
+                this.reportInvalidControl(invalid);
                 return this.completeSubmission(
                     {success: false, invalid: true, error: invalidError},
                     returnOutcome
@@ -212,6 +211,18 @@ const mform = () => {
             }
 
             const formData = this.processFormData(new FormData(form));
+            const hiddenFields = [];
+            for (const field of Object.values(this.fieldsProcessor?.fields ?? {})) {
+                const { control } = field;
+                if (!control.closest('[data-meros-hidden-field]') || control.matches(':disabled')) continue;
+                const name = field.name.replace(/\[\]$/, '');
+                if (!Object.prototype.hasOwnProperty.call(formData, name)) {
+                    const controls = control.querySelectorAll('input, select, textarea');
+                    if (controls.length && Array.from(controls).every(input => input.matches(':disabled'))) continue;
+                    formData[name] = this.fieldsProcessor.getFieldValue(field);
+                }
+                hiddenFields.push(name);
+            }
 
             if (this.onSubmit && typeof this.onSubmit === 'string') {
                 this.$dispatch('mforms::' + this.onSubmit, { 
@@ -237,6 +248,7 @@ const mform = () => {
             postData.append('form_name', this.name);
             postData.append('id', this.id);
             postData.append('form_data', JSON.stringify(formData));
+            postData.append('hidden_fields', JSON.stringify(hiddenFields));
 
             this.isSubmitting = true;
 

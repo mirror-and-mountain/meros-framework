@@ -1016,10 +1016,11 @@ trait UsesForms {
      *
      * @param integer      $id
      * @param array|string $data
+     * @param array        $hiddenFields Field names reported hidden by the browser.
      *
      * @return array
      */
-    public function handleSubmission(int $id, array|string $data): array {
+    public function handleSubmission(int $id, array|string $data, array $hiddenFields = []): array {
         $form = Post::find($id);
 
         if ($form === null) {
@@ -1042,7 +1043,7 @@ trait UsesForms {
         }
 
         $actions = $this->getFormActions($id);
-        $payload = $instance->buildSubmissionPayload($data);
+        $payload = $instance->buildSubmissionPayload($data, $hiddenFields);
 
         $storedResponseId = $this->storeFormResponse($id, $payload);
         if ($storedResponseId === false) {
@@ -1092,7 +1093,10 @@ trait UsesForms {
         $submitted = [];
         foreach ($fields as $name => $entry) {
             if (isset($entry['field_type']) && $entry['field_type'] !== 'password') {
-                $submitted[$name] = $entry['user_value'];
+                $submitted[$name] = [
+                    'type' => \MM\Meros\Support\FormDynamicValues::typeOf($entry['user_value']),
+                    'value' => $entry['user_value'],
+                ];
             }
         }
 

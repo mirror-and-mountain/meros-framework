@@ -549,9 +549,13 @@ abstract class Field extends Feature implements FormComponent {
 
         // Normalise and set the default value if provided, or normalise against null if not provided
         if (array_key_exists('defaultValue', $this->passedProps)) {
-            $this->defaultValue = $this->normaliseValue($this->passedProps['defaultValue']);
+            $value = $this->passedProps['defaultValue'];
+            $this->defaultValue = is_string($value) && Str::startsWith($value, '{{') && Str::endsWith($value, '}}')
+                ? $value : $this->normaliseValue($value);
         } else if (array_key_exists('default', $this->passedProps)) {
-            $this->defaultValue = $this->normaliseValue($this->passedProps['default']);
+            $value = $this->passedProps['default'];
+            $this->defaultValue = is_string($value) && Str::startsWith($value, '{{') && Str::endsWith($value, '}}')
+                ? $value : $this->normaliseValue($value);
         } else if ($this->defaultValue === null) {
             $this->defaultValue = $this->normaliseValue(null);
         }
@@ -1388,6 +1392,9 @@ abstract class Field extends Feature implements FormComponent {
      * @return mixed
      */
     public function getDefaultValue(): mixed {
+        if (is_string($this->defaultValue) && Str::startsWith($this->defaultValue, '{{') && Str::endsWith($this->defaultValue, '}}')) {
+            return $this->defaultValue;
+        }
         return $this->castValue($this->defaultValue, $this->dataType);
     }
 

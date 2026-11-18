@@ -171,16 +171,31 @@ Built-in tokens:
 
 Tokens resolve from the render-time WordPress context, not necessarily the post that stores the form. This is whole-value resolution, not general interpolation: do not assume `Hello {{user_first_name}}` will be substituted.
 
+In the visual builder, input-field editors use the field's own input type for a literal default. Turn on **Use Dynamic Default Value** to enter a complete token instead. Type `{{` to see matching dynamic-value suggestions; use the arrow keys and Enter, or click a suggestion. Selecting an option closes the list. Use its **Close** button, or Escape while suggestions are open, to dismiss suggestions without closing the field editor modal; editing the text brings suggestions back. Suggestions expose names and declared types, never current values. Only types accepted by the field are offered: number fields accept `integer` and `number`, whereas text/email fields accept `string`. Unknown or incompatible manually entered tokens prevent saving. The selected token is stored as the field's `defaultValue` and resolved when the form renders. Success-message suggestions are not type-restricted.
+
 Extend the grouped values with the `meros_dynamic_form_values` WordPress filter:
 
 ```php
 add_filter('meros_dynamic_form_values', function (array $values): array {
-    $values['site_values'] = ['site_name' => get_bloginfo('name')];
+    $values['site_values'] = [
+        'site_name' => [
+            'value' => get_bloginfo('name'),
+            'type' => 'string',
+        ],
+        'item_count' => [
+            'value' => 12,
+            'type' => 'integer',
+        ],
+    ];
     return $values;
 });
 ```
 
 The new token is `{{site_name}}`. Keep token names unique across groups. Builder editing disables dynamic resolution where it needs to preserve the literal configuration.
+
+Every item returned by this filter must now contain both `value` and `type`; migrate older filters that supplied raw values. Supported types are `string`, `integer`, `number` (integer or float), `boolean`, `array`, `array.scalar`, `array.object` (arrays of row arrays), and `null`. Values must match their declared type; malformed definitions throw `UnexpectedValueException`, rather than coercing text to numbers. A `null` value is allowed with any declared type when its context is unavailable (for example, `post_id` outside a post).
+
+`FormDynamicValues::get()` returns these grouped definitions. `resolve('user_id')` still returns the underlying value, not its definition; parsing and flow actions retain that behavior. `choices()` returns only `{name, type}` records for editor metadata. Built-in IDs declare `integer`; other built-in user/post tokens declare `string`. Field compatibility uses the field's primary and additional data types, not HTML-format validation: an email default must still contain an email address when the form is submitted.
 
 ## Conditions
 
@@ -227,7 +242,7 @@ For `setValueWhen()`, omitting the fourth element copies the source value when t
 
 Condition-hidden fields stop being required; revealing them reinstates their original required state or the applicable require/optional rule. Hiding a group similarly suppresses requirements for its descendants.
 
-Directly hidden non-repeater fields have their values cleared. Hiding a group is not equivalent to deleting all its values; do not rely on visibility as a data-erasure or authorization mechanism. Repeater child processors intentionally do not apply show/hide rules within rows.
+Hiding a field or group does not clear its values. Hidden fields do not block browser validation. Repeater child processors intentionally do not apply show/hide rules within rows.
 
 ### Signed-in conditions
 
@@ -503,11 +518,16 @@ data[field_name]
     field_name
     user_value
     user_value_data_type
+    submission_state
     field_type, field_data_type, field_metadata
     field_group, group_index, row_index, field_index
 ```
 
 Field-definition metadata is added when the submitted key matches a known field. Building this payload is not itself a complete server-side validation or authorization layer. Validate accepted values and permissions in your application/action pipeline.
+
+Each submitted field records `submission_state` as `hidden` if a visibility marker was present on that field or an ancestor, or `shown` otherwise. Hidden fields retain their submitted values, including defaults and values entered before they became hidden. Fields on inactive pagination steps are not hidden for this purpose. Submissions without visibility metadata default to `shown`. This state is reported by the browser and must not be used for authorization or server-side validation.
+
+Controls that are independently disabled remain excluded from submission. For a custom `FormHost` that implements submission handling without `UsesForms`, accept the optional third `array $hiddenFields = []` argument and pass it to `buildSubmissionPayload($data, $hiddenFields)` to record the same visibility states.
 
 Actions are configured through the host's actions editor. Available actions depend on registered flow actions. At runtime, action inputs can resolve current user/post tokens and custom groups from `meros_dynamic_form_values`, as well as submitted fields and earlier action outputs (`output_name_source_action_id`). `FormActionsRunner` adds `form_id` and `form_response_id` through that same filter for its own lookups.
 
@@ -537,7 +557,7 @@ add_filter('meros_flow_controls_dynamic_options', function (array $options): arr
 
 An explicit action success message takes priority over the configured form success message. Successful messages are passed through `wp_kses_post()` and rendered as HTML; errors remain plain text. An action flow may intentionally return an error-as-success outcome, which the browser also treats as success.
 
-For stored forms submitted over AJAX, type a placeholder into the **Success Message** editor using the field's name, not its label. For example, `Thanks, {{first_name}}!` uses the submitted `first_name` value. Placeholders are resolved in message text, not in links' URLs or other HTML attributes. Values are escaped as text, scalar lists are joined with commas, and missing values render as empty text. Password fields are not exposed. Built-in user and post tokens keep precedence over identically named fields. Action-provided messages and client-only `onSubmit()` callbacks do not use this interpolation.
+For stored forms submitted over AJAX, type a placeholder into the **Success Message** editor using the field's name, not its label. For example, `Thanks, {{first_name}}!` uses the submitted `first_name` value. Type `{{` in the rich-text editor to see suggestions for current form fields and shared dynamic values. Placeholders are resolved in message text, not in links' URLs or other HTML attributes. Values are escaped as text, scalar lists are joined with commas, and missing values render as empty text. Password fields are not exposed. Built-in user and post tokens keep precedence over identically named fields. Action-provided messages and client-only `onSubmit()` callbacks do not use this interpolation.
 
 After an ordinary successful submission:
 

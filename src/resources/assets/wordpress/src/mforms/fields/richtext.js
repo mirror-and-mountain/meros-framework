@@ -37,6 +37,9 @@ const mformsRichText = () => {
                 });
             }
             this.setValue(this.$refs.input.value);
+            if (/\[success_message\]$/.test(this.$refs.input.name)) {
+                attachDynamicSuggestions(this.$el, { quill, includeFields: true });
+            }
 
             quill.on('text-change', () => {
                 this.syncInput();
@@ -84,3 +87,4 @@ const mformsRichText = () => {
 }
 
 export default mformsRichText;
+import { attachDynamicSuggestions } from '../dynamic-suggestions.js';

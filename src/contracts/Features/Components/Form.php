@@ -219,10 +219,11 @@ class Form extends Feature implements FormComponent, Makeable {
      * Creates a payload array using submitted form data for passing to form actions.
      *
      * @param array $fieldValues
+     * @param array $hiddenFields Field names reported hidden by the browser.
      *
      * @return array
      */
-    public function buildSubmissionPayload(array $fieldValues): array {
+    public function buildSubmissionPayload(array $fieldValues, array $hiddenFields = []): array {
         $payload = [
             'form_id'         => $this->getId(),
             'form_title'      => $this->getTitle(),
@@ -241,7 +242,8 @@ class Form extends Feature implements FormComponent, Makeable {
             $payload['data'][$name] = [
                 'field_name'           => $name,
                 'user_value'           => $value,
-                'user_value_data_type' => gettype($value)
+                'user_value_data_type' => gettype($value),
+                'submission_state'     => in_array((string) $name, $hiddenFields, true) ? 'hidden' : 'shown'
             ];
 
             $field = $fields->firstWhere(function (Field $field) use($name) {

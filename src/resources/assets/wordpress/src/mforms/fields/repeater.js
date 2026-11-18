@@ -4,6 +4,7 @@ import MerosModal from '../../classes/modal.js';
 import { createConditionEditor } from '../builder-conditions.js';
 import { createChoiceDefaultEditor } from '../builder-choice-default.js';
 import { positionTemplateFieldLocks, updateTemplateLockControls } from '../builder-template-locks.js';
+import { attachDynamicSuggestions } from '../dynamic-suggestions.js';
 
 const mformsRepeater = () => {
     let initialRows = [];
@@ -302,6 +303,17 @@ const mformsRepeater = () => {
                 let conditionInput = null;
                 const card = this.container.closest('[data-form-field-component]');
                 const form = modal.content.querySelector('form');
+                const dynamicDefault = form?.querySelector('[name="__builder_dynamic_default"]');
+                let validateDynamicDefault = null;
+                if (card && dynamicDefault) {
+                    const stored = rowData.form_data?.defaultValue;
+                    const literal = form.querySelector('[name="defaultValue"]');
+                    if (literal && (stored === undefined ||
+                        (typeof stored === 'string' && stored.startsWith('{{') && stored.endsWith('}}')))) {
+                        literal.value = '';
+                    }
+                    validateDynamicDefault = attachDynamicSuggestions(dynamicDefault);
+                }
                 if (card) updateTemplateLockControls(modal.content, card);
                 if (card && form) {
                     createChoiceDefaultEditor(form, rowData.field_type, rowData.form_data || {},
@@ -327,6 +339,7 @@ const mformsRepeater = () => {
                 modal.onConfirm((modalElement) => {
                     const form = modalElement.querySelector('form')
                     if (!form) return;
+                    validateDynamicDefault?.();
 
                     if (conditionEditor) {
                         if (!conditionEditor.validate()) {
@@ -425,6 +438,16 @@ const mformsRepeater = () => {
             const formProcessor = new MerosFormProcessor(row);
             delete formData.__builder_condition_options;
             delete formData.__builder_conditions_locked;
+            if (Object.prototype.hasOwnProperty.call(formData, '__builder_dynamic_default')) {
+                const original = this.getRowData(row)?.form_data?.defaultValue;
+                const useDynamic = formData.__builder_use_dynamic_default ??
+                    (typeof original === 'string' && original.startsWith('{{') && original.endsWith('}}'));
+                if (useDynamic) {
+                    formData.defaultValue = formData.__builder_dynamic_default;
+                }
+                delete formData.__builder_use_dynamic_default;
+                delete formData.__builder_dynamic_default;
+            }
 
             // Update any table fields with new values from the form data.
             Object.keys(formData).forEach((key) => {
