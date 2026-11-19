@@ -258,6 +258,12 @@ $mf-first-row-offset: -24px;
 }
 
 // Feedback messages
+.mforms-field-validation {
+    margin-top: 0.5rem;
+    color: var(--mforms-feedback-error-text-color, #991b1b);
+    font-size: smaller;
+}
+
 .mforms-feedback {
     margin-top: 1rem;
     padding: 0.75rem 1rem;

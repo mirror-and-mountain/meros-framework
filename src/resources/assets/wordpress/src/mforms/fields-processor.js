@@ -1033,7 +1033,7 @@ export default class MerosFieldsProcessor {
     getFieldControls(field) {
         const control = field.control;
 
-        if (control.matches('input, select, textarea, .mforms-repeater-field')) {
+        if (control.matches('input, select, textarea, .mforms-repeater-field, .meros-choice-field')) {
             return [control];
         }
 

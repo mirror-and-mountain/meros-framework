@@ -3,6 +3,15 @@ import MerosFieldsProcessor from './fields-processor.js';
 
 const mform = () => {
     let pageObserver = null;
+    let validationFeedback = null;
+    const clearValidationFeedback = () => {
+        if (!validationFeedback) return;
+        const { target, message, describedBy } = validationFeedback;
+        if (describedBy === null) target.removeAttribute('aria-describedby');
+        else target.setAttribute('aria-describedby', describedBy);
+        message.remove();
+        validationFeedback = null;
+    };
 
     return {
         id: null,
@@ -77,6 +86,8 @@ const mform = () => {
             // Validate visible controls ourselves so retained hidden values cannot block submission.
             const form = this.resolveForm();
             if (form) form.noValidate = true;
+            this.$el.addEventListener('change', clearValidationFeedback);
+            this.$el.addEventListener('input', clearValidationFeedback);
 
             // Nested Alpine components are initialized after this component's init hook.
             this.$nextTick(() => {
@@ -91,6 +102,9 @@ const mform = () => {
 
         destroy() {
             pageObserver?.disconnect();
+            this.$el.removeEventListener('change', clearValidationFeedback);
+            this.$el.removeEventListener('input', clearValidationFeedback);
+            clearValidationFeedback();
         },
 
         initPagination() {
@@ -151,14 +165,77 @@ const mform = () => {
         },
 
         findInvalidControl(scope) {
-            return Array.from(scope.querySelectorAll('input, select, textarea'))
-                .find(control => control.willValidate && !this.isConditionallyHidden(control) && !control.checkValidity());
+            clearValidationFeedback();
+            if (!scope) return null;
+            const controls = scope.querySelectorAll('input, select, textarea, .meros-choice-field, .mforms-repeater-field');
+            for (const control of controls) {
+                if (control.matches(':disabled') || control.closest('.meros-repeater-table-row--template') ||
+                    this.isConditionallyHidden(control)) continue;
+
+                const message = this.getFieldValidationMessage(control, scope);
+                if (message) return { control, message };
+                if (control.willValidate && !control.checkValidity()) return { control };
+            }
+            return null;
         },
 
-        reportInvalidControl(control) {
+        getFieldValidationMessage(control, scope) {
+            let count;
+            let unit = 'options';
+            const required = control.hasAttribute('required');
+            if (control.matches('.meros-choice-field')) {
+                const inputs = control.querySelectorAll('input:is([type="checkbox"], [type="radio"]):not(:disabled)');
+                count = Array.from(inputs).filter(input => input.checked).length;
+            } else if (control.matches('select[multiple]')) {
+                count = Array.from(control.selectedOptions).filter(option => option.value !== '' &&
+                    !option.disabled && !option.closest('optgroup[disabled]')).length;
+            } else if (control.matches('.mforms-repeater-field')) {
+                unit = 'rows';
+                count = Array.from(control.querySelectorAll(
+                    '.meros-repeater-table-row:not(.meros-repeater-table-row--template, .meros-repeater-table-row--empty)'
+                )).filter(row => row.closest('.mforms-repeater-field') === control).length;
+            } else if (control.matches('[data-builder-bound="max"]') && control.value !== '') {
+                const min = scope.querySelector('[data-builder-bound="min"]');
+                return min && min.value !== '' && control.valueAsNumber < min.valueAsNumber
+                    ? 'The maximum must be greater than or equal to the minimum.' : '';
+            } else {
+                return '';
+            }
+
+            const minimum = Math.max(required ? 1 : 0, Number(control.dataset.minCount ?? 0));
+            const legacyMax = unit === 'rows' && Number(control.dataset.maxRows) > 0 ? control.dataset.maxRows : null;
+            const maximum = Number(control.dataset.maxCount ?? legacyMax ?? Infinity);
+            const verb = unit === 'rows' ? 'Add' : 'Select';
+            if (count < minimum) return `${verb} at least ${minimum} ${minimum === 1 ? unit.slice(0, -1) : unit}.`;
+            if (count > maximum) return `Use no more than ${maximum} ${maximum === 1 ? unit.slice(0, -1) : unit}.`;
+            return '';
+        },
+
+        reportInvalidControl({ control, message }) {
             const page = control.closest('[data-form-page]');
             if (page) this.showPage(page);
-            control.reportValidity();
+            if (!message && !control.tomselect) {
+                control.reportValidity();
+                return;
+            }
+            const fieldset = control.matches('fieldset');
+            const focusable = control.matches('.mforms-repeater-field')
+                ? '.meros-repeater-table-button--add:not(:disabled), .meros-repeater-table-button--remove:not(:disabled)'
+                : 'input:is([type="checkbox"], [type="radio"]):not(:disabled)';
+            const target = control.tomselect?.control_input ||
+                (fieldset ? control.querySelector(focusable) : control) || control;
+            if (target === control && fieldset) target.setAttribute('tabindex', '-1');
+            const feedback = document.createElement('div');
+            feedback.id = `${this.id || 'mforms'}-validation-message`;
+            feedback.className = 'mforms-field-validation';
+            feedback.setAttribute('role', 'alert');
+            feedback.textContent = message || control.validationMessage;
+            if (fieldset) control.append(feedback);
+            else (control.tomselect?.wrapper || control).after(feedback);
+            const describedBy = target.getAttribute('aria-describedby');
+            target.setAttribute('aria-describedby', [describedBy, feedback.id].filter(Boolean).join(' '));
+            validationFeedback = { target, message: feedback, describedBy };
+            target.focus();
         },
 
         nextPage() {

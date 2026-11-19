@@ -150,6 +150,12 @@ $form->field('select', function (Select $field) {
 
 Choice options accept value-to-label maps or records containing `value` and `label`. Use stable string values. Single-choice defaults use a scalar; multiple-choice defaults use an array of values. Searchable/multiple selects are enhanced by Tom Select.
 
+### Field validation
+
+**Next** validates the current page; **Submit** validates all pages. Conditionally hidden or disabled fields do not block either action. Required radio groups need one selection. Required checkbox groups, multi-selects and repeaters need at least one selection or row, unless a higher minimum is configured.
+
+In the builder, set **Minimum** and **Maximum** selections for checkbox groups and multi-selects, rows for repeaters, or values for number fields. Leave a bound blank for no explicit limit. Counts must be non-negative whole numbers. At capacity, a repeater disables **Add Row** and re-enables it when a row is removed. PHP field definitions can also specify `min` and `max`, for example `['name' => 'quantity', 'min' => 1, 'max' => 10]`. These validation rules run in the interactive form; they do not add server-side submission validation.
+
 ## Defaults and dynamic values
 
 For literal defaults, use `default($value)` or the `default`/`defaultValue` property. A repeater default is a list of row objects, each keyed by its column names.

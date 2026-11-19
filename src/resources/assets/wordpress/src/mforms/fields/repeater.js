@@ -52,7 +52,9 @@ const mformsRepeater = () => {
                     this.formId = form.id;
                 }
 
-                this.maxRows = this.container.dataset.maxRows ? parseInt(this.container.dataset.maxRows) : 0;
+                this.maxRows = this.container.dataset.maxCount !== undefined
+                    ? Number(this.container.dataset.maxCount)
+                    : Number(this.container.dataset.maxRows) || 0;
                 this.addRowButton = this.container.querySelector('.meros-repeater-table-button--add');
 
                 this.onInit = this.container.dataset.onInit && this.container.dataset.onInit !== 'false'
@@ -67,6 +69,7 @@ const mformsRepeater = () => {
                 this.container.removeAttribute('data-ajax-nonce');
                 this.container.removeAttribute('data-on-remove');
                 this.numRows = this.resolveRows().length;
+                if (this.addRowButton) this.addRowButton.disabled = !this.canAddRow();
                 initialRows = Array.from(this.resolveRows(), row => row.cloneNode(true));
 
                 this.$nextTick(() => {
@@ -321,6 +324,9 @@ const mformsRepeater = () => {
                 const card = this.container.closest('[data-form-field-component]');
                 const form = modal.content.querySelector('form');
                 const dynamicDefault = form?.querySelector('[name="__builder_dynamic_default"]');
+                form?.querySelectorAll('[data-builder-bound]').forEach(control => {
+                    control.value = rowData.form_data?.[control.dataset.builderBound] ?? '';
+                });
                 let validateDynamicDefault = null;
                 if (card && dynamicDefault) {
                     const stored = rowData.form_data?.defaultValue;
@@ -525,7 +531,7 @@ const mformsRepeater = () => {
             this.numRows = this.resolveRows().length;
             
             if (this.addRowButton) {
-                this.addRowButton.disabled = false;
+                this.addRowButton.disabled = !this.canAddRow();
             }
             this.container.dispatchEvent(new Event('change', { bubbles: true }));
         },
@@ -639,12 +645,11 @@ const mformsRepeater = () => {
         },
 
         canAddRow() {
-            if (this.maxRows === 0) return true; // No limit
-            return this.numRows < this.maxRows;
+            return !this.isAtCapacity();
         },
 
         isAtCapacity() {
-            if (this.maxRows === 0) return false; // No limit
+            if (this.maxRows === 0 && this.container?.dataset.maxCount === undefined) return false;
             return this.numRows >= this.maxRows;
         },
 

@@ -586,6 +586,11 @@ class FormBuilder {
                 }
 
                 if ($data['field_type'] === 'repeater') {
+                    foreach (['min', 'max'] as $bound) {
+                        if (array_key_exists($bound, $data)) {
+                            $decodedSettings[$bound] = $data[$bound];
+                        }
+                    }
                     $columnNames = [];
                     $columns = $this->getSubmittedBuilderValue($data, 'repeater_fields', []);
                     if (!is_array($columns)) {

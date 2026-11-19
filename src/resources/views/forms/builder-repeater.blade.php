@@ -16,6 +16,18 @@
     <div @if($locked && !$isFormTemplate) inert aria-disabled="true" @endif>
         @include($nameControl['wrapper'], $nameControl)
         @include($labelControl['wrapper'], $labelControl)
+        <div class="mforms-row" x-data>
+            <div class="meros-field-wrapper nice-form-group">
+                <label for="{{ $editorId }}-min">Minimum Rows</label>
+                <input type="number" id="{{ $editorId }}-min" name="{{ $name }}[min]" value="{{ $field['min'] ?? '' }}"
+                    min="0" step="1" @readonly($locked && !$isFormTemplate) @input="$refs.maxRows.min = $el.value || 0">
+            </div>
+            <div class="meros-field-wrapper nice-form-group">
+                <label for="{{ $editorId }}-max">Maximum Rows</label>
+                <input type="number" id="{{ $editorId }}-max" name="{{ $name }}[max]" value="{{ $field['max'] ?? '' }}"
+                    min="{{ $field['min'] ?? 0 }}" step="1" x-ref="maxRows" @readonly($locked && !$isFormTemplate)>
+            </div>
+        </div>
         <div class="mforms-builder-component-actions">
             <button type="button" class="button" @click.stop.prevent="configureConditions($el.closest('[data-form-field-component]'))">Configure conditions</button>
             <button type="button" class="button" @click.stop.prevent="configureRepeaterDefaults($el.closest('[data-form-field-component]'))">Set default value</button>

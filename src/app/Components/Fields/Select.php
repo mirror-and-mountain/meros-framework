@@ -5,12 +5,14 @@ namespace MM\Meros\App\Components\Fields;
 use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\Concerns\HasOptions;
+use MM\Meros\Contracts\Features\Components\Concerns\HasBounds;
 
 use MM\Meros\App\Components\Fields\Checkbox;
 use MM\Meros\App\Components\Fields\Repeater;
 
 class Select extends Field {
     use HasOptions;
+    use HasBounds;
     
     protected function init(): void {
         parent::init();
@@ -95,6 +97,7 @@ class Select extends Field {
         if (array_key_exists('searchable', $this->passedProps)) {
             $this->searchable((bool) $this->passedProps['searchable']);
         }
+        $this->configureBounds();
     }
 
     /**
@@ -141,6 +144,7 @@ class Select extends Field {
             });
         });
 
+        static::addBoundsControls($group, $locked, 'Selections', multipleOnly: true);
         return $group;
     }
 }

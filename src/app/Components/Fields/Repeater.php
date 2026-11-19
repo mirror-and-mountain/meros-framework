@@ -8,6 +8,8 @@ use Illuminate\Support\Str;
 
 use MM\Meros\Contracts\Features\Components\Form;
 use MM\Meros\Contracts\Features\Components\Field;
+use MM\Meros\Contracts\Features\Components\FieldGroup;
+use MM\Meros\Contracts\Features\Components\Concerns\HasBounds;
 
 use MM\Meros\Facades\Components\Forms;
 use MM\Meros\Facades\Components\Fields;
@@ -15,6 +17,7 @@ use MM\Meros\Facades\Components\Fields;
 use MM\Meros\Facades\Support\Ajax;
 
 class Repeater extends Field {
+    use HasBounds;
     /**
      * Indicates whether the repeater allows adding new rows.
      *
@@ -189,11 +192,17 @@ class Repeater extends Field {
 
     protected function whenConfigured(): void {
         parent::whenConfigured();
+        $this->configureBounds();
         $this->instantiateFields();
 
         if ($this->hasEditForm()) {
             $this->registerEditFormAjax();
         }
+    }
+
+    protected static function addBuilderControls(FieldGroup $group, bool $locked = false, array $rowData = []): FieldGroup {
+        static::addBoundsControls($group, $locked, 'Rows');
+        return $group;
     }
 
     /**
