@@ -114,6 +114,7 @@ class Select extends Field {
             $repeater->name('options');
             $repeater->label('Options');
             $repeater->description("The field's available options");
+            $repeater->addRowText('Add Option');
 
             $repeater->field('text', [
                 'name'  => 'value',
