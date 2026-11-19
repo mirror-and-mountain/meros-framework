@@ -1,3 +1,6 @@
+/**
+ * Processes and manages form fields, including their conditions, actions, and visibility.
+ */
 export default class MerosFieldsProcessor {
     parent = null;
     parentType = null;

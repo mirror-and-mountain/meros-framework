@@ -1,8 +1,15 @@
 import MerosFormProcessor from './form-processor.js';
 import MerosFieldsProcessor from './fields-processor.js';
+import { alignFormRows } from './row-alignment.js';
 
+/**
+ * Initialise and manage the form instance, including its fields, pagination, and submission handling.
+ * 
+ * @returns {Object} The form instance with its methods and properties.
+ */
 const mform = () => {
     let pageObserver = null;
+    let stopRowAlignment = null;
     let validationFeedback = null;
     const clearValidationFeedback = () => {
         if (!validationFeedback) return;
@@ -93,6 +100,7 @@ const mform = () => {
             this.$nextTick(() => {
                 this.fieldsProcessor = new MerosFieldsProcessor(this.$el);
                 this.initPagination();
+                stopRowAlignment = alignFormRows(this.$el);
             });
 
             if (this.onSubmit && typeof this.onSubmit === 'string') {
@@ -102,6 +110,7 @@ const mform = () => {
 
         destroy() {
             pageObserver?.disconnect();
+            stopRowAlignment?.();
             this.$el.removeEventListener('change', clearValidationFeedback);
             this.$el.removeEventListener('input', clearValidationFeedback);
             clearValidationFeedback();

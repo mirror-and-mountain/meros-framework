@@ -42,6 +42,9 @@
         <div class="mforms-progress" x-cloak x-show="{{ $showSuccessOnNewPage ? '!showingConfirmation && ' : '' }}pageCount &gt; 1">
             <p role="status" aria-live="polite" aria-atomic="true" x-text="pageStatus"></p>
             <progress aria-label="Form progress" max="1" value="0" :max="Math.max(pageCount, 1)" :value="pageNumber"></progress>
+            <div class="mforms-progress-track" aria-hidden="true">
+                <span class="mforms-progress-fill" :style="{ width: `${pageNumber / Math.max(pageCount, 1) * 100}%` }"></span>
+            </div>
         </div>
     @endif
     <div class="mforms-body" :inert="isSubmitting" @if($showSuccessOnNewPage) x-show="!showingConfirmation" @endif>

@@ -1,3 +1,14 @@
+/**
+ * Provides dynamic suggestions for form fields, including token parsing and suggestion menu handling.
+ */
+
+/**
+ * Finds the token at the current cursor position within the text.
+ *
+ * @param {string} text The text to search within.
+ * @param {number} cursor The current cursor position.
+ * @returns {Object|null} The token information or null if none found.
+ */
 function tokenAtCursor(text, cursor) {
     const before = text.slice(0, cursor);
     const complete = before.match(/\{\{([^{}]*)\}\}$/);
@@ -14,6 +25,12 @@ function tokenAtCursor(text, cursor) {
     };
 }
 
+/**
+ * Retrieves the list of available dynamic value choices for the form.
+ * 
+ * @param {boolean} includeFields Whether to include form fields in the choices.
+ * @returns {Array} The list of available choices, including dynamic values and optionally form fields.
+ */
 function choices(includeFields) {
     const builder = document.querySelector('.meros-form-builder[data-dynamic-values]');
     if (!builder) return [];
@@ -35,6 +52,14 @@ function choices(includeFields) {
     return options;
 }
 
+/**
+ * Attaches dynamic suggestions to a form control, optionally integrating with a Quill editor instance.
+ *
+ * @param {HTMLElement} control The form control to attach suggestions to.
+ * @param {Object} options Configuration options.
+ * @param {Quill|null} options.quill The Quill editor instance, if applicable.
+ * @param {boolean} options.includeFields Whether to include form fields in the suggestions.
+ */
 export function attachDynamicSuggestions(control, { quill = null, includeFields = false } = {}) {
     const host = quill ? control : control.parentElement;
     if (!host || host.dataset.dynamicSuggestionsAttached) return;

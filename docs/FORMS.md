@@ -95,6 +95,8 @@ Forms contain `FieldRow` objects. A row has three layout positions; field types 
 
 At viewport widths of 782px or less, fields within each row stack at full width in their original order, including rows inside groups and paginated forms. Stacked fields use the same vertical spacing whether they share a row or are in consecutive rows.
 
+On wider screens, the controls in a row align even when their labels or descriptions have different heights. The alignment adjusts when fields are shown, hidden, or resized.
+
 Pass `false` as the third argument to place a field on a fresh row. Use `row()` for explicit arrangements and `section()` for a field group:
 
 ```php
@@ -543,6 +545,8 @@ Pages follow top-level structure:
 For example, three ungrouped fields, one group, then two more ungrouped fields produce **three pages**, not six.
 
 The browser displays progress and Previous/Next controls. Next validates the current page before advancing; Previous preserves values. Final submission checks all conditionally visible fields and reveals an earlier page if it contains an invalid control. Pages with no conditionally visible non-hidden fields are skipped and progress updates accordingly.
+
+The progress fill animates between steps over 0.4 seconds, unless the visitor prefers reduced motion. Its colors can be customized with `--mforms-progress-bar-color` and `--mforms-progress-track-color`.
 
 Inactive pages retain enabled controls and values so their data remains part of submission. On success, the form returns to its first available page. Pagination and the enhanced submission flow require the JavaScript assets; do not assume a native no-JavaScript POST fallback.
 
