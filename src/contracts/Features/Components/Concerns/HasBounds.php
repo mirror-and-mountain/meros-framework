@@ -3,6 +3,7 @@
 namespace MM\Meros\Contracts\Features\Components\Concerns;
 
 use MM\Meros\Contracts\Features\Components\FieldGroup;
+use MM\Meros\App\Components\Fields\Number;
 
 /**
  * Trait HasBounds
@@ -60,13 +61,14 @@ trait HasBounds {
             foreach (['min' => 'Minimum', 'max' => 'Maximum'] as $name => $label) {
                 $attributes = ['step' => $count ? '1' : 'any', 'data-builder-bound' => $name];
                 if ($count) $attributes['min'] = 0;
-                $field = $row->field('number', [
+                $row->field('number', function (Number $field) use ($multipleOnly) {
+                    if ($multipleOnly) $field->showWhen([['allowsMultiple', '=', true]]);
+                }, [
                     'name' => $name,
                     'label' => "{$label} {$unit}",
                     'readonly' => $locked,
                     'attributes' => $attributes,
                 ]);
-                if ($multipleOnly) $field->showWhen([['allowsMultiple', '=', true]]);
             }
         });
     }
