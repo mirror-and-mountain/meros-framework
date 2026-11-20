@@ -392,6 +392,10 @@ form.mforms-form .mforms-section {
     margin: 0 !important;
 }
 
+.meros-field-wrapper.nice-form-group textarea {
+    resize: vertical !important;
+}
+
 .meros-field-wrapper.nice-form-group select {
     max-width: 100% !important;
 }
