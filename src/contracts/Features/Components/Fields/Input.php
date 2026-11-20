@@ -88,14 +88,18 @@ abstract class Input extends Field {
             'disabled' => $locked,
             'default' => $dynamic,
         ], false);
+        
         $literal = $group->field(Str::lower(class_basename(static::class)), [
             'name' => 'defaultValue',
             'label' => 'Default Value',
             'readonly' => $locked,
         ], false, true);
+
         $literal->showWhen([['__builder_use_dynamic_default', '=', false]]);
+
         $types = array_values(array_filter(\MM\Meros\Support\FormDynamicValues::TYPES,
             fn (string $type): bool => $literal->isCompatibleWithDataType($type)));
+
         $group->field('text', function (Field $field) use ($locked, $dynamic, $default, $types) {
             $field->name('__builder_dynamic_default');
             $field->label('Dynamic Default Value');

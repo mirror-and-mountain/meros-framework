@@ -4,4 +4,5 @@
     title="{{ $label }}"
     {!! $attributeString !!}
     class="{!! $classString !!}"
+    rows="{{ $rows }}"
 >{{ $defaultValue }}</textarea>
