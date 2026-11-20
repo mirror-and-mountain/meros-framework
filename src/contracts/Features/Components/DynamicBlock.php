@@ -71,6 +71,21 @@ class DynamicBlock extends Block {
                 'label' => !empty($label) ? $label : ucfirst($key)
             ];
 
+            if (is_array($attribute['control']) && array_key_exists('conditions', $attribute['control'])) {
+                $conditions = $attribute['control']['conditions'];
+                if (!is_array($conditions)) {
+                    throw new \InvalidArgumentException("Control conditions for '{$key}' must be an attribute/value map.");
+                }
+                foreach ($conditions as $dependency => $expected) {
+                    if (!is_string($dependency) || !array_key_exists($dependency, $attributes)
+                        || (!is_scalar($expected) && $expected !== null)
+                        || (is_float($expected) && !is_finite($expected))) {
+                        throw new \InvalidArgumentException("Control conditions for '{$key}' must reference defined attributes with scalar or null values.");
+                    }
+                }
+                $controlConfig['conditions'] = $conditions;
+            }
+
             if ($controlType === 'repeater') {
                 if ($type !== 'array' || !is_callable($callback)) {
                     throw new \InvalidArgumentException("Repeater control '{$key}' requires an array attribute and a callable control_callback.");
@@ -311,6 +326,8 @@ class DynamicBlock extends Block {
         return match ($dataType) {
             'string'  => 'text',
             'boolean' => 'toggle',
+            'integer' => 'number',
+            'number'  => 'number',
             default => 'text',
         };
     }

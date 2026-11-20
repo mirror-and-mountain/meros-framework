@@ -28,5 +28,24 @@ a labeled URL field for a `string` attribute. The field fits the inspector
 sidebar. Paste a URL or type to search for an existing link using WordPress
 suggestions. Set `placeholder` in the control options to override the default prompt.
 
+Set `conditions` in the control options to show it only when other attributes
+have the specified values:
+
+```php
+$this->attribute('form_id', [
+    'type' => 'integer',
+    'default' => 0,
+    'control' => [
+        'conditions' => ['use_current_form_id' => false],
+    ],
+]);
+```
+
+Conditions reference attributes defined on the same block and accept scalar
+or null values. All entries must match, using strict equality (for example,
+`false` is different from `0` or `'false'`). Updates toggle visibility immediately
+without clearing the hidden attribute's value. Conditions affect only the
+inspector, not front-end rendering or server-side validation.
+
 ### License 
 The Meros Framework is open-sourced software licensed under the MIT license.

@@ -9,6 +9,7 @@ import {
     PanelBody,
     ToggleControl,
     TextControl,
+    __experimentalNumberControl as NumberControl,
     DateTimePicker,
     DatePicker,
     TextareaControl,
@@ -66,6 +67,21 @@ const createControl = (attribute, config, attributes, setAttributes, label, name
                         onChange={updateValue}
                     />
                 </div>
+            );
+        case 'number':
+            return (
+                <NumberControl
+                    key={attribute}
+                    label={label}
+                    value={value ?? ''}
+                    onChange={(newValue) => {
+                        if (newValue === '') {
+                            updateValue(undefined);
+                        } else if (Number.isFinite(Number(newValue))) {
+                            updateValue(Number(newValue));
+                        }
+                    }}
+                />
             );
         case 'date':
             return (
@@ -149,6 +165,9 @@ const MerosDynamicBlockControls = createHigherOrderComponent((BlockEdit) => {
                             {Object.entries(controls).map(([attribute, config]) => {
                                 const type = config.type;
                                 if (!type) return null;
+                                if (config.conditions && !Object.entries(config.conditions).every(
+                                    ([dependency, expected]) => attributes[dependency] === expected
+                                )) return null;
 
                                 const label = String(config.label || attribute)
                                     .replace(/([a-z])([A-Z])/g, '$1 $2')

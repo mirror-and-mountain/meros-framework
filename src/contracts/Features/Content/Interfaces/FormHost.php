@@ -18,6 +18,9 @@ interface FormHost {
     public function getFormStructure(?int $postId = null, bool $refresh = false): array;
     public function getFormActions(?int $postId = null, bool $refresh = false): array;
     public function getFormSettings(?int $postId = null, bool $refresh = false): array;
+    public function getFormInstance(Post|int $post, array $rows = [], array $availableFields = [], bool $hideSubmitButton = false): FormComponent;
+    public function getFormTemplateTitle(): string;
+    public function getFormTemplateDescription(): string;
     public function getTemplateFields(): ?array;
     public function hasComponentFormTemplate(): bool;
     public function hasConfigurableFormTemplate(): bool;

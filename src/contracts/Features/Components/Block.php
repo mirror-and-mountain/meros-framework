@@ -232,8 +232,8 @@ class Block extends Feature implements Registrable, Makeable {
         // Try and get the id from the loop.
         $postID = get_the_ID();
 
-        // If we're in admin, see if we can get the id from the query params.
-        if ($postID === false && is_admin()) {
+        // See if we can get the id from the query params.
+        if ($postID === false) {
             $postID = $_GET['post'] ?? false;
         }
 

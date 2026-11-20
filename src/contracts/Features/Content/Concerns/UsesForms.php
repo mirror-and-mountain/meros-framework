@@ -888,123 +888,23 @@ trait UsesForms {
     /**
      * Creates a Form instance using the form's structure.
      *
-     * @param Post    $post
-     * @param array   $rows
-     * @param array   $availableFields
-     * @param boolean $hideSubmitButton
+     * @param Post|int $post
+     * @param array    $rows
+     * @param array    $availableFields
+     * @param boolean  $hideSubmitButton
      *
      * @return FormComponent
      */
-    public function getFormInstance(Post $post, array $rows = [], array $availableFields = [], bool $hideSubmitButton = false): FormComponent {
-        return $this->formBuilder()->makeFormInstance($post, $rows, $availableFields, $hideSubmitButton);
-    }
-
-    // =========================================================================
-    // Rendering
-    // =========================================================================
-
-    /**
-     * Creates and configures the form block for rendering the form.
-     *
-     * @return void
-     */
-    private function makeFormBlock(): void {
-        $block = $this->makeItem(DynamicBlock::class, [], [
-            'name'  => $this->getHandle() . '-form-block',
-            'title' => Str::title($this->getHandle()) . ' Form Block',
-            'icon'  => 'feedback'
-        ]);
-
-        if (!($block instanceof DynamicBlock)) {
-            return;
+    public function getFormInstance(Post|int $post, array $rows = [], array $availableFields = [], bool $hideSubmitButton = false): FormComponent {
+        if (is_int($post)) {
+            $post = Post::find($post);
         }
 
-        $block->attribute('show_title', [
-            'type'    => 'boolean',
-            'default' => true,
-            'control' => true
-        ]);
+        if (!($post instanceof Post)) {
+            throw new \InvalidArgumentException('Invalid post provided.');
+        }
 
-        $block->attribute('show_description', [
-            'type'    => 'boolean',
-            'default' => true,
-            'control' => true
-        ]);
-
-        add_filter("meros_render_block_args_{$block->getName()}", function (array $args) {
-            if (!isset($args['post_id']) || !is_int($args['post_id'])) {
-                return $args;
-            }
-
-            $postID = $args['post_id'];
-
-            if ($postID === 0) {
-                return $args;
-            }
-
-            $args['form_instance'] = $this->getFormInstance(Post::find($postID));
-
-            return $args;
-        });
-
-        $block->renderCallback(function (array $args) {
-            $postId = $args['post_id'] ?? 0;
-
-            $title = $postId !== 0 ? $this->getFormSettings($postId)['form_title'] ?? '' : '';
-            $description = $postId !== 0 ? $this->getFormSettings($postId)['form_description'] ?? '' : '';
-
-            if ($title === '' && $this->hasFormTemplate()) {
-                $title = $this->getFormTemplateTitle();
-            }
-
-            if ($description === '' && $this->hasFormTemplate()) {
-                $description = $this->getFormTemplateDescription();
-            }
-
-            $hideTitle = isset($args['attributes']['show_title']) && $args['attributes']['show_title'] === false;
-            $hideDescription = isset($args['attributes']['show_description']) && $args['attributes']['show_description'] === false;
-
-            if (is_admin()) {
-                return '<div style="border:1px solid #dcdcde;border-radius:4px;padding:16px;">
-                    <p style="margin:0 0 16px;padding:10px 12px;background:#f0f6fc;border-left:4px solid #72aee6;color:#1d2327;">
-                        Forms are not fully rendered in the editor. This preview shows where the form will appear on the front end.
-                    </p>
-                    
-                    ' . ($hideTitle === false ? '<h2>' . esc_html($title) . '</h2>' : '') . '
-                    ' . ($hideDescription === false && $description !== '' ? '<p>' . esc_html($description) . '</p>' : '') . '
-                    
-                    <div aria-hidden="true" style="display:grid;gap:14px;">
-                        <div>
-                            <div style="width:22%;height:10px;margin-bottom:7px;background:#a7aaad;border-radius:2px;"></div>
-                            <div style="height:36px;border:1px solid #c3c4c7;border-radius:2px;background:#f6f7f7;"></div>
-                        </div>
-                        <div>
-                            <div style="width:30%;height:10px;margin-bottom:7px;background:#a7aaad;border-radius:2px;"></div>
-                            <div style="height:36px;border:1px solid #c3c4c7;border-radius:2px;background:#f6f7f7;"></div>
-                        </div>
-                        <div>
-                            <div style="width:18%;height:10px;margin-bottom:7px;background:#a7aaad;border-radius:2px;"></div>
-                            <div style="height:72px;border:1px solid #c3c4c7;border-radius:2px;background:#f6f7f7;"></div>
-                        </div>
-                        <div style="width:112px;height:36px;border-radius:2px;background:#2271b1;"></div>
-                    </div>
-                </div>';
-            }
-
-            if (!isset($args['form_instance']) || !($args['form_instance'] instanceof FormComponent)) {
-                return 'Error: Form instance not found.';
-            }
-
-            if ($hideTitle === false) {
-                $args['form_instance']->title($title);
-            }
-
-            if ($hideDescription === false && $description !== '') {
-                $args['form_instance']->description($description);
-            }
-
-            return $args['form_instance']->hideTitle($hideTitle)->hideDescription($hideDescription)->html();
-        });
+        return $this->formBuilder()->makeFormInstance($post, $rows, $availableFields, $hideSubmitButton);
     }
 
     // =========================================================================

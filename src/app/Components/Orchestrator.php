@@ -30,6 +30,9 @@ use MM\Meros\App\Components\Fields\UsersLookup;
 // Form Action Components
 use MM\Meros\App\Components\FormActions\DeleteFormResponse;
 
+// Block Components
+use MM\Meros\App\Components\Blocks\FormBlock;
+
 use MM\Meros\Facades\Support\Ajax;
 use MM\Meros\Facades\Components\Fields;
 use MM\Meros\Facades\Content\PostTypes;
@@ -71,6 +74,7 @@ class Orchestrator extends ComponentsOrchestrator {
         }
 
         $this->registerFormActions();
+        $this->registerBlocks();
         $this->initFormAjax();
         $this->initRepeaterAjax();
         $this->initLookupAjax();
@@ -78,6 +82,10 @@ class Orchestrator extends ComponentsOrchestrator {
 
     private function registerFormActions(): void {
         $this->formActions()->register(DeleteFormResponse::class, 'delete_form_response');
+    }
+
+    private function registerBlocks(): void {
+        $this->dynamicBlocks()->makeFrom(FormBlock::class);
     }
 
     // =========================================================================

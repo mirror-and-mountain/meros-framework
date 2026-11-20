@@ -25,30 +25,5 @@ class Form extends PostType implements FormHost {
         $this->hasEditableForm()
             ->withActionsEditor()
             ->withFormSettings();
-
-        // Sets the render callback for form post types, filtering 'the content'
-        // to render the form using its stored strucure/
-        $this->render(function (string $content, int $postId, Post $post): string {
-            $structure = $this->getFormStructure($postId);
-
-            if ($structure === null) {
-                return $content;
-            }
-
-            $rows = $structure['rows'] ?? [];
-
-            if (empty($rows)) {
-                return $content;
-            }
-
-            $form = $this->getFormInstance($post, $rows, [], is_admin());
-            
-            if (!($form instanceof FormComponent)) {
-                return $content;
-            }
-
-            $form = apply_filters("meros_render_form_{$postId}", $form);
-            return $form->html();
-        });
     }
 }

@@ -1003,6 +1003,12 @@ class FormBuilder {
             $rows = $this->removeInvalidConditionRules($rows, $availableFields, $removedConditions);
         }
 
+        $form = Forms::checkout($this->postType->getProvider())->get($post->ID);
+
+        if ($form instanceof FormComponent) {
+            return $form;
+        }
+
         $form = Forms::checkout($this->postType->getProvider())->make(function (FormComponent $form) use ($post, $rows, $availableFields, $hideSubmitButton) {
             $form->name(Str::snake($post->post_title));
             $form->id($post->ID);
