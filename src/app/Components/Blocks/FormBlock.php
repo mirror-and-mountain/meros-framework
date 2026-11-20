@@ -59,7 +59,25 @@ class FormBlock extends DynamicBlock {
                 return $args;
             }
 
-            $postType = get_post_type($postId);
+            $post = get_post($postId);
+            
+            if (!($post instanceof \WP_Post)) {
+                return $args;
+            }
+
+            $postType = $post->post_type;
+
+            if (!is_admin() && $postType === 'form' && $post->post_name === 'f') {
+                $postId = $_GET['id'] ?? 0;
+
+                if ($postId === 0 || !is_numeric($postId)) {
+                    return $args;
+                }
+
+                $postId = (int) $postId;
+                $postType = get_post_type($postId);
+            }
+
             $formCPT  = PostTypes::checkout(Framework::get())->get($postType);
 
             if ($formCPT instanceof FormHost) {
@@ -141,7 +159,7 @@ class FormBlock extends DynamicBlock {
             }
 
             if (!($formInstance instanceof FormComponent)) {
-                return 'Error: Form instance not found.';
+                return '<div><p>Error: Form instance not found.</p></div>';
             }
 
             if ($hideTitle === false) {
