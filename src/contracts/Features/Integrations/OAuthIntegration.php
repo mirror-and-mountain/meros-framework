@@ -1422,13 +1422,15 @@ abstract class OAuthIntegration extends Integration {
 
     /**
      * Determines whether there is an active connection for this integration.
+     * 
+     * @param bool $checkEnabled Whether to check if the integration is enabled before determining active connection. Defaults to true.
      *
      * @return bool
      */
-    final public function hasActiveConnection(): bool {
+    final public function hasActiveConnection(bool $checkEnabled = true): bool {
         $enabled = $this->isEnabled();
 
-        if (!$enabled) {
+        if ($checkEnabled && !$enabled) {
             return false;
         }
 
