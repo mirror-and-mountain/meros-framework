@@ -9,6 +9,22 @@ This framework underpins our Meros starter themes for Wordpress. Under the hood 
 ### Documentation
 - [Forms](docs/FORMS.md): the PHP form API, WordPress form hosts and templates, client-side builder, conditions, pagination, submissions and field extension points.
 
+#### OAuth connection settings
+
+OAuth integrations require saved, non-empty values for their `UsesBaseUrl`,
+`UsesClientId` and `UsesClientSecret` settings before connecting. Values must be
+saved for the current environment. Override `requiredConnectionSettings()` to
+add custom setting names or exclude optional credentials:
+
+```php
+protected function requiredConnectionSettings(): array {
+    return [...parent::requiredConnectionSettings(), 'tenant_id'];
+}
+```
+
+Use setting names without environment suffixes. The same check applies when
+starting the OAuth flow directly.
+
 #### Nested dynamic blocks
 
 A Meros dynamic block can declare its direct parent with `$child->parent([$parent])`.

@@ -38,6 +38,13 @@ abstract class Integration extends Feature implements Registrable {
     protected string $category = 'general';
 
     /**
+     * Instructions to display for the integration.
+     *
+     * @var string
+     */
+    protected string $instructions = '';
+
+    /**
      * The integration's available environments.
      *
      * @var array
@@ -152,13 +159,6 @@ abstract class Integration extends Feature implements Registrable {
 
         $this->menuPage = $integrationsPage->subpage(function (Page $page) {
             $page->slug($this->getName('slug'));
-            $page->callback(function () {
-                echo 
-                    '<nav class="meros-breadcrumbs" aria-label="Breadcrumb">
-                        <a href="' . admin_url('admin.php?page=meros-integrations') . '">Integrations</a>
-                        <span class="meros-breadcrumb-separator">/ ' . $this->getLabel() . '</span>
-                    </nav>';
-            });
         });
     }
 
@@ -175,12 +175,17 @@ abstract class Integration extends Feature implements Registrable {
             throw new \RuntimeException('The meros integrations settings container must be an instance of SettingsContainer');
         }
 
-        $setting = $container->add('boolean', function (Setting $setting) {
+        $integrationCategory = in_array($this->category, ['crm', 'mail', 'general'])
+            ? $this->category
+            : 'general';
+
+        $container->add('boolean', function (Setting $setting) use ($integrationCategory) {
             $setting->name($this->getName() . '_enabled');
             $setting->label('Enable ' . $this->getLabel());
             $setting->description($this->getDescription());
             $setting->default(false);
             $setting->field();
+            $setting->section('meros-integrations-' . $integrationCategory . '-section');
         });
 
         $this->enabled = $container->getItemValue($this->getName() . '_enabled', true);
@@ -281,6 +286,18 @@ abstract class Integration extends Feature implements Registrable {
         }
 
         $this->menuPage->title($this->label);
+        $this->menuPage->callback(function () {
+            echo 
+                '<nav class="meros-breadcrumbs" aria-label="Breadcrumb">
+                    <a href="' . admin_url('admin.php?page=meros-integrations') . '">Integrations</a>
+                    <span class="meros-breadcrumb-separator">/ ' . $this->getLabel() . '</span>
+                </nav>';
+
+            if (!empty($this->instructions)) {
+                echo '<p class="meros-integration-instructions">' . $this->instructions . '</p>';
+            }
+        });
+
         $this->resolveMerosIntegrationSettings();
         $this->initConfigurableSettings();
         $this->afterInitConfigurableSettings();
@@ -449,6 +466,15 @@ abstract class Integration extends Feature implements Registrable {
         return null;
     }
 
+    /**
+     * Logs an error for the integration with a title, message, and optional code.
+     *
+     * @param string       $title
+     * @param string       $message
+     * @param integer|null $code
+     *
+     * @return void
+     */
     protected function logError(string $title, string $message = '', ?int $code = null): void {
         $this->lastError = [
             'title'   => $title,
@@ -456,7 +482,7 @@ abstract class Integration extends Feature implements Registrable {
             'code'    => $code
         ];
 
-        Log::error('Integration (' . $this->getName() . ') logged an error: ', $this->lastError);
+        Log::channel('meros-integrations')->error('Integration (' . $this->getName() . ') logged an error: ', $this->lastError);
     }
 
     // =========================================================================
@@ -486,9 +512,30 @@ abstract class Integration extends Feature implements Registrable {
         return $this;
     }
 
+    /**
+     * Sets the instructions for the integration.
+     *
+     * @param string $instructions
+     *
+     * @return static
+     */
+    final public function instructions(string $instructions): static {
+        $this->instructions = wp_kses_post($instructions);
+        return $this;
+    }
+
     // =========================================================================
     // Getters
     // =========================================================================
+
+    /**
+     * Determines whether the integration is currently enabled.
+     *
+     * @return boolean
+     */
+    final public function isEnabled(): bool {
+        return $this->enabled;
+    }
 
     /**
      * Retrieves the integration's name, which is used as its identifier.

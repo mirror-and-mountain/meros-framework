@@ -17,6 +17,8 @@ use MM\Meros\Contracts\Features\Concerns\IsHookable;
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 use MM\Meros\Contracts\Features\Concerns\MakesItems;
 
+use MM\Meros\Facades\Support\Ajax;
+
 /**
  * Plan to move subpage logic into a separate subpage contract.
  */
@@ -151,6 +153,13 @@ class Page extends Feature implements Registrable, Makeable {
      */
     private array $ajaxActions = [];
 
+    /**
+     * Array of ajax nonces for each action registered for the page.
+     *
+     * @var array
+     */
+    private array $ajaxNonces = [];
+
     use IsRegistrable, IsMakeable, IsHookable, InstantiatesItems, MakesItems;
 
     // =========================================================================
@@ -184,9 +193,21 @@ class Page extends Feature implements Registrable, Makeable {
     private function registerAjaxActions(): void {
         foreach ($this->ajaxActions as $action => $handler) {
             if (is_callable($handler)) {
-                add_action('wp_ajax_' . $action, $handler);
+                Ajax::addAction($action, $handler);
+                $this->ajaxNonces[$action] = Ajax::getActionNonce($action);
             }
         }
+    }
+
+    /**
+     * Retrieves the AJAX nonce for a given action, if it exists.
+     *
+     * @param string $action
+     *
+     * @return string|null
+     */
+    final protected function getAjaxNonce(string $action): ?string {
+        return $this->ajaxNonces[$action] ?? null;
     }
 
     // =========================================================================

@@ -23,6 +23,10 @@ use MM\Meros\App\Admin\Sections\MerosFormsProgressStyles;
 use MM\Meros\App\Admin\Sections\MerosFormsButtonStyles;
 use MM\Meros\App\Admin\Sections\MerosFormsFeedbackStyles;
 
+use MM\Meros\App\Admin\Sections\MerosIntegrationsCrm;
+use MM\Meros\App\Admin\Sections\MerosIntegrationsMail;
+use MM\Meros\App\Admin\Sections\MerosIntegrationsGeneral;
+
 use MM\Meros\App\Admin\Settings\Containers\MerosFrameworkSettings;
 use MM\Meros\App\Admin\Settings\Containers\MerosIntegrationSettings;
 use MM\Meros\App\Admin\Settings\Containers\MerosThemeSettings;
@@ -72,6 +76,10 @@ class Orchestrator extends SettingsOrchestrator {
         $this->settingsSections()->register(MerosFormsProgressStyles::class, 'meros-forms-progress-styles-section');
         $this->settingsSections()->register(MerosFormsButtonStyles::class, 'meros-forms-button-styles-section');
         $this->settingsSections()->register(MerosFormsFeedbackStyles::class, 'meros-forms-feedback-styles-section');
+        
+        $this->settingsSections()->register(MerosIntegrationsCrm::class, 'meros-integrations-crm-section');
+        $this->settingsSections()->register(MerosIntegrationsMail::class, 'meros-integrations-mail-section');
+        $this->settingsSections()->register(MerosIntegrationsGeneral::class, 'meros-integrations-general-section');
     }
 
     /**

@@ -4,6 +4,7 @@ import {
 } from './tables.js';
 
 import {
+    __meros_integrations_reset_log,
     __meros_integrations_switch_environment,
     __meros_integrations_oauth_connect,
     __meros_integrations_init_connections_repeater,
@@ -11,7 +12,6 @@ import {
 } from './integrations.js';
 
 import {mformsBuilder} from '../mforms/builder.js';
-
 import { __meros_send_test_email } from './mail.js';
 
 import '../mforms/admin.js';
@@ -29,12 +29,19 @@ document.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click', __meros_tables_multi_operation);
     });
 
-    // Setup listeners for integrations
+    // Setup listeners for integration environment selectors
     const integrationEnvironmentSelectors = document.querySelectorAll('select[data-meros-integration-env-switch]');
     integrationEnvironmentSelectors.forEach(selector => {
         selector.addEventListener('change', __meros_integrations_switch_environment);
     });
 
+    // Setup listener for reset integrations log button
+    const resetIntegrationsLogButton = document.getElementById('meros-integrations-reset-log');
+    if (resetIntegrationsLogButton) {
+        resetIntegrationsLogButton.addEventListener('click', __meros_integrations_reset_log);
+    }
+
+    // Setup listener for OAuth connect button
     const oauthConnectButton = document.getElementById('meros-integration-connect');
     if (oauthConnectButton) {
         oauthConnectButton.addEventListener('click', __meros_integrations_oauth_connect);

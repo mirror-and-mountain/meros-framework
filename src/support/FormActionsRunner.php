@@ -28,6 +28,13 @@ class FormActionsRunner extends FlowRunner {
         parent::__construct($actions, $triggerPayload);
     }
 
+    /**
+     * Resolves the given dynamic value, including form-specific dynamic values.
+     *
+     * @param string $dynamicValue
+     *
+     * @return mixed
+     */
     protected function resolveDynamicValue(string $dynamicValue): mixed {
         $addFormValues = fn (array $values): array => [
             'form_values' => [

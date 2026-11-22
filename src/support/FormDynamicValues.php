@@ -58,6 +58,13 @@ class FormDynamicValues {
         return $this->definition($key)['value'] ?? null;
     }
 
+    /**
+     * Returns the definition array for the given dynamic value key, or null if not found.
+     *
+     * @param string $key
+     *
+     * @return array|null
+     */
     public function definition(string $key): ?array {
         $key = trim(str_replace(['{{', '}}'], '', $key));
         $values = $this->get();
@@ -69,6 +76,11 @@ class FormDynamicValues {
         return null;
     }
 
+    /**
+     * Returns an array of available dynamic value choices for the form.
+     *
+     * @return array
+     */
     public function choices(): array {
         $values = $this->get();
         $choices = [];
@@ -80,6 +92,13 @@ class FormDynamicValues {
         return array_values($choices);
     }
 
+    /**
+     * Returns the type of the given value as a string.
+     *
+     * @param mixed $value
+     *
+     * @return string
+     */
     public static function typeOf(mixed $value): string {
         return match (gettype($value)) {
             'double' => 'number',
@@ -156,6 +175,16 @@ class FormDynamicValues {
         $currentPostId = get_the_ID();
         $currentPost   = $currentPostId !== false ? get_post($currentPostId) : null;
         $postExists    = $currentPost instanceof \WP_Post;
+
+        // Adjust if we're using a dynamic form template
+        if ($postExists && $currentPost->post_type === 'form' && $currentPost->post_name === 'f') {
+            $idParam = $_GET['id'] ?? '';
+            if (is_numeric($idParam) && (int) $idParam !== 0) {
+                $currentPostId = (int) $idParam;
+                $currentPost   = get_post($currentPostId);
+                $postExists    = $currentPost instanceof \WP_Post;
+            }
+        }
 
         $this->postData = [
             'post_id'    => ['type' => 'integer', 'value' => $currentPostId === false ? null : $currentPostId],

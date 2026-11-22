@@ -106,6 +106,7 @@ class FrameworkServiceProvider extends MerosServiceProvider {
      * @return void
      */
     final public function register(): void {
+        $this->initApplicationLogs();
         $this->initHelpers();
         $this->initRegisters();
         $this->registerFramework();
@@ -249,6 +250,24 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         $this->app->booted(function () {
             do_action('meros_framework_booted');
         });
+    }
+
+    /**
+     * Sets up custom log files for various components of the framework.
+     *
+     * @return void
+     */
+    private function initApplicationLogs(): void {
+        $config = $this->app->make('config');
+
+        if (!$config->has('logging.channels.meros-integrations')) {
+            $config->set('logging.channels.meros-integrations', [
+                'driver' => 'single',
+                'name'   => 'meros-integrations',
+                'path'   => $this->app->storagePath('logs/meros-integrations.log'),
+                'level'  => 'debug',
+            ]);
+        }
     }
 
     /**

@@ -270,6 +270,10 @@ abstract class OAuthIntegration extends Integration {
                     <a href="' . admin_url('admin.php?page=meros-integrations') . '">Integrations</a>
                     <span class="meros-breadcrumb-separator">/ ' . $this->getLabel() . '</span>
                 </nav>';
+
+            if (!empty($this->instructions)) {
+                echo '<p class="meros-integration-instructions">' . $this->instructions . '</p>';
+            }
                 
             echo '<form method="post" action="options.php">';
             settings_fields($page->getOptionGroup());
@@ -1301,11 +1305,7 @@ abstract class OAuthIntegration extends Integration {
 
             return Carbon::parse((string) $value, 'UTC');
         } catch (\Throwable $exception) {
-            Log::warning('Unable to parse OAuth token timestamp.', [
-                'value'     => $value,
-                'exception' => $exception->getMessage(),
-            ]);
-
+            $this->logError('Unable to parse OAuth token timestamp.', $exception->getMessage());
             return null;
         }
     }
@@ -1329,13 +1329,52 @@ abstract class OAuthIntegration extends Integration {
     }
 
     /**
-     * Determines whether the current user can connect to this integration based on the connection scope and existing connections.
+     * Returns the setting names required to start a connection, without environment suffixes.
+     * Integrations can override this to add or remove required settings.
+     *
+     * @return array<string>
+     */
+    protected function requiredConnectionSettings(): array {
+        $settings = [];
+
+        foreach (['baseUrl' => 'base_url', 'clientId' => 'client_id', 'clientSecret' => 'client_secret'] as $method => $name) {
+            if ($this->resolveConfigurableSettingMethod($method) !== null) {
+                $settings[] = $name;
+            }
+        }
+
+        return $settings;
+    }
+
+    /**
+     * Determines whether the current user can connect using the saved settings and connection scope.
      *
      * @return boolean
      */
     private function canConnect(): bool {
         if (!current_user_can('manage_options')) {
             return false;
+        }
+
+        $requiredSettings = $this->requiredConnectionSettings();
+        if ($requiredSettings !== []) {
+            $saved = get_option($this->settings()->getName(true), []);
+            if (!is_array($saved)) {
+                return false;
+            }
+
+            $environment = $this->getCurrentEnvironment();
+            foreach ($requiredSettings as $name) {
+                $key = $name . '_' . $environment;
+                if (!isset($saved[$key]) || !is_string($saved[$key]) || trim($saved[$key]) === '') {
+                    return false;
+                }
+
+                $value = $this->settings($name, true);
+                if (!is_string($value) || trim($value) === '') {
+                    return false;
+                }
+            }
         }
 
         if ($this->audience === 'current_user') {
@@ -1379,6 +1418,22 @@ abstract class OAuthIntegration extends Integration {
         }
 
         return null;
+    }
+
+    /**
+     * Determines whether there is an active connection for this integration.
+     *
+     * @return bool
+     */
+    final public function hasActiveConnection(): bool {
+        $enabled = $this->isEnabled();
+
+        if (!$enabled) {
+            return false;
+        }
+
+        $connection = $this->getConnection();
+        return $connection !== null && isset($connection['status']) && $connection['status'] === 'connected';
     }
 
     /**

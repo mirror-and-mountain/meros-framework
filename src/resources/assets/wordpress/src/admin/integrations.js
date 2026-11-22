@@ -1,5 +1,38 @@
 import MerosModal from '../classes/modal.js';
 
+export function __meros_integrations_reset_log(event) {
+    event.preventDefault();
+
+    const button = event.target;
+    if (!button || !button.dataset.nonce) return;
+
+    const action = 'meros-reset-integrations-log';
+    const nonce  = button.dataset.nonce;
+
+    const data = new FormData();
+    data.append('action', action);
+    data.append('nonce', nonce);
+
+    fetch(ajaxurl, {
+        method: 'POST',
+        body: data,
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else if (data.data && data.data.message) {
+            const message = data.data.message;
+            console.error('Could not reset integrations log: ', message);
+        } else {
+            console.error('Could not reset integrations log.');
+        }
+    })
+    .catch((error) => {
+        console.error('Could not reset integrations log: ', error);
+    });
+}
+
 export function __meros_integrations_switch_environment(event) {
     event.preventDefault();
 
