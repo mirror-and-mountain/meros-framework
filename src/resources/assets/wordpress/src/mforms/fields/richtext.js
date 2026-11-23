@@ -37,8 +37,19 @@ const mformsRichText = () => {
                 });
             }
             this.setValue(this.$refs.input.value);
-            if (/\[success_message\]$/.test(this.$refs.input.name)) {
-                attachDynamicSuggestions(this.$el, { quill, includeFields: true });
+            const flowChoices = this.$refs.input.dataset.flowDynamicChoices;
+            const suggestedTypes = this.$refs.input.dataset.merosDynamicSuggestions;
+            if (flowChoices || (suggestedTypes !== undefined &&
+                this.$refs.input.closest('[data-flow-dynamic-choices]') &&
+                document.querySelector('.meros-form-builder[data-dynamic-values]')) ||
+                /\[success_message\]$/.test(this.$refs.input.name)) {
+                const inheritedChoices = this.$refs.input.closest('[data-flow-dynamic-choices]')?.dataset.flowDynamicChoices;
+                attachDynamicSuggestions(this.$el, {
+                    quill,
+                    includeFields: true,
+                    additionalChoices: JSON.parse(flowChoices || inheritedChoices || '[]'),
+                    compatibleTypes: suggestedTypes === undefined ? null : JSON.parse(suggestedTypes),
+                });
             }
 
             quill.on('text-change', () => {

@@ -10,6 +10,9 @@ use MM\Meros\Contracts\Features\Admin\SettingsField;
 use MM\Meros\Contracts\Features\Components\Concerns\IsFormComponent;
 
 use MM\Meros\App\Components\Fields\Repeater;
+use MM\Meros\App\Components\Fields\RichText;
+use MM\Meros\App\Components\Fields\TextArea;
+use MM\Meros\Contracts\Features\Components\Fields\Input;
 
 use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Support\FormDynamicValues;
@@ -799,6 +802,31 @@ abstract class Field extends Feature implements FormComponent {
      */
     public function getDataType(): string {
         return $this->dataType;
+    }
+
+    /**
+     * Enables dynamic-value suggestions in form-builder action configuration controls.
+     * Types may match either a value's data type or its field type.
+     */
+    public function __suggestDynamicValues(?array $compatibleTypes = null): static {
+        if ((!($this instanceof Input) && !($this instanceof TextArea) && !($this instanceof RichText)) ||
+            ($this instanceof Input && in_array($this->attributes['type'] ?? 'text',
+                ['hidden', 'checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'image'], true))) {
+            throw new \InvalidArgumentException('Dynamic suggestions require a text-editable field.');
+        }
+        if ($compatibleTypes !== null && array_filter($compatibleTypes, fn ($type) => !is_string($type) || $type === '') !== []) {
+            throw new \InvalidArgumentException('Dynamic suggestion types must be non-empty strings.');
+        }
+
+        $this->attribute('data-meros-dynamic-suggestions', json_encode(
+            $compatibleTypes === null ? null : array_values($compatibleTypes), JSON_THROW_ON_ERROR
+        ));
+        $this->attribute('x-meros-dynamic-suggestions', '');
+        return $this;
+    }
+
+    public function __suggestsDynamicValues(): bool {
+        return $this->hasAttribute('data-meros-dynamic-suggestions');
     }
 
     /**

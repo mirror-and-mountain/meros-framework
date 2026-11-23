@@ -31,22 +31,34 @@ function tokenAtCursor(text, cursor) {
  * @param {boolean} includeFields Whether to include form fields in the choices.
  * @returns {Array} The list of available choices, including dynamic values and optionally form fields.
  */
-function choices(includeFields) {
+function choices(includeFields, additionalChoices = []) {
     const builder = document.querySelector('.meros-form-builder[data-dynamic-values]');
-    if (!builder) return [];
-    const definitions = JSON.parse(builder.dataset.dynamicValues);
-    const options = definitions.map(({ name, type }) => ({ name, type, label: name.replaceAll('_', ' ') }));
-    if (includeFields) {
+    const definitions = builder ? JSON.parse(builder.dataset.dynamicValues) : [];
+    const options = additionalChoices.filter(option => !includeFields || !builder || option.source !== 'field');
+    definitions.forEach(({ name, type, field_type }) => {
+        if (!options.some(option => option.name === name)) {
+            options.push({ name, type, field_type, label: name.replaceAll('_', ' ') });
+        }
+    });
+    if (includeFields && builder) {
+        const fieldDataTypes = JSON.parse(builder.dataset.fieldDataTypes || '{}');
         builder.querySelectorAll('[data-form-field-component]').forEach(card => {
             if (card.closest('.meros-repeater-table-row--template')) return;
             const input = suffix => Array.from(card.querySelectorAll(`[name$="[${suffix}]"]`))
                 .find(element => element.closest('[data-form-field-component]') === card);
             const name = input('field_name')?.value;
             const type = input('field_type')?.value;
-            if (!name || name.startsWith('new_field_') || name === '__FIELD_NAME__' || type === 'password') return;
-            if (!options.some(option => option.name === name)) {
-                options.push({ name, label: `Field: ${input('field_label')?.value || name}` });
-            }
+            if (!name || name.startsWith('new_field_') || name === '__FIELD_NAME__') return;
+            if (['user_id', 'user_display_name', 'form_id', 'form_response_id'].includes(name)) return;
+            const existing = options.findIndex(option => option.name === name);
+            if (existing !== -1) options.splice(existing, 1);
+            if (type === 'password') return;
+            options.push({
+                name,
+                type: fieldDataTypes[type],
+                field_type: type,
+                label: `Field: ${input('field_label')?.value || name}`,
+            });
         });
     }
     return options;
@@ -59,8 +71,12 @@ function choices(includeFields) {
  * @param {Object} options Configuration options.
  * @param {Quill|null} options.quill The Quill editor instance, if applicable.
  * @param {boolean} options.includeFields Whether to include form fields in the suggestions.
+ * @param {Array} options.additionalChoices Additional named and typed dynamic values.
+ * @param {string[]|null} options.compatibleTypes Accepted data or field types, or null for all.
  */
-export function attachDynamicSuggestions(control, { quill = null, includeFields = false } = {}) {
+export function attachDynamicSuggestions(control, {
+    quill = null, includeFields = false, additionalChoices = [], compatibleTypes = null,
+} = {}) {
     const host = quill ? control : control.parentElement;
     if (!host || host.dataset.dynamicSuggestionsAttached) return;
     host.dataset.dynamicSuggestionsAttached = '1';
@@ -87,12 +103,14 @@ export function attachDynamicSuggestions(control, { quill = null, includeFields 
     let dismissedText = null;
     const types = control.hasAttribute('data-dynamic-value-types')
         ? JSON.parse(control.dataset.dynamicValueTypes) : null;
-    const availableChoices = () => choices(includeFields).filter(option => !types || types.includes(option.type));
+    const availableChoices = () => choices(includeFields, additionalChoices).filter(option =>
+        (!types || types.includes(option.type)) &&
+        (!compatibleTypes || compatibleTypes.includes(option.type) || compatibleTypes.includes(option.field_type)));
     const validate = () => {
         if (!types) return;
         const token = control.value.match(/^\{\{\s*([^{}]+?)\s*\}\}$/);
         const name = token?.[1].trim();
-        const definition = choices(false).find(option => option.name === name);
+        const definition = choices(false, additionalChoices).find(option => option.name === name);
         const error = !name ? 'Enter a complete dynamic value, for example {{user_id}}.'
             : !definition ? 'Choose a registered dynamic value.'
                 : !types.includes(definition.type) ? `This field requires a dynamic value of type: ${types.join(', ')}.`
@@ -225,4 +243,38 @@ export function attachDynamicSuggestions(control, { quill = null, includeFields 
     return validate;
 }
 let suggestionSequence = 0;
+
+export function initializeFieldDynamicSuggestions(control) {
+    if (!document.querySelector('.meros-form-builder[data-dynamic-values]') ||
+        !control.closest('[data-flow-dynamic-choices]') ||
+        control.closest('.meros-repeater-table-row--template') ||
+        control.dataset.fieldType === 'richtext') return;
+
+    if (!control.matches('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), textarea')) {
+        throw new Error('Dynamic suggestions require a text-editable field.');
+    }
+
+    const compatibleTypes = JSON.parse(control.dataset.merosDynamicSuggestions);
+    const additionalChoices = JSON.parse(control.closest('[data-flow-dynamic-choices]')?.dataset.flowDynamicChoices || '[]');
+    const original = control.cloneNode(false);
+    if (control.tagName === 'INPUT' && !['text', 'search', 'tel', 'password'].includes(control.type)) {
+        if (control.type === 'email') control.inputMode = 'email';
+        control.type = 'text';
+    }
+    control.removeAttribute('pattern');
+    const validateLiteral = () => {
+        if (/\{\{[^{}]+\}\}/.test(control.value)) {
+            control.setCustomValidity('');
+            return;
+        }
+        original.value = control.value;
+        original.required = control.required;
+        original.disabled = control.disabled;
+        control.setCustomValidity(original.validationMessage);
+    };
+    control.addEventListener('input', validateLiteral);
+    control.addEventListener('change', validateLiteral);
+    validateLiteral();
+    attachDynamicSuggestions(control, { includeFields: true, additionalChoices, compatibleTypes });
+}
 

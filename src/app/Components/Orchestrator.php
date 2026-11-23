@@ -27,12 +27,17 @@ use MM\Meros\App\Components\Fields\Time;
 use MM\Meros\App\Components\Fields\Url;
 use MM\Meros\App\Components\Fields\UsersLookup;
 
+// Special Field Components
+use MM\Meros\App\Components\Fields\FlowActionsRepeater;
+
 // Form Action Components
 use MM\Meros\App\Components\FormActions\DeleteFormResponse;
+use MM\Meros\App\Components\FormActions\SendAnEmail;
 
 // Block Components
 use MM\Meros\App\Components\Blocks\FormBlock;
 
+use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Support\Ajax;
 use MM\Meros\Facades\Components\Fields;
 use MM\Meros\Facades\Content\PostTypes;
@@ -61,7 +66,10 @@ class Orchestrator extends ComponentsOrchestrator {
         'text'         => Text::class,
         'textarea'     => TextArea::class,
         'time'         => Time::class,
-        'url'          => Url::class
+        'url'          => Url::class,
+
+        // For framework use only.
+        'flow_actions_repeater' => FlowActionsRepeater::class
     ];
 
     // =========================================================================
@@ -77,11 +85,13 @@ class Orchestrator extends ComponentsOrchestrator {
         $this->registerBlocks();
         $this->initFormAjax();
         $this->initRepeaterAjax();
+        $this->initFieldCreateAjax();
         $this->initLookupAjax();
     }
 
     private function registerFormActions(): void {
         $this->formActions()->register(DeleteFormResponse::class, 'delete_form_response');
+        $this->formActions()->register(SendAnEmail::class, 'send_an_email');
     }
 
     private function registerBlocks(): void {
@@ -200,6 +210,38 @@ class Orchestrator extends ComponentsOrchestrator {
 
             exit;
         }, [], true);
+    }
+
+    /**
+     * Attempts to make a field instance and return its HTML for use client-side.
+     *
+     * @return void
+     */
+    private function initFieldCreateAjax(): void {
+        Ajax::addAction('meros_create_field', function (array $args) {
+            $type = $args['type'] ?? null;
+            $config = $args['config'] ?? null;
+
+            if ($type === null || !is_string($type) || $config === null) {
+                $this->sendAjaxError('Cannot create field: Missing type or config.');
+            }
+
+            if (is_string($config)) {
+                $config = json_decode(wp_unslash($config), true);
+            }
+
+            if (!is_array($config)) {
+                $this->sendAjaxError('Cannot create field: Invalid config.');
+            }
+            
+            $field = Fields::checkout(Framework::get())->makeFrom($type, $config);
+
+            if ($field instanceof Field) {
+                $this->sendAjaxSuccess([
+                    'html' => $field->html()
+                ], 'Field created successfully.');
+            }
+        });
     }
 
     /**

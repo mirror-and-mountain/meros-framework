@@ -205,7 +205,7 @@ The new token is `{{site_name}}`. Keep token names unique across groups. Builder
 
 Every item returned by this filter must now contain both `value` and `type`; migrate older filters that supplied raw values. Supported types are `string`, `integer`, `number` (integer or float), `boolean`, `array`, `array.scalar`, `array.object` (arrays of row arrays), and `null`. Values must match their declared type; malformed definitions throw `UnexpectedValueException`, rather than coercing text to numbers. A `null` value is allowed with any declared type when its context is unavailable (for example, `post_id` outside a post).
 
-`FormDynamicValues::get()` returns these grouped definitions. `resolve('user_id')` still returns the underlying value, not its definition; parsing and flow actions retain that behavior. `choices()` returns only `{name, type}` records for editor metadata. Built-in IDs declare `integer`; other built-in user/post tokens declare `string`. Field compatibility uses the field's primary and additional data types, not HTML-format validation: an email default must still contain an email address when the form is submitted.
+`FormDynamicValues::get()` returns these grouped definitions. `resolve('user_id')` still returns the underlying value, not its definition; parsing and flow actions retain that behavior. `choices()` returns editor metadata (`name`, `type`, and an optional `field_type`), never current values. Built-in IDs declare `integer`; other built-in user/post tokens declare `string`. `user_email` also declares `field_type: email`. Custom definitions may add a non-empty `field_type` in the same way. Field-default compatibility uses the field's primary and additional data types, not HTML-format validation: an email default must still contain an email address when the form is submitted.
 
 ## Conditions
 
@@ -644,13 +644,74 @@ $action->addInput(
 ```
 
 The editor shows a checked, disabled **Use Dynamic Value** toggle and a single
-read-only source option. The runner resolves this locked token from the schema,
+read-only token. The runner resolves this locked token from the schema,
 ignoring saved static values or a different saved source. `DeleteFormResponse`
 uses this configuration to target the current form response. Editable dynamic
 defaults also support `dynamic: true` without `readonly`.
 Ordinary static defaults/read-only attributes remain editor controls, not
 server-side authorization or immutable input enforcement; existing static values
 are not overwritten.
+
+Dynamic inputs accept `{{token}}` suggestions. A single token retains its native
+type; text such as `Hello {{first_name}}` interpolates scalar values into a string.
+An unresolved or non-scalar token in interpolated text fails the action input.
+
+Use `fieldCallback` to configure the static control. A `repeater` input is
+rendered separately from the action-input table and requires this callback:
+
+```php
+use MM\Meros\App\Components\Fields\Repeater;
+
+$action->addInput(
+    'items',
+    'array.object',
+    fieldType: 'repeater',
+    fieldCallback: function (Repeater $field) {
+        $field->field('text', ['name' => 'title', 'label' => 'Title']);
+    }
+);
+```
+
+The callback receives the created field and can configure other field types too.
+With `setInputSchema()`, provide the callback as `field_callback`. The framework
+assigns the input's configuration field name after the callback.
+
+To display another input separately, set `outsideRepeater: true` (or
+`outside_repeater: true` in `setInputSchema()`):
+
+```php
+$action->addInput('email_body', 'string', fieldType: 'richtext', outsideRepeater: true);
+```
+
+Separate inputs are static controls without a dynamic toggle; a non-repeater
+standalone input cannot specify `dynamic: true`. Repeater inputs are always separate
+and still require `fieldCallback`. The action-input table is omitted when no inputs
+use it. Rich-text action inputs, whether separate or in
+the table, offer dynamic suggestions unless `allow_dynamic_value` is false. Their
+tokens are resolved in HTML text nodes, not attributes; values are escaped, scalar
+lists are joined, and missing values become empty text.
+
+To opt a text-editable action-configuration field into suggestions, call
+`__suggestDynamicValues()` in its field callback. For example, a repeater input can
+offer only email-compatible form fields, server values and previous action outputs:
+
+```php
+use MM\Meros\Contracts\Features\Components\Field;
+
+$repeater->field('email', function (Field $field) {
+    $field->name('recipient_email_address');
+    $field->__suggestDynamicValues(['email']);
+});
+```
+
+The optional array matches a suggestion's data type **or** its `field_type`. Omit
+it to offer all types; `['string']` includes all strings, while `['email']`
+requires email field-type metadata. Previous action outputs can declare
+`field_type` in their output schema. In action inputs, opted-in controls are
+resolved when the action runs, including repeater columns. Complete tokens keep
+their value type; mixed text interpolates scalars. Unknown tokens fail the action.
+Rich text retains its HTML text-node escaping rules. The field callback is also
+used at execution to identify opted-in controls and should be deterministic.
 
 #### Conditional action execution
 
@@ -702,7 +763,10 @@ add_filter('meros_flow_controls_dynamic_options', function (array $options): arr
 });
 ```
 
-**User: First Name** now appears in the **Value** dropdown when **Use Dynamic Value** is enabled for a compatible string input. This filter only changes the editor's choices. If you add a custom token that isn't already resolved at runtime, supply its value separately through `meros_dynamic_form_values` using the same token key.
+**User: First Name** now appears in suggestions when typing `{{` in a dynamic input.
+This filter only changes the editor's choices. If you add a custom token that
+isn't already resolved at runtime, supply its value separately through
+`meros_dynamic_form_values` using the same token key.
 
 ### Feedback and reset
 

@@ -65,6 +65,20 @@ export default class MerosFormProcessor {
             }
         });
 
+        this.form.querySelectorAll('.meros-repeater-field[data-name]').forEach((repeater) => {
+            if (repeater.matches(':disabled') || repeater.closest('.meros-repeater-table-row--template')) return;
+            if (repeater.parentElement?.closest('.meros-repeater-field')) return;
+
+            const name = repeater.dataset.name;
+            if (!name || Object.prototype.hasOwnProperty.call(this.payload, name)) return;
+
+            const component = this.getFieldComponent(repeater);
+            if (!component || typeof component.getValue !== 'function') {
+                throw new Error(`Cannot process repeater "${name}": its component is not initialized.`);
+            }
+            this.payload[name] = component.getValue();
+        });
+
         return this.payload;
     }
 

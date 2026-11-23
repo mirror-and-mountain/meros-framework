@@ -136,7 +136,7 @@ class Repeater extends Field {
      *
      * @var string|null
      */
-    private ?string $ajaxUrl = null;
+    protected ?string $ajaxUrl = null;
 
     /**
      * The ajax nonce used for opening the repeater's edit form if applicable.
@@ -704,7 +704,7 @@ class Repeater extends Field {
         $row = [];
         
         foreach ($this->fields as $field) {
-            $clone = clone $field;
+            $clone = $this->resolveTableRowField($field, $rowData, $templateRow);
 
             $name  = $clone->getName();
             $id    = "{$this->id}-{$clone->getId()}";
@@ -738,5 +738,9 @@ class Repeater extends Field {
 
         return $row;
     } 
+
+    protected function resolveTableRowField(Field $field, Collection $rowData, bool $templateRow): Field {
+        return clone $field;
+    }
 
 }

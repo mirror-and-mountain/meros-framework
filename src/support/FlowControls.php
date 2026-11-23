@@ -8,6 +8,7 @@ use MM\Meros\Contracts\Providers\FeatureProvider;
 
 use MM\Meros\Contracts\Features\Automation\FlowAction;
 use MM\Meros\Contracts\Features\Components\Form as FormComponent;
+use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Contracts\Features\Components\FieldGroup;
 use MM\Meros\Contracts\Features\Components\FieldRow;
 
@@ -18,11 +19,14 @@ use MM\Meros\App\Components\Fields\Select;
 use MM\Meros\App\Components\Fields\Textarea;
 use MM\Meros\App\Components\Fields\Hidden;
 use MM\Meros\App\Components\Fields\Repeater;
+use MM\Meros\App\Components\Fields\FlowActionsRepeater;
+use MM\Meros\App\Components\Fields\RichText;
 
 
 use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Components\FieldGroups;
 use MM\Meros\Facades\Automation\FlowActions;
+use MM\Meros\Facades\Support\FormDynamicValues;
 
 class FlowControls {
     /**
@@ -177,7 +181,10 @@ class FlowControls {
     // =========================================================================
 
     /**
-     * Returns the edit form for a specific form action within the repeater.
+     * Returns the edit form for a specific flow action row.
+     *
+     * This function is used to configure the edit form for a flow action row in the repeater.
+     * It populates the form with the current row data and handles dynamic values.
      *
      * @param FormComponent $formComponent
      * @param array         $rowData
@@ -209,6 +216,10 @@ class FlowControls {
         }
 
         $action = $this->getActionInstance($actionName);
+        if (!$action) {
+            throw new \RuntimeException("Cannot configure unregistered flow action '{$actionName}'.");
+        }
+        $formComponent->resolveDynamicValues(false);
 
         $formComponent->field('text', [
             'name'     => 'action_label',
@@ -237,17 +248,129 @@ class FlowControls {
                 'prepend_label' => 'Field: '
             ]) ?? [];
 
-            $formComponent->section(function (FieldGroup $group) use ($inputSchema, $dynamicOptions, $formFields) {
+            $formComponent->section(function (FieldGroup $group) use ($formComponent, $inputSchema, $dynamicOptions, $formFields) {
                 $group->title('Action Inputs');
+                $choices = [];
+                foreach (FormDynamicValues::choices() as $option) {
+                    $choices[$option['name']] = [
+                        'name'  => $option['name'],
+                        'label' => str_replace('_', ' ', $option['name']),
+                        'type'  => $option['type'],
+                        ...isset($option['field_type']) ? ['field_type' => $option['field_type']] : [],
+                    ];
+                }
+                foreach (['dynamic' => $dynamicOptions, 'field' => $formFields] as $source => $options) {
+                    foreach ($options as $option) {
+                        if (($option['type'] ?? '') === 'password') continue;
+                        if (!isset($option['name'], $option['label'], $option['data_type'])) continue;
+                        $choices[$option['name']] = [
+                            'name'   => $option['name'],
+                            'label'  => $option['label'],
+                            'type'   => $option['data_type'],
+                            'source' => $source,
+                            ...isset($option['field_type']) ? ['field_type' => $option['field_type']]
+                                : (isset($option['type']) ? ['field_type' => $option['type']] : []),
+                        ];
+                    }
+                }
+                $choicesJson = json_encode(array_values($choices), JSON_THROW_ON_ERROR);
+                $formComponent->attribute('data-flow-dynamic-choices', $choicesJson);
+
+                $tableInputs = array_filter($inputSchema, fn (array $properties) => !FlowAction::inputUsesStandaloneField($properties));
+                if ($tableInputs !== []) {
+                    $group->field('flow_actions_repeater', function (FlowActionsRepeater $repeater) use ($tableInputs, $choicesJson) {
+                        $repeater->name('action_inputs');
+                        $repeater->label('Action Inputs');
+                        $repeater->allowAdd(false);
+                        $repeater->allowRemove(false);
+                        $repeater->allowReorder(false);
+                        $repeater->attribute('data-flow-dynamic-choices', $choicesJson);
+
+                        $repeater->field('text', function ($field) {
+                            $field->name('input_name');
+                            $field->label('Input Name');
+                            $field->readonly(true);
+                        });
+
+                        $repeater->field('text', [
+                            'name'     => 'input_type',
+                            'label'    => 'Input Type',
+                            'readonly' => true
+                        ]);
+
+                        $repeater->field('text', [
+                            'name'     => 'input_field_type',
+                            'label'    => 'Input Field Type',
+                            'readonly' => true
+                        ]);
+
+                        $repeater->field('checkbox', function (Checkbox $field) {
+                            $field->name('use_dynamic_value');
+                            $field->label('Use Dynamic Value');
+                            $field->default(true);
+                            $field->toggle(true);
+                            $field->attribute('data-dynamic-selector', true);
+                        });
+
+                        $repeater->field('text', function ($field) {
+                            $field->name('input_value');
+                            $field->label('Input Value');
+                        });
+
+                        $repeaterValue = [];
+
+                        foreach ($tableInputs as $inputName => $properties) {
+                            $dataType = $properties['type'] ?? 'string';
+                            $fieldType = $properties['field_type'] ?? FlowAction::inferInputFieldType($dataType);
+                            $callback = $properties['field_callback'] ?? null;
+                            if ($callback !== null && !is_callable($callback)) {
+                                throw new \InvalidArgumentException("Invalid field callback for action input '{$inputName}'.");
+                            }
+
+                            $useDynamic = $this->usesDynamicDefault($properties);
+                            $default = $properties['default'] ?? null;
+
+                            if ($useDynamic && is_string($default) && !str_contains($default, '{{')) {
+                                $default = '{{' . $default . '}}';
+                            }
+
+                            $staticField = $repeater->field($fieldType, function (Field $field) use ($properties, $inputName, $choicesJson) {
+                                $this->configureInputField($field, 'input_value', 'Input Value', $inputName, $properties, $choicesJson, false);
+                            }, false);
+
+                            $repeater->inputField($inputName, $staticField,
+                                ($properties['readonly'] ?? false) || !($properties['allow_dynamic_value'] ?? true),
+                                $properties['required'] ?? false, $properties['readonly'] ?? false);
+
+                            $repeaterValue[] = [
+                                'input_name'        => $inputName,
+                                'input_type'        => $dataType,
+                                'input_field_type'  => $fieldType,
+                                'use_dynamic_value' => $useDynamic,
+                                'input_value'       => $default,
+                            ];
+                        }
+
+                        $repeater->default($repeaterValue);
+                    });
+                }
 
                 foreach ($inputSchema as $inputName => $properties) {
-                    $group->row(function (FieldRow $row) use ($inputName, $properties) {
-                        $this->buildInputConfigRow($row, $inputName, $properties);
-                    });
-
-                    $group->row(function (FieldRow $row) use ($inputName, $properties, $dynamicOptions, $formFields) {
-                        $this->buildInputValueRow($row, $inputName, $properties, $dynamicOptions, $formFields);
-                    });
+                    $fieldType = $properties['field_type'] ?? FlowAction::inferInputFieldType($properties['type'] ?? 'string');
+                    if (!FlowAction::inputUsesStandaloneField($properties)) continue;
+                    $callback = $properties['field_callback'] ?? null;
+                    if ($callback !== null && !is_callable($callback)) {
+                        throw new \InvalidArgumentException("Invalid field callback for action input '{$inputName}'.");
+                    }
+                    if ($fieldType === 'repeater' && $callback === null) {
+                        throw new \InvalidArgumentException("A field callback is required for repeater input '{$inputName}'.");
+                    }
+                    $group->field($fieldType, function (Field $field) use ($inputName, $properties, $choicesJson) {
+                        $this->configureInputField(
+                            $field, Str::snake($inputName) . '_value', $properties['label'] ?? $inputName,
+                            $inputName, $properties, $choicesJson, true
+                        );
+                    }, false);
                 }
             });
         }
@@ -294,6 +417,35 @@ class FlowControls {
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    private function configureInputField(
+        Field $field, string $name, string $label, string $inputName, array $properties, string $choicesJson, bool $standalone
+    ): void {
+        $callback = $properties['field_callback'] ?? null;
+        if ($callback !== null && !is_callable($callback)) {
+            throw new \InvalidArgumentException("Invalid field callback for action input '{$inputName}'.");
+        }
+
+        $field->name($name);
+        $field->label($label);
+        if (($properties['description'] ?? null) !== null) $field->description($properties['description']);
+        if ($field instanceof Select && is_array($properties['options'] ?? null)) $field->options($properties['options']);
+        if ($field instanceof Select && ($properties['type'] ?? null) === 'array.scalar') $field->multiple();
+        if (array_key_exists('default', $properties) && ($standalone || !$this->usesDynamicDefault($properties))) {
+            $field->default($properties['default']);
+        }
+        if ($properties['required'] ?? false) $field->required();
+        if ($properties['readonly'] ?? false) $field->readonly();
+        if ($callback !== null) $callback($field);
+        $field->name($name);
+        if ($field instanceof RichText) {
+            if (($properties['allow_dynamic_value'] ?? true) === true) {
+                $field->attribute('data-flow-dynamic-choices', $choicesJson);
+            } else {
+                $field->removeAttribute('data-flow-dynamic-choices');
+            }
+        }
+    }
 
     /**
      * Helper method to retrieve an instance of a registered FlowAction by its name.
@@ -372,11 +524,16 @@ class FlowControls {
 
                 $inputSchema = $prevAction->getInputSchema();
                 $settings = $rowValue['form_data'];
-                if (array_key_exists('await_response', $inputSchema)
-                    && ($settings['use_dynamic_value_await_response'] ?? false) !== true
-                    && ($settings['await_response_value'] ?? $inputSchema['await_response']['default'] ?? true) === false
-                ) {
-                    continue;
+                if (array_key_exists('await_response', $inputSchema)) {
+                    $awaitRow = FlowAction::inputUsesStandaloneField($inputSchema['await_response'])
+                        ? ['input_value' => $settings['await_response_value'] ?? $inputSchema['await_response']['default'] ?? true]
+                        : collect($settings['action_inputs'] ?? [])->first(
+                            fn ($input) => is_array($input) && ($input['input_name'] ?? null) === 'await_response'
+                        );
+                    if (($awaitRow['use_dynamic_value'] ?? false) !== true &&
+                        ($awaitRow['input_value'] ?? $inputSchema['await_response']['default'] ?? true) === false) {
+                        continue;
+                    }
                 }
 
                 $prevActionOutputSchema = $prevAction->getOutputSchema();
@@ -390,7 +547,8 @@ class FlowControls {
                         $options[$outputName . '_source_' . $prevActionId] = [
                             'name'      => $outputName . '_source_' . $prevActionId,
                             'label'     => ('Action Output: ' . ($rowValue['form_data']['action_label'] ?? $prevActionName)) . ' - ' . $outputName,
-                            'data_type' => $config['type']
+                            'data_type' => $config['type'],
+                            ...isset($config['field_type']) ? ['field_type' => $config['field_type']] : [],
                         ];
                     }
                 }
@@ -452,10 +610,10 @@ class FlowControls {
         $fieldType      = $this->getInputProperty('field_type', 'string', null, $properties);
         $readonly       = $this->getInputProperty('readonly', 'boolean', false, $properties);
         $dynamicAllowed = $this->getInputProperty('allow_dynamic_value', 'boolean', true, $properties);
-        $useDynamic = $this->usesDynamicDefault($properties);
+        $useDynamic     = $this->usesDynamicDefault($properties);
 
         if ($fieldType === null) {
-            $fieldType = $this->inferFieldType($dataType);
+            $fieldType = FlowAction::inferInputFieldType($dataType);
         }
 
         if ($dataType === 'array') {
@@ -506,7 +664,7 @@ class FlowControls {
         $options        = $this->getInputProperty('options', 'array', [], $properties);
 
         if ($fieldType === null) {
-            $fieldType = $this->inferFieldType($dataType);
+            $fieldType = FlowAction::inferInputFieldType($dataType);
         }
 
         if (!$readonly || !$useDynamic) {
@@ -588,17 +746,6 @@ class FlowControls {
      *
      * @return string The inferred field type.
      */
-    private function inferFieldType(string $dataType): string {
-        return match ($dataType) {
-            'array.object'      => 'repeater',
-            'array.scalar'      => 'multi_select',
-            'string'            => 'text',
-            'boolean'           => 'checkbox',
-            'integer', 'number' => 'number',
-            default             => 'text'
-        };
-    }
-
     /**
      * Helper to retrieve available form actions for the form.
      *

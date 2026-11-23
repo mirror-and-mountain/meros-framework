@@ -11,6 +11,7 @@
     data-template-settings="{{ json_encode($templateLockSettings, JSON_THROW_ON_ERROR) }}"
     data-condition-sources="{{ json_encode((object) $conditionSources, JSON_THROW_ON_ERROR) }}"
     data-dynamic-values="{{ json_encode($dynamicValues, JSON_THROW_ON_ERROR) }}"
+    data-field-data-types="{{ json_encode((object) $fieldDataTypes, JSON_THROW_ON_ERROR) }}"
 >
     <div class="mforms-body">
         @if($templateRows !== null)

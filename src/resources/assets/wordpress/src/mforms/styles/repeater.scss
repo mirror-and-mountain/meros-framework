@@ -62,6 +62,13 @@
                 }
             }
 
+            td.meros-repeater-table-cell.meros-repeater-table-cell--field:has(.mforms-dynamic-suggestions) {
+                .mforms-dynamic-suggestions {
+                    position: relative;
+                    min-width: 100%;
+                }
+            }
+
             th.meros-repeater-table-header-cell--move {
                 width: var(--meros-repeater-move-width, 5rem);
             }

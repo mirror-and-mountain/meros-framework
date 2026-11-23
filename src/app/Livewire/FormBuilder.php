@@ -113,9 +113,18 @@ class FormBuilder extends Component {
     }
 
     public function render() {
+        $fieldDataTypes = [];
+        foreach (Fields::getRegisteredFeatures() as $registration) {
+            $class = $registration['class'] ?? null;
+            $alias = $registration['alias'] ?? null;
+            if (!is_string($class) || !class_exists($class) || !$class::useInFormBuilder() || !is_string($alias)) continue;
+            $field = Fields::checkout($this->componentTemplate->getProvider())->makeFrom($alias);
+            $fieldDataTypes[$alias] = $field->getDataType();
+        }
         return view('meros::forms.builder', [
             'conditionSources' => FormConditionSources::choices(),
             'dynamicValues' => FormDynamicValues::choices(),
+            'fieldDataTypes' => $fieldDataTypes,
         ]);
     }
 

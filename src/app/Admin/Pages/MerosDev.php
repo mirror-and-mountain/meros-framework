@@ -64,6 +64,9 @@ final class MerosDev extends Page {
                 echo '<p>You can check the result at <a href="' . $siteUrl . '/mailpit" target="_blank">' . $siteUrl . '/mailpit</a></p>';
                 echo '</div>';
                 echo '</div>';
+
+                echo '<hr>';
+                echo '<h3>Flow Actions Repeater Test</h3>';
             }
         });
     }

@@ -7,8 +7,13 @@ use Illuminate\Support\Str;
 use MM\Meros\Contracts\Providers\FeatureProvider;
 
 use MM\Meros\Contracts\Features\Automation\FlowAction;
+use MM\Meros\Contracts\Features\Components\Field;
+use MM\Meros\App\Components\Fields\Repeater;
+use MM\Meros\App\Components\Fields\RichText;
+use MM\Meros\App\Components\Fields\Select;
 
 use MM\Meros\Facades\Automation\FlowActions;
+use MM\Meros\Facades\Components\Fields;
 use MM\Meros\Facades\Support\FormDynamicValues;
 
 class FlowRunner {
@@ -334,62 +339,138 @@ class FlowRunner {
      */
     private function parseActionInputPayload(FlowAction $action, array $schema, array $payload): array|string {
         $parsed = [];
-        // Field setters snake-case editor names; older saved configs can contain both forms.
-        $getPayloadValue = static fn (string $name) => array_key_exists($name, $payload)
-            ? $payload[$name]
-            : ($payload[Str::snake($name)] ?? null);
-
-        foreach ($schema as $key => $config) {
-            $requiredDataType = $config['type'];
-
-            if (Str::contains($requiredDataType, '|')) {
-                $validDataTypes = explode('|', $requiredDataType);
-            } else {
-                $validDataTypes = [$requiredDataType];
+        $rows = $payload['action_inputs'] ?? [];
+        if (!is_array($rows)) {
+            return "Invalid input configuration for form action: " . $action->getName() . '.';
+        }
+        $inputs = [];
+        foreach ($rows as $row) {
+            if (!is_array($row) || !is_string($row['input_name'] ?? null) || isset($inputs[$row['input_name']])) {
+                return "Invalid input configuration for form action: " . $action->getName() . '.';
             }
-
-            $inputError    = "Form action '" . $action->getName() . "' requires a valid input value for input: " . $key . '.';
-            $lockedDynamic = ($config['readonly'] ?? false) === true && ($config['dynamic'] ?? false) === true;
-            $payloadHasKey = $lockedDynamic || array_key_exists($key . '_label', $payload)
-                || array_key_exists(Str::snake($key . '_label'), $payload);
-
-            if ($payloadHasKey === false) {
-                return $inputError;
-            }
-
-            $valueIsValid = function ($value) use ($validDataTypes) {
-                return in_array(gettype($value), $validDataTypes) === true;
-            };
-
-            $valueIsDynamic = $lockedDynamic || $getPayloadValue('use_dynamic_value_' . $key) === true;
-            
-            if ($valueIsDynamic) {
-                $dynamicValue = $lockedDynamic ? ($config['default'] ?? null) : $getPayloadValue($key . '_dynamic_value');
-
-                if (!is_string($dynamicValue)) {
-                    return $inputError;
-                } else {
-                    $value = $this->resolveDynamicValue($dynamicValue);
-
-                    if ($valueIsValid($value) === false) {
-                        return $inputError;
-                    }
-
-                    $parsed[$key] = $value;
-                }
-            }
-
-            else {
-                $value = $getPayloadValue($key . '_value');
-
-                if ($valueIsValid($value) === false) {
-                    return $inputError;
-                }
-
-                $parsed[$key] = $value;
-            }
+            $inputs[$row['input_name']] = $row;
         }
 
+        foreach ($schema as $key => $config) {
+            $validDataTypes = explode('|', $config['type']);
+            $inputError    = "Form action '" . $action->getName() . "' requires a valid input value for input: " . $key . '.';
+            $isStandalone = FlowAction::inputUsesStandaloneField($config);
+            $lockedDynamic = !$isStandalone && ($config['readonly'] ?? false) === true && ($config['dynamic'] ?? false) === true;
+            $row = $inputs[$key] ?? null;
+            if (!$isStandalone && !$lockedDynamic && !is_array($row)) return $inputError;
+            $valueIsDynamic = !$isStandalone && ($lockedDynamic || ($row['use_dynamic_value'] ?? false) === true);
+            if ($valueIsDynamic) {
+                $expression = $lockedDynamic ? ($config['default'] ?? null) : ($row['input_value'] ?? null);
+                if (!is_string($expression)) return $inputError;
+                if ($lockedDynamic && !str_contains($expression, '{{')) {
+                    $value = $this->resolveDynamicValue($expression);
+                } elseif (preg_match('/^\s*\{\{\s*([^{}]+?)\s*\}\}\s*$/', $expression, $match)) {
+                    $value = $this->resolveDynamicValue($match[1]);
+                } else {
+                    $value = preg_replace_callback('/\{\{\s*([^{}]+?)\s*\}\}/', function ($match) use ($inputError) {
+                        $resolved = $this->resolveDynamicValue($match[1]);
+                        if (!is_scalar($resolved)) throw new \UnexpectedValueException($inputError);
+                        return (string) $resolved;
+                    }, $expression);
+                    if (str_contains($value, '{{') || str_contains($value, '}}')) return $inputError;
+                }
+            } else {
+                $value = $isStandalone ? ($payload[Str::snake($key) . '_value'] ?? null) : ($row['input_value'] ?? null);
+                $field = null;
+                if (isset($config['field_callback']) && $this->containsDynamicToken($value)) {
+                    if (!is_callable($config['field_callback'])) {
+                        throw new \InvalidArgumentException("Invalid field callback for action input '{$key}'.");
+                    }
+                    $fieldType = $config['field_type'] ?? FlowAction::inferInputFieldType($config['type']);
+                    $field = Fields::checkout($action->getProvider())->makeFrom(
+                        $fieldType, function (Field $field) use ($config, $key, $isStandalone) {
+                            $field->name($isStandalone ? Str::snake($key) . '_value' : 'input_value');
+                            $field->label($isStandalone ? ($config['label'] ?? $key) : 'Input Value');
+                            if (($config['description'] ?? null) !== null) $field->description($config['description']);
+                            if ($field instanceof Select && is_array($config['options'] ?? null)) $field->options($config['options']);
+                            if ($field instanceof Select && ($config['type'] ?? null) === 'array.scalar') $field->multiple();
+                            $dynamicDefault = ($config['allow_dynamic_value'] ?? true) &&
+                                ($config['dynamic'] ?? (!($config['readonly'] ?? false) && !array_key_exists('default', $config)));
+                            if (array_key_exists('default', $config) && ($isStandalone || !$dynamicDefault)) {
+                                $field->default($config['default']);
+                            }
+                            if ($config['required'] ?? false) $field->required();
+                            if ($config['readonly'] ?? false) $field->readonly();
+                            ($config['field_callback'])($field);
+                            $field->name($isStandalone ? Str::snake($key) . '_value' : 'input_value');
+                        }
+                    );
+                    $value = $this->parseConfiguredFieldValue($field, $value, $inputError);
+                }
+                if (!$field?->__suggestsDynamicValues() &&
+                    ($config['field_type'] ?? null) === 'richtext' && ($config['allow_dynamic_value'] ?? true) === true &&
+                    is_string($value) && str_contains($value, '{{')) {
+                    $value = FormDynamicValues::parseHtml($value, fn (string $token) => $this->resolveDynamicValue($token));
+                }
+                if (is_string($value) && !in_array('string', $validDataTypes, true) && is_numeric($value)) {
+                    if (in_array('integer', $validDataTypes, true) && preg_match('/^[+-]?\d+$/', $value)) {
+                        $value = (int) $value;
+                    } elseif (in_array('number', $validDataTypes, true) || in_array('double', $validDataTypes, true)) {
+                        $value = (float) $value;
+                    }
+                }
+            }
+            $type = gettype($value);
+            $valid = in_array($type, $validDataTypes, true)
+                || ($type === 'integer' && in_array('number', $validDataTypes, true))
+                || ($type === 'double' && in_array('number', $validDataTypes, true))
+                || ($type === 'array' && in_array('array.object', $validDataTypes, true)
+                    && count(array_filter($value, 'is_array')) === count($value))
+                || ($type === 'array' && in_array('array.scalar', $validDataTypes, true)
+                    && count(array_filter($value, 'is_scalar')) === count($value));
+            if (!$valid) return $inputError;
+            $parsed[$key] = $value;
+        }
+
+        return $parsed;
+    }
+
+    private function containsDynamicToken(mixed $value): bool {
+        if (is_string($value)) return str_contains($value, '{{') || str_contains($value, '}}');
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if ($this->containsDynamicToken($item)) return true;
+            }
+        }
+        return false;
+    }
+
+    private function parseConfiguredFieldValue(Field $field, mixed $value, string $inputError): mixed {
+        if ($field instanceof Repeater && is_array($value)) {
+            foreach ($value as &$row) {
+                if (!is_array($row)) throw new \UnexpectedValueException($inputError);
+                foreach ($field->getFields(true) as $column) {
+                    $name = $column->getName();
+                    if (array_key_exists($name, $row)) {
+                        $row[$name] = $this->parseConfiguredFieldValue($column, $row[$name], $inputError);
+                    }
+                }
+            }
+            unset($row);
+            return $value;
+        }
+
+        if (!$field->__suggestsDynamicValues() || !is_string($value) ||
+            (!str_contains($value, '{{') && !str_contains($value, '}}'))) return $value;
+        if ($field instanceof RichText) {
+            return FormDynamicValues::parseHtml($value, fn (string $token) => $this->resolveDynamicValue($token));
+        }
+        if (preg_match('/^\s*\{\{\s*([^{}]+?)\s*\}\}\s*$/', $value, $match)) {
+            $resolved = $this->resolveDynamicValue($match[1]);
+            if ($resolved === null) throw new \UnexpectedValueException($inputError);
+            return $resolved;
+        }
+        $parsed = preg_replace_callback('/\{\{\s*([^{}]+?)\s*\}\}/', function ($match) use ($inputError) {
+            $resolved = $this->resolveDynamicValue($match[1]);
+            if (!is_scalar($resolved)) throw new \UnexpectedValueException($inputError);
+            return (string) $resolved;
+        }, $value);
+        if (str_contains($parsed, '{{') || str_contains($parsed, '}}')) throw new \UnexpectedValueException($inputError);
         return $parsed;
     }
 

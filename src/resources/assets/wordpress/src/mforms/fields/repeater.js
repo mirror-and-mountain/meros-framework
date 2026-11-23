@@ -241,6 +241,8 @@ const mformsRepeater = () => {
                 this.addRowButton.disabled = true;
             }
             this.container.dispatchEvent(new Event('change', { bubbles: true }));
+
+            return newRow;
         },
 
         reset() {

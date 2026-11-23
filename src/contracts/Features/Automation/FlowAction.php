@@ -106,6 +106,8 @@ class FlowAction extends Feature implements Registrable, Makeable {
      * @param mixed       $default
      * @param boolean     $readonly
      * @param boolean|null $dynamic Whether the default is a dynamic-value token.
+     * @param callable|null $fieldCallback Configures the input's field; required for repeater inputs.
+     * @param boolean $outsideRepeater Render the static input separately from the action-input table.
      *
      * @return static
      */
@@ -118,7 +120,9 @@ class FlowAction extends Feature implements Registrable, Makeable {
         bool $required = false,
         mixed $default = null,
         bool $readonly = false,
-        ?bool $dynamic = null
+        ?bool $dynamic = null,
+        ?callable $fieldCallback = null,
+        bool $outsideRepeater = false
     ): static {
         $this->inputSchema[$name] = [
             'type'        => Str::lower($type),
@@ -134,6 +138,12 @@ class FlowAction extends Feature implements Registrable, Makeable {
         }
         if ($dynamic !== null) {
             $this->inputSchema[$name]['dynamic'] = $dynamic;
+        }
+        if ($fieldCallback !== null) {
+            $this->inputSchema[$name]['field_callback'] = $fieldCallback;
+        }
+        if ($outsideRepeater) {
+            $this->inputSchema[$name]['outside_repeater'] = true;
         }
 
         return $this;
@@ -170,6 +180,35 @@ class FlowAction extends Feature implements Registrable, Makeable {
      */
     public function getInputSchema(): array {
         return $this->inputSchema;
+    }
+
+    /**
+     * Determines whether an input uses a separate static configuration field.
+     */
+    final public static function inputUsesStandaloneField(array $properties): bool {
+        if (array_key_exists('outside_repeater', $properties) && !is_bool($properties['outside_repeater'])) {
+            throw new \InvalidArgumentException('The outside_repeater input property must be a boolean.');
+        }
+
+        $fieldType = $properties['field_type'] ?? null;
+        $isRepeater = $fieldType === 'repeater' || ($fieldType === null && ($properties['type'] ?? null) === 'array.object');
+        $isStandalone = $isRepeater || ($properties['outside_repeater'] ?? false);
+        if ($isStandalone && !$isRepeater && ($properties['dynamic'] ?? false) === true) {
+            throw new \InvalidArgumentException('A standalone input cannot have a dynamic default.');
+        }
+
+        return $isStandalone;
+    }
+
+    final public static function inferInputFieldType(string $dataType): string {
+        return match ($dataType) {
+            'array.object' => 'repeater',
+            'array.scalar' => 'select',
+            'string' => 'text',
+            'boolean' => 'checkbox',
+            'integer', 'number' => 'number',
+            default => 'text',
+        };
     }
 
     /**

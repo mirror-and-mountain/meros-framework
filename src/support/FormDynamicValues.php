@@ -19,9 +19,11 @@ class FormDynamicValues {
             'user_values' => $this->userData,
             'post_values' => $this->postData
         ]);
+
         if (!is_array($values)) {
             throw new \UnexpectedValueException('Dynamic form values must be grouped arrays of typed definitions.');
         }
+        
         foreach ($values as $groupName => $group) {
             if (!is_array($group)) {
                 throw new \UnexpectedValueException("Dynamic form value group '{$groupName}' must be an array.");
@@ -31,6 +33,10 @@ class FormDynamicValues {
                     !array_key_exists('value', $definition) || !isset($definition['type']) ||
                     !in_array($definition['type'], self::TYPES, true)) {
                     throw new \UnexpectedValueException("Dynamic form value '{$groupName}.{$key}' requires a valid type and value.");
+                }
+                if (array_key_exists('field_type', $definition) &&
+                    (!is_string($definition['field_type']) || $definition['field_type'] === '')) {
+                    throw new \UnexpectedValueException("Dynamic form value '{$groupName}.{$key}' requires a valid field_type.");
                 }
                 $value = $definition['value'];
                 $valid = $value === null || match ($definition['type']) {
@@ -86,7 +92,11 @@ class FormDynamicValues {
         $choices = [];
         foreach (['user_values' => $values['user_values'] ?? [], 'post_values' => $values['post_values'] ?? []] + $values as $group) {
             foreach ($group as $name => $definition) {
-                $choices[$name] ??= ['name' => $name, 'type' => $definition['type']];
+                $choices[$name] ??= [
+                    'name' => $name,
+                    'type' => $definition['type'],
+                    ...isset($definition['field_type']) ? ['field_type' => $definition['field_type']] : [],
+                ];
             }
         }
         return array_values($choices);
@@ -113,12 +123,14 @@ class FormDynamicValues {
      *
      * @param string $content
      * @param callable|null $formatValue Formats a resolved value for the output context.
+     * @param callable|null $resolveValue Resolves a token using an alternative context.
      *
      * @return string
      */
-    public function parse(string $content, ?callable $formatValue = null): string {
-        return preg_replace_callback('/{{\s*([^}]+)\s*}}/', function ($matches) use ($formatValue) {
-            $value = $this->resolve(trim($matches[1]));
+    public function parse(string $content, ?callable $formatValue = null, ?callable $resolveValue = null): string {
+        return preg_replace_callback('/{{\s*([^}]+)\s*}}/', function ($matches) use ($formatValue, $resolveValue) {
+            $key = trim($matches[1]);
+            $value = $resolveValue !== null ? $resolveValue($key) : $this->resolve($key);
             return $formatValue !== null ? $formatValue($value) : (is_scalar($value) ? (string) $value : '');
         }, $content);
     }
@@ -127,10 +139,11 @@ class FormDynamicValues {
      * Parses the given HTML content and replaces dynamic value placeholders with their resolved values, escaping them for safe HTML output.
      *
      * @param string $content
+     * @param callable|null $resolveValue Resolves a token using an alternative context.
      *
      * @return string
      */
-    public function parseHtml(string $content): string {
+    public function parseHtml(string $content, ?callable $resolveValue = null): string {
         $formatValue = static function (mixed $value): string {
             if (is_array($value)) {
                 $value = implode(', ', array_filter($value, 'is_scalar'));
@@ -141,7 +154,7 @@ class FormDynamicValues {
         // Interpolate text nodes only. In particular, never substitute into link URLs.
         $parts = wp_html_split(wp_kses_post($content));
         for ($i = 0, $count = count($parts); $i < $count; $i += 2) {
-            $parts[$i] = $this->parse($parts[$i], $formatValue);
+            $parts[$i] = $this->parse($parts[$i], $formatValue, $resolveValue);
         }
         return implode('', $parts);
     }
@@ -159,7 +172,7 @@ class FormDynamicValues {
         $this->userData = [
             'user_id'           => ['type' => 'integer', 'value' => $currentUserId],
             'user_display_name' => ['type' => 'string', 'value' => $userExists ? $currentUser->display_name : ''],
-            'user_email'        => ['type' => 'string', 'value' => $userExists ? $currentUser->user_email : ''],
+            'user_email'        => ['type' => 'string', 'field_type' => 'email', 'value' => $userExists ? $currentUser->user_email : ''],
             'user_first_name'   => ['type' => 'string', 'value' => $userExists ? $currentUser->first_name : ''],
             'user_last_name'    => ['type' => 'string', 'value' => $userExists ? $currentUser->last_name : ''],
             'user_nickname'     => ['type' => 'string', 'value' => $userExists ? $currentUser->nickname : '']
