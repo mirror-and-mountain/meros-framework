@@ -365,6 +365,14 @@ form.mforms-form .mforms-section {
     color: #ff0000;
 }
 
+/**
+ * Styles for required fields that are not user-invalid.
+ * Prevents nice-forms.css marking required fields as invalid when they are not user-invalid.
+ */
+.meros-field-wrapper.nice-form-group > :is(input, select, textarea):required:not(:user-invalid) {
+    --nf-invalid-input-border-bottom-color: var(--nf-input-border-color);
+}
+
 .meros-field-wrapper.nice-form-group > * {
     display: block;
 }

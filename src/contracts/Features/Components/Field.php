@@ -805,8 +805,12 @@ abstract class Field extends Feature implements FormComponent {
     }
 
     /**
+     * For internal use only.
+     * 
      * Enables dynamic-value suggestions in form-builder action configuration controls.
      * Types may match either a value's data type or its field type.
+     * 
+     * @param array|null $compatibleTypes The data types that the field is compatible with for dynamic-value suggestions. If null, all types are considered compatible.
      */
     public function __suggestDynamicValues(?array $compatibleTypes = null): static {
         if ((!($this instanceof Input) && !($this instanceof TextArea) && !($this instanceof RichText)) ||
