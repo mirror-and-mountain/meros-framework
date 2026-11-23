@@ -94,6 +94,18 @@ class FlowAction extends Feature implements Registrable, Makeable {
         return $this;
     }
 
+    /**
+     * Adds an input field to the action's input schema.
+     *
+     * @param string      $name
+     * @param string      $type
+     * @param string|null $fieldType
+     * @param string|null $label
+     * @param string|null $description
+     * @param boolean     $required
+     *
+     * @return static
+     */
     final public function addInput(
         string $name, 
         string $type, 

@@ -2,6 +2,7 @@
 
 namespace MM\Meros\Contracts\Features\Integrations;
 
+use Closure;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
@@ -18,9 +19,13 @@ use MM\Meros\Contracts\Features\Concerns\IsRegistrable;
 use MM\Meros\Contracts\Features\Concerns\MakesItems;
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 
+use MM\Meros\Contracts\Features\Automation\FlowAction;
+
 use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Admin\SettingsContainers;
+
 use MM\Meros\Support\HttpClient;
+use MM\Meros\Support\ClassInfo;
 
 abstract class Integration extends Feature implements Registrable {
     /**
@@ -64,6 +69,13 @@ abstract class Integration extends Feature implements Registrable {
      * @var string
      */
     protected string $currentEnvironment = '';
+
+    /**
+     * Registered flow actions for the integration.
+     *
+     * @var array<FlowAction>
+     */
+    private array $flowActions = [];
 
     /**
      * Whether the integration is enabled or not.
@@ -443,6 +455,37 @@ abstract class Integration extends Feature implements Registrable {
 
         $this->currentEnvironment = $this->settings($this->currentEnvironmentSettingName, true);
         return $this->currentEnvironment;
+    }
+
+    // =========================================================================
+    // Flow actions
+    // =========================================================================
+
+    /**
+     * Registers a flow action for the integration. The action can be provided as a class name or a closure.
+     *
+     * @param string|Closure $action
+     *
+     * @return static
+     */
+    final public function registerFlowAction(string|Closure $action): static {
+        if (is_string($action)) {
+            $class = ClassInfo::get($action);
+            if ($class->extends(FlowAction::class)) {
+                $instance = $this->makeItemFrom($action, FlowAction::class);
+                if ($instance instanceof FlowAction) {
+                    $this->flowActions[$instance->getName()] = $instance;
+                }
+            }
+        }
+
+        $instance = $this->makeItem(FlowAction::class, $action);
+
+        if ($instance instanceof FlowAction) {
+            $this->flowActions[$instance->getName()] = $instance;
+        }
+
+        return $this;
     }
 
     // =========================================================================
