@@ -943,6 +943,7 @@ trait UsesForms {
 
         $instance = $this->getFormInstance($form);
         if (!($instance instanceof FormComponent)) {
+            $this->logSubmissionError('Failed to create form instance. Form ID: ' . $id);
             return [
                 'message' => 'An error occurred while processing the form.',
                 'type'    => 'error'
