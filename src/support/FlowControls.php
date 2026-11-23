@@ -98,6 +98,7 @@ class FlowControls {
             $group->field('repeater', function (Repeater $repeater) {
                 $repeater->name('form_actions');
                 $repeater->label('Form Actions');
+                $repeater->addRowText('Add Action');
                 $repeater->hideLabel();
 
                 $repeater->field('select', [
@@ -215,6 +216,18 @@ class FlowControls {
             'required' => true
         ]);
 
+        $formComponent->field('select', [
+            'name'        => 'run_when',
+            'label'       => 'Run When',
+            'default'     => 'success',
+            'description' => 'Uses the result of the last action that ran. Skipped actions do not change that result. The first action runs by default.',
+            'options'     => [
+                'success' => 'Previous Action Succeeded',
+                'failure' => 'Previous Action Failed',
+                'always'  => 'Always',
+            ],
+        ], false);
+
         $inputSchema = $action->getInputSchema();
 
         if ($inputSchema !== []) {
@@ -244,10 +257,11 @@ class FlowControls {
 
             $group->row(function (FieldRow $row) {
                 $row->field('select', [
-                    'name'    => 'error_behaviour',
-                    'label'   => 'Error Behaviour',
-                    'default' => 'continue',
-                    'options' => [
+                    'name'        => 'error_behaviour',
+                    'label'       => 'Error Behaviour',
+                    'description' => 'Continue allows later actions to handle a failure. Either Stop option ends the flow immediately.',
+                    'default'     => 'continue',
+                    'options'     => [
                         'continue'              => 'Continue',
                         'stop_and_show_error'   => 'Stop and Show Error',
                         'stop_and_show_success' => 'Stop and Show Success'
@@ -356,6 +370,15 @@ class FlowControls {
                     continue;
                 }
 
+                $inputSchema = $prevAction->getInputSchema();
+                $settings = $rowValue['form_data'];
+                if (array_key_exists('await_response', $inputSchema)
+                    && ($settings['use_dynamic_value_await_response'] ?? false) !== true
+                    && ($settings['await_response_value'] ?? $inputSchema['await_response']['default'] ?? true) === false
+                ) {
+                    continue;
+                }
+
                 $prevActionOutputSchema = $prevAction->getOutputSchema();
 
                 if ($prevActionOutputSchema !== []) {
@@ -394,6 +417,22 @@ class FlowControls {
     }
 
     /**
+     * Determines if an input should use a dynamic default value based on its properties.
+     *
+     * @param array $properties
+     *
+     * @return bool
+     */
+    private function usesDynamicDefault(array $properties): bool {
+        return $this->getInputProperty('allow_dynamic_value', 'boolean', true, $properties)
+            && $this->getInputProperty('dynamic', 'boolean',
+                !$this->getInputProperty('readonly', 'boolean', false, $properties)
+                    && !array_key_exists('default', $properties),
+                $properties
+            );
+    }
+
+    /**
      * Builds the configuration row for a specific input of a form action within action repeater row.
      *
      * @param FieldRow   $row
@@ -404,13 +443,16 @@ class FlowControls {
      */
     private function buildInputConfigRow(FieldRow $row, string $inputName, array $properties): void {
         $dataType = $properties['type'] ?? null;
+        $fieldName = Str::snake($inputName);
 
         if ($dataType === null || !is_string($dataType) || empty($dataType)) {
             return;
         }
 
         $fieldType      = $this->getInputProperty('field_type', 'string', null, $properties);
+        $readonly       = $this->getInputProperty('readonly', 'boolean', false, $properties);
         $dynamicAllowed = $this->getInputProperty('allow_dynamic_value', 'boolean', true, $properties);
+        $useDynamic = $this->usesDynamicDefault($properties);
 
         if ($fieldType === null) {
             $fieldType = $this->inferFieldType($dataType);
@@ -421,19 +463,19 @@ class FlowControls {
         }
 
         $row->field('text', [
-            'name'     => $inputName . '_label',
+            'name'     => $fieldName . '_label',
             'label'    => 'Input API Name',
             'default'  => $inputName,
             'readonly' => true,
         ]);
 
-        $row->field('checkbox', function (Checkbox $field) use ($inputName, $dynamicAllowed) {
-            $field->name('use_dynamic_value_' . $inputName);
+        $row->field('checkbox', function (Checkbox $field) use ($fieldName, $dynamicAllowed, $useDynamic, $readonly) {
+            $field->name('use_dynamic_value_' . $fieldName);
             $field->label('Use Dynamic Value');
-            $field->default($dynamicAllowed);
+            $field->default($useDynamic);
             $field->vertical();
 
-            if ($dynamicAllowed === false) {
+            if ($readonly || !$dynamicAllowed) {
                 $field->disabled();
             }
         });
@@ -450,6 +492,7 @@ class FlowControls {
      */
     private function buildInputValueRow(FieldRow $row, string $inputName, array $properties, array $dynamicOptions, array $formFields): void {
         $dataType = $properties['type'] ?? null;
+        $fieldName = Str::snake($inputName);
 
         if ($dataType === null || !is_string($dataType) || empty($dataType)) {
             return;
@@ -457,54 +500,81 @@ class FlowControls {
         
         $fieldType      = $this->getInputProperty('field_type', 'string', null, $properties);
         $required       = $this->getInputProperty('required', 'boolean', false, $properties);
+        $readonly       = $this->getInputProperty('readonly', 'boolean', false, $properties);
         $dynamicAllowed = $this->getInputProperty('allow_dynamic_value', 'boolean', true, $properties);
+        $useDynamic = $this->usesDynamicDefault($properties);
         $options        = $this->getInputProperty('options', 'array', [], $properties);
 
         if ($fieldType === null) {
             $fieldType = $this->inferFieldType($dataType);
         }
 
-        $row->field($fieldType, function($field) use($dataType, $fieldType, $inputName, $options, $required, $dynamicAllowed) {
-            $field->name($inputName . '_value');
-            $field->label('Value');
+        if (!$readonly || !$useDynamic) {
+            $row->field($fieldType, function($field) use($dataType, $fieldType, $fieldName, $options, $required, $readonly, $dynamicAllowed, $useDynamic, $properties) {
+                $field->name($fieldName . '_value');
+                $field->label('Value');
+                $field->readonly($readonly);
 
-            if ($dynamicAllowed) {
-                $field->showWhen([
-                    ['use_dynamic_value_' . $inputName, '=', false]
-                ]);
-            }
+                if (!$useDynamic && array_key_exists('default', $properties)) {
+                    $field->default($properties['default']);
+                }
 
-            if ($required) {
-                $field->required();
-            }
+                if ($dynamicAllowed && !$readonly) {
+                    $field->showWhen([
+                        ['use_dynamic_value_' . $fieldName, '=', false]
+                    ]);
+                }
 
-            if ($fieldType === 'select' && $options !== []) {
-                $field->options($options);
-            }
+                if ($required) {
+                    $field->required();
+                }
 
-            if ($fieldType === 'select' && $dataType === 'array.scalar') {
-                $field->multiple(true);
-            }
-        });
+                if ($fieldType === 'select' && $options !== []) {
+                    $field->options($options);
+                }
 
-        if ($dynamicAllowed) {
-            $row->field('select', function(Select $field) use($dataType, $inputName, $dynamicOptions, $formFields, $required) {
-                $field->name($inputName . '_dynamic_value');
+                if ($fieldType === 'select' && $dataType === 'array.scalar') {
+                    $field->multiple(true);
+                }
+            });
+        }
+
+        if ($dynamicAllowed && (!$readonly || $useDynamic)) {
+            $row->field('select', function(Select $field) use($dataType, $fieldName, $dynamicOptions, $formFields, $required, $readonly, $useDynamic, $properties) {
+                $field->name($fieldName . '_dynamic_value');
                 $field->label('Value');
 
+                $isCompatible = fn ($option) => is_string($option['data_type'] ?? null) && array_diff(
+                    explode('|', $option['data_type']),
+                    explode('|', $dataType)
+                ) === [];
                 $dynamicOptions = array_merge(
-                    collect($dynamicOptions)->where('data_type', $dataType)
+                    collect($dynamicOptions)->filter($isCompatible)
                         ->pluck('label', 'name')
                         ->toArray(),
-                    collect($formFields)->where('data_type', $dataType)
+                    collect($formFields)->filter($isCompatible)
                         ->pluck('label', 'name')
                         ->toArray()
                 );
 
+                if ($useDynamic && array_key_exists('default', $properties)) {
+                    $field->default($properties['default']);
+                }
+
+                if ($readonly) {
+                    $default = $properties['default'] ?? null;
+                    if (!is_string($default) || !array_key_exists($default, $dynamicOptions)) {
+                        throw new \InvalidArgumentException("Invalid locked dynamic default for action input '{$fieldName}'.");
+                    }
+                    // A single option stays submitted, unlike a disabled select.
+                    $dynamicOptions = [$default => $dynamicOptions[$default]];
+                    $field->readonly();
+                } else {
+                    $field->showWhen([
+                        ['use_dynamic_value_' . $fieldName, '=', true]
+                    ]);
+                }
                 $field->options($dynamicOptions);
-                $field->showWhen([
-                    ['use_dynamic_value_' . $inputName, '=', true]
-                ]);
 
                 if ($required) {
                     $field->required();

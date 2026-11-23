@@ -103,6 +103,9 @@ class FlowAction extends Feature implements Registrable, Makeable {
      * @param string|null $label
      * @param string|null $description
      * @param boolean     $required
+     * @param mixed       $default
+     * @param boolean     $readonly
+     * @param boolean|null $dynamic Whether the default is a dynamic-value token.
      *
      * @return static
      */
@@ -112,15 +115,26 @@ class FlowAction extends Feature implements Registrable, Makeable {
         ?string $fieldType = null,
         ?string $label = null,
         ?string $description = null,
-        bool $required = false
+        bool $required = false,
+        mixed $default = null,
+        bool $readonly = false,
+        ?bool $dynamic = null
     ): static {
         $this->inputSchema[$name] = [
             'type'        => Str::lower($type),
             'field_type'  => $fieldType,
             'label'       => $label,
             'description' => $description,
-            'required'    => $required
+            'required'    => $required,
+            'readonly'    => $readonly,
         ];
+
+        if ($default !== null) {
+            $this->inputSchema[$name]['default'] = $default;
+        }
+        if ($dynamic !== null) {
+            $this->inputSchema[$name]['dynamic'] = $dynamic;
+        }
 
         return $this;
     }

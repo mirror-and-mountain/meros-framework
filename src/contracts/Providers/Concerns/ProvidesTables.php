@@ -14,6 +14,8 @@ use MM\Meros\Contracts\Features\Concerns\SanitizesHtml;
 
 use MM\Meros\App\Package;
 
+use MM\Meros\Facades\Support\Ajax;
+
 trait ProvidesTables {
     use Abstracts, SanitizesHtml;
 
@@ -231,8 +233,6 @@ trait ProvidesTables {
             $subpage->addAjaxAction('meros_handle_table_action_' . $providerHandle, function () use ($providerHandle) {
                 $isValid = $this->validateTableOperation(
                     $_POST['table'] ?? '',
-                    $providerHandle,
-                    $_POST['nonce'] ?? '',
                     $_POST['operation'] ?? ''
                 );
 
@@ -394,7 +394,7 @@ trait ProvidesTables {
                 'enabled'       => $enabled,
                 'isPackage'     => $isPackage,
                 'dependencies'  => $dependencies,
-                'nonce'         => wp_create_nonce('meros_table_action_' . $name . '_' . $providerHandle),
+                'nonce'         => Ajax::getActionNonce('meros_handle_table_action_' . $providerHandle)
             ]);
 
             $html = ob_get_clean();
@@ -445,7 +445,7 @@ trait ProvidesTables {
                 class="meros-admin-button meros-small-button meros-tables-action-button button button-primary" 
                 data-provider="' . $providerHandle . '"
                 data-action="' . $action . '_all"
-                data-nonce="' . wp_create_nonce('meros_table_action_' . $action . '_all_' . $providerHandle) . '"
+                data-nonce="' . Ajax::getActionNonce('meros_handle_table_action_' . $providerHandle) . '"
                 data-tables=\'' . $tablesList . '\'
             >
                 ' . Str::title(Str::replace('_', ' ', $action)) . ' All Tables
@@ -477,25 +477,21 @@ trait ProvidesTables {
      * Validates the table operation request parameters.
      *
      * @param string $table
-     * @param string $provider
-     * @param string $nonce
      * @param string $operation
      *
      * @return boolean
      */
-    private function validateTableOperation(string $table, string $provider, string $nonce, string $operation): bool {
+    private function validateTableOperation(string $table, string $operation): bool {
         $isMultiOperation = in_array($operation, ['install_all', 'uninstall_all', 'update_all']);
 
         if ($isMultiOperation) {
-            $validNonce = wp_verify_nonce($nonce, 'meros_table_action_' . $operation . '_' . $provider);
-            return $validNonce;
+            return true;
         }
 
         $validTable = $table !== '';
-        $validNonce = wp_verify_nonce($nonce, 'meros_table_action_' . $table . '_' . $provider);
         $validOperation = in_array($operation, ['install', 'uninstall', 'update', 'rollback']);
 
-        return $validTable && $validNonce && $validOperation;
+        return $validTable && $validOperation;
     }
 
     /**

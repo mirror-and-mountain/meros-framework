@@ -605,7 +605,84 @@ Controls that are independently disabled remain excluded from submission. For a 
 
 Actions are configured through the host's actions editor. Available actions depend on registered flow actions. At runtime, action inputs can resolve current user/post tokens and custom groups from `meros_dynamic_form_values`, as well as submitted fields and earlier action outputs (`output_name_source_action_id`). `FormActionsRunner` adds `form_id` and `form_response_id` through that same filter for its own lookups.
 
+For actions with an `await_response` input, disabling that input removes their outputs
+from later actions' dynamic-value choices. Awaited actions still expose their output
+schema. When no value has been saved, the input's configured default is used.
+Background invocations return no outputs to the running sequence; existing references
+to those outputs must be replaced with an available source.
+
 The existing user ID, user display name and form identifiers take precedence over submitted fields of the same name. Other submitted field names take precedence over shared context tokens, so adding a token does not change an existing field reference.
+
+#### Action input defaults and read-only controls
+
+Developers can pass `default` and `readonly` to `FlowAction::addInput()`, or include
+the same keys in `setInputSchema()`:
+
+```php
+$action->addInput('source', 'string', default: 'website', readonly: true);
+$action->addInput('attempts', 'integer', default: 0);
+$action->addInput('notify', 'boolean', default: false);
+```
+
+Non-null defaults, including `false` and `0`, prefill the editor's static value
+control. A null/omitted `default` leaves the field's own default unchanged.
+Supplying a default selects static mode unless `dynamic: true` is specified.
+Read-only static inputs use the field's existing `readonly()` behavior where
+supported and do not offer dynamic-value selection.
+
+To default to a dynamic source and lock both the source and its mode, use:
+
+```php
+$action->addInput(
+    'response_id',
+    'integer',
+    required: true,
+    default: 'form_response_id',
+    readonly: true,
+    dynamic: true
+);
+```
+
+The editor shows a checked, disabled **Use Dynamic Value** toggle and a single
+read-only source option. The runner resolves this locked token from the schema,
+ignoring saved static values or a different saved source. `DeleteFormResponse`
+uses this configuration to target the current form response. Editable dynamic
+defaults also support `dynamic: true` without `readonly`.
+Ordinary static defaults/read-only attributes remain editor controls, not
+server-side authorization or immutable input enforcement; existing static values
+are not overwritten.
+
+#### Conditional action execution
+
+Each action's **Run When** setting controls whether it runs:
+
+- **Previous Action Succeeded** (`run_when: success`, the default).
+- **Previous Action Failed** (`run_when: failure`).
+- **Always** (`run_when: always`).
+
+The condition uses the most recent action that actually ran. Condition-skipped
+actions are recorded as `skipped`, do not resolve inputs or run, and do not change
+that result. Before the first action the result is treated as success, so the first
+default/Always action runs and an initial failure-only action is skipped.
+The success-only default also applies to previously saved actions without `run_when`.
+
+**Error Behaviour** is independent of this condition. Set the failing action to
+**Continue** to allow a later failure-handler action to run. **Stop and Show Error**
+and **Stop and Show Success** still terminate immediately, so no later handler runs.
+Exceptions, invalid action instances and input-validation failures can all trigger
+failure handlers when the failing action is configured to continue.
+
+A continued failure leaves the flow failed until a subsequent action runs
+successfully. That success recovers the flow and allows success-only actions to
+resume. If nothing recovers the failure, the flow returns an error. Executed failures
+remain recorded as `error`, including after recovery; only condition-skipped actions
+use `skipped`. A successfully queued background action counts as success here:
+its eventual remote result cannot affect this already-running sequence.
+
+For example: primary action (success / Continue), fallback action (failure /
+Continue), then follow-up action (success). The follow-up runs after either the
+primary succeeds or its fallback succeeds. The existing error-as-success stop
+behavior still reports success to the user while retaining the action error record.
 
 #### Adding dynamic value choices to the action editor
 

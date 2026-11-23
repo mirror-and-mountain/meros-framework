@@ -4,6 +4,7 @@ namespace MM\Meros\Contracts\Features\Content\Concerns;
 
 use Closure;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 use MM\Meros\App\Models\Post;
 use MM\Meros\App\Models\FormTemplate;
@@ -16,7 +17,6 @@ use MM\Meros\App\Components\Fields\Repeater;
 
 use MM\Meros\Contracts\Features\Data\PostMeta;
 use MM\Meros\Contracts\Features\Data\PostMetaContainer;
-use MM\Meros\Contracts\Features\Components\DynamicBlock;
 
 use MM\Meros\Contracts\Features\Makeable;
 use MM\Meros\Contracts\Features\Components\Form as FormComponent;
@@ -912,6 +912,17 @@ trait UsesForms {
     // =========================================================================
 
     /**
+     * Logs an error message related to form submission.
+     *
+     * @param string $message
+     *
+     * @return void
+     */
+    private function logSubmissionError(string $message): void {
+        Log::channel('meros-flows')->error($message);
+    }
+
+    /**
      * Handles the submission of a form, storing the response and executing associated actions.
      *
      * @param integer      $id
@@ -947,6 +958,7 @@ trait UsesForms {
 
         $storedResponseId = $this->storeFormResponse($id, $payload);
         if ($storedResponseId === false) {
+            $this->logSubmissionError('Failed to store form response. Form ID: ' . $id);
             return [
                 'message' => 'Failed to store form response.',
                 'type'    => 'error'
@@ -964,6 +976,7 @@ trait UsesForms {
         );
     
         if ($result === false && !$flowRunner->getErrorAsSuccess()) {
+            $this->logSubmissionError('Form submission error: ' . $flowRunner->getLastError());
             return [
                 'message' => $flowRunner->getLastError(),
                 'type'    => 'error'

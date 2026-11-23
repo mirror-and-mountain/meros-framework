@@ -8,16 +8,18 @@ use MM\Meros\Contracts\Features\Automation\FlowActionResponse;
 use MM\Meros\App\Models\FormResponse;
 
 final class DeleteFormResponse extends FlowAction {
-    protected array $inputSchema = [
-        'response_id' => [
-            'type'     => 'integer',
-            'required' => true,
-        ]
-    ];
-
     protected function configure(): void {
         $this->name('store_response');
         $this->label('Store Response');
+        $this->addInput(
+            'response_id',
+            'integer',
+            label: 'Form Response ID',
+            required: true,
+            default: 'form_response_id',
+            readonly: true,
+            dynamic: true
+        );
     }
 
     public function run(array $input): FlowActionResponse {

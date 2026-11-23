@@ -7,7 +7,6 @@ use Illuminate\Support\Str;
 use MM\Meros\Contracts\Providers\FeatureProvider;
 
 use MM\Meros\Contracts\Features\Automation\FlowAction;
-use MM\Meros\Contracts\Features\Automation\FlowActionResponse;
 
 use MM\Meros\Facades\Automation\FlowActions;
 use MM\Meros\Facades\Support\FormDynamicValues;
@@ -68,13 +67,14 @@ class FlowRunner {
     /**
      * Executes the flow by running each action in sequence.
      *
-     * @return boolean
+     * @return bool Whether the flow ran successfully or not.
      */
     public function run(): bool {
+        $previousSucceeded = true;
+
         foreach ($this->actions as $actionConfig) {
             $actionName = $this->getActionName($actionConfig);
             $actionId   = $this->getActionId($actionConfig);
-            $action     = $this->getActionInstance($actionConfig);
 
             $this->completedActions[$actionId] = [
                 'name'    => $actionName,
@@ -84,74 +84,86 @@ class FlowRunner {
                 'outputs' => '',
             ];
 
-            if (!($action instanceof FlowAction)) {
-                $this->lastError = 'Invalid action instance for action: ' . $actionName;
+            try {
+                $settings = $this->getActionConfiguration($actionConfig);
+            } catch (\UnexpectedValueException $exception) {
+                $this->lastError = $exception->getMessage();
                 $this->completedActions[$actionId]['status'] = 'error';
                 $this->completedActions[$actionId]['error']  = $this->lastError;
                 return false;
             }
 
-            $errorBehaviour = $this->getActionErrorHandlingBehaviour($actionConfig);
+            $runWhen = $settings['run_when'] ?? 'success';
+            if (!in_array($runWhen, ['success', 'failure', 'always'], true)) {
+                $this->lastError = 'Invalid run condition for action: ' . $actionName;
+                $this->completedActions[$actionId]['status'] = 'error';
+                $this->completedActions[$actionId]['error']  = $this->lastError;
+                return false;
+            }
+
+            if (($runWhen === 'success' && !$previousSucceeded) ||
+                ($runWhen === 'failure' && $previousSucceeded)
+            ) {
+                $this->completedActions[$actionId]['status'] = 'skipped';
+                continue;
+            }
+
+            $errorBehaviour = $this->getActionErrorHandlingBehaviour($settings);
             $errorAction    = $errorBehaviour['action'] ?? 'continue';
             $errorMessage   = $errorBehaviour['message'] ?? '';
 
-            if ($errorAction !== 'continue') {
-                $this->showErrorAsSuccess = $errorAction === 'stop_and_show_success';
-            }
-
-            if ($errorAction === 'stop_and_show_success') {
-                $this->successMessage = $errorMessage;
-            }
-
-            $inputPayload = $this->getActionInputPayload($action, $actionConfig);
-
-            if (!is_array($inputPayload)) {
-                $this->lastError = $errorMessage . ': ' . $inputPayload;
+            if (!in_array($errorAction, ['continue', 'stop_and_show_error', 'stop_and_show_success'], true)) {
+                $this->lastError = 'Invalid error behaviour for action: ' . $actionName;
                 $this->completedActions[$actionId]['status'] = 'error';
                 $this->completedActions[$actionId]['error']  = $this->lastError;
                 return false;
             }
 
-            $this->completedActions[$actionId]['inputs'] = $inputPayload;
-
+            $error = null;
             try {
-                $result = $action->run($inputPayload);
+                $action = $this->getActionInstance($actionConfig);
+                if (!($action instanceof FlowAction)) {
+                    $error = 'Invalid action instance for action: ' . $actionName;
+                } else {
+                    $inputPayload = $this->getActionInputPayload($action, $actionConfig);
+                    if (!is_array($inputPayload)) {
+                        $error = $inputPayload;
+                    } else {
+                        $this->completedActions[$actionId]['inputs'] = $inputPayload;
+                        $result = $action->run($inputPayload);
+
+                        if ($result->hasError()) {
+                            $error = 'Flow action error for action: ' . $actionName . '. Message: ' . $result->getError();
+                        } else {
+                            $this->triggerPayload[$actionId] = $result->output();
+                            $this->completedActions[$actionId]['outputs'] = $result->output();
+                            $this->completedActions[$actionId]['status'] = 'success';
+                        }
+                    }
+                }
             } catch (\Throwable $e) {
-                $this->lastError =  $errorMessage . ': ' . 'Exception occurred while running action: ' . $actionName . '. Message: ' . $e->getMessage();
+                $error = 'Exception occurred while running action: ' . $actionName . '. Message: ' . $e->getMessage();
+            }
+
+            if ($error !== null) {
+                $previousSucceeded = false;
+                $this->lastError = $errorMessage === '' ? $error : $errorMessage . ': ' . $error;
+                $this->completedActions[$actionId]['status'] = 'error';
                 $this->completedActions[$actionId]['error']  = $this->lastError;
-                
+
                 if ($errorAction === 'continue') {
-                    $this->completedActions[$actionId]['status'] = 'skipped';
                     continue;
                 }
 
-                $this->completedActions[$actionId]['status'] = 'error';
+                $this->showErrorAsSuccess = $errorAction === 'stop_and_show_success';
+                $this->successMessage = $this->showErrorAsSuccess ? $errorMessage : '';
                 return false;
             }
 
-            if ($result instanceof FlowActionResponse) {
-                $isError = $result->hasError();
-                if ($isError) {
-                    $this->lastError = $errorMessage . ': ' . 'Form action error for action: ' . $actionName . '. Message: ' . $result->getError();
-                    $this->completedActions[$actionId]['error']  = $this->lastError;
-
-                    if ($errorAction === 'continue') {
-                        $this->completedActions[$actionId]['status'] = 'skipped';
-                        continue;
-                    }
-
-                    $this->completedActions[$actionId]['status'] = 'error';
-                    return false;
-
-                } else {
-                    $this->triggerPayload[$actionId] = $result->output();
-                    $this->completedActions[$actionId]['outputs'] = $result->output();
-                    $this->completedActions[$actionId]['status'] = 'success';
-                }
-            }
+            $previousSucceeded = true;
         }
 
-        return true;
+        return $previousSucceeded;
     }
 
     /**
@@ -257,36 +269,28 @@ class FlowRunner {
     }
 
     /**
-     * Returns the error handling behaviour for the given action configuration.
-     *
-     * @param array $actionConfig
-     *
-     * @return array
+     * Returns the decoded editor configuration for an action.
      */
-    private function getActionErrorHandlingBehaviour(array $actionConfig): array {
-        if (!array_key_exists('__form_data', $actionConfig)) {
-            return [
-                'action' => 'continue'
-            ];
+    private function getActionConfiguration(array $actionConfig): array {
+        $payload = $actionConfig['__form_data'] ?? [];
+        if (is_string($payload)) {
+            $payload = $payload === '' ? [] : json_decode($payload, true);
         }
 
-        $payload = $actionConfig['__form_data'];
-
-        if (is_string($payload) && $payload !== '') {
-            $payload = json_decode($payload, true);
-        } else {
-            $payload = [];
+        if (!is_array($payload)) {
+            throw new \UnexpectedValueException('Invalid configuration for action: ' . $this->getActionName($actionConfig));
         }
 
-        if (array_key_exists('error_behaviour', $payload)) {
-            return [
-                'action'  => $payload['error_behaviour'],
-                'message' => $payload['error_message'] ?? $payload['success_message'] ?? ''
-            ];
-        }
+        return $payload;
+    }
 
+    private function getActionErrorHandlingBehaviour(array $payload): array {
+        $action = $payload['error_behaviour'] ?? 'continue';
         return [
-            'action' => 'continue'
+            'action' => $action,
+            'message' => $action === 'stop_and_show_success'
+                ? ($payload['success_message'] ?? '')
+                : ($payload['error_message'] ?? ''),
         ];
     }
 
@@ -310,13 +314,7 @@ class FlowRunner {
             return $payloadError;
         }
 
-        $payload = $actionConfig['__form_data'];
-
-        if (is_string($payload) && $payload !== '') {
-            $payload = json_decode($payload, true);
-        } else {
-            $payload = [];
-        }
+        $payload = $this->getActionConfiguration($actionConfig);
 
         if ($payload === []) {
             return $payloadError;
@@ -336,6 +334,10 @@ class FlowRunner {
      */
     private function parseActionInputPayload(FlowAction $action, array $schema, array $payload): array|string {
         $parsed = [];
+        // Field setters snake-case editor names; older saved configs can contain both forms.
+        $getPayloadValue = static fn (string $name) => array_key_exists($name, $payload)
+            ? $payload[$name]
+            : ($payload[Str::snake($name)] ?? null);
 
         foreach ($schema as $key => $config) {
             $requiredDataType = $config['type'];
@@ -347,7 +349,9 @@ class FlowRunner {
             }
 
             $inputError    = "Form action '" . $action->getName() . "' requires a valid input value for input: " . $key . '.';
-            $payloadHasKey = array_key_exists($key . '_label', $payload);
+            $lockedDynamic = ($config['readonly'] ?? false) === true && ($config['dynamic'] ?? false) === true;
+            $payloadHasKey = $lockedDynamic || array_key_exists($key . '_label', $payload)
+                || array_key_exists(Str::snake($key . '_label'), $payload);
 
             if ($payloadHasKey === false) {
                 return $inputError;
@@ -357,14 +361,10 @@ class FlowRunner {
                 return in_array(gettype($value), $validDataTypes) === true;
             };
 
-            $valueIsDynamic = 
-                array_key_exists('use_dynamic_value_' . $key, $payload) && 
-                $payload['use_dynamic_value_' . $key] === true;
+            $valueIsDynamic = $lockedDynamic || $getPayloadValue('use_dynamic_value_' . $key) === true;
             
             if ($valueIsDynamic) {
-                $dynamicValue = array_key_exists($key . '_dynamic_value', $payload)
-                    ? $payload[$key . '_dynamic_value']
-                    : null;
+                $dynamicValue = $lockedDynamic ? ($config['default'] ?? null) : $getPayloadValue($key . '_dynamic_value');
 
                 if (!is_string($dynamicValue)) {
                     return $inputError;
@@ -380,9 +380,7 @@ class FlowRunner {
             }
 
             else {
-                $value = array_key_exists($key . '_value', $payload)
-                    ? $payload[$key . '_value']
-                    : null;
+                $value = $getPayloadValue($key . '_value');
 
                 if ($valueIsValid($value) === false) {
                     return $inputError;
