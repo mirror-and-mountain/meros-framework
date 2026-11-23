@@ -964,7 +964,7 @@ class FormBuilder {
      * @return array
      */
     public function getAvailableFieldTypes(): array {
-        return collect(Fields::getRegisteredFeatures())
+        $fields = collect(Fields::getRegisteredFeatures())
             ->where(function ($field) {
                 $class = $field['class'] ?? null;
                 if (!is_string($class) || !class_exists($class)) {
@@ -976,6 +976,9 @@ class FormBuilder {
             ->keyBy('alias')
             ->mapWithKeys(fn ($field, $alias) => [$alias => Str::title(Str::replace('_', ' ', $alias))])
             ->all(); 
+
+        ksort($fields); // Sort the fields alphabetically by their alias.
+        return $fields;
     }
 
     /**

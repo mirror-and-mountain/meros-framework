@@ -49,9 +49,10 @@ class Orchestrator extends ComponentsOrchestrator {
         'email'        => Email::class,
         'hidden'       => Hidden::class,
         'lookup'       => Lookup::class,
+        'lookup_posts' => PostsLookup::class,
+        'lookup_users' => UsersLookup::class,
         'number'       => Number::class,
         'password'     => Password::class,
-        'posts_lookup' => PostsLookup::class,
         'radio'        => Radio::class,
         'repeater'     => Repeater::class,
         'richtext'     => RichText::class,
@@ -60,8 +61,7 @@ class Orchestrator extends ComponentsOrchestrator {
         'text'         => Text::class,
         'textarea'     => TextArea::class,
         'time'         => Time::class,
-        'url'          => Url::class,
-        'users_lookup' => UsersLookup::class,
+        'url'          => Url::class
     ];
 
     // =========================================================================
