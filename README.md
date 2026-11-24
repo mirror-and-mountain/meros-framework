@@ -8,6 +8,7 @@ This framework underpins our Meros starter themes for Wordpress. Under the hood 
 
 ### Documentation
 - [Forms](docs/FORMS.md): the PHP form API, WordPress form hosts and templates, client-side builder, conditions, pagination, submissions and field extension points.
+- [MFA](docs/MFA.md): native WordPress login enrollment, authenticator challenges, recovery and package integration.
 
 #### Using integrations
 

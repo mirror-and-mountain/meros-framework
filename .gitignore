@@ -4,4 +4,5 @@
 !/tests/integration-setting-labels.test.php
 !/tests/integration-readiness.test.php
 !/tests/role-configuration.test.php
+!/tests/mfa.test.php
 .DS_Store*

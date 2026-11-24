@@ -68,6 +68,18 @@ final class Framework extends Provider {
 
         $this->registerTables();
         $this->ensurePrettyPermalinks();
+        $this->removeActions();
+    }
+
+    /**
+     * Used to remove a few wordpress actions.
+     *
+     * @return void
+     */
+    private function removeActions(): void {
+        add_action("admin_init", function () {
+            remove_action("admin_color_scheme_picker", "admin_color_scheme_picker");
+        });
     }
 
     /**

@@ -106,7 +106,6 @@ class Orchestrator extends SettingsOrchestrator {
      * @return void
      */
     private function registerSettings(): void {
-        $this->registerSecuritySettings();
         $this->registerFormSettings();
 
         $packageToggleSetting = $this->settings()->add('boolean', function ($setting) {
@@ -122,54 +121,6 @@ class Orchestrator extends SettingsOrchestrator {
                 $packageToggleSetting->setValue(false);
             }
         });
-    }
-
-    /**
-     * Registers security-related settings.
-     *
-     * @return void
-     */
-    private function registerSecuritySettings(): void {
-        $this->settings()->add('boolean', function (Setting $setting) {
-            $setting->name('meros_security_mfa_enabled');
-            $setting->label('Enable Multi-Factor Authentication');
-            $setting->description('Enables multi-factor authentication for enhanced security.');
-            $setting->default(false);
-            $setting->field();
-            $setting->page('meros-security');
-        });
-
-        if ($this->getSettingValue('meros_security_mfa_enabled') === true) {
-            $this->settings()->add('array', function (Setting $setting) {
-                $setting->name('meros_security_mfa_roles');
-                $setting->label('Roles for Multi-Factor Authentication');
-                $setting->description('Specify the roles that require multi-factor authentication.');
-                $setting->page('meros-security');
-
-                $setting->field('select', [
-                    'allowMultiple' => true,
-                    'options' => [
-                        'administrator' => 'Administrator',
-                        'editor'        => 'Editor',
-                        'author'        => 'Author',
-                        'contributor'   => 'Contributor',
-                        'subscriber'    => 'Subscriber',
-                    ]
-                ]);
-            });
-
-            // Dynamically populate the roles for the MFA roles select field when rendered.
-            add_filter('meros_admin_select_options', function ($options, $name) {
-                if ($name === 'meros_framework_settings[meros_security_mfa_roles]') {
-                    $roles = \get_editable_roles();
-                    $options = [];
-                    foreach ($roles as $roleKey => $role) {
-                        $options[$roleKey] = $role['name'];
-                    }
-                }
-                return $options;
-            }, 10, 2);
-        }
     }
 
     /**

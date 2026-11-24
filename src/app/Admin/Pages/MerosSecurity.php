@@ -20,6 +20,7 @@ final class MerosSecurity extends Page {
         $this->title('Security');
         $this->menuTitle('Security');
         $this->area('options');
+        $this->position(0);
         $this->hideSettings(true);
 
         add_filter('editable_roles', [Role::class, 'filterEditableRoles']);
