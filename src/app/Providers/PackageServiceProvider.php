@@ -46,6 +46,24 @@ abstract class PackageServiceProvider extends MerosServiceProvider {
     // =========================================================================
 
     /**
+     * Makes the config files in a directory publishable to the theme's
+     * config directory with `wp meros:publish --provider=<this provider>`.
+     *
+     * @param string $directory Directory containing `name.php` config files.
+     *
+     * @return void
+     */
+    final protected function publishesConfig(string $directory): void {
+        $paths = [];
+
+        foreach (glob(rtrim($directory, '/\\') . '/*.php') ?: [] as $file) {
+            $paths[$file] = config_path(basename($file));
+        }
+
+        $this->publishes($paths, 'config');
+    }
+
+    /**
      * Initialises the service provider. 
      * 
      * Should be overridden by child classes to set the package class 
