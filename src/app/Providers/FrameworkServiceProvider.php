@@ -36,6 +36,9 @@ use MM\Meros\Registers\Automation\FlowActions;
 
 use MM\Meros\Registers\Content\PostTypes;
 
+use MM\Meros\Registers\Security\Roles;
+use MM\Meros\Registers\Security\Capabilities;
+
 use MM\Meros\Registers\Data\PostMetaContainers;
 use MM\Meros\Registers\Data\PostMetaDefinitions;
 use MM\Meros\Registers\Data\Tables;
@@ -86,6 +89,9 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         FlowActions::class,
 
         PostTypes::class,
+
+        Roles::class,
+        Capabilities::class,
 
         PostMetaContainers::class,
         PostMetaDefinitions::class,

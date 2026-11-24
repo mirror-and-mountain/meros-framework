@@ -84,9 +84,11 @@ class Sanitizer {
         return match ($type) {
             'object'  => $this->sanitizeObject(is_array($value) ? $value : [], $schema),
             'array'   => $this->sanitizeArrayBySchema(is_array($value) ? $value : [], $schema),
-            'string'  => ($schema['format'] ?? null) === 'html'
-                ? wp_kses_post((string) ($value ?? ''))
-                : $this->sanitizeString((string) ($value ?? '')),
+            'string'  => match ($schema['format'] ?? null) {
+                'html' => wp_kses_post((string) ($value ?? '')),
+                'json-html' => $this->sanitizeEditorJson((string) ($value ?? '')),
+                default => $this->sanitizeString((string) ($value ?? '')),
+            },
             'integer' => $this->sanitizeInteger($value),
             'number'  => $this->sanitizeNumber($value),
             'boolean' => $this->sanitizeBoolean($value),
@@ -330,6 +332,27 @@ class Sanitizer {
         }
 
         return trim(strip_tags($input));
+    }
+
+    private function sanitizeEditorJson(string $input): string {
+        if ($input === '') return '';
+
+        $value = json_decode($input, false, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($value) && !($value instanceof \stdClass)) {
+            throw new \UnexpectedValueException('Repeater editor data must be a JSON object or array.');
+        }
+
+        return json_encode($this->sanitizeEditorValues($value), JSON_THROW_ON_ERROR);
+    }
+
+    private function sanitizeEditorValues(array|\stdClass $input): array|\stdClass {
+        $output = [];
+        foreach ($input as $key => $value) {
+            $key = is_int($key) ? $key : $this->sanitizeArrayKey($key);
+            $output[$key] = is_array($value) || $value instanceof \stdClass ? $this->sanitizeEditorValues($value)
+                : (is_string($value) ? wp_kses_post($value) : $this->sanitizeScalar($value));
+        }
+        return $input instanceof \stdClass ? (object) $output : $output;
     }
 
     /**

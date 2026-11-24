@@ -1406,6 +1406,9 @@ abstract class OAuthIntegration extends Integration {
      * @return array|null
      */
     protected function getConnection(): ?array {
+        $this->getCurrentEnvironment(true);
+        $this->initConnections();
+
         if ($this->audience === 'current_user') {
             return collect($this->connections)
                 ->where('user_id', get_current_user_id())
@@ -1436,6 +1439,15 @@ abstract class OAuthIntegration extends Integration {
 
         $connection = $this->getConnection();
         return $connection !== null && isset($connection['status']) && $connection['status'] === 'connected';
+    }
+
+    protected function isReady(?string $capability): bool {
+        if (!parent::isReady($capability) || !$this->hasActiveConnection()) {
+            return false;
+        }
+
+        $token = $this->getAccessToken();
+        return is_string($token) && trim($token) !== '';
     }
 
     /**

@@ -283,8 +283,8 @@ class PostMetaContainer extends DataContainer {
      * @return void
      */
     private function savePostMeta(int $postId, array $value): void {
-        $sanitizedValue = $this->sanitizeValue($value);
-        update_post_meta($postId, $this->getName(true), $sanitizedValue);
+        $sanitizedValue = $this->sanitizeValue(wp_unslash($value));
+        update_post_meta($postId, $this->getName(true), wp_slash($sanitizedValue));
     }
 
     /**

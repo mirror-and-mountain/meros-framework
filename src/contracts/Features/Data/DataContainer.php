@@ -17,6 +17,7 @@ use MM\Meros\Contracts\Features\Concerns\MakesItems;
 use MM\Meros\Contracts\Features\Concerns\InstantiatesItems;
 
 use MM\Meros\Support\Sanitizer;
+use MM\Meros\App\Components\Fields\Repeater;
 
 abstract class DataContainer extends Feature implements Storable {
     /**
@@ -607,6 +608,9 @@ abstract class DataContainer extends Feature implements Storable {
                 $item->getField()?->getType() === 'richtext') {
                 $itemSchema['format'] = 'html';
             }
+            if ($item instanceof DataItem && $item->getField() instanceof Repeater) {
+                $itemSchema['items'] = $this->getRepeaterRowSchema($item->getField());
+            }
 
             if (method_exists($item, 'getLabel')) {
                 $label = $item->getLabel();
@@ -634,5 +638,19 @@ abstract class DataContainer extends Feature implements Storable {
         });
 
         return ['schema' => $schema];
+    }
+
+    private function getRepeaterRowSchema(Repeater $repeater): array {
+        $properties = [];
+        foreach ($repeater->getFields(true) as $field) {
+            if ($field->getType() === 'richtext') {
+                $properties[$field->getName()] = ['type' => 'string', 'format' => 'html'];
+            } elseif ($field->getName() === '__form_data' && $repeater->hasEditForm()) {
+                $properties[$field->getName()] = ['type' => 'string', 'format' => 'json-html'];
+            } elseif ($field instanceof Repeater) {
+                $properties[$field->getName()] = ['type' => 'array', 'items' => $this->getRepeaterRowSchema($field)];
+            }
+        }
+        return ['type' => 'object', 'properties' => $properties];
     }
 }

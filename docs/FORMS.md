@@ -691,6 +691,11 @@ the table, offer dynamic suggestions unless `allow_dynamic_value` is false. Thei
 tokens are resolved in HTML text nodes, not attributes; values are escaped, scalar
 lists are joined, and missing values become empty text.
 
+Rich-text content in repeater columns and row-editor configuration preserves
+paragraphs and blank lines through WordPress saves. Editor JSON is decoded before
+its string values are sanitized with WordPress's allowed post HTML, then encoded
+again; ordinary repeater columns still use plain-text sanitization.
+
 To opt a text-editable action-configuration field into suggestions, call
 `__suggestDynamicValues()` in its field callback. For example, a repeater input can
 offer only email-compatible form fields, server values and previous action outputs:

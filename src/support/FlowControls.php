@@ -250,6 +250,7 @@ class FlowControls {
 
             $formComponent->section(function (FieldGroup $group) use ($formComponent, $inputSchema, $dynamicOptions, $formFields) {
                 $group->title('Action Inputs');
+                $group->description('Configure the inputs for this action.');
                 $choices = [];
                 foreach (FormDynamicValues::choices() as $option) {
                     $choices[$option['name']] = [

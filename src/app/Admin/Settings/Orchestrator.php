@@ -14,6 +14,7 @@ use MM\Meros\App\Admin\Pages\MerosIntegrations as IntegrationsSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosAssets as AssetGroupSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosBlocksSettings as BlocksSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosFormsStyles as FormsSettingsPage;
+use MM\Meros\App\Admin\Pages\MerosSecurity as SecuritySettingsPage;
 
 use MM\Meros\App\Admin\Pages\MerosDev as DevPage;
 
@@ -33,6 +34,7 @@ use MM\Meros\App\Admin\Settings\Containers\MerosThemeSettings;
 use MM\Meros\App\Admin\Settings\Containers\MerosPackageSettings;
 use MM\Meros\App\Admin\Settings\Containers\MerosAssetGroupSettings;
 use MM\Meros\App\Admin\Settings\Containers\MerosBlocksSettings;
+use MM\Meros\App\Admin\Settings\Containers\MerosRoleSettings;
 
 use MM\Meros\Contracts\Orchestrators\SettingsOrchestrator;
 use MM\Meros\Contracts\Providers\Concerns\ProvidesSettingsContainers;
@@ -62,6 +64,7 @@ class Orchestrator extends SettingsOrchestrator {
         $this->pages(AssetGroupSettingsPage::class)->register();
         $this->pages(BlocksSettingsPage::class)->register();
         $this->pages(FormsSettingsPage::class)->register();
+        $this->pages(SecuritySettingsPage::class)->register();
         $this->pages(DevPage::class)->make();
     }
 
@@ -94,6 +97,7 @@ class Orchestrator extends SettingsOrchestrator {
         $this->settingsContainers(MerosPackageSettings::class)->register();
         $this->settingsContainers(MerosAssetGroupSettings::class)->register();
         $this->settingsContainers(MerosBlocksSettings::class)->register();
+        $this->settingsContainers(MerosRoleSettings::class)->register();
     }
 
     /**
@@ -102,6 +106,7 @@ class Orchestrator extends SettingsOrchestrator {
      * @return void
      */
     private function registerSettings(): void {
+        $this->registerSecuritySettings();
         $this->registerFormSettings();
 
         $packageToggleSetting = $this->settings()->add('boolean', function ($setting) {
@@ -117,6 +122,54 @@ class Orchestrator extends SettingsOrchestrator {
                 $packageToggleSetting->setValue(false);
             }
         });
+    }
+
+    /**
+     * Registers security-related settings.
+     *
+     * @return void
+     */
+    private function registerSecuritySettings(): void {
+        $this->settings()->add('boolean', function (Setting $setting) {
+            $setting->name('meros_security_mfa_enabled');
+            $setting->label('Enable Multi-Factor Authentication');
+            $setting->description('Enables multi-factor authentication for enhanced security.');
+            $setting->default(false);
+            $setting->field();
+            $setting->page('meros-security');
+        });
+
+        if ($this->getSettingValue('meros_security_mfa_enabled') === true) {
+            $this->settings()->add('array', function (Setting $setting) {
+                $setting->name('meros_security_mfa_roles');
+                $setting->label('Roles for Multi-Factor Authentication');
+                $setting->description('Specify the roles that require multi-factor authentication.');
+                $setting->page('meros-security');
+
+                $setting->field('select', [
+                    'allowMultiple' => true,
+                    'options' => [
+                        'administrator' => 'Administrator',
+                        'editor'        => 'Editor',
+                        'author'        => 'Author',
+                        'contributor'   => 'Contributor',
+                        'subscriber'    => 'Subscriber',
+                    ]
+                ]);
+            });
+
+            // Dynamically populate the roles for the MFA roles select field when rendered.
+            add_filter('meros_admin_select_options', function ($options, $name) {
+                if ($name === 'meros_framework_settings[meros_security_mfa_roles]') {
+                    $roles = \get_editable_roles();
+                    $options = [];
+                    foreach ($roles as $roleKey => $role) {
+                        $options[$roleKey] = $role['name'];
+                    }
+                }
+                return $options;
+            }, 10, 2);
+        }
     }
 
     /**

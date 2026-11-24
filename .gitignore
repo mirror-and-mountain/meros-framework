@@ -1,4 +1,7 @@
 /vendor/
 /node_modules/
-/tests/
+/tests/*
+!/tests/integration-setting-labels.test.php
+!/tests/integration-readiness.test.php
+!/tests/role-configuration.test.php
 .DS_Store*

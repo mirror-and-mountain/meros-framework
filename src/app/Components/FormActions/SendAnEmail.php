@@ -9,7 +9,7 @@ use MM\Meros\Contracts\Features\Automation\FlowActionResponse;
 use MM\Meros\App\Components\Fields\Repeater;
 use MM\Meros\App\Components\Fields\Checkbox;
 
-use MM\Meros\App\Models\FormResponse;
+use Illuminate\Support\Facades\Log;
 
 class SendAnEmail extends FlowAction {
     protected function configure(): void {
@@ -17,25 +17,17 @@ class SendAnEmail extends FlowAction {
         $this->label('Send an Email');
 
         $this->addInput(
-            'to_recipients',
-            'array.object',
-            label: 'The recipients of the email',
+            'email_subject',
+            'string',
+            label: 'Email Subject',
             required: true,
-            fieldType: 'repeater',
-            fieldCallback: function (Repeater $repeater) {
-                $repeater->field('email', function (Field $field) {
-                    $field->name('recipient_email_address');
-                    $field->label('Recipient Email Address');
-                    $field->required();
-                    $field->__suggestDynamicValues(['email']);
-                });
-            }
+            outsideRepeater: true
         );
 
         $this->addInput(
             'email_body',
             'string',
-            label: 'The body of the email',
+            label: 'Email Body',
             required: true,
             fieldType: 'richtext',
             outsideRepeater: true,
@@ -43,11 +35,32 @@ class SendAnEmail extends FlowAction {
                 $field->__suggestDynamicValues();
             }
         );
+
+        $recipientTypes = ['to', 'cc', 'bcc'];
+
+        foreach ($recipientTypes as $type) {
+            $this->addInput(
+                $type . '_recipients',
+                'array.object',
+                label: strtoupper($type) . ' Recipients',
+                description: 'Add ' . strtoupper($type) . ' recipients for the email.',
+                required: $type === 'to',
+                fieldType: 'repeater',
+                fieldCallback: function (Repeater $repeater) {
+                    $repeater->addRowText('Add Recipient');
+                    $repeater->field('email', function (Field $field) {
+                        $field->name('recipient_email_address');
+                        $field->label('Recipient Email Address');
+                        $field->required();
+                        $field->__suggestDynamicValues(['email']);
+                    });
+                }
+            );
+        }
     }
 
     public function run(array $input): FlowActionResponse {
-        $emailBody = $input['email_body'] ?? '';
-
+        Log::info('Running SendAnEmail action with input:', $input);
         // Implement the logic to send the email here
 
         return new FlowActionResponse([

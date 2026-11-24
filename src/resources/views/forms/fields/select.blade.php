@@ -9,6 +9,10 @@
             return (string) $value;
         }, $defaultValue)
         : [];
+
+    if (is_admin()) {
+        $options = apply_filters('meros_admin_select_options', $options ?? [], $name);
+    }
 @endphp
 
 <select

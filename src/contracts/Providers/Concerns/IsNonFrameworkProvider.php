@@ -9,6 +9,7 @@ trait IsNonFrameworkProvider {
         ProvidesAutomation,
         ProvidesContent,
         ProvidesComponents,
+        ProvidesSecurityFeatures,
         ProvidesTables,
         ProvidesIntegrations;
 }

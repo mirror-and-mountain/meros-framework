@@ -9,6 +9,35 @@ This framework underpins our Meros starter themes for Wordpress. Under the hood 
 ### Documentation
 - [Forms](docs/FORMS.md): the PHP form API, WordPress form hosts and templates, client-side builder, conditions, pagination, submissions and field extension points.
 
+#### Using integrations
+
+Resolve a registered integration and check its local readiness before use:
+
+```php
+use MM\Meros\Facades\Integrations;
+
+$integration = Integrations::connect('mailchimp');
+if ($integration->ready('marketing')) {
+    $audiences = $integration->getAudiences();
+}
+```
+
+`connect()` accepts a registered identifier, an integration class, or a unique
+snake-case class name. It returns the integration even when it is not ready and
+throws an `InvalidArgumentException` for unknown or ambiguous names. Readiness
+checks the enabled setting and integration-specific prerequisites in the current
+environment; OAuth integrations require a connected record and access token for
+the selected audience. It does not contact the remote service or guarantee that
+the next request will succeed. API request boundaries must enforce readiness too;
+existing integration-specific facades remain available but are deprecated.
+
+Integration authors can override `isReady(?string $capability): bool` for
+additional local checks. Call `parent::isReady($capability)` when extending an
+integration with its own prerequisites. The base implementation checks only the
+enabled state and rejects unsupported capabilities. A readiness check is
+side-effect-free apart from reading settings and connections; API failures should
+still be logged and surfaced according to the integration's return contract.
+
 #### OAuth connection settings
 
 OAuth integrations require saved, non-empty values for their `UsesBaseUrl`,

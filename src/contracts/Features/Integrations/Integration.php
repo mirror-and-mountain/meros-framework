@@ -251,10 +251,13 @@ abstract class Integration extends Feature implements Registrable {
             }
 
             $currentEnv = $this->getCurrentEnvironment();
+            $environments = $this->getEnvironments();
             
             if (!Str::endsWith($name, '_' . $currentEnv)) {
                 $setting->name($name . '_' . $currentEnv);
-                $setting->label($label . ' (' . ucfirst($currentEnv) . ')');
+                if (count($environments) > 1) {
+                    $setting->label($label . ' (' . ucfirst($currentEnv) . ')');
+                }
 
                 $settingField = $setting->getField();
                 if ($settingField !== null) {
@@ -263,8 +266,6 @@ abstract class Integration extends Feature implements Registrable {
                     $setting->__overrideField($newField);
                 }
             }
-
-            $environments = $this->getEnvironments();
 
             foreach ($environments as $handle => $__) {
                 if ($handle === $currentEnv) {
@@ -493,6 +494,29 @@ abstract class Integration extends Feature implements Registrable {
     // =========================================================================
 
     /**
+     * Check local configuration for the current environment without contacting the service.
+     */
+    final public function ready(?string $capability = null): bool {
+        if (!$this->isEnabled(true)) {
+            return false;
+        }
+
+        $this->getCurrentEnvironment(true);
+        return $this->isReady($capability);
+    }
+
+    /**
+     * Override to check integration-specific credentials or capabilities.
+     */
+    protected function isReady(?string $capability): bool {
+        if ($capability !== null) {
+            throw new \InvalidArgumentException("Unknown integration capability '{$capability}'.");
+        }
+
+        return true;
+    }
+
+    /**
      * Resolves the configuration method for a configurable setting added to the integration
      * via a trait, if it exists.
      *
@@ -576,7 +600,11 @@ abstract class Integration extends Feature implements Registrable {
      *
      * @return boolean
      */
-    final public function isEnabled(): bool {
+    final public function isEnabled(bool $refresh = false): bool {
+        if ($refresh) {
+            $this->enabled = (bool) $this->merosSettings->getItemValue($this->getName() . '_enabled', true);
+        }
+
         return $this->enabled;
     }
 
@@ -589,6 +617,15 @@ abstract class Integration extends Feature implements Registrable {
      */
     final public function getName(string $format = 'default'): string {
         return $this->getIdentifier($format);
+    }
+
+    /**
+     * Retrieves the integration's category.
+     *
+     * @return string
+     */
+    final public function getCategory(): string {
+        return $this->category;
     }
 
     /**

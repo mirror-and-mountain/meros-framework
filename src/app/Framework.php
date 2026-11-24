@@ -8,9 +8,11 @@ use MM\Meros\Contracts\Provider;
 use MM\Meros\Registers\Admin\SettingsContainers;
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
 
-use MM\Meros\App\Components\Orchestrator as ComponentsOrchestrator;
-use MM\Meros\App\Assets\Orchestrator as AssetsOrchestrator;
 use MM\Meros\App\Admin\Settings\Orchestrator as SettingsOrchestrator;
+use MM\Meros\App\Admin\Auth\Orchestrator as AuthOrchestrator;
+use MM\Meros\App\Security\Orchestrator as SecurityOrchestrator;
+use MM\Meros\App\Assets\Orchestrator as AssetsOrchestrator;
+use MM\Meros\App\Components\Orchestrator as ComponentsOrchestrator;
 use MM\Meros\App\Content\Orchestrator as ContentOrchestrator;
 
 use MM\Meros\Contracts\Providers\Concerns\IsFrameworkProvider;
@@ -59,6 +61,8 @@ final class Framework extends Provider {
     public function configure(): void {
         $this->initialise(ComponentsOrchestrator::class);
         $this->initialise(SettingsOrchestrator::class);
+        $this->initialise(AuthOrchestrator::class);
+        $this->initialise(SecurityOrchestrator::class);
         $this->initialise(AssetsOrchestrator::class);
         $this->initialise(ContentOrchestrator::class);
 
