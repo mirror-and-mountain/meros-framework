@@ -2,27 +2,32 @@
 
 namespace MM\Meros;
 
-use Roots\Acorn\Application as RootsApplication;
+use MM\Foundations\Foundations;
 use MM\Meros\App\Providers\FrameworkServiceProvider;
 
 final class Loader {    
+    /**
+     * Boots the Laravel application through Meros Foundations.
+     *
+     * @param string[] $providers Additional service providers.
+     * @param string[] $stubs     Extra config stub directories, applied after the framework's own.
+     */
     public static function boot(
-        array  $providers = []
+        array $providers = [],
+        array $stubs     = []
     ): void {
-        if (class_exists(RootsApplication::class)) {
-            add_action('after_setup_theme', function () use ($providers) {
+        if (class_exists(Foundations::class)) {
+            add_action('after_setup_theme', function () use ($providers, $stubs) {
                 
                 $merosProviders = [
                     FrameworkServiceProvider::class,
                 ];
                 
-                $providers = array_merge($merosProviders, $providers);
-                $root      = get_stylesheet_directory();
-
-                RootsApplication::configure($root)
-                    ->withProviders($providers)
-                    ->withRouting(wordpress: true)
-                    ->boot();
+                Foundations::boot(
+                    get_stylesheet_directory(),
+                    array_merge($merosProviders, $providers),
+                    $stubs
+                );
             }, 0);
         }
     }

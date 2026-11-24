@@ -7,7 +7,7 @@ Meros supports authenticator-app TOTP and single-use recovery codes on the nativ
 All MFA settings, service bindings, login hooks and policy configuration live in [the Auth orchestrator](../src/app/Admin/Auth/Orchestrator.php). Settings retain their existing names and storage in the framework settings container.
 
 1. Install Composer dependencies in the consuming theme.
-2. Keep Acorn's application encryption key stable and backed up. Losing that key makes existing authenticator secrets unreadable. Use HTTPS in production.
+2. Keep The application encryption key (`APP_KEY`) stable and backed up. Losing that key makes existing authenticator secrets unreadable. Use HTTPS in production.
 3. Install the two optional framework tables using Meros's table tooling or WP-CLI:
 
    ```sh

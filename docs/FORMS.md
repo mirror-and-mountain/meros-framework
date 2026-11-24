@@ -2,7 +2,7 @@
 
 Meros uses the same PHP form components for developer-defined forms, WordPress settings controls, and forms edited through the visual builder. The builder stores a definition; PHP reconstructs that definition into components; Blade renders the form; Alpine supplies the interactive behaviour.
 
-This guide describes the current framework implementation. Examples assume a bootstrapped Meros/Acorn WordPress application with the relevant component registrations and assets available.
+This guide describes the current framework implementation. Examples assume a bootstrapped Meros WordPress application with the relevant component registrations and assets available.
 
 ## Contents
 

@@ -13,9 +13,9 @@
     "require": {
         "bacon/bacon-qr-code": "^3.0",
         "pragmarx/google2fa": "^9.0",
-        "roots/acorn": "^6.3",
         "livewire/livewire": "^4.4.8",
-        "symfony/uid": "^8.1.9"
+        "symfony/uid": "^8.1.9",
+        "mirror-and-mountain/meros-foundations": "@dev"
     },
     "autoload": {
         "psr-4": {
@@ -30,5 +30,11 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../meros-foundations"
+        }
+    ]
 }
