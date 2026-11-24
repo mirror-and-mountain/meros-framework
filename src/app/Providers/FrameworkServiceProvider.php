@@ -6,6 +6,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
 
 use MM\Meros\Contracts\MerosServiceProvider;
+use MM\Meros\Foundations\PackageManifest;
 
 use MM\Meros\App\Framework;
 
@@ -310,15 +311,24 @@ class FrameworkServiceProvider extends MerosServiceProvider {
     }
 
     /**
-     * Registers packages as singletons in the service container. 
-     * Checks packages extend the correct base class before registering.
+     * Registers Meros packages. They are discovered from composer metadata
+     * (`extra.meros.provider` / `extra.meros.providers`), with the theme's
+     * `config/theme.php` `packages` key as a manual list for anything not
+     * discoverable. Only classes extending PackageServiceProvider are registered.
      * 
      * @return void
      */
     private function registerPackages(): void {
-        $packages = Config::get("theme.packages") ?? [];
+        $providers = array_unique(array_merge(
+            $this->app->make(PackageManifest::class)->merosProviders(),
+            Config::get('theme.packages') ?? []
+        ));
         
-        foreach ($packages as $serviceProvider) {
+        foreach ($providers as $serviceProvider) {
+            if (! class_exists($serviceProvider)) {
+                continue;
+            }
+
             $providerClass = ClassInfo::get($serviceProvider);
             if ($providerClass->extends(PackageServiceProvider::class)) {
                 $this->app->register($providerClass->name);

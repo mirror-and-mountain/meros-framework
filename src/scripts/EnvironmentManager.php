@@ -55,13 +55,6 @@ class EnvironmentManager {
     private string $keysPath;
 
     /** 
-     * The theme class name.
-     * 
-     * @var string
-     */
-    private string $themeClass;
-
-    /** 
      * Whether the environment is local.
      * 
      * @var bool
@@ -81,13 +74,6 @@ class EnvironmentManager {
      * @var array
      */
     private array $scripts = [];
-
-    /** 
-     * The theme's packages.
-     * 
-     * @var array
-     */
-    private array $packages = [];
 
     /** 
      * The last error message.
@@ -252,40 +238,6 @@ PHP;
         }
 
         return true;
-    }
-
-    /**
-     * Installs a package in the environment's theme.
-     * 
-     * @param string $serviceProvider The package's service provider class.
-     * 
-     * @return bool  True on success, false on failure.
-     */
-    public function installPackage(string $serviceProvider): bool {
-        if ($this->error !== '' && $this->error !== 'Package already installed.') {
-            return false;
-        }
-
-        $this->error = '';
-
-        if (! $this->isLocal) {
-            $this->error = 'Packages can only be installed in a local environment.';
-            return false;
-        }
-
-        $themeConfigInitialised = $this->initThemeConfig( DIRECTORY_SEPARATOR );
-        if (! $themeConfigInitialised ) {
-            $this->error = 'Failed to initialise theme configuration.';
-            return false;
-        }
-
-        if (in_array($serviceProvider, $this->packages)) {
-            $this->error = 'Package already installed.';
-            return false;
-        }
-
-        $this->packages[] = $serviceProvider;
-        return $this->regenerateThemeConfig();
     }
 
     /**
@@ -871,79 +823,6 @@ PHP;
                     chmod($path, 0755);
                 }
             }
-        }
-    }
-
-    /**
-     * Initialises the theme's configuration from the config/theme.php file.
-     * 
-     * @param string $separator The directory separator.
-     * @return bool  True on success, false on failure.
-     */
-    private function initThemeConfig(string $separator): bool {
-        $configPath = $this->themePath . $separator . 'config' . $separator . 'theme.php';
-        if (file_exists($configPath)) {
-            $config = require $configPath;
-            $this->themeClass = $config['theme_class'] ?? 'App\\Theme';
-            $this->packages   = $config['packages'] ?? [];
-            return true;
-        } else {
-            $this->themeClass = '';
-            $this->packages   = [];
-            return false;
-        }
-    }
- 
-    /**
-     * Regenerates the theme configuration file.
-     * 
-     * @return bool True on success, false on failure.
-     */
-    private function regenerateThemeConfig(): bool {
-        $stubsPath = $this->frameworkPath . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR;
-        $stub      = $stubsPath . 'config' . DIRECTORY_SEPARATOR . 'theme.php.stub';
-
-        if (file_exists($stub)) {
-            $formatArray = function(array $array, int $indentLevel = 2): string {
-                $indent = str_repeat('    ', $indentLevel);
-                $lines = ['['];
-
-                foreach ($array as $item) {
-                    $formattedValue = var_export($item, true);
-                    $lines[] = "{$indent}{$formattedValue},";
-                }
-
-                $lines[] = str_repeat('    ', $indentLevel - 1) . ']';
-                return implode("\n", $lines);
-            };
-
-            $stubContent = file_get_contents($stub);
-            $rendered = str_replace(
-                [
-                    '{{theme_class}}',
-                    '{{packages}}',
-                ],
-                [
-                    var_export($this->themeClass, true),
-                    $formatArray($this->packages),
-                ],
-                $stubContent
-            );
-
-            $themeConfigFilePath = $this->themePath . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'theme.php';
-            if (! is_dir(dirname($themeConfigFilePath))) {
-                mkdir(dirname($themeConfigFilePath), 0755, true);
-            }
-
-            if (file_put_contents($themeConfigFilePath, $rendered) !== false) {
-                return true;
-            }
-
-            $this->error = 'Failed to write theme configuration file.';
-            return false;
-        } else {
-            $this->error = 'Theme stub file not found.';
-            return false;
         }
     }
 

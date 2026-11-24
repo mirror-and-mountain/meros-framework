@@ -7,15 +7,11 @@ return [
      * to the file located at app/Theme.php. If you have moved this file or want
      * to use a different class name, update this value accordingly.
      */
-    'theme_class' => {{theme_class}},
+    'theme_class' => 'App\\Theme',
 
     /**
-     * The following array stores service providers needed to bootstrap
-     * your theme's packages. 
-     * 
-     * It is updated automatically when either a new package is installed or 
-     * an existing one is removed.
+     * Meros packages are discovered automatically from composer. List a
+     * service provider here only to register one that isn't discoverable.
      */
-    'packages' => {{packages}}
+    'packages' => []
 ];
-

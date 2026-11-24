@@ -236,7 +236,7 @@ class ComposerScripts {
     }
 
     /**
-     * Handles the post-autoload-dump event for Composer, checking installed packages and handling any relevant theme extension installations.
+     * Handles the post-autoload-dump event for Composer, setting up the local environment when WordPress isn't installed yet.
      *
      * @param Event $event
      *
@@ -244,7 +244,6 @@ class ComposerScripts {
      */
     public static function postAutoloadDump(Event $event): void {
         $composer = $event->getComposer();
-        $installationManager = $composer->getInstallationManager();
         $io = $event->getIO();
 
         self::initialise($composer, $io);
@@ -264,42 +263,8 @@ class ComposerScripts {
             self::configureWordpress($io, $environmentManager);
         }
 
-        $io->write('<comment>Handling package installations...</comment>');
-
-        // Handle package installations
-        foreach ($composer->getRepositoryManager()->getLocalRepository()->getPackages() as $package) {
-            $packageName = $package->getName();
-            $extra       = $package->getExtra();
-            $installPath = $installationManager->getInstallPath($package);
-
-            // Resolve the real path
-            $realInstallPath = realpath($installPath);
-
-            if ($realInstallPath === false) {
-                $io->write("<error>Could not determine real path for {$packageName} at {$installPath}. Skipping.</error>");
-                continue;
-            }
-
-            // Install package
-            elseif (isset($extra['meros'], $extra['meros']['provider'])) {
-                $io->write("<comment>Installing package {$packageName} from provider {$extra['meros']['provider']}...</comment>");
-
-                $result = $environmentManager->installPackage(
-                    $extra['meros']['provider']
-                );
-
-                if ($result !== true) {
-                    $error = $environmentManager->getError();
-                    if ($error === 'Package already installed.') {
-                        $io->write("<comment>Package {$packageName} is already installed. Skipping.</comment>");
-                    } else {
-                        $io->write("<error>Failed to install package {$packageName}: {$error}</error>");
-                    }
-                } else {
-                    $io->write("<info>Package {$packageName} installed successfully.</info>");
-                }
-            }
-        }
+        // Meros packages need no install step: they are discovered from each package's
+        // `extra.meros.provider` entry at runtime, as Laravel discovers its own packages.
     }
 
     /**
