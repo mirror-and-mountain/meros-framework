@@ -420,6 +420,7 @@ final class WordPressMfa {
     private function unavailable(\Throwable $exception): never {
         $this->reportUnavailable($exception);
         wp_die('MFA is unavailable. Ask the site administrator to check the MFA tables and application encryption key.', 'MFA unavailable', ['response' => 503]);
+        exit;
     }
 
     /**
