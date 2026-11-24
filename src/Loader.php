@@ -2,7 +2,7 @@
 
 namespace MM\Meros;
 
-use MM\Foundations\Foundations;
+use MM\Meros\Foundations\Foundations;
 use MM\Meros\App\Providers\FrameworkServiceProvider;
 
 final class Loader {    
