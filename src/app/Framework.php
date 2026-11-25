@@ -20,6 +20,9 @@ use MM\Meros\Contracts\Providers\Concerns\IsNonPackageProvider;
 
 use MM\Meros\Facades\Support\Ajax;
 
+use MM\Meros\Facades\Components\Forms;
+use MM\Meros\Facades\Data\Integrations;
+
 final class Framework extends Provider {
     use IsFrameworkProvider, IsNonPackageProvider;
 
@@ -68,7 +71,15 @@ final class Framework extends Provider {
 
         $this->registerTables();
         $this->ensurePrettyPermalinks();
-        $this->removeActions();
+        $this->removeActions(); 
+
+        // dd(Forms::find(263)->responses());
+        // add_action('init', function () {
+        //     $mailchimp = Integrations::connect('mailchimp');
+        //     if ($mailchimp->ready('transactional')) {
+        //         dd($mailchimp->getTemplates());
+        //     }
+        // });
     }
 
     /**

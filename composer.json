@@ -11,6 +11,7 @@
         }
     ],
     "require": {
+        "ext-dom": "*",
         "bacon/bacon-qr-code": "^3.0",
         "pragmarx/google2fa": "^9.0",
         "mirror-and-mountain/meros-foundations": "^1.0"

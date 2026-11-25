@@ -20,6 +20,7 @@ namespace MM\Meros\Tests\Unit {
     use MM\Meros\App\Components\FormActions\SendAnEmail;
     use MM\Meros\Contracts\Features\Integrations\Interfaces\Mailer;
     use MM\Meros\Facades\Data\Integrations;
+    use MM\Meros\Support\EmailHelpers;
     use PHPUnit\Framework\TestCase;
     use ReflectionClass;
 
@@ -57,11 +58,11 @@ namespace MM\Meros\Tests\Unit {
             $response = $this->action->run($this->input);
 
             self::assertFalse($response->hasError());
-            self::assertSame(['success' => true], $response->output());
+            self::assertSame('Email sent successfully.', $response->output());
             self::assertSame([[
                 'to' => ['to@example.com', 'another@example.com'],
                 'subject' => 'Subject',
-                'body' => '<p>Hello</p>',
+                'body' => '<p style="margin:0;">Hello</p>',
                 'headers' => [
                     'Content-Type: text/html; charset=UTF-8',
                     'Cc: cc@example.com',
@@ -103,9 +104,9 @@ namespace MM\Meros\Tests\Unit {
             $response = $this->action->run($this->input);
 
             self::assertFalse($response->hasError());
-            self::assertSame(['success' => true], $response->output());
+            self::assertSame('Email sent successfully.', $response->output());
             self::assertSame([
-                ['to@example.com', 'another@example.com'], 'Subject', '<p>Hello</p>',
+                ['to@example.com', 'another@example.com'], 'Subject', '<p style="margin:0;">Hello</p>',
                 ['cc@example.com'], ['bcc@example.com'], true,
             ], $mailer->calls[0]);
             $mailer->result = false;
@@ -124,6 +125,46 @@ namespace MM\Meros\Tests\Unit {
             self::assertFalse($this->action->run($this->input)->hasError());
             self::assertSame([], $mailer->calls);
             self::assertCount(1, $GLOBALS['emailTestCalls']);
+        }
+
+        public function testHtmlEmailPreservesEditorLinesWithoutParagraphMargins(): void {
+            $this->input['email_body'] = '<p>Hello, Toby,</p><p><br></p>'
+                . '<p style="color:red">Thanks for your <strong>message</strong>.</p><p><br></p><p>Admin</p>';
+            $this->action->run($this->input);
+
+            self::assertSame(
+                '<p style="margin:0;">Hello, Toby,</p><p style="margin:0;"><br></p>'
+                . '<p style="color:red;margin:0;">Thanks for your <strong>message</strong>.</p>'
+                . '<p style="margin:0;"><br></p><p style="margin:0;">Admin</p>',
+                $GLOBALS['emailTestCalls'][0]['body']
+            );
+        }
+
+        public function testPlainTextEmailConvertsMarkupToNewlinesForBothMailers(): void {
+            $this->input['email_body'] = "<p>H\u{00e9}llo &amp; welcome</p><p><br></p>"
+                . '<p>Thanks<br>Admin</p>';
+            $this->input['send_as_plain_text'] = true;
+            $this->action->run($this->input);
+            self::assertSame("H\u{00e9}llo & welcome\n\nThanks\nAdmin", $GLOBALS['emailTestCalls'][0]['body']);
+            self::assertSame('Content-Type: text/plain; charset=UTF-8', $GLOBALS['emailTestCalls'][0]['headers'][0]);
+
+            $mailer = new EmailTestMailer();
+            Integrations::swap(new class($mailer) {
+                public function __construct(private EmailTestMailer $mailer) {}
+                public function getMailer(string $name): Mailer { return $this->mailer; }
+            });
+            $this->input['send_using'] = 'test_mailer';
+            $this->action->run($this->input);
+            self::assertSame("H\u{00e9}llo & welcome\n\nThanks\nAdmin", $mailer->calls[0][2]);
+            self::assertFalse($mailer->calls[0][5]);
+        }
+
+        public function testSharedHelpersAreAvailableIndependentlyOfTheAction(): void {
+            self::assertSame(['cc@example.com'], EmailHelpers::getRecipients($this->input, 'cc'));
+            self::assertSame([], EmailHelpers::getRecipients([], 'bcc'));
+            self::assertNull(EmailHelpers::getRecipients(['to_recipients' => [['recipient_email_address' => 'bad']]], 'to'));
+            self::assertSame('<p style="margin:0;">Hello</p>', EmailHelpers::formatBody('<p>Hello</p>', false));
+            self::assertSame("Hello\nWorld", EmailHelpers::formatBody('<p>Hello</p><p>World</p>', true));
         }
     }
 

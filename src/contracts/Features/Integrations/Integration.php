@@ -71,7 +71,7 @@ abstract class Integration extends Feature implements Registrable {
     protected string $currentEnvironment = '';
 
     /**
-     * Registered flow actions for the integration.
+     * Instantiated flow actions for the integration.
      *
      * @var array<FlowAction>
      */
@@ -316,6 +316,7 @@ abstract class Integration extends Feature implements Registrable {
         $this->afterInitConfigurableSettings();
         $this->initCustomSettings();
         $this->afterInitCustomSettings();
+        do_action("meros_integration_configured_" . $this->name);
     }
 
     // =========================================================================
@@ -470,21 +471,27 @@ abstract class Integration extends Feature implements Registrable {
      * @return static
      */
     final public function registerFlowAction(string|Closure $action): static {
-        if (is_string($action)) {
-            $class = ClassInfo::get($action);
-            if ($class->extends(FlowAction::class)) {
-                $instance = $this->makeItemFrom($action, FlowAction::class);
+        add_action("meros_integration_configured_" . $this->name, function() use ($action) {
+            if ($this->ready() === false) {
+                return;
+            }
+
+            if (is_string($action)) {
+                $class = ClassInfo::get($action);
+                if ($class->extends(FlowAction::class)) {
+                    $instance = $this->makeItemFrom($action, FlowAction::class);
+                    if ($instance instanceof FlowAction) {
+                        $this->flowActions[$instance->getName()] = $instance;
+                    }
+                }
+            } else {
+                $instance = $this->makeItem(FlowAction::class, $action);
+
                 if ($instance instanceof FlowAction) {
                     $this->flowActions[$instance->getName()] = $instance;
                 }
             }
-        }
-
-        $instance = $this->makeItem(FlowAction::class, $action);
-
-        if ($instance instanceof FlowAction) {
-            $this->flowActions[$instance->getName()] = $instance;
-        }
+        });
 
         return $this;
     }

@@ -8,10 +8,11 @@ use MM\Meros\Contracts\Features\Automation\FlowActionResponse;
 
 use MM\Meros\Contracts\Features\Integrations\Interfaces\Mailer;
 
-use MM\Meros\App\Components\Fields\Repeater;
+use MM\Meros\App\Components\Fields\Checkbox;
 use MM\Meros\App\Components\Fields\Select;
 
 use MM\Meros\Facades\Data\Integrations;
+use MM\Meros\Support\EmailHelpers;
 
 class SendAnEmail extends FlowAction {
     protected function configure(): void {
@@ -30,6 +31,7 @@ class SendAnEmail extends FlowAction {
             'email_body',
             'string',
             label: 'Email Body',
+            description: 'Paragraphs and blank lines are preserved in HTML email and converted to newlines for plain-text email.',
             required: true,
             fieldType: 'richtext',
             outsideRepeater: true,
@@ -38,29 +40,12 @@ class SendAnEmail extends FlowAction {
             }
         );
 
-        $recipientTypes = ['to', 'cc', 'bcc'];
+        EmailHelpers::addRecipientInputs($this);
 
-        foreach ($recipientTypes as $type) {
-            $this->addInput(
-                $type . '_recipients',
-                'array.object',
-                label: strtoupper($type) . ' Recipients',
-                description: 'Add ' . strtoupper($type) . ' recipients for the email.',
-                required: $type === 'to',
-                fieldType: 'repeater',
-                fieldCallback: function (Repeater $repeater) {
-                    $repeater->addRowText('Add Recipient');
-                    $repeater->field('email', function (Field $field) {
-                        $field->name('recipient_email_address');
-                        $field->label('Recipient Email Address');
-                        $field->required();
-                        $field->__suggestDynamicValues(['email']);
-                    });
-                }
-            );
-        }
+        $mailers = Integrations::getMailers(true)->where(function (Mailer $mailer) {
+            return $mailer->ready();
+        });
 
-        $mailers = Integrations::getMailers(true);
         $mailersArray = [];
 
         if ($mailers->isNotEmpty()) {
@@ -90,18 +75,20 @@ class SendAnEmail extends FlowAction {
             'boolean',
             label: 'Send as Plain Text',
             default: false,
-            required: true,
             outsideRepeater: true,
-            fieldType: 'checkbox'
+            fieldType: 'checkbox',
+            fieldCallback: function (Checkbox $field) {
+                $field->toggle(true);
+            }
         );
     }
 
     public function run(array $input): FlowActionResponse {
         $subject = $input['email_subject'] ?? '';
         $body    = $input['email_body'] ?? '';
-        $to      = $this->getRecipients($input, 'to');
-        $cc      = $this->getRecipients($input, 'cc');
-        $bcc     = $this->getRecipients($input, 'bcc');
+        $to      = EmailHelpers::getRecipients($input, 'to');
+        $cc      = EmailHelpers::getRecipients($input, 'cc');
+        $bcc     = EmailHelpers::getRecipients($input, 'bcc');
         $plainText = $input['send_as_plain_text'] ?? false;
 
         $body = wp_kses_post($body);
@@ -117,6 +104,7 @@ class SendAnEmail extends FlowAction {
             );
         }
 
+        $body = EmailHelpers::formatBody($body, $plainText);
         $mailer = $input['send_using'] ?? 'default';
 
         if ($mailer !== 'default') {
@@ -134,7 +122,7 @@ class SendAnEmail extends FlowAction {
                 $body,
                 $cc,
                 $bcc,
-                $plainText
+                !$plainText
             );
 
             if ($result === false) {
@@ -169,26 +157,4 @@ class SendAnEmail extends FlowAction {
         );
     }
 
-    /**
-     * Extract and validate addresses from recipient repeater rows.
-     *
-     * @return array<string>|null
-     */
-    private function getRecipients(array $input, string $type): ?array {
-        $rows = $input[$type . '_recipients'] ?? [];
-        if (!is_array($rows)) {
-            return null;
-        }
-
-        $recipients = [];
-        foreach ($rows as $row) {
-            $address = is_array($row) ? ($row['recipient_email_address'] ?? null) : null;
-            if (!is_string($address) || strpbrk($address, "\r\n") !== false || filter_var($address, FILTER_VALIDATE_EMAIL) === false) {
-                return null;
-            }
-            $recipients[] = $address;
-        }
-
-        return $recipients;
-    }
 }
