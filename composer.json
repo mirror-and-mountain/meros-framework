@@ -13,7 +13,7 @@
     "require": {
         "bacon/bacon-qr-code": "^3.0",
         "pragmarx/google2fa": "^9.0",
-        "mirror-and-mountain/meros-foundations": "dev-main"
+        "mirror-and-mountain/meros-foundations": "^1.0"
     },
     "require-dev": {
         "illuminate/testing": "^13.0",
@@ -42,11 +42,5 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true,
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/mirror-and-mountain/meros-foundations"
-        }
-    ]
+    "prefer-stable": true
 }
