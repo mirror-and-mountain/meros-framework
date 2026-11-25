@@ -2898,12 +2898,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/mirror-and-mountain/meros-foundations.git",
-                "reference": "b5341c594c86d2d5cb19b6dc1e25b1e297906472"
+                "reference": "4c01094f843d720c5dfdc5569c435757d39b0977"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mirror-and-mountain/meros-foundations/zipball/b5341c594c86d2d5cb19b6dc1e25b1e297906472",
-                "reference": "b5341c594c86d2d5cb19b6dc1e25b1e297906472",
+                "url": "https://api.github.com/repos/mirror-and-mountain/meros-foundations/zipball/4c01094f843d720c5dfdc5569c435757d39b0977",
+                "reference": "4c01094f843d720c5dfdc5569c435757d39b0977",
                 "shasum": ""
             },
             "require": {
@@ -2927,6 +2927,7 @@
                 "illuminate/routing": "^13.0",
                 "illuminate/session": "^13.0",
                 "illuminate/support": "^13.0",
+                "illuminate/translation": "^13.0",
                 "illuminate/validation": "^13.0",
                 "illuminate/view": "^13.0",
                 "livewire/livewire": "^4.4.8",
@@ -2957,7 +2958,7 @@
                 "source": "https://github.com/mirror-and-mountain/meros-foundations/tree/main",
                 "issues": "https://github.com/mirror-and-mountain/meros-foundations/issues"
             },
-            "time": "2026-11-25T10:28:40+00:00"
+            "time": "2026-11-25T10:32:45+00:00"
         },
         {
             "name": "monolog/monolog",
