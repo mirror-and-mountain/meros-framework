@@ -29,6 +29,15 @@ SOURCE_SSH_KEY="${13:-""}"
 
 COMPOSER_UPDATE="${14:-"FALSE"}"
 
+PHPUNIT_EXCLUDES=(
+    --exclude='/tests/'
+    --exclude='/tools/testing/'
+    --exclude='/vendor/mirror-and-mountain/**/tests/'
+    --exclude='.phpunit.cache/'
+    --exclude='.phpunit.result.cache'
+    --exclude='phpunit*.xml*'
+)
+
 # ---------------------------------------------------------------------
 # Sync Operation - From Local to Remote
 # ---------------------------------------------------------------------
@@ -54,6 +63,7 @@ if [ $SOURCE_ENV = 'local_dev' ]; then
         -e "ssh -i ${DEST_SSH_KEY} -p ${DEST_SSH_PORT} -o StrictHostKeyChecking=no" \
         "${SOURCE_PATH}/wp-content/themes/${THEME_SLUG}/" \
         "${DEST_SSH_HOST}:${DEST_PATH}/wp-content/themes/${THEME_SLUG}/" \
+            "${PHPUNIT_EXCLUDES[@]}" \
             --exclude='/.devcontainer/' \
             --exclude='/.git/' \
             --exclude='/.vscode/' \
@@ -114,13 +124,15 @@ else
     rsync -avz \
         -e "ssh -i ${SOURCE_SSH_KEY} -p ${SOURCE_SSH_PORT}" \
         "${SOURCE_SSH_HOST}:${SOURCE_PATH}/wp-content/themes/${THEME_SLUG}/" \
-        "$TMP_DIR/remote-theme/"
+        "$TMP_DIR/remote-theme/" \
+        "${PHPUNIT_EXCLUDES[@]}"
 
     # Push local temp to dest remote
     rsync -avz \
         -e "ssh -i ${DEST_SSH_KEY} -p ${DEST_SSH_PORT}" \
         "$TMP_DIR/remote-theme/" \
         "${DEST_SSH_HOST}:${DEST_PATH}/wp-content/themes/${THEME_SLUG}/" \
+        "${PHPUNIT_EXCLUDES[@]}" \
         --delete
 
     echo "Activating theme '${THEME_SLUG}' on destination..."
