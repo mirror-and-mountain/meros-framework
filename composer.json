@@ -15,6 +15,20 @@
         "pragmarx/google2fa": "^9.0",
         "mirror-and-mountain/meros-foundations": "dev-main"
     },
+    "require-dev": {
+        "illuminate/testing": "^13.0",
+        "phpunit/phpunit": "^9.6",
+        "yoast/phpunit-polyfills": "^3.1"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MM\\Meros\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit -c phpunit.xml",
+        "test:integration": "phpunit -c phpunit.integration.xml"
+    },
     "autoload": {
         "psr-4": {
             "MM\\Meros\\": "src/",

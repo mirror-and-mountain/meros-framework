@@ -1,8 +1,5 @@
 /vendor/
 /node_modules/
-/tests/*
-!/tests/integration-setting-labels.test.php
-!/tests/integration-readiness.test.php
-!/tests/role-configuration.test.php
-!/tests/mfa.test.php
+/.phpunit.cache/
+/.phpunit.result.cache
 .DS_Store*

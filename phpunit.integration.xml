@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="tests/bootstrap-integration.php" cacheResultFile=".phpunit.result.cache">
+    <php>
+        <env name="MEROS_ENVIRONMENT" value="false" force="true"/>
+    </php>
+    <testsuites>
+        <testsuite name="Integration">
+            <directory>tests/Integration</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
