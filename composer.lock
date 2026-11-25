@@ -2898,12 +2898,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/mirror-and-mountain/meros-foundations.git",
-                "reference": "dabb2f943663f99217d4e873fa4a6a6be928fa1b"
+                "reference": "b5341c594c86d2d5cb19b6dc1e25b1e297906472"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mirror-and-mountain/meros-foundations/zipball/dabb2f943663f99217d4e873fa4a6a6be928fa1b",
-                "reference": "dabb2f943663f99217d4e873fa4a6a6be928fa1b",
+                "url": "https://api.github.com/repos/mirror-and-mountain/meros-foundations/zipball/b5341c594c86d2d5cb19b6dc1e25b1e297906472",
+                "reference": "b5341c594c86d2d5cb19b6dc1e25b1e297906472",
                 "shasum": ""
             },
             "require": {
@@ -2957,7 +2957,7 @@
                 "source": "https://github.com/mirror-and-mountain/meros-foundations/tree/main",
                 "issues": "https://github.com/mirror-and-mountain/meros-foundations/issues"
             },
-            "time": "2026-11-24T23:31:14+00:00"
+            "time": "2026-11-25T10:28:40+00:00"
         },
         {
             "name": "monolog/monolog",
