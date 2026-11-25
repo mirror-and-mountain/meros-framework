@@ -4,6 +4,7 @@ require __DIR__ . '/../../../autoload.php';
 
 use Illuminate\Database\SQLiteConnection;
 use Illuminate\Encryption\Encrypter;
+use MM\Meros\App\Admin\Auth\Orchestrator as AuthOrchestrator;
 use MM\Meros\Contracts\Features\Data\TableCreator;
 use MM\Meros\Contracts\Security\MfaIdentity;
 use MM\Meros\Services\Security\Mfa;
@@ -169,6 +170,7 @@ function wp_safe_redirect(string $url): void { throw new TestMfaRedirect($url); 
 function wp_die(string $message, string $title = '', array $args = []): never { throw new RuntimeException($message); }
 function get_userdata(int $id): WP_User|false { return $GLOBALS['users'][$id] ?? false; }
 function get_current_user_id(): int { return $GLOBALS['currentUser'] ?? 0; }
+function get_editable_roles(): array { return $GLOBALS['editableRoles']; }
 function wp_set_current_user(int $id): void { $GLOBALS['currentUser'] = $id; }
 function wp_set_auth_cookie(int $id, bool $remember): void { $GLOBALS['authCookies'][] = [$id, $remember]; }
 function do_action(string $name, mixed ...$args): void { $GLOBALS['actions'][] = $name; }
@@ -426,5 +428,19 @@ check(str_contains(ob_get_contents(), '>Enable MFA<') && str_contains(ob_get_con
 
 $apiLogin = new WordPressMfa(fn () => throw new LogicException('Non-interactive login must not invoke MFA.'), fn () => true, 'Test', 600);
 check($apiLogin->authenticate($GLOBALS['users'][10]) === $GLOBALS['users'][10], 'Non-interactive authentication must remain unchanged.');
+
+$auth = (new ReflectionClass(AuthOrchestrator::class))->newInstanceWithoutConstructor();
+$GLOBALS['editableRoles'] = [
+    'administrator' => ['name' => 'Administrator'],
+    'form_manager' => ['name' => 'Form Manager'],
+];
+$roleFieldName = 'meros_framework_settings[meros_security_mfa_roles][]';
+check($auth->mfaRoleOptions(['subscriber' => 'Subscriber'], $roleFieldName) === [
+    'administrator' => 'Administrator',
+    'form_manager' => 'Form Manager',
+], 'The actual multi-select field name must resolve current roles, including custom roles, instead of static defaults.');
+$GLOBALS['editableRoles']['form_reader'] = ['name' => 'Form Reader'];
+check(($auth->mfaRoleOptions([], $roleFieldName)['form_reader'] ?? null) === 'Form Reader', 'MFA role options must include roles registered after settings configuration.');
+check($auth->mfaRoleOptions(['unrelated' => 'Unrelated'], 'another_setting[]') === ['unrelated' => 'Unrelated'], 'The MFA role filter must preserve unrelated select options.');
 ob_end_clean();
 echo "MFA tests passed.\n";

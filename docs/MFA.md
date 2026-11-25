@@ -18,6 +18,8 @@ All MFA settings, service bindings, login hooks and policy configuration live in
 4. Enable MFA under **Settings > Security > Multi-Factor Authentication**.
 5. Select **Required MFA Roles** to require enrollment for those roles, or leave the selection empty for optional enrollment only. Every user can enable MFA from their own profile while the master switch is enabled. Keep an existing administrator session open while testing enrollment and save the generated recovery codes.
 
+The required-role selector uses WordPress's current editable roles, including custom roles registered through the Role contract.
+
 The credentials table stores encrypted secrets and individual recovery-code hashes. The challenges table stores hashed, short-lived, browser-bound login tokens. Tables use the configured database connection and its table prefix; they are not created during login requests.
 
 ## Enforcement and login

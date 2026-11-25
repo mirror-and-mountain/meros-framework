@@ -86,14 +86,21 @@ class Orchestrator extends SettingsOrchestrator {
             ]);
         });
 
-        add_filter('meros_admin_select_options', function ($options, $name) {
-            if ($name === 'meros_framework_settings[meros_security_mfa_roles]') {
-                $options = [];
-                foreach (\get_editable_roles() as $roleKey => $role) {
-                    $options[$roleKey] = $role['name'];
-                }
-            }
+        add_filter('meros_admin_select_options', [$this, 'mfaRoleOptions'], 10, 2);
+    }
+
+    /**
+     * Resolves MFA multi-select options at render time, after custom roles register on init.
+     */
+    public function mfaRoleOptions(array $options, string $name): array {
+        if ($name !== 'meros_framework_settings[meros_security_mfa_roles][]') {
             return $options;
-        }, 10, 2);
+        }
+
+        $options = [];
+        foreach (\get_editable_roles() as $roleKey => $role) {
+            $options[$roleKey] = $role['name'];
+        }
+        return $options;
     }
 }
