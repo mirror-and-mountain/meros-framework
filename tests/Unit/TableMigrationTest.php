@@ -6,6 +6,9 @@ use MM\Meros\Contracts\Features\Data\Table;
 use MM\Meros\Testing\FeatureProvider;
 use MM\Meros\Testing\TestCase;
 
+/**
+ * Tests table creation, updates, rollback and removal with migration tracking.
+ */
 final class TableMigrationTest extends TestCase
 {
     public function test_table_create_update_rollback_and_drop_are_tracked(): void

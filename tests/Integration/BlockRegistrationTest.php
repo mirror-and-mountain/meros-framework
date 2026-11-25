@@ -6,6 +6,9 @@ use MM\Meros\Contracts\Features\Components\Block;
 use MM\Meros\Testing\FeatureProvider;
 use MM\Meros\Testing\WordPressTestCase;
 
+/**
+ * Verifies that dynamic blocks reach the native WordPress registry and render successfully.
+ */
 final class BlockRegistrationTest extends WordPressTestCase
 {
     public function test_dynamic_blocks_reach_the_wordpress_registry_and_render(): void

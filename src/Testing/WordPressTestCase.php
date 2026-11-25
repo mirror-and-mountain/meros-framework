@@ -10,6 +10,9 @@ use MM\Meros\Facades\Framework;
 use MM\Meros\Foundations\Application;
 use MM\Meros\Foundations\Testing\WordPressTestCase as FoundationsWordPressTestCase;
 
+/**
+ * Boots the Framework with a fixture theme and package metadata, and provides table and block test helpers.
+ */
 abstract class WordPressTestCase extends FoundationsWordPressTestCase
 {
     protected function createApplication(array $providers = []): Application

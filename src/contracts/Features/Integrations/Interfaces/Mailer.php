@@ -23,4 +23,8 @@ interface Mailer {
         array $bcc = [],
         bool $html = false
     ): bool;
+
+    public function getName(string $format = 'default'): string;
+    public function getLabel(): string;
+    public function ready(?string $capability = null): bool;
 }

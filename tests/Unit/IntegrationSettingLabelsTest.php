@@ -17,6 +17,8 @@ use ReflectionMethod;
 use ReflectionProperty;
 
 /**
+ * Tests environment-specific integration setting keys and labels for single and multiple environments.
+ *
  * @runTestsInSeparateProcesses
  * @preserveGlobalState disabled
  */

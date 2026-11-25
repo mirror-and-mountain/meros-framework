@@ -7,6 +7,9 @@ use MM\Meros\Facades\Theme;
 use MM\Meros\Testing\TestTheme;
 use MM\Meros\Testing\WordPressTestCase;
 
+/**
+ * Tests real Framework and theme provider startup and migrations against the WordPress test database.
+ */
 final class FrameworkBootTest extends WordPressTestCase
 {
     public function test_framework_and_theme_boot_through_real_providers(): void

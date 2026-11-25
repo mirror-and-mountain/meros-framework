@@ -40,6 +40,8 @@ use TestWordPressRole;
 use PHPUnit\Framework\TestCase;
 
 /**
+ * Tests role and capability configuration, including permissions matrix validation and persistence.
+ *
  * @runTestsInSeparateProcesses
  * @preserveGlobalState disabled
  */

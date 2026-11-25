@@ -68,4 +68,19 @@ class Integrations extends Register implements Registrar {
 
         return $mailers->all();
     }
+
+    /**
+     * Retrieves a specific mailer integration by its registered identifier, class, or unique short class name.
+     *
+     * @param string $name
+     *
+     * @return Mailer
+     */
+    public function getMailer(string $name): Mailer {
+        $integration = $this->connect($name);
+        if (!$integration instanceof Mailer) {
+            throw new \InvalidArgumentException("Integration '{$name}' is not a mailer.");
+        }
+        return $integration;
+    }
 }

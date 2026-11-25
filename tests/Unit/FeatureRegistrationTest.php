@@ -13,6 +13,9 @@ use MM\Meros\Contracts\Registers\RegistrarMaker;
 use MM\Meros\Testing\FeatureProvider;
 use MM\Meros\Testing\TestCase;
 
+/**
+ * Tests feature creation, provider ownership, lookup and register contract validation.
+ */
 final class FeatureRegistrationTest extends TestCase
 {
     public function test_registration_and_making_preserve_provider_ownership(): void

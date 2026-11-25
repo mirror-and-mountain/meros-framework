@@ -18,6 +18,8 @@ use ReflectionClass;
 use ReflectionProperty;
 
 /**
+ * Tests integration readiness refreshes and resolution through identifiers, classes and facades.
+ *
  * @runTestsInSeparateProcesses
  * @preserveGlobalState disabled
  */

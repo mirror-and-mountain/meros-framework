@@ -7,6 +7,9 @@ use MM\Meros\Facades\Packages;
 use MM\Meros\Foundations\Application;
 use ReflectionClass;
 
+/**
+ * Discovers a package in real WordPress tests with configurable enablement and access to its registered instance.
+ */
 abstract class PackageTestCase extends WordPressTestCase
 {
     abstract protected function packageClass(): string;

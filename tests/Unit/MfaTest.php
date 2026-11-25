@@ -24,6 +24,8 @@ use WP_User;
 use PHPUnit\Framework\TestCase;
 
 /**
+ * Tests MFA credential lifecycle, recovery, WordPress login enforcement and account management.
+ *
  * @runTestsInSeparateProcesses
  * @preserveGlobalState disabled
  */

@@ -7,6 +7,9 @@ use MM\Meros\Facades\Components\Forms;
 use MM\Meros\Facades\Theme;
 use MM\Meros\Testing\WordPressTestCase;
 
+/**
+ * Verifies that form submissions build timestamped payloads without relying on Acorn helpers.
+ */
 final class FormSubmissionTest extends WordPressTestCase
 {
     public function test_form_submission_builds_a_timestamped_payload_without_acorn_helpers(): void
