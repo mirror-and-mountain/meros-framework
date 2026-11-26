@@ -36,6 +36,7 @@ use MM\Meros\Registers\Components\FieldGroups;
 use MM\Meros\Registers\Automation\FlowActions;
 
 use MM\Meros\Registers\Content\PostTypes;
+use MM\Meros\Registers\Content\Taxonomies;
 
 use MM\Meros\Registers\Security\Roles;
 use MM\Meros\Registers\Security\Capabilities;
@@ -90,6 +91,7 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         FlowActions::class,
 
         PostTypes::class,
+        Taxonomies::class,
 
         Roles::class,
         Capabilities::class,

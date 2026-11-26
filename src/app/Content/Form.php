@@ -25,6 +25,8 @@ class Form extends PostType implements FormHost {
         $this->rewrite(['slug' => 'forms']);
         $this->useBlockTemplate();
         $this->menuIcon('dashicons-feedback');
+        $this->showInMenu('meros-forms');
+        $this->taxonomy(FormTags::class);
 
         $this->hasEditableForm()
             ->withActionsEditor()

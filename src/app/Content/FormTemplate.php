@@ -10,10 +10,12 @@ class FormTemplate extends PostType implements FormHost {
     use UsesForms;
 
     protected function configure(): void {
-        $this->public();
+        $this->private()->showUi();
         $this->handle('form-template');
         $this->label('Form Template', 'Form Templates');
         $this->menuIcon('dashicons-feedback');
+        $this->showInMenu('meros-forms');
+        $this->taxonomy(FormTags::class);
         $this->supports(['title', 'editor', 'thumbnail'], false);
         $this->hasEditableForm()
             ->withActionsEditor()

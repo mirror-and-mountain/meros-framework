@@ -61,6 +61,13 @@ class PostType extends Feature implements Makeable, Registrable {
     protected array $args = ['supports' => ['title', 'editor']];
 
     /**
+     * The taxonomy features associated with this post type.
+     *
+     * @var array<Taxonomy>
+     */
+    private array $taxonomyFeatures = [];
+
+    /**
      * An array of associated post meta containers for this post type.
      *
      * @var array<PostMetaContainer|array>
@@ -115,6 +122,7 @@ class PostType extends Feature implements Makeable, Registrable {
             $this->label(class_basename($this));
         }
 
+        $this->associateTaxonomies();
         $this->initMetaContainers();
 
         if ($this->metaBlocks !== []) {
@@ -249,6 +257,8 @@ class PostType extends Feature implements Makeable, Registrable {
     // =========================================================================
 
     final public function register(): void {
+        $this->associateTaxonomies();
+
         if ($this->isCore || empty($this->handle)) {
             return;
         }
@@ -258,6 +268,7 @@ class PostType extends Feature implements Makeable, Registrable {
         }
 
         register_post_type($this->handle, array_merge($this->args, ['description' => $this->getDescription()]));
+        $this->associateTaxonomies();
     }
 
     /**
@@ -828,10 +839,10 @@ class PostType extends Feature implements Makeable, Registrable {
     /**
      * Sets whether the post type should be shown in the admin menu.
      *
-     * @param bool $showInMenu Whether the post type should be shown in the admin menu. Default is true.
+     * @param bool|string $showInMenu Whether to show the post type, or the slug of its parent menu. Default is true.
      * @return static
      */
-    final public function showInMenu(bool $showInMenu = true): static {
+    final public function showInMenu(bool|string $showInMenu = true): static {
         $this->args['show_in_menu'] = $showInMenu;
         return $this;
     }
@@ -1155,6 +1166,45 @@ class PostType extends Feature implements Makeable, Registrable {
     final public function taxonomies(array $taxonomies): static {
         $this->args['taxonomies'] = $taxonomies;
         return $this;
+    }
+
+    /**
+     * Associates a taxonomy feature class/alias or makes one using a callback.
+     *
+     * @param string|Closure $taxonomyOrClosure
+     * @return Taxonomy The associated taxonomy feature.
+     * @throws \InvalidArgumentException If the taxonomy cannot be resolved.
+     */
+    final public function taxonomy(string|Closure $taxonomyOrClosure): Taxonomy {
+        $taxonomy = is_string($taxonomyOrClosure)
+            ? $this->makeItemFrom($taxonomyOrClosure, Taxonomy::class)
+            : $this->makeItem(Taxonomy::class, $taxonomyOrClosure);
+
+        if (!($taxonomy instanceof Taxonomy)) {
+            throw new \InvalidArgumentException('The provided taxonomy could not be resolved to a Taxonomy feature.');
+        }
+
+        if (!in_array($taxonomy, $this->taxonomyFeatures, true)) {
+            $this->taxonomyFeatures[] = $taxonomy;
+        }
+
+        $this->associateTaxonomies();
+        return $taxonomy;
+    }
+
+    /**
+     * Associates taxonomy features once the post type's handle has been configured.
+     *
+     * @return void
+     */
+    private function associateTaxonomies(): void {
+        if ($this->handle === '') {
+            return;
+        }
+
+        foreach ($this->taxonomyFeatures as $taxonomy) {
+            $taxonomy->postType($this->handle);
+        }
     }
 
     /**

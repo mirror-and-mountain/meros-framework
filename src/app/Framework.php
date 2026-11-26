@@ -68,7 +68,8 @@ final class Framework extends Provider {
 
         $this->registerTables();
         $this->ensurePrettyPermalinks();
-        $this->removeActions();
+
+        // $this->removeActions(); // Not included for now.
     }
 
     /**

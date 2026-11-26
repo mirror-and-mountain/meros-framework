@@ -15,6 +15,7 @@ use MM\Meros\App\Admin\Pages\MerosAssets as AssetGroupSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosBlocksSettings as BlocksSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosFormsStyles as FormsSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosSecurity as SecuritySettingsPage;
+use MM\Meros\App\Admin\Pages\MerosForms as FormsPage;
 
 use MM\Meros\App\Admin\Pages\MerosDev as DevPage;
 
@@ -64,6 +65,7 @@ class Orchestrator extends SettingsOrchestrator {
         $this->pages(AssetGroupSettingsPage::class)->register();
         $this->pages(BlocksSettingsPage::class)->register();
         $this->pages(FormsSettingsPage::class)->register();
+        $this->pages(FormsPage::class)->make();
         $this->pages(SecuritySettingsPage::class)->register();
         $this->pages(DevPage::class)->make();
     }
