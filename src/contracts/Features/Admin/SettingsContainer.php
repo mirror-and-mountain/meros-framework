@@ -37,6 +37,8 @@ class SettingsContainer extends DataContainer {
      */
     protected string $section = '';
 
+    private array $configurationValues = [];
+
     // =========================================================================
     // Initialisation
     // =========================================================================
@@ -85,6 +87,10 @@ class SettingsContainer extends DataContainer {
     // =========================================================================
     // DataItem Management
     // =========================================================================
+
+    final public function setConfigurationValue(string $key, mixed $value): void {
+        $this->configurationValues[$key] = $value;
+    }
 
     protected function afterAdd(StorableItem $item): void {
         if (!($item instanceof Setting)) {
@@ -285,6 +291,10 @@ class SettingsContainer extends DataContainer {
      * @return mixed
      */
     final public function getItemValue(string $key, bool $refresh = false): mixed {
+        if (array_key_exists($key, $this->configurationValues)) {
+            return $this->configurationValues[$key];
+        }
+
         $value = parent::getItemValue($key, $refresh);
 
         if (is_string($value) && !empty($value)) {

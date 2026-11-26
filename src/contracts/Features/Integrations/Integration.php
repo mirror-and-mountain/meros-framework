@@ -12,6 +12,7 @@ use MM\Meros\Contracts\Features\Registrable;
 use MM\Meros\Contracts\Features\Admin\Page;
 use MM\Meros\Contracts\Features\Admin\Setting;
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
+use MM\Meros\Contracts\Features\Components\Field;
 
 use MM\Meros\App\Admin\Pages\MerosIntegrations as IntegrationsPage;
 
@@ -69,6 +70,8 @@ abstract class Integration extends Feature implements Registrable {
      * @var string
      */
     protected string $currentEnvironment = '';
+
+    private ?string $environmentOverride = null;
 
     /**
      * Instantiated flow actions for the integration.
@@ -191,12 +194,13 @@ abstract class Integration extends Feature implements Registrable {
             ? $this->category
             : 'general';
 
-        $container->add('boolean', function (Setting $setting) use ($integrationCategory) {
+        $container->add('boolean', function (Setting $setting) use ($integrationCategory, $container) {
             $setting->name($this->getName() . '_enabled');
             $setting->label('Enable ' . $this->getLabel());
             $setting->description($this->getDescription());
             $setting->default(false);
             $setting->field();
+            $this->configureEnabledSetting($setting, $container);
             $setting->section('meros-integrations-' . $integrationCategory . '-section');
         });
 
@@ -219,6 +223,29 @@ abstract class Integration extends Feature implements Registrable {
                     '<a href="' . esc_url(admin_url('admin.php?page=meros-integrations&integration=' . $this->getName('slug'))) . '" title="Manage">Manage</a>
                 </div>';
         }, 10, 3);
+    }
+
+    /**
+     * Configures the integration enabled setting based on the integration's configuration.
+     *
+     * @param Setting           $setting
+     * @param SettingsContainer $container
+     *
+     * @return void
+     */
+    private function configureEnabledSetting(Setting $setting, SettingsContainer $container): void {
+        if (($this->getIntegrationConfig()['force_enabled'] ?? false) !== true) {
+            return;
+        }
+
+        $field = $setting->getField();
+        if ($field === null) {
+            throw new \LogicException('The integration enabled setting must have a field.');
+        }
+
+        $field->disabled();
+        $setting->onUpdate(fn (mixed $value, mixed $oldValue): mixed => $oldValue);
+        $container->setConfigurationValue($setting->getName(), true);
     }
 
     /**
@@ -286,11 +313,87 @@ abstract class Integration extends Feature implements Registrable {
                         $newField->attribute('data-hidden', true);
                         $envSetting->__overrideField($newField);
                     }
+
+                    $this->configureSettingFromConfig($envSetting, $name, $handle);
                 }
             }
+
+            $this->configureSettingFromConfig($setting, $name, $currentEnv);
         });
 
         $this->settings = $container;
+    }
+
+    /**
+     * Applies configured defaults and read-only state to a registered setting.
+     */
+    private function configureSettingFromConfig(Setting $setting, string $name, string $environment): void {
+        if (in_array($name, $this->adminManagedSettings(), true)) {
+            return;
+        }
+
+        $integrationConfig = $this->getIntegrationConfig();
+        $settingConfig = $this->getEnvironmentConfig($environment);
+
+        if (!array_key_exists($name, $settingConfig)) {
+            return;
+        }
+
+        $value = $settingConfig[$name];
+        $setting->default($value);
+
+        $allowConfiguration = $settingConfig['allow_configuration']
+            ?? $integrationConfig['allow_configuration']
+            ?? true;
+        if ($allowConfiguration === false) {
+            $this->settings->setConfigurationValue($setting->getName(), $value);
+        }
+
+        $field = $setting->getField();
+        if ($field !== null) {
+            $field->default($value);
+            if ($allowConfiguration === false) {
+                $field->readonly();
+            }
+        }
+    }
+
+    /**
+     * Settings that must always be managed in wp-admin rather than configuration.
+     */
+    protected function adminManagedSettings(): array {
+        return [];
+    }
+
+    /**
+     * Returns this integration's merged configuration.
+     */
+    private function getIntegrationConfig(): array {
+        $config = config('integrations.' . $this->getName(), []);
+        if (!is_array($config)) {
+            throw new \UnexpectedValueException("Configuration for integration '{$this->getName()}' must be an array.");
+        }
+
+        return $config;
+    }
+
+    private function getEnvironmentConfig(string $environment): array {
+        $integrationConfig = $this->getIntegrationConfig();
+        $environments = $integrationConfig['environments'] ?? [];
+
+        if (!is_array($environments)) {
+            throw new \UnexpectedValueException("Environment configuration for integration '{$this->getName()}' must be an array.");
+        }
+
+        $environmentConfig = $environments[$environment] ?? [];
+        if (!is_array($environmentConfig)) {
+            throw new \UnexpectedValueException("Configuration for integration '{$this->getName()}' environment '{$environment}' must be an array.");
+        }
+
+        return array_merge(
+            array_diff_key($integrationConfig, ['environments' => true]),
+            $environmentConfig
+        );
     }
 
     protected function whenConfigured(): void {
@@ -377,16 +480,34 @@ abstract class Integration extends Feature implements Registrable {
             $setting->name($this->currentEnvironmentSettingName);
             $setting->label('Current Environment');
             $setting->description('The current environment being used for connections to this service.');
-            $setting->default(array_key_first($environments));
+            $integrationConfig = $this->getIntegrationConfig();
+            $environment = $integrationConfig['site_environment'] ?? array_key_first($environments);
+            if (!is_string($environment) || !array_key_exists($environment, $environments)) {
+                throw new \InvalidArgumentException("Invalid configured environment for integration '{$this->getName()}'.");
+            }
+            $setting->default($environment);
 
             if (count($environments) > 1) {
-                $setting->field('select', ['options' => $environments])
+                $field = $setting->field('select', ['options' => $environments])
                     ->attribute('data-meros-integration-env-switch', 'true')
                     ->attribute('data-action', $switchAction)
                     ->attribute('data-nonce', wp_create_nonce($switchAction . '_' . $this->getName()))
                     ->attribute('data-int-name', $this->getName());
+
+                $this->configureEnvironmentSwitch($setting, $field);
             }
         });
+    }
+
+    private function allowsEnvironmentSwitching(): bool {
+        return ($this->getIntegrationConfig()['allow_environment_switching'] ?? true) !== false;
+    }
+
+    private function configureEnvironmentSwitch(Setting $setting, Field $field): void {
+        if (!$this->allowsEnvironmentSwitching()) {
+            $field->disabled();
+            $setting->onUpdate(fn (mixed $value, mixed $oldValue): mixed => $oldValue);
+        }
     }
 
     /**
@@ -400,6 +521,11 @@ abstract class Integration extends Feature implements Registrable {
         add_action("wp_ajax_{$switchAction}", function () use ($switchAction) {
             if (!check_ajax_referer($switchAction, 'nonce', false)) {
                 wp_send_json_error(['message' => 'Invalid request.'], 403);
+                exit;
+            }
+
+            if (!$this->allowsEnvironmentSwitching()) {
+                wp_send_json_error(['message' => 'Environment switching is disabled for this integration.'], 403);
                 exit;
             }
 
@@ -445,6 +571,10 @@ abstract class Integration extends Feature implements Registrable {
      * @return string
      */
     final public function getCurrentEnvironment(bool $refresh = false): string {
+        if ($this->environmentOverride !== null) {
+            return $this->environmentOverride;
+        }
+
         if (empty($this->currentEnvironmentSettingName)) {
             $this->currentEnvironment = 'default';
             return 'default';
@@ -457,6 +587,33 @@ abstract class Integration extends Feature implements Registrable {
 
         $this->currentEnvironment = $this->settings($this->currentEnvironmentSettingName, true);
         return $this->currentEnvironment;
+    }
+
+    /**
+     * Indicates whether this integration's configuration is managed outside wp-admin.
+     */
+    final public function isConfigurationLocked(?string $environment = null): bool {
+        $environment ??= $this->getCurrentEnvironment();
+        if (!array_key_exists($environment, $this->getEnvironments())) {
+            throw new \InvalidArgumentException("Unknown environment '{$environment}' for integration '{$this->getName()}'.");
+        }
+
+        return ($this->getEnvironmentConfig($environment)['allow_configuration'] ?? true) === false;
+    }
+
+    /**
+     * Temporarily selects an environment for the current request without changing saved settings.
+     */
+    final protected function overrideEnvironment(string $environment): void {
+        if (!array_key_exists($environment, $this->getEnvironments())) {
+            throw new \InvalidArgumentException("Unknown environment '{$environment}' for integration '{$this->getName()}'.");
+        }
+
+        $this->environmentOverride = $environment;
+    }
+
+    final protected function clearEnvironmentOverride(): void {
+        $this->environmentOverride = null;
     }
 
     // =========================================================================

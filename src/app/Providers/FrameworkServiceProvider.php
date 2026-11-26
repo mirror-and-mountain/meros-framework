@@ -347,10 +347,12 @@ class FrameworkServiceProvider extends MerosServiceProvider {
             $installCli   = new InstallCommands();
             $uninstallCli = new UninstallCommands();
             $updateCli    = new UpdateCommands();
+            $integrationCli = new \MM\Meros\Scripts\IntegrationCommands();
             
             \WP_CLI::add_command('meros:install', $installCli);
             \WP_CLI::add_command('meros:uninstall', $uninstallCli);
             \WP_CLI::add_command('meros:update', $updateCli);
+            \WP_CLI::add_command('meros:integration', $integrationCli);
 
             if (getenv('MEROS_ENVIRONMENT') === 'true') {
                 $environmentsCli = new \MM\Meros\Scripts\EnvironmentCommands();

@@ -2,8 +2,8 @@
 
 namespace MM\Meros\Contracts\Features\Integrations;
 
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 use MM\Meros\Contracts\Features\Admin\Page;
@@ -16,6 +16,9 @@ use MM\Meros\Facades\Components\Fields;
 use MM\Meros\App\Components\Fields\Repeater;
 
 abstract class OAuthIntegration extends Integration {
+    private const ENVIRONMENT_STATE_PREFIX = 'meros_env_';
+    private const AUTHORIZATION_STATE_TTL = 600;
+
     /**
      * The url that receives the integration's authorization callback.
      * 
@@ -527,11 +530,46 @@ abstract class OAuthIntegration extends Integration {
      * @return string
      */
     final public function startAuthFlow(): string {
+        return $this->startAuthFlowForEnvironment($this->getCurrentEnvironment());
+    }
+
+    /**
+     * Starts OAuth authorization for a specific environment without changing the saved selection.
+     */
+    final public function startAuthFlowForEnvironment(string $environment): string {
+        $connections = $this->connections;
+        $this->overrideEnvironment($environment);
+
+        try {
+            $state = self::ENVIRONMENT_STATE_PREFIX . bin2hex(random_bytes(32));
+            $this->initConnections();
+            $url = $this->buildAuthorizationUrl($state);
+            if ($url !== '') {
+                $stored = set_transient($this->environmentStateKey($state), [
+                    'environment' => $environment,
+                    'user_id' => get_current_user_id(),
+                ], self::AUTHORIZATION_STATE_TTL);
+                if ($stored !== true) {
+                    throw new \RuntimeException('Unable to store the OAuth authorization state.');
+                }
+            }
+
+            return $url;
+        } finally {
+            $this->clearEnvironmentOverride();
+            $this->connections = $connections;
+        }
+    }
+
+    private function buildAuthorizationUrl(?string $state = null): string {
         if ($this->canConnect() === false) {
             return '';
         }
 
         $params = $this->getAuthorizationParams();
+        if ($state !== null) {
+            $params['state'] = $state;
+        }
 
         // Append PKCE params if enabled
         if ($this->usesPKCE) {
@@ -582,6 +620,9 @@ abstract class OAuthIntegration extends Integration {
         }
 
         $params = Context::params();
+        $environment = $this->resolveAuthorizationEnvironment($params);
+        $this->overrideEnvironment($environment);
+
         $error  = $this->getAuthorizationError($params);
 
         if (is_string($error)) {
@@ -610,6 +651,41 @@ abstract class OAuthIntegration extends Integration {
 
         // Redirect to a success page or back to the integration settings
         $this->redirect('success');
+    }
+
+    private function resolveAuthorizationEnvironment(array $params): string {
+        $state = $params['state'] ?? null;
+        if (!is_string($state) || !str_starts_with($state, self::ENVIRONMENT_STATE_PREFIX)) {
+            $error = 'The integration authorization state is missing or invalid.';
+            $this->logOauthError($error);
+            $this->redirect('error', $error);
+        }
+
+        $key = $this->environmentStateKey($state);
+        $attempt = get_transient($key);
+
+        if (
+            !is_array($attempt)
+            || ($attempt['user_id'] ?? null) !== get_current_user_id()
+            || !is_string($attempt['environment'] ?? null)
+            || !array_key_exists($attempt['environment'], $this->getEnvironments())
+        ) {
+            $error = 'The integration authorization state is invalid or expired.';
+            $this->logOauthError($error);
+            $this->redirect('error', $error);
+        }
+
+        if (delete_transient($key) !== true) {
+            $error = 'Unable to clear the OAuth authorization state.';
+            $this->logOauthError($error);
+            $this->redirect('error', $error);
+        }
+
+        return $attempt['environment'];
+    }
+
+    private function environmentStateKey(string $state): string {
+        return 'meros_oauth_environment_' . $this->getName() . '_' . hash('sha256', $state);
     }
 
     /**
@@ -1358,18 +1434,7 @@ abstract class OAuthIntegration extends Integration {
 
         $requiredSettings = $this->requiredConnectionSettings();
         if ($requiredSettings !== []) {
-            $saved = get_option($this->settings()->getName(true), []);
-            if (!is_array($saved)) {
-                return false;
-            }
-
-            $environment = $this->getCurrentEnvironment();
             foreach ($requiredSettings as $name) {
-                $key = $name . '_' . $environment;
-                if (!isset($saved[$key]) || !is_string($saved[$key]) || trim($saved[$key]) === '') {
-                    return false;
-                }
-
                 $value = $this->settings($name, true);
                 if (!is_string($value) || trim($value) === '') {
                     return false;
@@ -1421,6 +1486,62 @@ abstract class OAuthIntegration extends Integration {
         }
 
         return null;
+    }
+
+    /**
+     * Marks this integration's connection in the given environment as revoked.
+     *
+     * @return int The number of connections revoked.
+     */
+    final public function revokeToken(?string $environment = null): int {
+        $connections = $this->connectionsForEnvironment($environment);
+        $count = 0;
+
+        foreach ($connections as $connection) {
+            $connection->is_active = false;
+            $connection->status = 'revoked';
+            $connection->status_reason = 'Revoked via WP-CLI.';
+            $connection->revoked_at = now();
+            $connection->save();
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Deletes this integration's connection in the given environment.
+     *
+     * @return int The number of connections deleted.
+     */
+    final public function deleteToken(?string $environment = null): int {
+        $connections = $this->connectionsForEnvironment($environment);
+        $count = 0;
+
+        foreach ($connections as $connection) {
+            $connection->delete();
+            $count++;
+        }
+
+        return $count;
+    }
+
+    private function connectionsForEnvironment(?string $environment): EloquentCollection {
+        $environment ??= $this->getCurrentEnvironment();
+        if (!array_key_exists($environment, $this->getEnvironments())) {
+            throw new \InvalidArgumentException("Unknown environment '{$environment}' for integration '{$this->getName()}'.");
+        }
+
+        $query = ExternalConnection::where('integration_id', $this->getName())
+            ->where('environment', $environment);
+
+        if ($this->audience === 'current_user') {
+            $query->where('user_id', get_current_user_id());
+        } elseif ($this->audience !== 'all_users') {
+            throw new \UnexpectedValueException("Unsupported connection audience '{$this->audience}'.");
+        }
+
+        return $query->get();
     }
 
     /**

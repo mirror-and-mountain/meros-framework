@@ -50,17 +50,75 @@ abstract class PackageServiceProvider extends MerosServiceProvider {
      * config directory with `wp meros:publish --provider=<this provider>`.
      *
      * @param string $directory Directory containing `name.php` config files.
+     * @param string $prefix    Optional prefix for published filenames.
      *
      * @return void
      */
-    final protected function publishesConfig(string $directory): void {
+    final protected function publishesConfig(string $directory, string $prefix = ''): void {
         $paths = [];
 
         foreach (glob(rtrim($directory, '/\\') . '/*.php') ?: [] as $file) {
-            $paths[$file] = config_path(basename($file));
+            $paths[$file] = config_path($prefix . basename($file));
         }
 
         $this->publishes($paths, 'config');
+    }
+
+    /**
+     * Merges a package config file beneath the active configuration.
+     *
+     * @param string $file
+     * @param string $key
+     * @param string|null $publishedFile
+     *
+     * @return void
+     */
+    final protected function mergePackageConfig(string $file, string $key, ?string $publishedFile = null): void {
+        $defaults = require $file;
+
+        if (!is_array($defaults)) {
+            throw new \UnexpectedValueException("Configuration '{$key}' must be an array.");
+        }
+
+        if ($publishedFile !== null) {
+            $publishedPath = config_path($publishedFile);
+            if (is_file($publishedPath)) {
+                $published = require $publishedPath;
+                if (!is_array($published)) {
+                    throw new \UnexpectedValueException("Published configuration '{$publishedFile}' must be an array.");
+                }
+
+                $defaults = $this->mergeConfigArrays($defaults, $published);
+            }
+        }
+
+        $overrides = config($key, []);
+        if (!is_array($overrides)) {
+            throw new \UnexpectedValueException("Configuration '{$key}' must be an array.");
+        }
+
+        config([$key => $this->mergeConfigArrays($defaults, $overrides)]);
+    }
+
+    /**
+     * Recursively merges associative configuration maps while replacing lists.
+     */
+    private function mergeConfigArrays(array $defaults, array $overrides): array {
+        foreach ($overrides as $key => $value) {
+            if (
+                isset($defaults[$key])
+                && is_array($defaults[$key])
+                && is_array($value)
+                && !array_is_list($defaults[$key])
+                && !array_is_list($value)
+            ) {
+                $defaults[$key] = $this->mergeConfigArrays($defaults[$key], $value);
+            } else {
+                $defaults[$key] = $value;
+            }
+        }
+
+        return $defaults;
     }
 
     /**
