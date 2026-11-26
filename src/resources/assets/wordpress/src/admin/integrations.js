@@ -1,4 +1,4 @@
-import MerosModal from '../classes/modal.js';
+const MerosModal = window.MerosModal;
 
 export function __meros_integrations_reset_log(event) {
     event.preventDefault();

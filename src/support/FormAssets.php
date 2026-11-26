@@ -20,8 +20,8 @@ class FormAssets {
         $html = [];
 
         // Dependencies must load before the main form bundle.
-        foreach (['nice-forms/', 'tomselect/', 'quill/', ''] as $directory) {
-            $path = 'resources/assets/wordpress/build/mforms/' . $directory . $filename;
+        foreach (['modal/', 'mforms/nice-forms/', 'mforms/tomselect/', 'mforms/quill/', 'mforms/'] as $directory) {
+            $path = 'resources/assets/wordpress/build/' . $directory . $filename;
             $filePath = $framework->getPath($path);
 
             if (!File::isFile($filePath)) {

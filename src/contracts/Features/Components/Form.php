@@ -19,6 +19,7 @@ use MM\Meros\Facades\Framework;
 use MM\Meros\Facades\Support\Ajax;
 use MM\Meros\Facades\Components\Fields;
 use MM\Meros\Support\FormConditionSources;
+use MM\Meros\App\Components\Fields\Repeater;
 
 class Form extends Feature implements FormComponent, Makeable {
     /**
@@ -709,6 +710,47 @@ class Form extends Feature implements FormComponent, Makeable {
         }
 
         return $collect ? collect($fields) : $fields;
+    }
+
+    final public function repeaterEditFormLoader(string $event): static {
+        $this->attribute('data-repeater-edit-form-loader', $event);
+        return $this;
+    }
+
+    final public function renderRepeaterEditForm(
+        string $name,
+        string $originalName,
+        array $rowData = [],
+        array $currentValue = []
+    ): string {
+        if ($name === '') {
+            throw new \InvalidArgumentException('The repeater name is required.');
+        }
+        $repeater = null;
+        foreach (array_unique(array_filter([$name, $originalName])) as $candidate) {
+            $repeater = $this->getFields(true)->first(fn ($field) =>
+                $field instanceof Repeater && $field->getName() === $candidate
+            );
+            if ($repeater instanceof Repeater) {
+                break;
+            }
+        }
+
+        if (!($repeater instanceof Repeater) || !$repeater->hasEditForm()) {
+            throw new \InvalidArgumentException('Unable to get repeater edit form.');
+        }
+        if (isset($rowData['form_data']) && !is_array($rowData['form_data'])) {
+            throw new \InvalidArgumentException('Repeater form data must be an array.');
+        }
+
+        $repeater = clone $repeater;
+        $repeater->name($name);
+        $form = $repeater->prepareEditForm($rowData, $currentValue);
+        if (!($form instanceof self)) {
+            throw new \RuntimeException('The repeater edit-form callback must return a Form instance.');
+        }
+
+        return $form->html();
     }
 
     // =========================================================================

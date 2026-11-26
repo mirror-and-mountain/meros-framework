@@ -1,3 +1,5 @@
+import './style.scss';
+
 export default class MerosModal {
     static stashedContent = new WeakMap();
 
@@ -36,6 +38,8 @@ export default class MerosModal {
                 event.preventDefault();
                 first.focus();
             }
+
+            window.MerosModal = MerosModal;
         }
     };
 
@@ -342,11 +346,11 @@ export default class MerosModal {
 
         const modalConfirmButton = document.createElement('button');
         modalConfirmButton.type = 'button';
-        modalConfirmButton.classList.add('meros-modal-button', 'meros-modal-confirm-button', 'button', 'button-primary');
+        modalConfirmButton.classList.add('meros-modal-button', 'meros-modal-confirm-button', 'mforms-button');
 
         const modalCancelButton = document.createElement('button');
         modalCancelButton.type = 'button';
-        modalCancelButton.classList.add('meros-modal-button', 'meros-modal-cancel-button', 'button');
+        modalCancelButton.classList.add('meros-modal-button', 'meros-modal-cancel-button', 'mforms-button');
         modalCancelButton.textContent = 'Cancel';
 
         modalHeader.append(modalTitle, modalCloseButton);
@@ -361,3 +365,5 @@ export default class MerosModal {
         return overlay;
     }
 }
+
+window.MerosModal = MerosModal;

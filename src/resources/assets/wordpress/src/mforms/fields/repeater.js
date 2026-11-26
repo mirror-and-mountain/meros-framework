@@ -1,6 +1,6 @@
 import MerosFormProcessor from '../form-processor.js';
 import MerosFieldsProcessor from '../fields-processor.js';
-import MerosModal from '../../classes/modal.js';
+const MerosModal = window.MerosModal;
 import { createConditionEditor } from '../builder-conditions.js';
 import { createChoiceDefaultEditor } from '../builder-choice-default.js';
 import { positionTemplateFieldLocks, updateTemplateLockControls } from '../builder-template-locks.js';
@@ -266,6 +266,64 @@ const mformsRepeater = () => {
             this.fieldsProcessor = new MerosFieldsProcessor(this.container);
         },
 
+        get editFormLoaderEvent() {
+            return this.container.closest('[data-repeater-edit-form-loader]')?.dataset.repeaterEditFormLoader || null;
+        },
+
+        requestEditForm(rowData, currentValue) {
+            const formId = this.container.dataset.formId || this.formId;
+            let request;
+
+            if (this.editFormLoaderEvent) {
+                request = new Promise((resolve, reject) => {
+                    let responded = false;
+                    this.container.dispatchEvent(new CustomEvent('mforms::' + this.editFormLoaderEvent, {
+                        bubbles: true,
+                        detail: {
+                            formId,
+                            name: this.name,
+                            originalName: this.originalName,
+                            rowData,
+                            currentValue,
+                            respondWith(result) {
+                                responded = true;
+                                resolve(result);
+                            },
+                        },
+                    }));
+                    if (!responded) {
+                        reject(new Error('No repeater edit-form loader responded to ' + this.editFormLoaderEvent));
+                    }
+                });
+            } else {
+                const formData = new FormData();
+                formData.append('action', this.ajaxAction);
+                formData.append('nonce', this.ajaxNonce);
+                formData.append('repeater_name', this.name);
+                formData.append('repeater_original_name', this.originalName);
+                formData.append('row_data', JSON.stringify(rowData));
+                formData.append('current_value', JSON.stringify(currentValue));
+                formData.append('form_id', formId);
+
+                request = fetch(this.ajaxurl, { method: 'POST', body: formData })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Unable to load the edit form: HTTP ' + response.status);
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (!data.success) throw new Error(data.data?.message || 'Unable to load the edit form.');
+                        return data.data?.html;
+                    });
+            }
+
+            return request.then(html => {
+                if (typeof html !== 'string' || html.trim() === '') {
+                    throw new Error('The repeater edit-form loader did not return HTML.');
+                }
+                return html;
+            });
+        },
+
         handleEditRow(event) {
             const row = event.target.closest('tr.meros-repeater-table-row');
             if (!row) return;
@@ -287,7 +345,8 @@ const mformsRepeater = () => {
                 return;
             }
 
-            if (!this.name || !this.originalName || !this.ajaxAction || !this.ajaxurl || !this.ajaxNonce) return;
+            if (!this.name || !this.originalName ||
+                (!this.editFormLoaderEvent && (!this.ajaxAction || !this.ajaxurl || !this.ajaxNonce))) return;
 
             const rowData = this.getRowData(row);
             const currentValue = this.getValue();
@@ -302,11 +361,14 @@ const mformsRepeater = () => {
             );
 
             modal.show();
+            modal.disableConfirmButton();
 
             const openForm = (html, stash = false) => {
                 if (!modal.modal) return;
 
                 modal.setContent(html);
+                const form = modal.content.querySelector('form');
+                if (!form) throw new Error('The repeater edit-form loader did not return a form.');
                 if (stash) modal.stash(row, revision);
 
                 const processor = new MerosFieldsProcessor(modal.content);
@@ -324,7 +386,6 @@ const mformsRepeater = () => {
                 let conditionEditor = null;
                 let conditionInput = null;
                 const card = this.container.closest('[data-form-field-component]');
-                const form = modal.content.querySelector('form');
                 const dynamicDefault = form?.querySelector('[name="__builder_dynamic_default"]');
                 form?.querySelectorAll('[data-builder-bound]').forEach(control => {
                     control.value = rowData.form_data?.[control.dataset.builderBound] ?? '';
@@ -396,6 +457,7 @@ const mformsRepeater = () => {
                 modal.onCancel(() => {
                     this.editingRowIndex = null;
                 });
+                modal.enableConfirmButton();
                 modal.focusContent();
             };
 
@@ -405,42 +467,8 @@ const mformsRepeater = () => {
                 return;
             }
 
-            const formData = new FormData();
-            formData.append('action', this.ajaxAction);
-            formData.append('nonce', this.ajaxNonce);
-            formData.append('repeater_name', this.name);
-            formData.append('repeater_original_name', this.originalName);
-            formData.append('row_data', JSON.stringify(rowData));
-            formData.append('current_value', JSON.stringify(currentValue));
-            formData.append('form_id', this.formId);
-
-            const formId = this.container.dataset.formId;
-            if (formId) {
-                formData.append('form_id', formId);
-            }
-
-            fetch(this.ajaxurl, {
-                method: 'POST',
-                body: formData,
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.data && data.data.html) {
-                        openForm(data.data.html, true);
-                    }
-
-                    else if (data.data && data.data.message) {
-                        modal.setExtraContent('Unable to load the edit form. Please cancel and try again.', 'red', '1rem');
-                        modal.hideConfirmButton();
-                        console.error('Error fetching edit form:', data.data.message);
-                    }
-
-                    else {
-                        modal.setExtraContent('Unable to load the edit form. Please cancel and try again.', 'red', '1rem');
-                        modal.hideConfirmButton();
-                        console.error('Unexpected response:', data);
-                    }
-                })
+            return this.requestEditForm(rowData, currentValue)
+                .then(html => openForm(html, true))
                 .catch((error) => {
                     if (!modal.modal) return;
                     modal.setExtraContent('Unable to load the edit form. Please cancel and try again.', 'red', '1rem');

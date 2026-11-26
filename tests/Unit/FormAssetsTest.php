@@ -36,14 +36,14 @@ final class FormAssetsTest extends TestCase {
             'styles' => ['style-index.css', '<link rel="stylesheet" href="%s">'],
         ] as $view => [$filename, $tag]) {
             $expected = [];
-            foreach (['nice-forms/', 'tomselect/', 'quill/', ''] as $directory) {
-                if ($view === 'scripts' && $directory === 'quill/') {
+            foreach (['modal/', 'mforms/nice-forms/', 'mforms/tomselect/', 'mforms/quill/', 'mforms/'] as $directory) {
+                if ($view === 'scripts' && $directory === 'mforms/quill/') {
                     $expected[] = FormAssetsScriptRegistry::LODASH_HTML;
                 }
                 $expected[] = sprintf(
                     $tag,
-                    'https://meros.test/framework/resources/assets/wordpress/build/mforms/' . $directory . $filename
-                        . '?ver=' . md5_file(dirname(__DIR__, 2) . '/src/resources/assets/wordpress/build/mforms/' . $directory . $filename)
+                    'https://meros.test/framework/resources/assets/wordpress/build/' . $directory . $filename
+                        . '?ver=' . md5_file(dirname(__DIR__, 2) . '/src/resources/assets/wordpress/build/' . $directory . $filename)
                 );
             }
 
@@ -74,6 +74,10 @@ final class FormAssetsTest extends TestCase {
     public function test_cached_views_use_new_asset_urls_when_bundle_contents_change(): void {
         $buildPath = 'resources/assets/wordpress/build/mforms';
         $this->files->copyDirectory(dirname(__DIR__, 2) . '/src/' . $buildPath, $this->directory . '/' . $buildPath);
+        $this->files->copyDirectory(
+            dirname(__DIR__, 2) . '/src/resources/assets/wordpress/build/modal',
+            $this->directory . '/resources/assets/wordpress/build/modal'
+        );
         (new ReflectionProperty(Provider::class, 'path'))->setValue($this->framework, $this->directory . '/');
         $before = $this->app['view']->make('form-assets::scripts')->render();
         $bundle = $this->directory . '/' . $buildPath . '/index.js';

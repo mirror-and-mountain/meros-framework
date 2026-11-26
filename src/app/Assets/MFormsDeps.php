@@ -7,6 +7,8 @@ use MM\Meros\Contracts\Features\Assets\AssetGroup;
 final class MFormsDeps extends AssetGroup {
     protected function configure(): void {
         $assets = [
+            'mforms-modal-style'       => 'modal/style-index.css',
+            'mforms-modal-script'      => 'modal/index.js',
             'mforms-nice-forms-style'  => 'mforms/nice-forms/style-index.css',
             'mforms-tom-select-style'  => 'mforms/tomselect/style-index.css',
             'mforms-tom-select-script' => 'mforms/tomselect/index.js',

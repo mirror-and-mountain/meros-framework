@@ -1,4 +1,4 @@
-import MerosModal from '../classes/modal.js';
+const MerosModal = window.MerosModal;
 
 export function __meros_tables_multi_operation(event) {
     event.preventDefault();

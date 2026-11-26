@@ -1,4 +1,4 @@
-import MerosModal from '../classes/modal.js';
+const MerosModal = window.MerosModal;
 
 const operators = ['=', '!=', 'LIKE', 'CONTAINS', 'NOT CONTAINS', 'EMPTY', 'NOT EMPTY', '<', '>', '=>', '=<'];
 const equality = ['=', '!='];

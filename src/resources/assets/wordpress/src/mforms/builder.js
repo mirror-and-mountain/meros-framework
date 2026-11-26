@@ -1,7 +1,7 @@
 import { configureConditions } from './builder-conditions.js';
 import { configureRepeaterDefaults } from './builder-repeater-default.js';
 import { updateTemplateLockControls, watchTemplateLockControls } from './builder-template-locks.js';
-import MerosModal from '../classes/modal.js';
+const MerosModal = window.MerosModal;
 
 export const mformsBuilder = () => ({
     isFullscreen: false,

@@ -18,7 +18,8 @@ assets directly with `@merosFormStyles()` in the document head and
 `@merosFormScripts()` before `@livewireScripts`. The script directive must run
 before Alpine starts so the form components are registered. Both directives
 include the dependencies from `resources/assets/wordpress/build/mforms` before
-the main bundle, using the framework's public asset URLs without WordPress
+the main bundle, together with the standalone `build/modal` script and styles,
+using the framework's public asset URLs without WordPress
 enqueue hooks. External script dependencies declared in `index.asset.php` are
 printed through WordPress's script registry, including their inline initialization
 (for example, Quill's `window.lodash` dependency). Alpine is supplied by Livewire
@@ -44,6 +45,35 @@ listeners to `$wire.$el` rather than `document` to avoid stale navigation listen
 For asynchronous callbacks, set `form.isSubmitting = true` before the request
 and clear it in the promise's `finally` handler. This activates the existing
 submit-button spinner, busy overlay, and duplicate-submission protection.
+
+### Repeater edit forms on custom routes
+
+The existing modal, row-save behavior, validation and per-row HTML cache are
+shared by WordPress and custom views. WordPress AJAX remains the default.
+The standalone modal bundle exposes `window.MerosModal`; `MFormsDeps` and the
+form asset directives load it before any consuming scripts.
+For a custom transport, configure `$form->repeaterEditFormLoader('myLoader')`.
+Listen for `mforms::myLoader` on the form's parent and call
+`event.detail.respondWith(htmlOrPromise)` synchronously. The event also contains
+`formId`, `name`, `originalName`, `rowData` and `currentValue`. The promise must
+resolve to the edit-form HTML, not a JSON response envelope; missing handlers,
+failed requests and invalid responses display a modal error.
+
+For reusable Livewire support:
+
+1. Use `MM\Meros\App\Livewire\Concerns\InteractsWithForms` on the component.
+2. Implement `protected function makeMerosForm(string $formId): Form`, selecting
+   and rebuilding the component's authorized PHP form definition on every call.
+3. Configure `$form->repeaterEditFormLoader('livewireRepeaterEditForm')`.
+4. Include `@include('meros::forms.livewire-repeater-loader')` once in the component view.
+
+The trait supplies a renderless `renderRepeaterEditForm` action and checks the
+requested form ID. Other HTTP transports can call
+`$form->renderRepeaterEditForm($name, $originalName, $rowData, $currentValue)` from
+their own CSRF-protected/authorized endpoint. Only repeaters in that form can be
+resolved. Edit-form callbacks must return their configured `Form` instance.
+PHP closures and schemas stay on the server rather than being serialized into
+the browser or session.
 
 ## Taxonomies
 

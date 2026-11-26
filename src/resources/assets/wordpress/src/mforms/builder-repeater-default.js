@@ -1,4 +1,4 @@
-import MerosModal from '../classes/modal.js';
+const MerosModal = window.MerosModal;
 
 export async function configureRepeaterDefaults(card) {
     const editor = card.querySelector('.mforms-builder-repeater-editor');
