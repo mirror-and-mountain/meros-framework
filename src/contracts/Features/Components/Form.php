@@ -78,11 +78,25 @@ class Form extends Feature implements FormComponent, Makeable {
     protected string $invalidText = "The form is invalid. Please check the information you've entered.";
 
     /**
-     * The callback function to be executed when the form is submitted.
+     * Override styles applied to the form.
      *
-     * @var Closure|string|null
+     * @var array
      */
-    protected Closure|string|null $onSubmit = null;
+    protected array $styles = [];
+
+    /**
+     * Whether to use the default styles for the form.
+     *
+     * @var boolean
+     */
+    protected bool $useDefaultStyles = false;
+
+    /**
+     * The js callback function to be executed when the form is submitted.
+     *
+     * @var string|null
+     */
+    protected string|null $onSubmit = null;
 
     /**
      * Whether to hide the form's title.
@@ -111,7 +125,19 @@ class Form extends Feature implements FormComponent, Makeable {
      * @var boolean
      */
     protected bool $displayAsPages = false;
+
+    /**
+     * Whether to show the success message on a new page.
+     *
+     * @var boolean
+     */
     protected bool $showSuccessOnNewPage = false;
+
+    /**
+     * Whether to show the option to submit another response.
+     *
+     * @var boolean
+     */
     protected bool $showSubmitAnotherResponse = false;
 
     /**
@@ -421,6 +447,8 @@ class Form extends Feature implements FormComponent, Makeable {
      * 
      * Event names are prefixed with 'mforms::' to avoid conflicts with other events. Example:
      * mforms::myCustomEvent.
+     * The event includes the Alpine form instance as detail.form. Callbacks own
+     * completion and may call showSuccess() or showError() to display feedback.
      *
      * @param string $jsCallback The name of the client-side event to trigger on form submission.
      *
@@ -443,18 +471,61 @@ class Form extends Feature implements FormComponent, Makeable {
         return $this;
     }
 
+    /**
+     * Sets whether the form should be displayed as pages.
+     *
+     * @param boolean $display
+     *
+     * @return static
+     */
     final public function displayAsPages(bool $display = true): static {
         $this->displayAsPages = $display;
         return $this;
     }
 
+    /**
+     * Sets whether to show the success message on a new page.
+     *
+     * @param boolean $show
+     *
+     * @return static
+     */
     final public function showSuccessOnNewPage(bool $show = true): static {
         $this->showSuccessOnNewPage = $show;
         return $this;
     }
 
+    /**
+     * Sets whether to show the option to submit another response.
+     *
+     * @param boolean $show
+     *
+     * @return static
+     */
     final public function showSubmitAnotherResponse(bool $show = true): static {
         $this->showSubmitAnotherResponse = $show;
+        return $this;
+    }
+
+    /**
+     * Sets the styles applied to the form.
+     *
+     * @param array $styles
+     *
+     * @return static
+     */
+    final public function styles(array $styles): static {
+        $this->styles = $styles;
+        return $this;
+    }
+
+    /**
+     * Enables the use of default styles for the form.
+     *
+     * @return static
+     */
+    final public function useDefaultStyles(): static {
+        $this->useDefaultStyles = true;
         return $this;
     }
 
@@ -589,6 +660,13 @@ class Form extends Feature implements FormComponent, Makeable {
         return $index !== false ? $index : null;
     }
 
+    /**
+     * Returns the index of the given FieldGroup instance within the form's rows.
+     *
+     * @param FieldGroup $group
+     *
+     * @return integer|null
+     */
     final public function getGroupIndex(FieldGroup $group): ?int {
         $groupRow = collect($this->rows)->firstWhere(function (FieldRow $row) use($group) {
             return $row->getGroup() === $group;
@@ -653,19 +731,22 @@ class Form extends Feature implements FormComponent, Makeable {
                 : $properties;
         }
 
-        $properties['style'] = $this->mapFormStyles();
+        if ($this->useDefaultStyles === false) {
+            $properties['style'] = $this->mapFormStyles();
+        }
+
         $properties['conditionValues'] = FormConditionSources::values();
 
         echo view($view, $properties);
     }
 
     /**
-     * Maps the form styles based on the global colour settings.
+     * Maps the form styles based on the global colour settings or the styles array if it is set.
      *
      * @return string
      */
     private function mapFormStyles(): string {
-        $globalColourSettings = Framework::__getFormsSettings();
+        $globalColourSettings = empty($this->styles) ? Framework::__getFormsSettings() : $this->styles;
         $styles = '';
 
         // These styles map to nice-forms.css styles.

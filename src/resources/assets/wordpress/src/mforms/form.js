@@ -312,15 +312,16 @@ const mform = () => {
 
             if (this.onSubmit && typeof this.onSubmit === 'string') {
                 this.$dispatch('mforms::' + this.onSubmit, { 
+                    form: this,
                     formId: this.id,
                     formName: this.name,
                     formData,
                 });
 
-                return this.completeSubmission(
-                    {success: true, error: null, message: this.successMessage},
-                    returnOutcome
-                );
+                if (returnOutcome) {
+                    return {success: true, error: null, message: this.successMessage};
+                }
+                return;
             }
 
             if (!this.ajaxUrl || !this.ajaxNonce || !this.ajaxAction) {
@@ -380,6 +381,14 @@ const mform = () => {
             }
 
             return request.then(outcome => this.completeSubmission(outcome, false));
+        },
+
+        showSuccess(message = this.successMessage) {
+            this.completeSubmission({success: true, message}, false);
+        },
+
+        showError(message) {
+            this.completeSubmission({success: false, error: message}, false);
         },
 
         completeSubmission(outcome, returnOutcome) {

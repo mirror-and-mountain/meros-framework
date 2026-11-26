@@ -138,6 +138,8 @@ class FrameworkServiceProvider extends MerosServiceProvider {
         }
 
         $this->registerViteDirective();
+        $this->registerFormScriptsDirective();
+        $this->registerFormStylesDirective();
     }
 
     /**
@@ -185,6 +187,28 @@ class FrameworkServiceProvider extends MerosServiceProvider {
             }
 
             return $this->app->make(ViteAssets::class)->render($entry, $buildPath);
+        });
+    }
+
+    /**
+     * Registers the @merosFormScripts Blade directive for including form scripts in views.
+     *
+     * @return void
+     */
+    private function registerFormScriptsDirective(): void {
+        Blade::directive('merosFormScripts', function () {
+            return '<?php echo app(\MM\Meros\Support\FormAssets::class)->scripts(); ?>';
+        });
+    }
+
+    /**
+     * Registers the @merosFormStyles Blade directive for including form styles in views.
+     *
+     * @return void
+     */
+    private function registerFormStylesDirective(): void {
+        Blade::directive('merosFormStyles', function () {
+            return '<?php echo app(\MM\Meros\Support\FormAssets::class)->styles(); ?>';
         });
     }
 

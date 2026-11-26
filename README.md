@@ -11,6 +11,40 @@ services for Meros themes, powered by Meros Foundations.
 
 Detailed documentation is maintained in [meros-docs](https://github.com/mirror-and-mountain/meros-docs).
 
+## Forms on custom routes
+
+Views rendered by non-WordPress routes can include the framework's built form
+assets directly with `@merosFormStyles()` in the document head and
+`@merosFormScripts()` before `@livewireScripts`. The script directive must run
+before Alpine starts so the form components are registered. Both directives
+include the dependencies from `resources/assets/wordpress/build/mforms` before
+the main bundle, using the framework's public asset URLs without WordPress
+enqueue hooks. External script dependencies declared in `index.asset.php` are
+printed through WordPress's script registry, including their inline initialization
+(for example, Quill's `window.lodash` dependency). Alpine is supplied by Livewire
+(or by the consuming layout). Livewire `@script` blocks listening for form submit
+events must contain a `<script>` element.
+Asset URLs include a content-based version so rebuilt bundles bypass browser
+caches, including when the Blade view is already compiled.
+
+Forms with `onSubmit('eventName')` dispatch `mforms::eventName` with
+`{ form, formId, formName, formData }`. `form` is the Alpine form instance.
+Callbacks now own completion: dispatching the event does not automatically
+display feedback or reset the inputs. Existing callbacks that want success
+feedback must explicitly call `form.showSuccess(message)` (omit the message to
+use the configured success message); `form.showError(message)` displays an error
+without resetting inputs. Redirecting callbacks can leave feedback untouched.
+Validation and forms using the default AJAX submission retain their existing
+behavior. `submitForm(true)` still returns the validation/dispatch outcome for
+repeater editors, not the outcome of asynchronous callback logic.
+Livewire actions that return callback results without changing server-rendered
+content should use `#[\Livewire\Attributes\Renderless]` so their response does not
+replace the form before client-side feedback is applied. Attach component-local
+listeners to `$wire.$el` rather than `document` to avoid stale navigation listeners.
+For asynchronous callbacks, set `form.isSubmitting = true` before the request
+and clear it in the promise's `finally` handler. This activates the existing
+submit-button spinner, busy overlay, and duplicate-submission protection.
+
 ## Taxonomies
 
 Extend `MM\Meros\Contracts\Features\Content\Taxonomy` and configure it like a
