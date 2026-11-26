@@ -712,11 +712,28 @@ class Form extends Feature implements FormComponent, Makeable {
         return $collect ? collect($fields) : $fields;
     }
 
+    /**
+     * Sets the event name for the repeater edit form loader.
+     *
+     * @param string $event
+     *
+     * @return static
+     */
     final public function repeaterEditFormLoader(string $event): static {
         $this->attribute('data-repeater-edit-form-loader', $event);
         return $this;
     }
 
+    /**
+     * Renders the edit form for a repeater field.
+     *
+     * @param string $name The name of the repeater field.
+     * @param string $originalName The original name of the repeater field.
+     * @param array  $rowData The data for the current row.
+     * @param array  $currentValue The current value of the repeater field.
+     *
+     * @return string
+     */
     final public function renderRepeaterEditForm(
         string $name,
         string $originalName,
