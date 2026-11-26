@@ -282,6 +282,7 @@ class FlowControls {
                     $group->field('flow_actions_repeater', function (FlowActionsRepeater $repeater) use ($tableInputs, $choicesJson) {
                         $repeater->name('action_inputs');
                         $repeater->label('Action Inputs');
+                        $repeater->hideLabel(true);
                         $repeater->allowAdd(false);
                         $repeater->allowRemove(false);
                         $repeater->allowReorder(false);
