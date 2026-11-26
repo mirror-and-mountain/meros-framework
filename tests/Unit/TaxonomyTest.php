@@ -23,6 +23,9 @@ namespace MM\Meros\Tests\Unit {
             TaxonomyWordPressState::$events = [];
             TaxonomyWordPressState::$failRegistration = false;
             TaxonomyWordPressState::$capabilities = ['read_forms', 'edit_forms'];
+            TaxonomyWordPressState::$posts = [];
+            TaxonomyWordPressState::$admin = false;
+            TaxonomyWordPressState::$screen = null;
         }
 
         public function test_standalone_taxonomy_registration_preserves_configuration_and_ownership(): void {
@@ -181,13 +184,13 @@ namespace MM\Meros\Tests\Unit {
                 $capabilities = $postType->getArg('capabilities');
                 $this->assertSame('read_forms', $capabilities['edit_posts']);
                 $this->assertSame('read_forms', $capabilities['read_post']);
-                $this->assertSame('edit_forms', $capabilities['edit_post']);
+                $this->assertSame($postType === $form ? 'edit_form' : 'edit_forms', $capabilities['edit_post']);
                 $this->assertFalse($postType->getArg('map_meta_cap'));
             }
 
             foreach (['create_posts', 'delete_post', 'delete_posts', 'delete_others_posts', 'delete_private_posts', 'delete_published_posts'] as $capability) {
                 $this->assertSame('do_not_allow', $template->getArg('capabilities')[$capability]);
-                $this->assertSame('edit_forms', $form->getArg('capabilities')[$capability]);
+                $this->assertSame($capability === 'delete_post' ? 'delete_form' : 'edit_forms', $form->getArg('capabilities')[$capability]);
             }
 
             $this->assertSame([
@@ -238,6 +241,81 @@ namespace MM\Meros\Tests\Unit {
             ], apply_filters('display_post_states', $states, (object) ['post_type' => 'form-template']));
             $this->assertSame($states, apply_filters('display_post_states', $states, (object) ['post_type' => 'form']));
         }
+
+        public function test_theme_provided_form_is_only_excluded_from_the_main_forms_admin_list(): void {
+            $provider = new FeatureProvider($this->directory);
+            PostTypes::checkout($provider)->makeFrom(Form::class);
+            global $wpdb;
+            $originalWpdb = $wpdb;
+            $wpdb = new class {
+                public string $posts = 'wp_posts';
+                public function prepare(string $sql, string $value): string {
+                    return str_replace('%s', "'" . $value . "'", $sql);
+                }
+            };
+
+            try {
+                $formsScreen = (object) ['base' => 'edit', 'post_type' => 'form'];
+                $cases = [
+                    [true, true, 'form', $formsScreen, true],
+                    [false, true, 'form', $formsScreen, false],
+                    [true, false, 'form', $formsScreen, false],
+                    [true, true, 'form-template', $formsScreen, false],
+                    [true, true, 'form', (object) ['base' => 'post', 'post_type' => 'form'], false],
+                    [true, true, 'form', (object) ['base' => 'edit', 'post_type' => 'form-template'], false],
+                    [true, true, 'form', null, false],
+                ];
+                foreach ($cases as [$admin, $main, $postType, $screen, $excluded]) {
+                    TaxonomyWordPressState::$admin = $admin;
+                    TaxonomyWordPressState::$screen = $screen;
+                    $query = $this->getMockBuilder(\WP_Query::class)
+                        ->onlyMethods(['is_main_query', 'get'])
+                        ->getMock();
+                    $query->method('is_main_query')->willReturn($main);
+                    $query->method('get')->with('post_type')->willReturn($postType);
+                    $where = ' AND wp_posts.post_status = \'publish\'';
+                    $this->assertSame(
+                        $where . ($excluded ? " AND wp_posts.post_name <> 'f'" : ''),
+                        apply_filters('posts_where', $where, $query)
+                    );
+                }
+            } finally {
+                $wpdb = $originalWpdb;
+            }
+        }
+
+        public function test_theme_provided_form_is_labelled_read_only_without_labelling_other_forms(): void {
+            $provider = new FeatureProvider($this->directory);
+            PostTypes::checkout($provider)->makeFrom(Form::class);
+            $states = ['private' => 'Private'];
+            $this->assertSame([
+                'private' => 'Private',
+                'meros_form_host_provider' => 'Provided by theme (read-only)',
+            ], apply_filters('display_post_states', $states, (object) ['post_type' => 'form', 'post_name' => 'f']));
+            $this->assertSame($states, apply_filters('display_post_states', $states, (object) ['post_type' => 'form', 'post_name' => 'contact']));
+            $this->assertSame($states, apply_filters('display_post_states', $states, (object) ['post_type' => 'post', 'post_name' => 'f']));
+        }
+
+        public function test_theme_provided_form_cannot_be_edited_or_removed_and_other_permissions_are_preserved(): void {
+            $provider = new FeatureProvider($this->directory);
+            PostTypes::checkout($provider)->makeFrom(Form::class);
+            TaxonomyWordPressState::$posts = [
+                1 => (object) ['post_type' => 'form', 'post_name' => 'f'],
+                2 => (object) ['post_type' => 'form', 'post_name' => 'contact'],
+                3 => (object) ['post_type' => 'form-template', 'post_name' => 'f'],
+            ];
+
+            foreach (['edit_post' => 'edit_form', 'delete_post' => 'delete_form', 'edit_form' => 'edit_form', 'delete_form' => 'delete_form'] as $requested => $required) {
+                $this->assertSame(['do_not_allow'], apply_filters('map_meta_cap', [$required], $requested, 10, [1]));
+                $this->assertSame(['edit_forms', 'extra_requirement'], apply_filters('map_meta_cap', [$required, 'extra_requirement'], $requested, 10, [2]));
+                $this->assertSame(['do_not_allow'], apply_filters('map_meta_cap', ['do_not_allow'], $requested, 10, [2]));
+            }
+
+            $this->assertSame(['edit_forms'], apply_filters('map_meta_cap', ['edit_forms'], 'edit_post', 10, [3]));
+            $this->assertSame(['read_forms'], apply_filters('map_meta_cap', ['read_forms'], 'read_post', 10, [1]));
+            $this->assertSame(['edit_forms'], apply_filters('map_meta_cap', ['edit_forms'], 'edit_forms', 10, []));
+            $this->assertSame(['do_not_allow'], apply_filters('map_meta_cap', ['edit_form'], 'edit_form', 10, [999]));
+        }
     }
 
     class Genre extends Taxonomy {
@@ -264,10 +342,27 @@ namespace MM\Meros\Tests\Unit {
         public static array $events = [];
         public static bool $failRegistration = false;
         public static array $capabilities = [];
+        public static array $posts = [];
+        public static bool $admin = false;
+        public static ?object $screen = null;
     }
 
     final class TaxonomyRegistrationError {
         public function get_error_message(): string { return 'Registration rejected'; }
+    }
+}
+
+namespace MM\Meros\App\Content {
+    function is_admin(): bool {
+        return \MM\Meros\Tests\Unit\TaxonomyWordPressState::$admin;
+    }
+
+    function get_current_screen(): ?object {
+        return \MM\Meros\Tests\Unit\TaxonomyWordPressState::$screen;
+    }
+
+    function get_post(int $id): ?object {
+        return \MM\Meros\Tests\Unit\TaxonomyWordPressState::$posts[$id] ?? null;
     }
 }
 
@@ -320,5 +415,19 @@ namespace MM\Meros\Contracts\Features\Content {
 
     function is_wp_error(mixed $result): bool {
         return $result instanceof TaxonomyRegistrationError;
+    }
+}
+
+namespace {
+    if (!class_exists('WP_Query')) {
+        class WP_Query {
+            public function is_main_query(): bool {
+                return false;
+            }
+
+            public function get(string $name, mixed $default = ''): mixed {
+                return $default;
+            }
+        }
     }
 }

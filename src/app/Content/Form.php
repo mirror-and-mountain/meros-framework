@@ -19,6 +19,11 @@ class Form extends PostType implements FormHost {
     // Configuration
     // =========================================================================
 
+    /**
+     * Configures forms and protects the theme-provided form used to render form hosts.
+     *
+     * @return void
+     */
     protected function configure(): void {
         $this->public();
         $this->hasArchive('forms');
@@ -28,6 +33,19 @@ class Form extends PostType implements FormHost {
         $this->showInMenu('meros-forms');
         $this->taxonomy(FormTags::class);
         $this->configureFormCapabilities();
+        $this->capabilities(array_merge($this->getArg('capabilities'), [
+            'edit_post'   => 'edit_form',
+            'delete_post' => 'delete_form',
+        ]));
+        add_filter('map_meta_cap', [$this, 'mapFormCapabilities'], 10, 4);
+        add_filter('posts_where', [$this, 'excludeFormHostFromAdminList'], 10, 2);
+        add_filter('display_post_states', function (array $states, $post): array {
+            if ($post->post_type === $this->getHandle() && $post->post_name === 'f') {
+                $states['meros_form_host_provider'] = 'Provided by theme (read-only)';
+            }
+
+            return $states;
+        }, 10, 2);
 
         $this->hasEditableForm()
             ->withActionsEditor()
@@ -64,15 +82,6 @@ class Form extends PostType implements FormHost {
         });
 
         add_action('meros_framework_booted', function () {
-            if (is_admin() && isset($_GET['post'], $_GET['action']) && $_GET['action'] === 'edit') {
-                $postId = intval($_GET['post']);
-                $post = get_post($postId);
-                if ($post && $post->post_type === $this->getHandle() && $post->post_name === 'f') {
-                    wp_redirect(admin_url('edit.php?post_type=' . $this->getHandle()));
-                    exit;
-                }
-            }
-
             if (Context::isEditingPostType($this->getHandle())) {
                 $this->ensureFormHostForm();
 
@@ -98,6 +107,61 @@ class Form extends PostType implements FormHost {
                 });
             }
         });
+    }
+
+    /**
+     * Excludes the theme-provided form from the main Forms admin list query.
+     *
+     * @param string $where The existing query conditions.
+     * @param \WP_Query $query The posts query being filtered.
+     * @return string
+     */
+    public function excludeFormHostFromAdminList(string $where, \WP_Query $query): string {
+        if (!is_admin() || !$query->is_main_query() || $query->get('post_type') !== $this->getHandle()) {
+            return $where;
+        }
+
+        $screen = get_current_screen();
+        if ($screen === null || $screen->base !== 'edit' || $screen->post_type !== $this->getHandle()) {
+            return $where;
+        }
+
+        global $wpdb;
+
+        return $where . $wpdb->prepare(" AND {$wpdb->posts}.post_name <> %s", 'f');
+    }
+
+    /**
+     * Resolves per-form editing/deletion permissions and denies changes to the theme-provided form.
+     *
+     * @param array<string> $capabilities The primitive capabilities already required by WordPress.
+     * @param string $capability The requested meta capability.
+     * @param int $userId The user whose permissions are being checked.
+     * @param array $args Arguments containing the target post ID.
+     * @return array<string>
+     */
+    public function mapFormCapabilities(array $capabilities, string $capability, int $userId, array $args): array {
+        if (!in_array($capability, ['edit_post', 'delete_post', 'edit_form', 'delete_form'], true)) {
+            return $capabilities;
+        }
+
+        $post = isset($args[0]) ? get_post($args[0]) : null;
+        if ($post === null || $post->post_type !== $this->getHandle()) {
+            return in_array($capability, ['edit_form', 'delete_form'], true)
+                ? ['do_not_allow']
+                : $capabilities;
+        }
+
+        if ($post->post_name === 'f') {
+            return ['do_not_allow'];
+        }
+
+        return array_map(
+            fn (string $requiredCapability): string => in_array($requiredCapability, ['edit_form', 'delete_form'], true)
+                ? 'edit_forms'
+                : $requiredCapability,
+            $capabilities
+        );
     }
 
     /**
@@ -128,7 +192,7 @@ class Form extends PostType implements FormHost {
         FormModel::create([
             'post_type'         => $this->getHandle(),
             'post_name'         => 'f',
-            'post_title'        => 'Built in: Form for rendering forms that belong to other post types.',
+            'post_title'        => 'Built In: Form for rendering forms that belong to other post types',
             'post_status'       => 'publish',
             'post_date'         => $time,
             'post_date_gmt'     => $gmtTime,

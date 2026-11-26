@@ -55,6 +55,25 @@ Taxonomies register on WordPress `init` after post types. The existing
 `PostType::taxonomies(array $handles)` API remains available for raw handles.
 Use `args([...])` for additional WordPress taxonomy registration options.
 
+### Taxonomy models
+
+`App\Models\Taxonomy` represents a `term_taxonomy` record, not a taxonomy feature
+definition. Its `term()` relationship exposes the associated `App\Models\Term`
+record containing the term's name and slug. `Term::taxonomies()` returns its
+taxonomy records.
+
+`Post::taxonomies()` and `Taxonomy::posts()` use WordPress's `term_relationships`
+table, including the pivot's `term_order`. Post subclasses inherit this relationship.
+
+```php
+$post = \MM\Meros\App\Models\Post::with('taxonomies.term')->findOrFail($postId);
+$tags = $post->taxonomies()->where('taxonomy', 'form-tags')->with('term')->get();
+```
+
+Use WordPress taxonomy APIs for writes so term counts and caches stay in sync.
+
+### Built-in form taxonomies
+
 The framework's built-in `Form` and `FormTemplate` post types share the
 non-hierarchical `form-tags` taxonomy, configured by `App\Content\FormTags`.
 It is available in the REST API and adds a tags column to their admin lists.
@@ -82,6 +101,11 @@ Security > Manage Permissions. For other capabilities, call both
 `userConfigurable()` and `assignableToDefaultRoles()` to enable this. The latter
 does not grant capabilities automatically; `roles([...])` still defines defaults.
 Administrator remains read-only and receives every registered capability.
+The special `form` post at slug `f` is hidden from the Forms admin list, but
+remains available for front-end form-host rendering.
+WordPress permission checks prevent editing, trashing or deleting it, including
+through direct editor links or API requests. Its former editor redirect is no
+longer needed; normal forms remain editable by users with `edit_forms`.
 
 ## License
 

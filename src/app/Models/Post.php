@@ -5,6 +5,7 @@ namespace MM\Meros\App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Post extends Model {
     protected $table      = 'posts';
@@ -54,6 +55,22 @@ class Post extends Model {
 
     public function meta(): HasMany {
         return $this->hasMany(PostMeta::class, 'post_id');
+    }
+
+    /**
+     * Gets the taxonomy term assignments for this post.
+     *
+     * @return BelongsToMany
+     */
+    public function taxonomies(): BelongsToMany {
+        return $this->belongsToMany(
+            Taxonomy::class,
+            'term_relationships',
+            'object_id',
+            'term_taxonomy_id',
+            'ID',
+            'term_taxonomy_id'
+        )->withPivot('term_order');
     }
 
     public function scopePublished($query) {
