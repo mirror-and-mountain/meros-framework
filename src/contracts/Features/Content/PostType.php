@@ -7,6 +7,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
 use MM\Meros\App\Models\Post;
+use MM\Meros\App\Models\Term;
 use MM\Meros\App\Models\PostMeta as PostMetaModel;
 use Illuminate\Database\Eloquent\ModelInspector;
 
@@ -524,6 +525,8 @@ class PostType extends Feature implements Makeable, Registrable {
     /**
      * Returns a post of this type's properties using the given ID. If no ID is provided,
      * properties for the post type with their default values will be returned instead.
+     * Includes assigned term arrays grouped by associated taxonomy handle under
+     * 'taxonomies', with empty lists for unassigned taxonomies or when no ID is provided.
      *
      * @param integer|null $postId
      * @param boolean      $refresh
@@ -532,13 +535,20 @@ class PostType extends Feature implements Makeable, Registrable {
      */
     public function inspect(?int $postId = null, bool $refresh = false): array {
         $data = [];
+        $post = null;
+        $taxonomyHandles = array_values(array_unique(array_merge(
+            $this->args['taxonomies'] ?? [],
+            array_map(fn (Taxonomy $taxonomy): string => $taxonomy->getHandle(), $this->taxonomyFeatures),
+            get_object_taxonomies($this->handle)
+        )));
 
         if (is_int($postId)) {
-            $data = Post::where('post_type', $this->handle)
+            $post = Post::with('taxonomies.term')
+                ->where('post_type', $this->handle)
                 ->where('ID', $postId)
                 ->first();
 
-            $data = $data instanceof Post ? $data->toArray() : [];
+            $data = $post instanceof Post ? $post->toArray() : [];
         } else {
             $data = $this->getDefaultProperties();
         }
@@ -573,6 +583,22 @@ class PostType extends Feature implements Makeable, Registrable {
                     $data = array_merge($data, $formatted);
                 }
             } 
+        }
+
+        $data['taxonomies'] = array_fill_keys($taxonomyHandles, []);
+        if ($post instanceof Post) {
+            foreach ($post->taxonomies as $taxonomy) {
+                if (!array_key_exists($taxonomy->taxonomy, $data['taxonomies'])) {
+                    continue;
+                }
+
+                $term = $taxonomy->term;
+                if (!($term instanceof Term)) {
+                    throw new \RuntimeException("Taxonomy record '{$taxonomy->getKey()}' references a missing term.");
+                }
+
+                $data['taxonomies'][$taxonomy->taxonomy][] = $term->toArray();
+            }
         }
 
         return $data;

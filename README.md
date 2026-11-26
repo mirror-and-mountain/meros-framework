@@ -72,6 +72,13 @@ $tags = $post->taxonomies()->where('taxonomy', 'form-tags')->with('term')->get()
 
 Use WordPress taxonomy APIs for writes so term counts and caches stay in sync.
 
+`PostType::inspect($postId)` includes a `taxonomies` key grouped by associated
+taxonomy handle. Each assigned term is an array containing `term_id`, `name`,
+`slug`, and `term_group`. Unassigned taxonomies have empty lists; calling
+`inspect()` without a post ID returns empty lists for all associated taxonomies.
+Associations include configured taxonomy features, raw handles and WordPress
+registrations. Existing post attributes and metadata remain alongside this data.
+
 ### Built-in form taxonomies
 
 The framework's built-in `Form` and `FormTemplate` post types share the
