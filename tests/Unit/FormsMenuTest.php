@@ -13,7 +13,7 @@ namespace MM\Meros\Tests\Unit {
             WordPressState::$hooks = [];
             FormsMenuWordPressState::$menus = [];
             FormsMenuWordPressState::$submenus = [];
-            FormsMenuWordPressState::$capabilities = ['edit_posts'];
+            FormsMenuWordPressState::$capabilities = ['read_forms'];
         }
 
         public function test_forms_menu_registers_a_shared_parent_and_native_taxonomy_link(): void {
@@ -24,12 +24,12 @@ namespace MM\Meros\Tests\Unit {
 
             $this->assertSame(['meros-forms'], array_keys(FormsMenuWordPressState::$menus));
             $this->assertSame('Forms', FormsMenuWordPressState::$menus['meros-forms']['menuTitle']);
-            $this->assertSame('edit_posts', FormsMenuWordPressState::$menus['meros-forms']['capability']);
+            $this->assertSame('read_forms', FormsMenuWordPressState::$menus['meros-forms']['capability']);
             $this->assertSame([
                 'parent' => 'meros-forms',
                 'title' => 'Form Tags',
                 'menuTitle' => 'Form Tags',
-                'capability' => 'manage_categories',
+                'capability' => 'read_forms',
                 'slug' => 'edit-tags.php?taxonomy=form-tags&post_type=form',
             ], FormsMenuWordPressState::$submenus[0]);
         }
@@ -43,13 +43,13 @@ namespace MM\Meros\Tests\Unit {
 
             $this->assertStringContainsString('edit.php?post_type=form"', $html);
             $this->assertStringContainsString('edit.php?post_type=form-template"', $html);
-            $this->assertStringNotContainsString('edit-tags.php', $html);
+            $this->assertStringContainsString('edit-tags.php?taxonomy=form-tags&amp;post_type=form', $html);
 
-            FormsMenuWordPressState::$capabilities[] = 'manage_categories';
+            FormsMenuWordPressState::$capabilities = ['edit_posts', 'manage_categories'];
             ob_start();
             $page->render();
             $html = ob_get_clean();
-            $this->assertStringContainsString('edit-tags.php?taxonomy=form-tags&amp;post_type=form', $html);
+            $this->assertStringNotContainsString('<a href=', $html);
         }
     }
 

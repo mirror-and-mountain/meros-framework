@@ -22,6 +22,7 @@ namespace MM\Meros\Tests\Unit {
             TaxonomyWordPressState::$registrations = [];
             TaxonomyWordPressState::$events = [];
             TaxonomyWordPressState::$failRegistration = false;
+            TaxonomyWordPressState::$capabilities = ['read_forms', 'edit_forms'];
         }
 
         public function test_standalone_taxonomy_registration_preserves_configuration_and_ownership(): void {
@@ -168,6 +169,75 @@ namespace MM\Meros\Tests\Unit {
             $this->assertTrue(TaxonomyWordPressState::$postTypes['form-template']['show_ui']);
             $this->assertFalse(TaxonomyWordPressState::$taxonomies['form-tags']['args']['show_in_menu']);
         }
+
+        public function test_form_permissions_separate_reading_from_editing_and_deny_template_creation_and_deletion(): void {
+            $provider = new FeatureProvider($this->directory);
+            $template = PostTypes::checkout($provider)->makeFrom(FormTemplate::class, [
+                'args' => ['capabilities' => ['edit_posts' => 'edit_templates']],
+            ]);
+            $form = PostTypes::checkout($provider)->makeFrom(Form::class);
+
+            foreach ([$form, $template] as $postType) {
+                $capabilities = $postType->getArg('capabilities');
+                $this->assertSame('read_forms', $capabilities['edit_posts']);
+                $this->assertSame('read_forms', $capabilities['read_post']);
+                $this->assertSame('edit_forms', $capabilities['edit_post']);
+                $this->assertFalse($postType->getArg('map_meta_cap'));
+            }
+
+            foreach (['create_posts', 'delete_post', 'delete_posts', 'delete_others_posts', 'delete_private_posts', 'delete_published_posts'] as $capability) {
+                $this->assertSame('do_not_allow', $template->getArg('capabilities')[$capability]);
+                $this->assertSame('edit_forms', $form->getArg('capabilities')[$capability]);
+            }
+
+            $this->assertSame([
+                'manage_terms' => 'read_forms',
+                'edit_terms' => 'edit_forms',
+                'delete_terms' => 'edit_forms',
+                'assign_terms' => 'edit_forms',
+            ], Taxonomies::get('form-tags')->getArg('capabilities'));
+        }
+
+        public function test_readers_cannot_bulk_edit_but_managers_can_edit_forms_and_templates(): void {
+            $provider = new FeatureProvider($this->directory);
+            PostTypes::checkout($provider)->makeFrom(Form::class);
+            PostTypes::checkout($provider)->makeFrom(FormTemplate::class);
+            $actions = ['edit' => 'Edit', 'trash' => 'Trash', 'export' => 'Export'];
+
+            foreach (['form', 'form-template'] as $postType) {
+                do_action('current_screen', (object) ['base' => 'edit', 'post_type' => $postType, 'id' => 'edit-' . $postType]);
+                TaxonomyWordPressState::$capabilities = ['read_forms'];
+                $this->assertSame(['export' => 'Export'], apply_filters('bulk_actions-edit-' . $postType, $actions));
+                TaxonomyWordPressState::$capabilities[] = 'edit_forms';
+                $expected = $postType === 'form-template' ? ['edit' => 'Edit', 'export' => 'Export'] : $actions;
+                $this->assertSame($expected, apply_filters('bulk_actions-edit-' . $postType, $actions));
+            }
+        }
+
+        public function test_template_row_actions_keep_editing_available(): void {
+            $provider = new FeatureProvider($this->directory);
+            PostTypes::checkout($provider)->makeFrom(FormTemplate::class);
+
+            $actions = ['edit' => 'Edit', 'trash' => 'Trash', 'delete' => 'Delete'];
+            $this->assertSame(['edit' => 'Edit'], apply_filters(
+                'post_row_actions',
+                $actions,
+                (object) ['post_type' => 'form-template']
+            ));
+            $this->assertSame($actions, apply_filters('post_row_actions', $actions, (object) ['post_type' => 'form']));
+        }
+
+        public function test_template_provider_label_preserves_other_states_and_ignores_other_post_types(): void {
+            $provider = new FeatureProvider($this->directory);
+            PostTypes::checkout($provider)->makeFrom(FormTemplate::class);
+            $states = ['draft' => 'Draft'];
+
+            $this->assertSame([
+                'draft' => 'Draft',
+                'meros_form_template_provider' => 'Provided by theme',
+            ], apply_filters('display_post_states', $states, (object) ['post_type' => 'form-template']));
+            $this->assertSame($states, apply_filters('display_post_states', $states, (object) ['post_type' => 'form']));
+        }
     }
 
     class Genre extends Taxonomy {
@@ -193,10 +263,17 @@ namespace MM\Meros\Tests\Unit {
         public static array $registrations = [];
         public static array $events = [];
         public static bool $failRegistration = false;
+        public static array $capabilities = [];
     }
 
     final class TaxonomyRegistrationError {
         public function get_error_message(): string { return 'Registration rejected'; }
+    }
+}
+
+namespace MM\Meros\Contracts\Features\Content\Concerns {
+    function current_user_can(string $capability): bool {
+        return in_array($capability, \MM\Meros\Tests\Unit\TaxonomyWordPressState::$capabilities, true);
     }
 }
 

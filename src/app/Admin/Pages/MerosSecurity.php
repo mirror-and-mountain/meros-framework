@@ -114,7 +114,7 @@ final class MerosSecurity extends Page {
         ?>
         <h2>Roles and Capabilities</h2>
         <p class="description">Assign WordPress capabilities to built-in roles and opted-in custom roles. Administrator is read-only and always receives every registered theme/package-defined capability. Theme/package-defined assignments retain their opt-in restrictions.</p>
-        <p class="description">Changes affect every user assigned to a role. Powerful capabilities such as Manage Options or Promote Users can grant administrative access. WordPress may further restrict some capabilities on multisite or through site configuration.</p>
+        <p class="description">Changes affect every user assigned to a role. Code-defined capabilities can be assigned to default roles when explicitly opted in. Powerful capabilities such as Manage Options or Promote Users can grant administrative access. WordPress may further restrict some capabilities on multisite or through site configuration.</p>
         <?php if (($_GET['roles-saved'] ?? null) === '1'): ?>
             <div class="notice notice-success inline"><p>Role settings saved.</p></div>
         <?php endif; ?>

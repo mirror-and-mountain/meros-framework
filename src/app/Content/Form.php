@@ -27,6 +27,7 @@ class Form extends PostType implements FormHost {
         $this->menuIcon('dashicons-feedback');
         $this->showInMenu('meros-forms');
         $this->taxonomy(FormTags::class);
+        $this->configureFormCapabilities();
 
         $this->hasEditableForm()
             ->withActionsEditor()

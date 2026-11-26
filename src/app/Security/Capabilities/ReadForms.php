@@ -9,6 +9,8 @@ class ReadForms extends Capability {
         $this->name('read_forms');
         $this->label('Read Forms');
         $this->description('View forms.');
+        $this->roles(['editor']);
         $this->userConfigurable();
+        $this->assignableToDefaultRoles();
     }
 }

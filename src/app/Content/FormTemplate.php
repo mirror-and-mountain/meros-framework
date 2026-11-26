@@ -9,6 +9,11 @@ use MM\Meros\Contracts\Features\Content\Concerns\UsesForms;
 class FormTemplate extends PostType implements FormHost {
     use UsesForms;
 
+    /**
+     * Configures the admin-only, code-provided form templates and their list actions.
+     *
+     * @return void
+     */
     protected function configure(): void {
         $this->private()->showUi();
         $this->handle('form-template');
@@ -17,9 +22,18 @@ class FormTemplate extends PostType implements FormHost {
         $this->showInMenu('meros-forms');
         $this->taxonomy(FormTags::class);
         $this->supports(['title', 'editor', 'thumbnail'], false);
+        $this->configureFormCapabilities(false);
         $this->hasEditableForm()
             ->withActionsEditor()
             ->withFormSettings();
+
+        add_filter('display_post_states', function (array $states, $post): array {
+            if ($post->post_type === $this->getHandle()) {
+                $states['meros_form_template_provider'] = 'Provided by theme';
+            }
+
+            return $states;
+        }, 10, 2);
 
         /**
          * Remove delete and trash actions from bulk actions for this post type

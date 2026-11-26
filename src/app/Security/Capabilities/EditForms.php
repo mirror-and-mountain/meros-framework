@@ -9,6 +9,8 @@ class EditForms extends Capability {
         $this->name('edit_forms');
         $this->label('Edit Forms');
         $this->description('Create and edit forms.');
+        $this->roles(['editor']);
         $this->userConfigurable();
+        $this->assignableToDefaultRoles();
     }
 }

@@ -220,7 +220,17 @@ class Role extends Feature implements Makeable, Registrable {
         }
 
         if (in_array($handle, self::BUILT_IN_ROLES, true)) {
-            return Capability::CORE_CAPABILITIES;
+            $capabilities = Capability::CORE_CAPABILITIES;
+            foreach (CapabilitiesFacade::all() as $capability) {
+                if ($capability instanceof Capability &&
+                    $capability->isUserConfigurable() &&
+                    $capability->isAssignableToDefaultRoles()
+                ) {
+                    $capabilities[] = $capability->getIdentifier();
+                }
+            }
+
+            return array_values(array_unique($capabilities));
         }
 
         $role = RolesFacade::get($handle);
@@ -242,7 +252,7 @@ class Role extends Feature implements Makeable, Registrable {
     }
 
     /**
-     * Applies the built-in capability settings for all roles except the administrator.
+     * Applies core and opted-in custom capability settings to default roles except Administrator.
      *
      * @return void
      */
@@ -259,7 +269,7 @@ class Role extends Feature implements Makeable, Registrable {
                 continue;
             }
 
-            foreach (Capability::CORE_CAPABILITIES as $capability) {
+            foreach (self::getConfigurableCapabilities($handle) as $capability) {
                 if (!array_key_exists($capability, $overrides) || !is_bool($overrides[$capability])) {
                     continue;
                 }

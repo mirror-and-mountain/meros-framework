@@ -119,6 +119,50 @@ trait UsesForms {
     // =========================================================================
 
     /**
+     * Applies read-only list access and explicit editing permissions to a form post type.
+     *
+     * @param bool $allowCreationAndDeletion Whether managers may create and delete posts of this type.
+     * @return void
+     */
+    private function configureFormCapabilities(bool $allowCreationAndDeletion = true): void {
+        $mutationCapability = $allowCreationAndDeletion ? 'edit_forms' : 'do_not_allow';
+        $this->capabilities(array_merge($this->getArg('capabilities', []), [
+            'read' => 'read_forms',
+            'read_post' => 'read_forms',
+            'read_private_posts' => 'read_forms',
+            'edit_posts' => 'read_forms',
+            'edit_post' => 'edit_forms',
+            'edit_others_posts' => 'edit_forms',
+            'edit_private_posts' => 'edit_forms',
+            'edit_published_posts' => 'edit_forms',
+            'publish_posts' => 'edit_forms',
+            'create_posts' => $mutationCapability,
+            'delete_post' => $mutationCapability,
+            'delete_posts' => $mutationCapability,
+            'delete_others_posts' => $mutationCapability,
+            'delete_private_posts' => $mutationCapability,
+            'delete_published_posts' => $mutationCapability,
+        ]));
+
+        // Native lists require edit_posts; explicit meta capabilities keep list readers from editing.
+        $this->mapMetaCapabilities(false);
+
+        add_action('current_screen', function ($screen) {
+            if ($screen->base !== 'edit' || $screen->post_type !== $this->getHandle()) {
+                return;
+            }
+
+            add_filter('bulk_actions-' . $screen->id, function (array $actions): array {
+                if (!current_user_can('edit_forms')) {
+                    unset($actions['edit'], $actions['trash'], $actions['delete']);
+                }
+
+                return $actions;
+            });
+        });
+    }
+
+    /**
      * Marks the post type as having an associated form.
      *
      * @return static

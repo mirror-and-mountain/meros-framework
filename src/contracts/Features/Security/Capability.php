@@ -47,6 +47,13 @@ class Capability extends Feature implements Makeable, Registrable {
      */
     protected bool $userConfigurable = false;
 
+    /**
+     * Whether this capability may be assigned to default WordPress roles through Security settings.
+     *
+     * @var bool
+     */
+    protected bool $assignableToDefaultRoles = false;
+
     use IsMakeable, IsRegistrable, IsHookable;
 
     protected function init(): void {
@@ -122,6 +129,26 @@ class Capability extends Feature implements Makeable, Registrable {
      */
     final public function isUserConfigurable(): bool {
         return $this->userConfigurable;
+    }
+
+    /**
+     * Opts a user-configurable capability into assignments to default WordPress roles.
+     *
+     * @param bool $assignable Whether to allow assignments without changing default role grants.
+     * @return static
+     */
+    final public function assignableToDefaultRoles(bool $assignable = true): static {
+        $this->assignableToDefaultRoles = $assignable;
+        return $this;
+    }
+
+    /**
+     * Checks whether the capability has opted into default-role assignments.
+     *
+     * @return bool
+     */
+    final public function isAssignableToDefaultRoles(): bool {
+        return $this->assignableToDefaultRoles;
     }
 
     /**

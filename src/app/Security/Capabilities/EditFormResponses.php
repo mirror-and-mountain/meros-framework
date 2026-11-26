@@ -10,5 +10,6 @@ class EditFormResponses extends Capability {
         $this->label('Edit Form Responses');
         $this->description('Edit form responses.');
         $this->userConfigurable();
+        $this->assignableToDefaultRoles();
     }
 }

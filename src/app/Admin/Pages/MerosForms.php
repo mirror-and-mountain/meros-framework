@@ -14,7 +14,7 @@ final class MerosForms extends Page {
         $this->slug('meros-forms');
         $this->title('Forms');
         $this->menuTitle('Forms');
-        $this->capability('edit_posts');
+        $this->capability('read_forms');
         $this->icon('dashicons-feedback');
         $this->position(26);
         $this->hideSettings();
@@ -25,9 +25,9 @@ final class MerosForms extends Page {
             echo '<p>Manage forms, form templates and their shared tags.</p>';
             echo '<ul>';
             foreach ([
-                ['edit.php?post_type=form', 'All Forms', 'edit_posts'],
-                ['edit.php?post_type=form-template', 'Form Templates', 'edit_posts'],
-                ['edit-tags.php?taxonomy=form-tags&post_type=form', 'Form Tags', 'manage_categories'],
+                ['edit.php?post_type=form', 'All Forms', 'read_forms'],
+                ['edit.php?post_type=form-template', 'Form Templates', 'read_forms'],
+                ['edit-tags.php?taxonomy=form-tags&post_type=form', 'Form Tags', 'read_forms'],
             ] as [$url, $label, $capability]) {
                 if (!current_user_can($capability)) {
                     continue;
@@ -49,7 +49,7 @@ final class MerosForms extends Page {
             $this->getSlug(),
             'Form Tags',
             'Form Tags',
-            'manage_categories',
+            'read_forms',
             'edit-tags.php?taxonomy=form-tags&post_type=form'
         );
     }

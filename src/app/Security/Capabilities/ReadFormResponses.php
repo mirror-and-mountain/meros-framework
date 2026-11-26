@@ -10,5 +10,6 @@ class ReadFormResponses extends Capability {
         $this->label('Read Form Responses');
         $this->description('View form responses.');
         $this->userConfigurable();
+        $this->assignableToDefaultRoles();
     }
 }

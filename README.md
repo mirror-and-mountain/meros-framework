@@ -63,6 +63,25 @@ alongside a single **Form Tags** link. Their native list and editor screens
 remain available. `PostType::showInMenu()` accepts either a boolean or a parent
 menu slug when grouping other post types.
 Form Templates are non-public, with their WordPress admin UI explicitly enabled.
+They are provisioned by code rather than created with WordPress's Add New action,
+and their list titles show a **Provided by theme** label. Existing templates
+remain editable.
+Manual deletion and trashing are also denied through WordPress capabilities;
+template provisioning through the `UsesForms` trait remains unchanged.
+
+Forms and Form Templates use `read_forms` for list access and `edit_forms` for
+editing. Form Readers can browse the lists, while Form Managers can edit both
+types and create/delete regular forms. Templates cannot be created/deleted
+manually by any role. Editors and administrators receive both capabilities by
+default; grants remain configurable through Security settings.
+The shared Form Tags screen is readable with `read_forms`; changing or assigning
+tags requires `edit_forms`. Explicit meta capabilities separate read-only list
+access from editing, without changing access to ordinary WordPress posts.
+All four form capabilities opt into assignment to default WordPress roles in
+Security > Manage Permissions. For other capabilities, call both
+`userConfigurable()` and `assignableToDefaultRoles()` to enable this. The latter
+does not grant capabilities automatically; `roles([...])` still defines defaults.
+Administrator remains read-only and receives every registered capability.
 
 ## License
 
