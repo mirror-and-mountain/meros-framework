@@ -17,9 +17,8 @@ use MM\Meros\App\Admin\Pages\MerosFormsStyles as FormsSettingsPage;
 use MM\Meros\App\Admin\Pages\MerosSecurity as SecuritySettingsPage;
 use MM\Meros\App\Admin\Pages\MerosForms as FormsPage;
 
-use MM\Meros\App\Admin\Pages\MerosDev as DevPage;
-
 use MM\Meros\App\Admin\Sections\MerosSettings;
+use MM\Meros\App\Admin\Sections\MerosMail;
 use MM\Meros\App\Admin\Sections\MerosFormsFieldStyles;
 use MM\Meros\App\Admin\Sections\MerosFormsProgressStyles;
 use MM\Meros\App\Admin\Sections\MerosFormsButtonStyles;
@@ -67,7 +66,6 @@ class Orchestrator extends SettingsOrchestrator {
         $this->pages(FormsSettingsPage::class)->register();
         $this->pages(FormsPage::class)->make();
         $this->pages(SecuritySettingsPage::class)->register();
-        $this->pages(DevPage::class)->make();
     }
 
     /**
@@ -77,6 +75,7 @@ class Orchestrator extends SettingsOrchestrator {
      */
     private function registerSettingsSections(): void {
         $this->settingsSections()->register(MerosSettings::class, 'meros-theme-settings-section');
+        $this->settingsSections()->register(MerosMail::class, 'meros-mail-section');
         $this->settingsSections()->register(MerosFormsFieldStyles::class, 'meros-forms-field-styles-section');
         $this->settingsSections()->register(MerosFormsProgressStyles::class, 'meros-forms-progress-styles-section');
         $this->settingsSections()->register(MerosFormsButtonStyles::class, 'meros-forms-button-styles-section');

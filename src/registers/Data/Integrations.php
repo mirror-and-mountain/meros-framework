@@ -54,12 +54,13 @@ class Integrations extends Register implements Registrar {
      * Retrieves all registered mailer integrations.
      *
      * @param boolean $collect
+     * @param boolean $ready
      *
      * @return array|Collection
      */
-    public function getMailers(bool $collect = false): array|Collection {
+    public function getMailers(bool $collect = false, bool $ready = false): array|Collection {
         $mailers = $this->all()->filter(fn ($integration) =>
-            $integration instanceof Mailer
+            $integration instanceof Mailer && (!$ready || $integration->ready())
         );
 
         if ($collect) {

@@ -310,6 +310,15 @@ class FrameworkServiceProvider extends MerosServiceProvider {
                 'level'  => 'debug',
             ]);
         }
+
+        if (!$config->has('logging.channels.meros-mail')) {
+            $config->set('logging.channels.meros-mail', [
+                'driver' => 'single',
+                'name'   => 'meros-mail',
+                'path'   => $this->app->storagePath('logs/meros-mail.log'),
+                'level'  => 'debug',
+            ]);
+        }
     }
 
     /**

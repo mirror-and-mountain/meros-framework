@@ -12,7 +12,7 @@ import {
 } from './integrations.js';
 
 import {mformsBuilder} from '../mforms/builder.js';
-import { __meros_send_test_email } from './mail.js';
+import { __meros_mail_reset_log } from './mail.js';
 
 import '../mforms/admin.js';
 import './style.scss';
@@ -41,6 +41,12 @@ document.addEventListener('DOMContentLoaded', () => {
         resetIntegrationsLogButton.addEventListener('click', __meros_integrations_reset_log);
     }
 
+    // Setup listener for mail reset log button
+    const mailResetLogButton = document.getElementById('meros-mail-logs-reset');
+    if (mailResetLogButton) {
+        mailResetLogButton.addEventListener('click', __meros_mail_reset_log);
+    }
+
     // Setup listener for OAuth connect button
     const oauthConnectButton = document.getElementById('meros-integration-connect');
     if (oauthConnectButton) {
@@ -52,9 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Expose the revoke connection function to the global scope
     window.__meros_integrations_revoke_connection = __meros_integrations_revoke_connection;
-
-    // Handle meros dev test email tool
-    document.addEventListener('mforms::meros_send_test_email', __meros_send_test_email);
 });
 
 document.addEventListener('alpine:init', () => {

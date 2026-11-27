@@ -2,6 +2,8 @@
 
 namespace MM\Meros\App\Components\FormActions;
 
+use Illuminate\Support\Facades\Log;
+
 use MM\Meros\Contracts\Features\Components\Field;
 use MM\Meros\Contracts\Features\Automation\FlowAction;
 use MM\Meros\Contracts\Features\Automation\FlowActionResponse;
@@ -106,6 +108,7 @@ class SendAnEmail extends FlowAction {
 
         $body = EmailHelpers::formatBody($body, $plainText);
         $mailer = $input['send_using'] ?? 'default';
+        $usingWPMailer = false;
 
         if ($mailer !== 'default') {
             try {
@@ -116,6 +119,11 @@ class SendAnEmail extends FlowAction {
         }
 
         if ($mailer instanceof Mailer && $mailer->ready()) {
+            if ($plainText && $mailer->prefersHTML()) {
+                $body = nl2br($body);
+                $plainText = false;
+            }
+
             $result = $mailer->sendMail(
                 $to,
                 $subject,
@@ -126,12 +134,14 @@ class SendAnEmail extends FlowAction {
             );
 
             if ($result === false) {
+                Log::channel('meros-mail-logs')->error('Failed to send email using ' . ($input['send_using'] ?? 'default'));
                 return new FlowActionResponse(
                     null,
                     'Failed to send email using ' . ($input['send_using'] ?? 'default')
                 );
             }
         } else {
+            $usingWPMailer = true;
             $headers = ['Content-Type: ' . ($plainText ? 'text/plain' : 'text/html') . '; charset=UTF-8'];
             foreach ($cc as $address) {
                 $headers[] = 'Cc: ' . $address;
@@ -148,10 +158,19 @@ class SendAnEmail extends FlowAction {
             );
 
             if (!$result) {
+                Log::channel('meros-mail')->error('Failed to send email using WordPress default mailer.');
                 return new FlowActionResponse(null, 'Failed to send email using WordPress.');
             }
         }
 
+        Log::channel('meros-mail')->info('Email sent successfully using ' . ($usingWPMailer ? 'WordPress default mailer' : ($input['send_using'] ?? 'default')), [
+            'to' => $to,
+            'subject' => $subject,
+            'cc' => $cc,
+            'bcc' => $bcc,
+            'plain_text' => $plainText
+        ])
+        ;
         return new FlowActionResponse(
             'Email sent successfully.'
         );

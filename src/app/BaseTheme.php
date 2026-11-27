@@ -3,11 +3,13 @@
 namespace MM\Meros\App;
 
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 use MM\Meros\Contracts\Provider;
 
 use MM\Meros\Registers\Admin\SettingsContainers;
 use MM\Meros\Contracts\Features\Admin\Setting;
 use MM\Meros\Contracts\Features\Admin\SettingsContainer;
+use MM\Meros\Contracts\Features\Integrations\Interfaces\Mailer;
 
 use MM\Meros\Contracts\Providers\Concerns\IsNonFrameworkProvider;
 use MM\Meros\Contracts\Providers\Concerns\IsNonPackageProvider;
@@ -17,6 +19,10 @@ use MM\Meros\Support\SchemaManager;
 
 use MM\Meros\App\Models\Migration as TrackedMigration;
 use MM\Meros\App\Models\Option;
+
+use MM\Meros\App\Components\Fields\Select;
+
+use MM\Meros\Facades\Data\Integrations;
 
 abstract class BaseTheme extends Provider {
     use IsNonFrameworkProvider, IsNonPackageProvider;
@@ -47,6 +53,8 @@ abstract class BaseTheme extends Provider {
      * @return void
      */
     final public function whenConfigured(): void {
+        // Adds mail-related settings to the theme's settings container.
+        $this->addMailSettings();
         // Adds framework settings to the theme's settings container.
         $this->addMerosSettings();
 
@@ -59,6 +67,187 @@ abstract class BaseTheme extends Provider {
         add_action('switch_theme', function () {
             $this->__whenThemeDeactivated();
         });
+    }
+
+    /**
+     * Adds mail-related settings to the theme's settings container.
+     *
+     * @return void
+     */
+    private function addMailSettings(): void {
+        $mailers = Integrations::getMailers(true, true);
+
+        if ($mailers->isNotEmpty()) {
+            $options = array_merge(['default' => 'Default'], $mailers->mapWithKeys(function ($mailer) {
+                return [$mailer->getName() => $mailer->getLabel()];
+            })->toArray());
+
+            $this->settings()->add('string', function (Setting $setting) use ($options) {
+                $setting->name('default_admin_mailer');
+                $setting->label('Default Admin Mailer');
+                $setting->description('Select the mailer for emails addressed to the site\'s administration email address. Failed sends and messages with attachments, named recipients or unsupported headers use the WordPress default mailer. The "Default" option always uses the WordPress default mailer.');
+                $setting->default('default');
+                $setting->field('select', function (Select $field) use ($options) {
+                    $field->options($options);
+                });
+                $setting->section('meros-mail-section');
+            });
+
+            $this->settings()->add('string', function (Setting $setting) use ($options) {
+                $setting->name('default_transactional_mailer');
+                $setting->label('Default Transactional Mailer');
+                $setting->description('Select the mailer for emails not addressed to the site\'s administration email address, such as password resets and account notifications. Failed sends and messages with attachments, named recipients or unsupported headers use the WordPress default mailer. The "Default" option always uses the WordPress default mailer.');
+                $setting->default('default');
+                $setting->field('select', function (Select $field) use ($options) {
+                    $field->options($options);
+                });
+                $setting->section('meros-mail-section');
+            });
+
+            add_action('meros_framework_booted', function () {
+                $this->configureMailTransport();
+            });
+        }
+    }
+
+    /**
+     * Configures the mail transport for the theme based on the selected mailers.
+     *
+     * @return void
+     */
+    private function configureMailTransport(): void {
+        add_action('wp_mail_succeeded', function (array $mailData): void {
+            Log::channel('meros-mail-logs')->info('PHP mailer send succeeded:', [
+                'to' => $mailData['to'],
+                'subject' => $mailData['subject'],
+            ]);
+        });
+
+        $mailers = [];
+        foreach (['admin', 'transactional'] as $type) {
+            $mailerID = $this->getSettingValue('default_' . $type . '_mailer');
+
+            if (!is_string($mailerID) || $mailerID === '' || $mailerID === 'default') {
+                continue;
+            }
+
+            try {
+                $mailer = Integrations::getMailer($mailerID);
+            } catch (\InvalidArgumentException $e) {
+                Log::channel('meros-mail-logs')->warning('Unable to configure the ' . $type . ' mailer: ' . $e->getMessage());
+                continue;
+            }
+
+            if ($mailer instanceof Mailer && $mailer->ready()) {
+                $mailers[$type] = $mailer;
+            }
+        }
+
+        if ($mailers === []) {
+            return;
+        }
+
+        add_filter('pre_wp_mail', function (mixed $pre, array $atts) use ($mailers): mixed {
+            if ($pre !== null || !empty($atts['attachments']) || !empty($atts['embeds'])) {
+                return $pre;
+            }
+
+            $parseRecipients = static function (array|string $recipients): ?array {
+                if ($recipients === '') {
+                    return [];
+                }
+                $addresses = [];
+                foreach (is_array($recipients) ? $recipients : explode(',', $recipients) as $recipient) {
+                    if (!is_string($recipient) || strpbrk($recipient, "\r\n") !== false) {
+                        return null;
+                    }
+                    $address = trim($recipient);
+                    if (filter_var($address, FILTER_VALIDATE_EMAIL) === false) {
+                        return null;
+                    }
+                    $addresses[] = $address;
+                }
+                return $addresses;
+            };
+
+            $to = $parseRecipients($atts['to']);
+            $adminEmail = get_option('admin_email');
+            if ($to === null || $to === []) {
+                return null;
+            }
+
+            $type = is_string($adminEmail) && in_array(strtolower($adminEmail), array_map('strtolower', $to), true)
+                ? 'admin'
+                : 'transactional';
+            $mailer = $mailers[$type] ?? null;
+            if ($mailer === null || !$mailer->ready()) {
+                return null;
+            }
+
+            $cc = [];
+            $bcc = [];
+            $html = false;
+            $headers = $atts['headers'] ?? [];
+            if (is_string($headers)) {
+                $headers = explode("\n", str_replace("\r\n", "\n", $headers));
+            }
+            foreach ($headers as $header) {
+                if (trim($header) === '') {
+                    continue;
+                }
+                if (strpbrk($header, "\r\n") !== false || !str_contains($header, ':')) {
+                    return null;
+                }
+                [$name, $value] = array_map('trim', explode(':', $header, 2));
+                switch (strtolower($name)) {
+                    case 'cc':
+                    case 'bcc':
+                        $recipients = $parseRecipients($value);
+                        if ($recipients === null) {
+                            return null;
+                        }
+                        if (strtolower($name) === 'cc') {
+                            $cc = array_merge($cc, $recipients);
+                        } else {
+                            $bcc = array_merge($bcc, $recipients);
+                        }
+                        break;
+                    case 'content-type':
+                        if (!preg_match('/^text\/(plain|html)(?:;\s*charset="?UTF-8"?)?$/i', $value, $matches)) {
+                            return null;
+                        }
+                        $html = strtolower($matches[1]) === 'html';
+                        break;
+                    case 'mime-version':
+                        if ($value !== '1.0') {
+                            return null;
+                        }
+                        break;
+                    default:
+                        // The integration cannot preserve arbitrary headers.
+                        return null;
+                }
+            }
+
+            if ($mailer->prefersHTML() && !$html) {
+                $atts['message'] = nl2br($atts['message']);
+                $html = true;
+            }
+
+            try {
+                $result = $mailer->sendMail($to, $atts['subject'], $atts['message'], $cc, $bcc, $html) ? true : null;
+                if ($result === null) {
+                    Log::channel('meros-mail')->error(ucfirst($type) . ' mailer send failed; falling back to WordPress.');
+                    return null;
+                } else {
+                    Log::channel('meros-mail')->info(ucfirst($type) . ' mailer send succeeded:', ['to' => $to, 'subject' => $atts['subject']]);
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                Log::channel('meros-mail')->error(ucfirst($type) . ' mailer send failed; falling back to WordPress.', ['exception' => $e]);
+                return null;
+            }
+        }, 10, 2);
     }
 
     /**

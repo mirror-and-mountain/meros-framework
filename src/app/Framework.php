@@ -45,9 +45,9 @@ final class Framework extends Provider {
         $this->setPreference('livewire_namespace', 'MM\\Meros\\App\\Livewire');
 
         // Configure MEROS_ENVIRONMENT services for local development
-        if (getenv('MEROS_ENVIRONMENT') && getenv('MEROS_ENVIRONMENT') === 'true') {
-            $this->configureMerosEnv();
-        }
+        // if (getenv('MEROS_ENVIRONMENT') && getenv('MEROS_ENVIRONMENT') === 'true') {
+        //     $this->configureMerosEnv();
+        // }
 
         // Register tables
         $this->tables()->register();
