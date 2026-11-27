@@ -257,16 +257,6 @@ abstract class BaseTheme extends Provider {
      * @return void
      */
     private function addMerosSettings(): void {
-        // Features
-        $this->settings()->add('boolean', function (Setting $setting) {
-            $setting->name('meros_forms_enabled');
-            $setting->label('Enable Meros Forms');
-            $setting->description($this->getMerosSettingDescription('meros_forms_enabled'));
-            $setting->default(false);
-            $setting->field();
-            $setting->section('meros-theme-settings-section');
-        });
-
         // Deactivation preferences
         $this->settings()->add('boolean', function (Setting $setting) {
             $setting->name('meros_reset_settings_on_deactivate');
