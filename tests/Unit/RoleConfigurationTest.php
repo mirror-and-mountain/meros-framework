@@ -257,19 +257,21 @@ class RoleConfigurationTest extends TestCase {
         
         $GLOBALS['options'][Role::OPTION_NAME]['role_capabilities'] = [
             'administrator' => ['read' => false],
-            'editor' => ['edit_posts' => false, 'upload_files' => true, 'read_forms' => true, 'read_form_responses' => true],
-            'form_reader' => ['read' => true, 'upload_files' => true, 'edit_forms' => true],
+            'editor' => ['edit_posts' => false, 'publish_posts' => true, 'upload_files' => true, 'read_forms' => true, 'read_form_responses' => true],
+            'form_reader' => ['read' => true, 'publish_posts' => true, 'upload_files' => true, 'edit_forms' => true],
         ];
         Role::applyBuiltInCapabilitySettings();
         $reader = $rolesRegister->get('form_reader');
         $reader->register();
         check(!get_role('editor')->has_cap('edit_posts'), 'Built-in roles must support revoking core capabilities.');
-        check(get_role('editor')->has_cap('upload_files'), 'Built-in roles must support granting core capabilities.');
+        check(get_role('editor')->has_cap('publish_posts'), 'Built-in roles must support granting core capabilities.');
+        check(!get_role('editor')->has_cap('upload_files'), 'Excluded core overrides must not be applied to built-in roles.');
         check(get_role('administrator')->has_cap('read'), 'Stored overrides must never modify Administrator.');
         check(get_role('editor')->has_cap('read_forms'), 'Editors must retain their opted-in form access.');
         check(get_role('editor')->has_cap('read_form_responses'), 'Opted-in response capabilities must be assignable to default roles.');
         check(get_role('form_reader')->has_cap('read'), 'Core capabilities not declared by a custom role can be added.');
-        check(get_role('form_reader')->has_cap('upload_files'), 'Additional core capabilities must be applied on initialization.');
+        check(get_role('form_reader')->has_cap('publish_posts'), 'Additional core capabilities must be applied on initialization.');
+        check(!get_role('form_reader')->has_cap('upload_files'), 'Excluded core overrides must not be applied to custom roles.');
         check(!get_role('form_reader')->has_cap('edit_forms'), 'Undeclared theme/package-defined capabilities must remain protected.');
         $reader->userConfigurable(false);
         check(Role::getConfigurableCapabilities('form_reader') === [], 'Custom roles must opt in to core capability editing.');
@@ -416,19 +418,21 @@ class RoleConfigurationTest extends TestCase {
         
         $GLOBALS['options'][Role::OPTION_NAME]['role_capabilities'] = [
             'administrator' => ['read' => false],
-            'editor' => ['edit_posts' => false, 'upload_files' => true, 'read_forms' => true, 'read_form_responses' => true],
-            'form_reader' => ['read' => true, 'upload_files' => true, 'edit_forms' => true],
+            'editor' => ['edit_posts' => false, 'publish_posts' => true, 'upload_files' => true, 'read_forms' => true, 'read_form_responses' => true],
+            'form_reader' => ['read' => true, 'publish_posts' => true, 'upload_files' => true, 'edit_forms' => true],
         ];
         Role::applyBuiltInCapabilitySettings();
         $reader = $rolesRegister->get('form_reader');
         $reader->register();
         check(!get_role('editor')->has_cap('edit_posts'), 'Built-in roles must support revoking core capabilities.');
-        check(get_role('editor')->has_cap('upload_files'), 'Built-in roles must support granting core capabilities.');
+        check(get_role('editor')->has_cap('publish_posts'), 'Built-in roles must support granting core capabilities.');
+        check(!get_role('editor')->has_cap('upload_files'), 'Excluded core overrides must not be applied to built-in roles.');
         check(get_role('administrator')->has_cap('read'), 'Stored overrides must never modify Administrator.');
         check(get_role('editor')->has_cap('read_forms'), 'Editors must retain their opted-in form access.');
         check(get_role('editor')->has_cap('read_form_responses'), 'Opted-in response capabilities must be assignable to default roles.');
         check(get_role('form_reader')->has_cap('read'), 'Core capabilities not declared by a custom role can be added.');
-        check(get_role('form_reader')->has_cap('upload_files'), 'Additional core capabilities must be applied on initialization.');
+        check(get_role('form_reader')->has_cap('publish_posts'), 'Additional core capabilities must be applied on initialization.');
+        check(!get_role('form_reader')->has_cap('upload_files'), 'Excluded core overrides must not be applied to custom roles.');
         check(!get_role('form_reader')->has_cap('edit_forms'), 'Undeclared theme/package-defined capabilities must remain protected.');
         $reader->userConfigurable(false);
         check(Role::getConfigurableCapabilities('form_reader') === [], 'Custom roles must opt in to core capability editing.');
@@ -442,7 +446,9 @@ class RoleConfigurationTest extends TestCase {
         $xpath = new DOMXPath($document);
         check($xpath->query('//input[@id="capability-read-administrator"][@disabled][@checked]')->length === 1, 'Administrator core capabilities must be read-only and reflect actual grants.');
         check($xpath->query('//input[@id="capability-edit_posts-editor"][not(@disabled)][not(@checked)]')->length === 1, 'Editable built-in cells must show persisted revocations.');
-        check($xpath->query('//input[@id="capability-upload_files-form_reader"][not(@disabled)][@checked]')->length === 1, 'Opted-in custom roles must expose undeclared core capabilities.');
+        check($xpath->query('//input[@id="capability-publish_posts-form_reader"][not(@disabled)][@checked]')->length === 1, 'Opted-in custom roles must expose undeclared selected core capabilities.');
+        check($xpath->query('//input[@id="capability-upload_files-form_reader"]')->length === 0, 'Excluded core capabilities must not appear in the matrix.');
+        check($xpath->query('//input[@id="capability-edit_users-editor"][not(@disabled)]')->length === 1 && $xpath->query('//input[@id="capability-edit_dashboard-editor"][not(@disabled)]')->length === 1, 'User management and dashboard capabilities must remain configurable.');
         check($xpath->query('//input[@id="capability-edit_forms-form_reader"][@disabled]')->length === 1, 'Undeclared theme/package-defined capability cells must stay locked.');
         foreach (['editor', 'author', 'contributor', 'subscriber'] as $roleHandle) {
             foreach (['read_forms', 'edit_forms', 'read_form_responses', 'edit_form_responses'] as $capability) {
@@ -451,6 +457,7 @@ class RoleConfigurationTest extends TestCase {
         }
         
         $GLOBALS['canManage'] = true;
+        get_role('editor')->add_cap('upload_files');
         $GLOBALS['validNonce'] = true;
         $GLOBALS['options'][Role::OPTION_NAME]['unrelated_setting'] = 'preserve_me';
         $settingUpdates = [];
@@ -463,7 +470,7 @@ class RoleConfigurationTest extends TestCase {
             'meros_hidden_default_roles' => ['editor', 'administrator'],
             'meros_role_capabilities' => [
                 'administrator' => ['read' => '0'],
-                'editor' => ['read' => '1', 'read_forms' => '1', 'read_form_responses' => '1', 'unknown_capability' => '1'],
+                'editor' => ['read' => '1', 'upload_files' => '1', 'read_forms' => '1', 'read_form_responses' => '1', 'unknown_capability' => '1'],
                 'subscriber' => ['read' => '1', 'read_forms' => '1', 'edit_forms' => '1'],
                 'form_reader' => ['read' => '1', 'edit_posts' => '1', 'read_forms' => '1', 'edit_forms' => '1'],
             ],
@@ -475,8 +482,9 @@ class RoleConfigurationTest extends TestCase {
             check(str_contains($redirect->getMessage(), 'roles-saved=1'), 'A successful save must redirect with confirmation.');
         }
         check(get_role('form_reader')->has_cap('edit_posts'), 'New core grants must apply immediately after saving.');
-        check(!get_role('editor')->has_cap('upload_files'), 'Unchecked core capabilities must be revoked immediately.');
-        check(!get_role('form_reader')->has_cap('upload_files'), 'Unchecked extra core grants must be revocable on custom roles.');
+        check(!get_role('editor')->has_cap('publish_posts'), 'Unchecked core capabilities must be revoked immediately.');
+        check(get_role('editor')->has_cap('upload_files'), 'Saving must leave existing excluded WordPress grants unchanged.');
+        check(!get_role('form_reader')->has_cap('publish_posts'), 'Unchecked extra core grants must be revocable on custom roles.');
         check(get_role('administrator')->has_cap('read'), 'Forged Administrator submissions must not change its grants.');
         check(get_role('administrator')->has_cap('read_forms'), 'Administrator must retain every registered theme/package-defined capability.');
         check(!get_role('editor')->has_cap('unknown_capability'), 'Unknown capability submissions must be ignored.');
@@ -487,10 +495,11 @@ class RoleConfigurationTest extends TestCase {
         check(Role::getSettings()['hidden_default_roles'] === ['editor'], 'Administrator must not be hidden through a forged request.');
         check(count($settingUpdates) === 2, 'The permissions save must run the container update lifecycle for both settings.');
         check(Role::getSettings()['unrelated_setting'] === 'preserve_me', 'Saving permissions must preserve other values in the container.');
-        check(Role::getSettings()['role_capabilities']['editor']['upload_files'] === false, 'Container sanitization must retain boolean revocations and role/capability keys.');
+        check(Role::getSettings()['role_capabilities']['editor']['publish_posts'] === false, 'Container sanitization must retain boolean revocations and role/capability keys.');
+        check(!isset(Role::getSettings()['role_capabilities']['editor']['upload_files']), 'Saving must discard excluded capability overrides.');
         Role::applyBuiltInCapabilitySettings();
         $reader->register();
-        check(get_role('form_reader')->has_cap('edit_posts') && !get_role('editor')->has_cap('upload_files'), 'Saved choices must survive subsequent role initialization.');
+        check(get_role('form_reader')->has_cap('edit_posts') && !get_role('editor')->has_cap('publish_posts'), 'Saved choices must survive subsequent role initialization.');
         
         $before = $GLOBALS['options'];
         unset($_POST['meros_role_settings_complete']);

@@ -10,20 +10,17 @@ use MM\Meros\Contracts\Features\Concerns\IsRegistrable;
 use MM\Meros\Contracts\Features\Concerns\IsHookable;
 
 class Capability extends Feature implements Makeable, Registrable {
-    // Primitive grants from WordPress's default role setup, not context-dependent meta capabilities.
+    // Selected WordPress primitive grants for content, user management and basic dashboard access.
     public const CORE_CAPABILITIES = [
-        'activate_plugins', 'create_users', 'delete_others_pages', 'delete_others_posts',
-        'delete_pages', 'delete_plugins', 'delete_posts', 'delete_private_pages',
+        'create_users', 'delete_others_pages', 'delete_others_posts',
+        'delete_pages', 'delete_posts', 'delete_private_pages',
         'delete_private_posts', 'delete_published_pages', 'delete_published_posts',
-        'delete_themes', 'delete_users', 'edit_dashboard', 'edit_files',
-        'edit_others_pages', 'edit_others_posts', 'edit_pages', 'edit_plugins',
+        'delete_users', 'edit_dashboard',
+        'edit_others_pages', 'edit_others_posts', 'edit_pages',
         'edit_posts', 'edit_private_pages', 'edit_private_posts', 'edit_published_pages',
-        'edit_published_posts', 'edit_theme_options', 'edit_themes', 'edit_users',
-        'export', 'import', 'install_plugins', 'install_themes', 'list_users',
-        'manage_categories', 'manage_links', 'manage_options', 'moderate_comments',
+        'edit_published_posts', 'edit_users', 'list_users',
         'promote_users', 'publish_pages', 'publish_posts', 'read', 'read_private_pages',
-        'read_private_posts', 'remove_users', 'switch_themes', 'unfiltered_html',
-        'unfiltered_upload', 'update_core', 'update_plugins', 'update_themes', 'upload_files'
+        'read_private_posts', 'remove_users',
     ];
 
     /**

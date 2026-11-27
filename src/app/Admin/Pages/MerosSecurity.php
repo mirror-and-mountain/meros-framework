@@ -29,7 +29,7 @@ final class MerosSecurity extends Page {
         $this->callback(function () {
             $tabs = [
                 'mfa'  => 'Multi-Factor Authentication',
-                'permissions' => 'Manage Permissions',
+                'permissions' => 'Manage Roles & Capabilities',
             ];
 
             $activeTab = isset($_GET['tab']) && is_string($_GET['tab'])
@@ -113,8 +113,8 @@ final class MerosSecurity extends Page {
         ob_start();
         ?>
         <h2>Roles and Capabilities</h2>
-        <p class="description">Assign WordPress capabilities to built-in roles and opted-in custom roles. Administrator is read-only and always receives every registered theme/package-defined capability. Theme/package-defined assignments retain their opt-in restrictions.</p>
-        <p class="description">Changes affect every user assigned to a role. Code-defined capabilities can be assigned to default roles when explicitly opted in. Powerful capabilities such as Manage Options or Promote Users can grant administrative access. WordPress may further restrict some capabilities on multisite or through site configuration.</p>
+        <p class="description">Assign selected WordPress capabilities for posts, pages, users and dashboard access to built-in roles and opted-in custom roles. Administrator is read-only and always receives every registered theme/package-defined capability. Theme/package-defined assignments retain their opt-in restrictions.</p>
+        <p class="description">Changes affect every user assigned to a role. Code-defined capabilities can be assigned to default roles when explicitly opted in. Powerful capabilities such as Promote Users or Delete Users can grant administrative access. WordPress may further restrict some capabilities on multisite or through site configuration.</p>
         <?php if (($_GET['roles-saved'] ?? null) === '1'): ?>
             <div class="notice notice-success inline"><p>Role settings saved.</p></div>
         <?php endif; ?>
@@ -124,7 +124,8 @@ final class MerosSecurity extends Page {
             <?php wp_nonce_field('meros_save_role_settings'); ?>
 
             <h3>Capability assignments</h3>
-            <div class="meros-role-matrix-wrap" style="overflow-x:auto;">
+            <?php // Keep absolutely positioned screen-reader labels inside the scrolling container. ?>
+            <div class="meros-role-matrix-wrap" style="position:relative;overflow-x:auto;">
                 <table class="widefat striped meros-role-matrix" aria-label="Role capability assignments">
                     <thead>
                         <tr>
